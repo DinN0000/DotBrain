@@ -21,17 +21,33 @@ struct PKMPathManager {
         }
     }
 
+    /// Sanitize a folder name to prevent path traversal attacks
+    private func sanitizeFolderName(_ name: String) -> String {
+        // Remove path traversal components and absolute path prefixes
+        let components = name.components(separatedBy: "/")
+        let safe = components.filter { $0 != ".." && $0 != "." && !$0.isEmpty }
+        return safe.joined(separator: "/")
+    }
+
     /// Get the target directory for a classification result
     func targetDirectory(for result: ClassifyResult) -> String {
         if result.para == .project, let project = result.project {
-            return (projectsPath as NSString).appendingPathComponent(project)
+            let safeProject = sanitizeFolderName(project)
+            let targetPath = (projectsPath as NSString).appendingPathComponent(safeProject)
+            // Verify the resolved path is within projectsPath
+            guard targetPath.hasPrefix(projectsPath) else { return projectsPath }
+            return targetPath
         }
 
         let base = paraPath(for: result.para)
         if result.targetFolder.isEmpty {
             return base
         }
-        return (base as NSString).appendingPathComponent(result.targetFolder)
+        let safeFolder = sanitizeFolderName(result.targetFolder)
+        let targetPath = (base as NSString).appendingPathComponent(safeFolder)
+        // Verify the resolved path is within the PARA base directory
+        guard targetPath.hasPrefix(base) else { return base }
+        return targetPath
     }
 
     /// Get the assets directory for a target directory

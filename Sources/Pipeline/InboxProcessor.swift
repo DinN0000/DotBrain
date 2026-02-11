@@ -117,13 +117,18 @@ struct InboxProcessor {
                     result = try await mover.moveFile(at: input.filePath, with: classification)
                 }
                 processed.append(result)
+                StatisticsService.recordActivity(
+                    fileName: input.fileName,
+                    category: classification.para.rawValue,
+                    action: "classified"
+                )
             } catch {
                 processed.append(ProcessedFileResult(
                     fileName: input.fileName,
                     para: classification.para,
                     targetPath: "",
                     tags: classification.tags,
-                    status: .error(error.localizedDescription)
+                    status: .error(Self.friendlyErrorMessage(error))
                 ))
                 failed += 1
             }
@@ -146,6 +151,54 @@ struct InboxProcessor {
             total: files.count,
             failed: failed
         )
+    }
+
+    // MARK: - Error Messages
+
+    /// Convert technical errors to user-friendly messages
+    static func friendlyErrorMessage(_ error: Error) -> String {
+        let desc = error.localizedDescription
+
+        // API key errors
+        if error is ClaudeAPIError || error is GeminiAPIError {
+            if desc.contains("API 키") || desc.contains("noAPIKey") {
+                return "API 키를 확인해주세요. 설정에서 올바른 키를 입력하세요."
+            }
+            if desc.contains("429") || desc.contains("rate") {
+                return "API 요청 한도 초과. 잠시 후 다시 시도해주세요."
+            }
+            if desc.contains("401") || desc.contains("403") || desc.contains("authentication") {
+                return "API 키가 유효하지 않습니다. 설정에서 확인해주세요."
+            }
+            if desc.contains("500") || desc.contains("502") || desc.contains("503") {
+                return "AI 서비스 일시 장애. 잠시 후 다시 시도해주세요."
+            }
+        }
+
+        // Network errors
+        let nsError = error as NSError
+        if nsError.domain == NSURLErrorDomain {
+            switch nsError.code {
+            case NSURLErrorNotConnectedToInternet, NSURLErrorNetworkConnectionLost:
+                return "인터넷 연결을 확인해주세요."
+            case NSURLErrorTimedOut:
+                return "요청 시간이 초과되었습니다. 다시 시도해주세요."
+            default:
+                return "네트워크 오류가 발생했습니다. 연결을 확인해주세요."
+            }
+        }
+
+        // File permission errors
+        if nsError.domain == NSCocoaErrorDomain {
+            if nsError.code == NSFileReadNoPermissionError || nsError.code == NSFileWriteNoPermissionError {
+                return "파일 접근 권한이 필요합니다. 시스템 설정에서 권한을 확인해주세요."
+            }
+            if nsError.code == NSFileNoSuchFileError || nsError.code == NSFileReadNoSuchFileError {
+                return "파일을 찾을 수 없습니다. 파일이 이동되거나 삭제되었을 수 있습니다."
+            }
+        }
+
+        return desc
     }
 
     // MARK: - Private

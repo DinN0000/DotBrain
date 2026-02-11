@@ -25,17 +25,30 @@ struct ResultsView: View {
 
             // Results list
             ScrollView {
-                LazyVStack(spacing: 2) {
-                    ForEach(appState.processedResults) { result in
-                        ResultRow(result: result)
+                if appState.processedResults.isEmpty && appState.pendingConfirmations.isEmpty {
+                    VStack(spacing: 8) {
+                        Image(systemName: "tray")
+                            .font(.title)
+                            .foregroundColor(.secondary)
+                        Text("처리된 파일이 없습니다")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
                     }
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 40)
+                } else {
+                    LazyVStack(spacing: 2) {
+                        ForEach(appState.processedResults) { result in
+                            ResultRow(result: result)
+                        }
 
-                    ForEach(appState.pendingConfirmations) { confirmation in
-                        ConfirmationRow(confirmation: confirmation)
+                        ForEach(appState.pendingConfirmations) { confirmation in
+                            ConfirmationRow(confirmation: confirmation)
+                        }
                     }
+                    .padding(.horizontal)
+                    .padding(.vertical, 8)
                 }
-                .padding(.horizontal)
-                .padding(.vertical, 8)
             }
 
             Divider()
@@ -192,6 +205,7 @@ struct ConfirmationRow: View {
     let confirmation: PendingConfirmation
     @EnvironmentObject var appState: AppState
     @State private var isHovered = false
+    @State private var isConfirming = false
 
     private var sortedOptions: [ClassifyResult] {
         let paraOrder: [PARACategory] = [.project, .area, .resource, .archive]
@@ -234,14 +248,22 @@ struct ConfirmationRow: View {
 
             // PARA buttons
             HStack(spacing: 4) {
-                ForEach(sortedOptions, id: \.para) { option in
-                    HoverPARAButton(para: option.para) {
-                        Task {
-                            await appState.confirmClassification(confirmation, choice: option)
+                if isConfirming {
+                    ProgressView()
+                        .controlSize(.small)
+                        .frame(maxWidth: .infinity)
+                } else {
+                    ForEach(sortedOptions, id: \.para) { option in
+                        HoverPARAButton(para: option.para) {
+                            isConfirming = true
+                            Task {
+                                await appState.confirmClassification(confirmation, choice: option)
+                            }
                         }
                     }
                 }
             }
+            .disabled(isConfirming)
 
             // Skip / Delete
             HStack(spacing: 12) {
@@ -255,6 +277,7 @@ struct ConfirmationRow: View {
                     appState.deleteConfirmation(confirmation)
                 }
             }
+            .disabled(isConfirming)
         }
         .padding(.vertical, 6)
         .padding(.horizontal, 6)

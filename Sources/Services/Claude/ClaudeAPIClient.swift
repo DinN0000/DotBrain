@@ -68,13 +68,17 @@ actor ClaudeAPIClient {
             throw ClaudeAPIError.noAPIKey
         }
 
+        guard let url = URL(string: baseURL) else {
+            throw ClaudeAPIError.invalidURL
+        }
+
         let request = MessageRequest(
             model: model,
             max_tokens: maxTokens,
             messages: [.init(role: "user", content: userMessage)]
         )
 
-        var urlRequest = URLRequest(url: URL(string: baseURL)!)
+        var urlRequest = URLRequest(url: url)
         urlRequest.httpMethod = "POST"
         urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
         urlRequest.setValue(apiKey, forHTTPHeaderField: "x-api-key")
@@ -100,7 +104,11 @@ actor ClaudeAPIClient {
         }
 
         let messageResponse = try JSONDecoder().decode(MessageResponse.self, from: data)
-        return messageResponse.text
+        let text = messageResponse.text
+        guard !text.isEmpty else {
+            throw ClaudeAPIError.emptyResponse
+        }
+        return text
     }
 }
 
@@ -108,7 +116,9 @@ actor ClaudeAPIClient {
 
 enum ClaudeAPIError: LocalizedError {
     case noAPIKey
+    case invalidURL
     case invalidResponse
+    case emptyResponse
     case httpError(status: Int)
     case apiError(status: Int, message: String)
     case jsonParseFailed(raw: String)
@@ -117,8 +127,12 @@ enum ClaudeAPIError: LocalizedError {
         switch self {
         case .noAPIKey:
             return "API 키가 설정되지 않았습니다"
+        case .invalidURL:
+            return "잘못된 API URL"
         case .invalidResponse:
             return "잘못된 응답"
+        case .emptyResponse:
+            return "빈 응답"
         case .httpError(let status):
             return "HTTP 오류: \(status)"
         case .apiError(_, let message):

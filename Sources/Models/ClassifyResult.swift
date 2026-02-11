@@ -26,6 +26,7 @@ struct ClassifyResult: Codable {
         let summary: String
         let targetFolder: String
         var project: String?
+        var confidence: Double?
     }
 }
 

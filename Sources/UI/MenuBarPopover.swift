@@ -19,6 +19,8 @@ struct MenuBarPopover: View {
                     SettingsView()
                 case .reorganize:
                     ReorganizeView()
+                case .dashboard:
+                    DashboardView()
                 }
 
                 // Footer (hidden during onboarding and settings)
@@ -27,6 +29,12 @@ struct MenuBarPopover: View {
                     HStack {
                         Button(action: { appState.currentScreen = .settings }) {
                             Image(systemName: "gear")
+                                .foregroundColor(.secondary)
+                        }
+                        .buttonStyle(.plain)
+
+                        Button(action: { appState.currentScreen = .dashboard }) {
+                            Image(systemName: "chart.bar.fill")
                                 .foregroundColor(.secondary)
                         }
                         .buttonStyle(.plain)

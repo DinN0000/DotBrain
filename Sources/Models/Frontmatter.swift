@@ -177,6 +177,26 @@ struct Frontmatter {
 
     // MARK: - Stringify
 
+    /// Escape a string for safe YAML output
+    private static func escapeYAML(_ value: String) -> String {
+        let needsQuoting = value.contains(":") || value.contains("#") ||
+            value.contains("\"") || value.contains("'") ||
+            value.contains("\n") || value.contains("\r") ||
+            value.hasPrefix(" ") || value.hasSuffix(" ") ||
+            value.hasPrefix("[") || value.hasPrefix("{") ||
+            value == "true" || value == "false" ||
+            value == "null" || value == "yes" || value == "no"
+
+        guard needsQuoting else { return value }
+
+        let escaped = value
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "\"", with: "\\\"")
+            .replacingOccurrences(of: "\n", with: "\\n")
+            .replacingOccurrences(of: "\r", with: "\\r")
+        return "\"\(escaped)\""
+    }
+
     /// Convert frontmatter to YAML string (with --- delimiters)
     func stringify() -> String {
         var lines: [String] = ["---"]
@@ -185,7 +205,8 @@ struct Frontmatter {
             lines.append("para: \(para.rawValue)")
         }
         if !tags.isEmpty {
-            lines.append("tags: [\(tags.joined(separator: ", "))]")
+            let escapedTags = tags.map { Frontmatter.escapeYAML($0) }
+            lines.append("tags: [\(escapedTags.joined(separator: ", "))]")
         }
         if let created = created {
             lines.append("created: \(created)")
@@ -194,18 +215,17 @@ struct Frontmatter {
             lines.append("status: \(status.rawValue)")
         }
         if let summary = summary {
-            let escaped = summary.contains(":") ? "\"\(summary)\"" : summary
-            lines.append("summary: \(escaped)")
+            lines.append("summary: \(Frontmatter.escapeYAML(summary))")
         }
         if let source = source {
             lines.append("source: \(source.rawValue)")
         }
         if let project = project {
-            lines.append("project: \(project)")
+            lines.append("project: \(Frontmatter.escapeYAML(project))")
         }
         if let file = file {
             lines.append("file:")
-            lines.append("  name: \(file.name)")
+            lines.append("  name: \(Frontmatter.escapeYAML(file.name))")
             lines.append("  format: \(file.format)")
             lines.append("  size_kb: \(file.sizeKB)")
         }

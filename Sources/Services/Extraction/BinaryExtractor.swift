@@ -33,6 +33,8 @@ enum BinaryExtractor {
             return PPTXExtractor.extract(at: path)
         case "xlsx":
             return XLSXExtractor.extract(at: path)
+        case "docx":
+            return DOCXExtractor.extract(at: path)
         case "jpg", "jpeg", "png", "gif", "bmp", "webp", "heic":
             return ImageExtractor.extract(at: path)
         default:

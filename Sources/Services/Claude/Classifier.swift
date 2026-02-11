@@ -73,7 +73,7 @@ actor Classifier {
                     summary: s2.summary,
                     targetFolder: s2.targetFolder,
                     project: s2.project.flatMap { fuzzyMatchProject($0, projectNames: projectNames) },
-                    confidence: 1.0
+                    confidence: s2.confidence ?? 0.9
                 )
             }
 
@@ -167,7 +167,8 @@ actor Classifier {
                 tags: Array((item.tags ?? []).prefix(5)),
                 summary: item.summary ?? "",
                 targetFolder: stripParaPrefix(item.targetFolder ?? item.targetPath ?? ""),
-                project: item.project
+                project: item.project,
+                confidence: item.confidence.map { max(0, min(1, $0)) }
             )
         }
 
@@ -268,11 +269,13 @@ actor Classifier {
           "para": "project" | "area" | "resource" | "archive",
           "tags": ["태그1", "태그2"],
           "summary": "문서 내용을 2~3문장으로 요약",
+          "confidence": 0.0~1.0,
           "targetFolder": "하위 폴더명. PARA 접두사 포함하지 말 것",
           "project": "관련 프로젝트명 (관련 있을 때만, 없으면 생략)"
         }
 
         tags는 최대 5개, summary는 한국어로 작성하세요.
+        confidence는 분류 확신도입니다 (0.0=모름, 1.0=확실).
         ⚠️ 같은 주제의 기존 폴더가 있으면 반드시 그 폴더명을 그대로 사용하세요.
         """
     }
@@ -296,32 +299,40 @@ actor Classifier {
         var targetFolder: String?
         var targetPath: String?  // legacy field
         var project: String?
+        var confidence: Double?
     }
 
     /// Safely parse JSON from LLM response (handles markdown code blocks)
     private func parseJSONSafe<T: Decodable>(_ type: T.Type, from text: String) -> T? {
-        // Remove markdown code blocks
         let cleaned = text
             .replacingOccurrences(of: #"^```(?:json)?\s*\n?"#, with: "", options: .regularExpression)
             .replacingOccurrences(of: #"\n?```\s*$"#, with: "", options: .regularExpression)
             .trimmingCharacters(in: .whitespacesAndNewlines)
 
         // Try direct parse
-        if let data = cleaned.data(using: .utf8),
-           let result = try? JSONDecoder().decode(T.self, from: data) {
-            return result
+        if let data = cleaned.data(using: .utf8) {
+            do {
+                return try JSONDecoder().decode(T.self, from: data)
+            } catch {
+                // Will try extraction below
+            }
         }
 
         // Extract JSON from first [ or { to last ] or }
         if let startBracket = cleaned.firstIndex(where: { $0 == "[" || $0 == "{" }),
            let endBracket = cleaned.lastIndex(where: { $0 == "]" || $0 == "}" }) {
             let jsonStr = String(cleaned[startBracket...endBracket])
-            if let data = jsonStr.data(using: .utf8),
-               let result = try? JSONDecoder().decode(T.self, from: data) {
-                return result
+            if let data = jsonStr.data(using: .utf8) {
+                do {
+                    return try JSONDecoder().decode(T.self, from: data)
+                } catch {
+                    print("[Classifier] JSON 파싱 실패: \(error.localizedDescription)")
+                    print("[Classifier] 원본 응답 (처음 200자): \(String(cleaned.prefix(200)))")
+                }
             }
         }
 
+        print("[Classifier] JSON 추출 실패 — 응답에서 JSON을 찾을 수 없습니다")
         return nil
     }
 

@@ -15,6 +15,7 @@ final class AppState: ObservableObject {
         case results
         case settings
         case reorganize
+        case dashboard
     }
 
     @Published var currentScreen: Screen = .inbox
@@ -74,6 +75,8 @@ final class AppState: ObservableObject {
             return "·_·?"
         case .reorganize:
             return "·_·?"
+        case .dashboard:
+            return "·_·"
         }
     }
 
@@ -116,6 +119,8 @@ final class AppState: ObservableObject {
         inboxFileCount = files.count
     }
 
+    private var processingTask: Task<Void, Never>?
+
     func startProcessing() async {
         guard !isProcessing else { return }
         guard hasAPIKey else {
@@ -131,31 +136,43 @@ final class AppState: ObservableObject {
         processingOrigin = .inbox
         currentScreen = .processing
 
-        let processor = InboxProcessor(
-            pkmRoot: pkmRootPath,
-            onProgress: { [weak self] progress, status in
-                Task { @MainActor in
-                    self?.processingProgress = progress
-                    self?.processingStatus = status
+        processingTask = Task { @MainActor in
+            let processor = InboxProcessor(
+                pkmRoot: pkmRootPath,
+                onProgress: { [weak self] progress, status in
+                    Task { @MainActor in
+                        self?.processingProgress = progress
+                        self?.processingStatus = status
+                    }
+                }
+            )
+
+            do {
+                let results = try await processor.process()
+                guard !Task.isCancelled else { return }
+                processedResults = results.processed
+                pendingConfirmations = results.needsConfirmation
+                currentScreen = .results
+            } catch {
+                if !Task.isCancelled {
+                    processingStatus = "오류: \(InboxProcessor.friendlyErrorMessage(error))"
                 }
             }
-        )
 
-        do {
-            let results = try await processor.process()
-            processedResults = results.processed
-            pendingConfirmations = results.needsConfirmation
-
-            if pendingConfirmations.isEmpty {
-                currentScreen = .results
-            } else {
-                currentScreen = .results
-            }
-        } catch {
-            processingStatus = "오류: \(error.localizedDescription)"
+            isProcessing = false
         }
+    }
 
+    func cancelProcessing() {
+        processingTask?.cancel()
+        processingTask = nil
         isProcessing = false
+        processingProgress = 0
+        processingStatus = ""
+        currentScreen = processingOrigin == .reorganize ? .reorganize : .inbox
+        Task {
+            await refreshInboxCount()
+        }
     }
 
     func startReorganizing() async {
@@ -174,28 +191,33 @@ final class AppState: ObservableObject {
         processingOrigin = .reorganize
         currentScreen = .processing
 
-        let reorganizer = FolderReorganizer(
-            pkmRoot: pkmRootPath,
-            category: category,
-            subfolder: subfolder,
-            onProgress: { [weak self] progress, status in
-                Task { @MainActor in
-                    self?.processingProgress = progress
-                    self?.processingStatus = status
+        processingTask = Task { @MainActor in
+            let reorganizer = FolderReorganizer(
+                pkmRoot: pkmRootPath,
+                category: category,
+                subfolder: subfolder,
+                onProgress: { [weak self] progress, status in
+                    Task { @MainActor in
+                        self?.processingProgress = progress
+                        self?.processingStatus = status
+                    }
+                }
+            )
+
+            do {
+                let results = try await reorganizer.process()
+                guard !Task.isCancelled else { return }
+                processedResults = results.processed
+                pendingConfirmations = results.needsConfirmation
+                currentScreen = .results
+            } catch {
+                if !Task.isCancelled {
+                    processingStatus = "오류: \(InboxProcessor.friendlyErrorMessage(error))"
                 }
             }
-        )
 
-        do {
-            let results = try await reorganizer.process()
-            processedResults = results.processed
-            pendingConfirmations = results.needsConfirmation
-            currentScreen = .results
-        } catch {
-            processingStatus = "오류: \(error.localizedDescription)"
+            isProcessing = false
         }
-
-        isProcessing = false
     }
 
     /// Skip a pending confirmation — file stays where it is
@@ -214,17 +236,36 @@ final class AppState: ObservableObject {
         checkConfirmationsComplete()
     }
 
-    /// Delete a pending file entirely
+    /// Delete a pending file entirely (with confirmation dialog)
     func deleteConfirmation(_ confirmation: PendingConfirmation) {
+        let alert = NSAlert()
+        alert.messageText = "파일을 삭제하시겠습니까?"
+        alert.informativeText = "\"\(confirmation.fileName)\"을(를) 영구적으로 삭제합니다. 이 작업은 되돌릴 수 없습니다."
+        alert.alertStyle = .warning
+        alert.addButton(withTitle: "삭제")
+        alert.addButton(withTitle: "취소")
+
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+
         pendingConfirmations.removeAll { $0.id == confirmation.id }
-        try? FileManager.default.removeItem(atPath: confirmation.filePath)
-        processedResults.append(ProcessedFileResult(
-            fileName: confirmation.fileName,
-            para: .archive,
-            targetPath: "",
-            tags: [],
-            status: .deleted
-        ))
+        do {
+            try FileManager.default.removeItem(atPath: confirmation.filePath)
+            processedResults.append(ProcessedFileResult(
+                fileName: confirmation.fileName,
+                para: .archive,
+                targetPath: "",
+                tags: [],
+                status: .deleted
+            ))
+        } catch {
+            processedResults.append(ProcessedFileResult(
+                fileName: confirmation.fileName,
+                para: .archive,
+                targetPath: "",
+                tags: [],
+                status: .error("삭제 실패: \(error.localizedDescription)")
+            ))
+        }
         checkConfirmationsComplete()
     }
 
@@ -250,8 +291,18 @@ final class AppState: ObservableObject {
         checkConfirmationsComplete()
     }
 
-    /// Copy files into _Inbox/ folder, return count of successfully added files
+    /// Copy files into _Inbox/ folder, return (added count, failed file names)
+    struct AddFilesResult {
+        let added: Int
+        let failedFiles: [String]
+    }
+
     func addFilesToInbox(urls: [URL]) async -> Int {
+        let result = await addFilesToInboxDetailed(urls: urls)
+        return result.added
+    }
+
+    func addFilesToInboxDetailed(urls: [URL]) async -> AddFilesResult {
         let fm = FileManager.default
         let inboxPath = PKMPathManager(root: pkmRootPath).inboxPath
 
@@ -259,6 +310,7 @@ final class AppState: ObservableObject {
         try? fm.createDirectory(atPath: inboxPath, withIntermediateDirectories: true)
 
         var added = 0
+        var failedFiles: [String] = []
         for url in urls {
             let fileName = url.lastPathComponent
             var destPath = (inboxPath as NSString).appendingPathComponent(fileName)
@@ -283,12 +335,12 @@ final class AppState: ObservableObject {
                 try fm.copyItem(atPath: url.path, toPath: destPath)
                 added += 1
             } catch {
-                // Skip files that fail to copy
+                failedFiles.append(fileName)
             }
         }
 
         await refreshInboxCount()
-        return added
+        return AddFilesResult(added: added, failedFiles: failedFiles)
     }
 
     func resetToInbox() {
@@ -320,19 +372,21 @@ final class AppState: ObservableObject {
     }
 
     private var isAutoNavigating = false
+    private var autoNavigateTask: Task<Void, Never>?
 
     private func checkConfirmationsComplete() {
         guard pendingConfirmations.isEmpty else { return }
         guard !isAutoNavigating else { return }
         isAutoNavigating = true
-        Task { @MainActor in
+
+        // Cancel any previous auto-navigate task
+        autoNavigateTask?.cancel()
+        autoNavigateTask = Task { @MainActor in
+            defer { isAutoNavigating = false }
             try? await Task.sleep(nanoseconds: 1_500_000_000)
-            guard pendingConfirmations.isEmpty else {
-                isAutoNavigating = false
-                return
-            }
+            guard !Task.isCancelled else { return }
+            guard pendingConfirmations.isEmpty else { return }
             navigateBack()
-            isAutoNavigating = false
         }
     }
 }

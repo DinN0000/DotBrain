@@ -40,7 +40,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func observeStateForIcon() {
-        // Observe all state changes that affect the icon
+        // Observe all state changes that affect the icon, including isProcessing
         appState.$currentScreen
             .combineLatest(
                 appState.$inboxFileCount,
@@ -49,6 +49,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             )
             .receive(on: RunLoop.main)
             .sink { [weak self] _, _, _, _ in
+                self?.updateMenuBarIcon()
+            }
+            .store(in: &cancellables)
+
+        appState.$isProcessing
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in
                 self?.updateMenuBarIcon()
             }
             .store(in: &cancellables)

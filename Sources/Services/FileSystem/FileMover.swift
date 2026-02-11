@@ -201,8 +201,11 @@ struct FileMover {
         let assetsDir = pathManager.assetsDirectory(for: targetDir)
         try fm.createDirectory(atPath: assetsDir, withIntermediateDirectories: true)
 
-        // Duplicate check: compare file hash against existing files in _Assets/
-        if let sourceData = fm.contents(atPath: filePath),
+        // Duplicate check: skip hash for large files (>500MB) to avoid memory issues
+        let fileSize = (try? fm.attributesOfItem(atPath: filePath)[.size] as? Int) ?? 0
+        let maxHashSize = 500 * 1024 * 1024  // 500MB
+        if fileSize <= maxHashSize,
+           let sourceData = fm.contents(atPath: filePath),
            let dupPath = findDuplicateByData(sourceData, in: assetsDir) {
             // Merge tags into companion markdown if it exists
             let dupFileName = (dupPath as NSString).lastPathComponent
@@ -343,19 +346,25 @@ struct FileMover {
     }
 
     /// Merge new tags into an existing file's frontmatter (deduplicates and sorts)
-    private func mergeTags(_ newTags: [String], into filePath: String) {
-        guard !newTags.isEmpty,
-              let content = try? String(contentsOfFile: filePath, encoding: .utf8) else { return }
+    @discardableResult
+    private func mergeTags(_ newTags: [String], into filePath: String) -> Bool {
+        guard !newTags.isEmpty else { return true }
+        guard let content = try? String(contentsOfFile: filePath, encoding: .utf8) else { return false }
 
         let (existing, body) = Frontmatter.parse(markdown: content)
         let mergedTags = Array(Set(existing.tags + newTags)).sorted()
 
-        guard mergedTags != existing.tags.sorted() else { return } // no change needed
+        guard mergedTags != existing.tags.sorted() else { return true } // no change needed
 
         var updated = existing
         updated.tags = mergedTags
         let result = updated.stringify() + "\n" + body
-        try? result.write(toFile: filePath, atomically: true, encoding: .utf8)
+        do {
+            try result.write(toFile: filePath, atomically: true, encoding: .utf8)
+            return true
+        } catch {
+            return false
+        }
     }
 
     /// Ensure index note exists for subfolder
@@ -391,7 +400,8 @@ struct FileMover {
         }
 
         var counter = 2
-        while true {
+        let maxAttempts = 1000
+        while counter < maxAttempts {
             let newName = ext.isEmpty ? "\(baseName)_\(counter)" : "\(baseName)_\(counter).\(ext)"
             let newPath = (dir as NSString).appendingPathComponent(newName)
             if !fm.fileExists(atPath: newPath) {
@@ -399,5 +409,9 @@ struct FileMover {
             }
             counter += 1
         }
+        // Fallback with UUID to guarantee uniqueness
+        let uuid = UUID().uuidString.prefix(8)
+        let fallbackName = ext.isEmpty ? "\(baseName)_\(uuid)" : "\(baseName)_\(uuid).\(ext)"
+        return (dir as NSString).appendingPathComponent(fallbackName)
     }
 }

@@ -34,11 +34,15 @@ struct ProcessingView: View {
 
             Spacer()
 
-            // Cancel hint
-            Text("메뉴바 아이콘을 클릭하면 팝오버를 닫을 수 있습니다")
-                .font(.caption2)
-                .foregroundStyle(.quaternary)
-                .padding(.bottom, 4)
+            // Cancel button
+            Button(action: {
+                appState.cancelProcessing()
+            }) {
+                Text("취소")
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+            .padding(.bottom, 4)
         }
         .padding()
     }
