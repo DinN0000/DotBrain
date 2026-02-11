@@ -14,6 +14,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         setupPopover()
         observeStateForIcon()
 
+        // Set app icon (shown in Activity Monitor, Force Quit, etc.)
+        NSApp.applicationIconImage = AppIconGenerator.generate()
+
         // Hide dock icon
         NSApp.setActivationPolicy(.accessory)
     }
