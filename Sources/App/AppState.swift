@@ -67,7 +67,7 @@ final class AppState: ObservableObject {
         case .onboarding:
             return "·‿·"
         case .inbox:
-            return inboxFileCount > 0 ? "·_·!" : "-_-"
+            return inboxFileCount > 0 ? "·_·!" : "·_·"
         case .processing:
             return "·_·…"
         case .results:

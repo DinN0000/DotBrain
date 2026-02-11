@@ -1,85 +1,175 @@
 import Foundation
-import Security
+import CryptoKit
+import IOKit
+import Security  // legacy keychain migration only
 
-/// Secure storage for API keys using macOS Keychain
+/// Secure storage for API keys using AES-GCM encrypted local file.
+/// Device-bound: encryption key is derived from hardware UUID + salt.
 enum KeychainService {
     private static let service = "com.hwaa.ai-pkm-menubar"
     private static let claudeKeyAccount = "anthropic-api-key"
     private static let geminiKeyAccount = "gemini-api-key"
 
-    // MARK: - Claude API Key (legacy compatibility)
+    private static let salt = "ai-pkm-menubar-key-salt-v1"
+
+    private static var storageURL: URL {
+        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        let dir = appSupport.appendingPathComponent(service)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        return dir.appendingPathComponent("keys.enc")
+    }
+
+    // MARK: - Claude API Key
 
     static func saveAPIKey(_ key: String) -> Bool {
-        saveKey(key, account: claudeKeyAccount)
+        migrateFromKeychainIfNeeded()
+        return saveValue(key, forKey: claudeKeyAccount)
     }
 
     static func getAPIKey() -> String? {
-        getKey(account: claudeKeyAccount)
+        migrateFromKeychainIfNeeded()
+        return getValue(forKey: claudeKeyAccount)
     }
 
     @discardableResult
     static func deleteAPIKey() -> Bool {
-        deleteKey(account: claudeKeyAccount)
+        migrateFromKeychainIfNeeded()
+        return deleteValue(forKey: claudeKeyAccount)
     }
 
     // MARK: - Gemini API Key
 
     static func saveGeminiAPIKey(_ key: String) -> Bool {
-        saveKey(key, account: geminiKeyAccount)
+        migrateFromKeychainIfNeeded()
+        return saveValue(key, forKey: geminiKeyAccount)
     }
 
     static func getGeminiAPIKey() -> String? {
-        getKey(account: geminiKeyAccount)
+        migrateFromKeychainIfNeeded()
+        return getValue(forKey: geminiKeyAccount)
     }
 
     @discardableResult
     static func deleteGeminiAPIKey() -> Bool {
-        deleteKey(account: geminiKeyAccount)
+        migrateFromKeychainIfNeeded()
+        return deleteValue(forKey: geminiKeyAccount)
     }
 
-    // MARK: - Generic Key Operations
+    // MARK: - Encrypted File Storage
 
-    private static func saveKey(_ key: String, account: String) -> Bool {
-        guard let data = key.data(using: .utf8) else { return false }
-
-        // First try to read existing key for rollback
-        let existingKey = getKey(account: account)
-
-        // Delete existing key before saving
-        let deleteStatus = SecItemDelete(deleteQuery(account: account) as CFDictionary)
-        if deleteStatus != errSecSuccess && deleteStatus != errSecItemNotFound {
-            print("[Keychain] 삭제 실패: \(keychainErrorMessage(deleteStatus))")
+    private static func encryptionKey() -> SymmetricKey? {
+        guard let uuid = hardwareUUID() else {
+            print("[SecureStore] 하드웨어 UUID를 가져올 수 없음")
+            return nil
         }
+        let material = uuid + salt
+        let hash = SHA256.hash(data: Data(material.utf8))
+        return SymmetricKey(data: hash)
+    }
 
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecAttrAccount as String: account,
-            kSecValueData as String: data,
-            kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlockedThisDeviceOnly,
-        ]
+    private static func loadStore() -> [String: String] {
+        guard FileManager.default.fileExists(atPath: storageURL.path) else {
+            return [:]
+        }
+        guard let key = encryptionKey() else { return [:] }
 
-        let status = SecItemAdd(query as CFDictionary, nil)
-        if status == errSecSuccess {
+        do {
+            let data = try Data(contentsOf: storageURL)
+            let box = try AES.GCM.SealedBox(combined: data)
+            let decrypted = try AES.GCM.open(box, using: key)
+            return (try? JSONDecoder().decode([String: String].self, from: decrypted)) ?? [:]
+        } catch {
+            print("[SecureStore] 복호화 실패: \(error.localizedDescription)")
+            return [:]
+        }
+    }
+
+    private static func saveStore(_ store: [String: String]) -> Bool {
+        guard let key = encryptionKey() else { return false }
+
+        do {
+            let data = try JSONEncoder().encode(store)
+            let sealed = try AES.GCM.seal(data, using: key)
+            guard let combined = sealed.combined else { return false }
+            try combined.write(to: storageURL, options: .atomic)
+            // Restrict file permissions to owner only
+            try FileManager.default.setAttributes(
+                [.posixPermissions: 0o600],
+                ofItemAtPath: storageURL.path
+            )
             return true
+        } catch {
+            print("[SecureStore] 저장 실패: \(error.localizedDescription)")
+            return false
         }
-
-        // Rollback: if save failed and we had a previous key, try to restore it
-        print("[Keychain] 저장 실패: \(keychainErrorMessage(status))")
-        if let existing = existingKey, let existingData = existing.data(using: .utf8) {
-            let rollbackQuery: [String: Any] = [
-                kSecClass as String: kSecClassGenericPassword,
-                kSecAttrService as String: service,
-                kSecAttrAccount as String: account,
-                kSecValueData as String: existingData,
-                kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlockedThisDeviceOnly,
-            ]
-            SecItemAdd(rollbackQuery as CFDictionary, nil)
-        }
-        return false
     }
 
-    private static func getKey(account: String) -> String? {
+    private static func getValue(forKey key: String) -> String? {
+        loadStore()[key]
+    }
+
+    private static func saveValue(_ value: String, forKey key: String) -> Bool {
+        var store = loadStore()
+        store[key] = value
+        return saveStore(store)
+    }
+
+    private static func deleteValue(forKey key: String) -> Bool {
+        var store = loadStore()
+        store.removeValue(forKey: key)
+        return saveStore(store)
+    }
+
+    // MARK: - Hardware UUID
+
+    private static func hardwareUUID() -> String? {
+        let service = IOServiceGetMatchingService(
+            kIOMainPortDefault,
+            IOServiceMatching("IOPlatformExpertDevice")
+        )
+        guard service != 0 else { return nil }
+        defer { IOObjectRelease(service) }
+
+        let key = kIOPlatformUUIDKey as CFString
+        guard let uuid = IORegistryEntryCreateCFProperty(service, key, kCFAllocatorDefault, 0)?
+            .takeRetainedValue() as? String else {
+            return nil
+        }
+        return uuid
+    }
+
+    // MARK: - Keychain Migration
+
+    private static var migrationDone = false
+
+    private static func migrateFromKeychainIfNeeded() {
+        guard !migrationDone else { return }
+        migrationDone = true
+
+        // Check if we already have an encrypted file — skip migration
+        if FileManager.default.fileExists(atPath: storageURL.path) { return }
+
+        // Try to read from legacy keychain
+        let claudeKey = legacyKeychainGet(account: claudeKeyAccount)
+        let geminiKey = legacyKeychainGet(account: geminiKeyAccount)
+
+        guard claudeKey != nil || geminiKey != nil else { return }
+
+        var store: [String: String] = [:]
+        if let k = claudeKey { store[claudeKeyAccount] = k }
+        if let k = geminiKey { store[geminiKeyAccount] = k }
+
+        if saveStore(store) {
+            print("[SecureStore] 키체인 → 암호화 파일 마이그레이션 완료")
+            // Clean up legacy keychain entries
+            legacyKeychainDelete(account: claudeKeyAccount)
+            legacyKeychainDelete(account: geminiKeyAccount)
+        }
+    }
+
+    // MARK: - Legacy Keychain (migration only)
+
+    private static func legacyKeychainGet(account: String) -> String? {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
@@ -87,54 +177,22 @@ enum KeychainService {
             kSecReturnData as String: true,
             kSecMatchLimit as String: kSecMatchLimitOne,
         ]
-
         var result: AnyObject?
         let status = SecItemCopyMatching(query as CFDictionary, &result)
-
         guard status == errSecSuccess,
               let data = result as? Data,
               let key = String(data: data, encoding: .utf8) else {
-            if status != errSecItemNotFound {
-                print("[Keychain] 읽기 실패: \(keychainErrorMessage(status))")
-            }
             return nil
         }
-
         return key
     }
 
-    @discardableResult
-    private static func deleteKey(account: String) -> Bool {
-        let status = SecItemDelete(deleteQuery(account: account) as CFDictionary)
-        let success = status == errSecSuccess || status == errSecItemNotFound
-        if !success {
-            print("[Keychain] 삭제 실패: \(keychainErrorMessage(status))")
-        }
-        return success
-    }
-
-    private static func deleteQuery(account: String) -> [String: Any] {
-        [
+    private static func legacyKeychainDelete(account: String) {
+        let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
             kSecAttrAccount as String: account,
         ]
-    }
-
-    /// Translate OSStatus to human-readable error message
-    private static func keychainErrorMessage(_ status: OSStatus) -> String {
-        switch status {
-        case errSecSuccess: return "성공"
-        case errSecItemNotFound: return "항목 없음"
-        case errSecDuplicateItem: return "중복 항목"
-        case errSecAuthFailed: return "인증 실패"
-        case errSecInteractionNotAllowed: return "잠금 상태에서 접근 불가"
-        case errSecDecode: return "디코딩 실패"
-        default:
-            if let message = SecCopyErrorMessageString(status, nil) {
-                return message as String
-            }
-            return "OSStatus \(status)"
-        }
+        SecItemDelete(query as CFDictionary)
     }
 }
