@@ -3,7 +3,10 @@ set -euo pipefail
 
 REPO="DinN0000/AI-PKM-Bar"
 APP_NAME="AI-PKM-MenuBar"
+APP_BUNDLE="$APP_NAME.app"
 INSTALL_DIR="$HOME/Applications"
+APP_PATH="$INSTALL_DIR/$APP_BUNDLE"
+EXECUTABLE="$APP_PATH/Contents/MacOS/$APP_NAME"
 LAUNCHAGENT_DIR="$HOME/Library/LaunchAgents"
 PLIST_NAME="com.ai-pkm.menubar"
 PLIST_PATH="$LAUNCHAGENT_DIR/$PLIST_NAME.plist"
@@ -35,25 +38,72 @@ echo "다운로드: $DOWNLOAD_URL"
 TMP_DIR=$(mktemp -d)
 trap 'rm -rf "$TMP_DIR"' EXIT
 
-# Download
+# Download binary
 curl -sL "$DOWNLOAD_URL" -o "$TMP_DIR/$APP_NAME"
-
-# Remove quarantine attribute (Gatekeeper 우회)
-xattr -cr "$TMP_DIR/$APP_NAME" 2>/dev/null || true
-
-# Set executable permission
 chmod +x "$TMP_DIR/$APP_NAME"
-
-# Install to ~/Applications
-mkdir -p "$INSTALL_DIR"
 
 # Stop running instance if any
 pkill -f "$APP_NAME" 2>/dev/null || true
 sleep 1
 
-cp "$TMP_DIR/$APP_NAME" "$INSTALL_DIR/$APP_NAME"
+# --- .app 번들 생성 ---
+echo "앱 번들 생성 중..."
 
-echo "✓ 바이너리 설치 완료: $INSTALL_DIR/$APP_NAME"
+mkdir -p "$INSTALL_DIR"
+rm -rf "$APP_PATH"
+mkdir -p "$APP_PATH/Contents/MacOS"
+mkdir -p "$APP_PATH/Contents/Resources"
+
+# Copy binary
+cp "$TMP_DIR/$APP_NAME" "$EXECUTABLE"
+
+# Info.plist
+cat > "$APP_PATH/Contents/Info.plist" << 'INFOPLIST'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleName</key>
+    <string>AI-PKM</string>
+    <key>CFBundleDisplayName</key>
+    <string>AI-PKM MenuBar</string>
+    <key>CFBundleIdentifier</key>
+    <string>com.hwaa.ai-pkm-menubar</string>
+    <key>CFBundleVersion</key>
+    <string>1.0.0</string>
+    <key>CFBundleShortVersionString</key>
+    <string>1.0.0</string>
+    <key>CFBundleExecutable</key>
+    <string>AI-PKM-MenuBar</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>LSUIElement</key>
+    <true/>
+    <key>LSMinimumSystemVersion</key>
+    <string>13.0</string>
+    <key>NSAppTransportSecurity</key>
+    <dict>
+        <key>NSAllowsArbitraryLoads</key>
+        <false/>
+        <key>NSExceptionDomains</key>
+        <dict>
+            <key>api.anthropic.com</key>
+            <dict>
+                <key>NSExceptionAllowsInsecureHTTPLoads</key>
+                <false/>
+                <key>NSIncludesSubdomains</key>
+                <true/>
+            </dict>
+        </dict>
+    </dict>
+</dict>
+</plist>
+INFOPLIST
+
+# Remove quarantine (Gatekeeper)
+xattr -cr "$APP_PATH" 2>/dev/null || true
+
+echo "✓ 앱 설치 완료: $APP_PATH"
 
 # --- LaunchAgent 등록 (로그인 시 자동 시작) ---
 echo ""
@@ -72,7 +122,7 @@ cat > "$PLIST_PATH" << PLIST
     <string>$PLIST_NAME</string>
     <key>ProgramArguments</key>
     <array>
-        <string>$INSTALL_DIR/$APP_NAME</string>
+        <string>$EXECUTABLE</string>
     </array>
     <key>RunAtLoad</key>
     <true/>
@@ -94,19 +144,21 @@ echo "✓ 자동 시작 등록 완료"
 # --- 바로 실행 ---
 echo ""
 echo "앱을 시작합니다..."
-launchctl kickstart "gui/$(id -u)/$PLIST_NAME" 2>/dev/null || "$INSTALL_DIR/$APP_NAME" &
+launchctl kickstart "gui/$(id -u)/$PLIST_NAME" 2>/dev/null || open "$APP_PATH"
 
 echo ""
 echo "================================================"
 echo "  설치 완료!"
 echo "  메뉴바에서 ·‿· 아이콘을 확인하세요."
 echo ""
+echo "  • ~/Applications에서 앱을 확인할 수 있습니다"
 echo "  • 로그인 시 자동으로 시작됩니다"
 echo "  • 비정상 종료 시 자동으로 재시작됩니다"
-echo "  • 제거: $0 --uninstall 또는 아래 명령어"
 echo "================================================"
 echo ""
 echo "제거하려면:"
-echo "  launchctl bootout gui/$(id -u)/$PLIST_NAME"
-echo "  rm $PLIST_PATH"
-echo "  rm $INSTALL_DIR/$APP_NAME"
+echo "  pkill -f $APP_NAME; \\"
+echo "  launchctl bootout gui/$(id -u)/$PLIST_NAME; \\"
+echo "  rm -rf $APP_PATH; \\"
+echo "  rm -f $PLIST_PATH; \\"
+echo "  echo \"제거 완료\""

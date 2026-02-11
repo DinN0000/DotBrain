@@ -235,7 +235,7 @@ xattr -cr ~/Applications/AI-PKM-MenuBar
 pkill -f AI-PKM-MenuBar 2>/dev/null; \
 launchctl bootout gui/$(id -u)/com.ai-pkm.menubar 2>/dev/null; \
 rm -f ~/Library/LaunchAgents/com.ai-pkm.menubar.plist; \
-rm -f ~/Applications/AI-PKM-MenuBar; \
+rm -rf ~/Applications/AI-PKM-MenuBar.app; \
 echo "제거 완료"
 ```
 
