@@ -4,20 +4,50 @@ import Security
 /// Secure storage for API keys using macOS Keychain
 enum KeychainService {
     private static let service = "com.hwaa.ai-pkm-menubar"
-    private static let apiKeyAccount = "anthropic-api-key"
+    private static let claudeKeyAccount = "anthropic-api-key"
+    private static let geminiKeyAccount = "gemini-api-key"
 
-    // MARK: - API Key
+    // MARK: - Claude API Key (legacy compatibility)
 
     static func saveAPIKey(_ key: String) -> Bool {
-        // Delete existing first
-        deleteAPIKey()
+        saveKey(key, account: claudeKeyAccount)
+    }
+
+    static func getAPIKey() -> String? {
+        getKey(account: claudeKeyAccount)
+    }
+
+    @discardableResult
+    static func deleteAPIKey() -> Bool {
+        deleteKey(account: claudeKeyAccount)
+    }
+
+    // MARK: - Gemini API Key
+
+    static func saveGeminiAPIKey(_ key: String) -> Bool {
+        saveKey(key, account: geminiKeyAccount)
+    }
+
+    static func getGeminiAPIKey() -> String? {
+        getKey(account: geminiKeyAccount)
+    }
+
+    @discardableResult
+    static func deleteGeminiAPIKey() -> Bool {
+        deleteKey(account: geminiKeyAccount)
+    }
+
+    // MARK: - Generic Key Operations
+
+    private static func saveKey(_ key: String, account: String) -> Bool {
+        deleteKey(account: account)
 
         guard let data = key.data(using: .utf8) else { return false }
 
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
-            kSecAttrAccount as String: apiKeyAccount,
+            kSecAttrAccount as String: account,
             kSecValueData as String: data,
             kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlocked,
         ]
@@ -26,11 +56,11 @@ enum KeychainService {
         return status == errSecSuccess
     }
 
-    static func getAPIKey() -> String? {
+    private static func getKey(account: String) -> String? {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
-            kSecAttrAccount as String: apiKeyAccount,
+            kSecAttrAccount as String: account,
             kSecReturnData as String: true,
             kSecMatchLimit as String: kSecMatchLimitOne,
         ]
@@ -48,11 +78,11 @@ enum KeychainService {
     }
 
     @discardableResult
-    static func deleteAPIKey() -> Bool {
+    private static func deleteKey(account: String) -> Bool {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
-            kSecAttrAccount as String: apiKeyAccount,
+            kSecAttrAccount as String: account,
         ]
 
         let status = SecItemDelete(query as CFDictionary)

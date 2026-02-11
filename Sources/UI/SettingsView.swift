@@ -83,12 +83,18 @@ struct SettingsView: View {
                 Text("비용 안내")
                     .font(.subheadline)
                     .fontWeight(.medium)
-                Text("파일당 약 $0.002 (Haiku 4.5)")
+                Text(appState.selectedProvider.costInfo)
                     .font(.caption)
                     .foregroundColor(.secondary)
-                Text("불확실한 파일은 Sonnet 4.5로 재분류 (약 $0.01)")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                if appState.selectedProvider == .claude {
+                    Text("불확실한 파일은 Sonnet 4.5로 재분류 (약 $0.01)")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                } else {
+                    Text("불확실한 파일은 Gemini Pro로 재분류")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
             }
 
             Spacer()

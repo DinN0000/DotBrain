@@ -37,7 +37,22 @@ final class AppState: ObservableObject {
         }
     }
 
+    @Published var selectedProvider: AIProvider {
+        didSet {
+            UserDefaults.standard.set(selectedProvider.rawValue, forKey: "selectedProvider")
+            updateAPIKeyStatus()
+        }
+    }
+
     @Published var hasAPIKey: Bool = false
+    @Published var hasClaudeKey: Bool = false
+    @Published var hasGeminiKey: Bool = false
+
+    func updateAPIKeyStatus() {
+        hasClaudeKey = KeychainService.getAPIKey() != nil
+        hasGeminiKey = KeychainService.getGeminiAPIKey() != nil
+        hasAPIKey = selectedProvider.hasAPIKey()
+    }
 
     // MARK: - Menubar Icon
 
@@ -67,7 +82,18 @@ final class AppState: ObservableObject {
     private init() {
         self.pkmRootPath = UserDefaults.standard.string(forKey: "pkmRootPath")
             ?? (NSHomeDirectory() + "/Documents/AI-PKM")
-        self.hasAPIKey = KeychainService.getAPIKey() != nil
+
+        // Load saved provider or default to Gemini (free tier available)
+        if let savedProvider = UserDefaults.standard.string(forKey: "selectedProvider"),
+           let provider = AIProvider(rawValue: savedProvider) {
+            self.selectedProvider = provider
+        } else {
+            self.selectedProvider = .gemini
+        }
+
+        self.hasClaudeKey = KeychainService.getAPIKey() != nil
+        self.hasGeminiKey = KeychainService.getGeminiAPIKey() != nil
+        self.hasAPIKey = selectedProvider.hasAPIKey()
 
         if !UserDefaults.standard.bool(forKey: "onboardingCompleted") {
             self.currentScreen = .onboarding
