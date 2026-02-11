@@ -22,7 +22,7 @@ echo "시스템: macOS $(sw_vers -productVersion) ($ARCH)"
 echo "최신 릴리즈 확인 중..."
 DOWNLOAD_URL=$(curl -sL "https://api.github.com/repos/$REPO/releases/latest" \
     | grep '"browser_download_url"' \
-    | grep "$APP_NAME" \
+    | grep "/${APP_NAME}\"" \
     | head -1 \
     | sed -E 's/.*"(https[^"]+)".*/\1/')
 
@@ -79,7 +79,7 @@ cat > "$APP_PATH/Contents/Info.plist" << 'INFOPLIST'
 <plist version="1.0">
 <dict>
     <key>CFBundleName</key>
-    <string>AI-PKM</string>
+    <string>DotBrain</string>
     <key>CFBundleDisplayName</key>
     <string>DotBrain</string>
     <key>CFBundleIdentifier</key>
