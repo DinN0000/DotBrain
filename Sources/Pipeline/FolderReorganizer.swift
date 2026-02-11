@@ -120,7 +120,7 @@ struct FolderReorganizer {
             let locationMatches = targetCategory == currentCategory && targetFolder == currentFolder
 
             if locationMatches {
-                // Location correct — replace frontmatter with AI-PKM format
+                // Location correct — replace frontmatter with DotBrain format
                 let result = updateFrontmatter(
                     at: input.filePath,
                     classification: classification
@@ -358,7 +358,7 @@ struct FolderReorganizer {
 
     // MARK: - Frontmatter Update
 
-    /// Replace frontmatter with AI-PKM format, preserving only `created`
+    /// Replace frontmatter with DotBrain format, preserving only `created`
     private func updateFrontmatter(
         at filePath: String,
         classification: ClassifyResult

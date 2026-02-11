@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="Resources/app-icon.png" width="128" alt="AI-PKM MenuBar Icon">
+  <img src="Resources/app-icon.png" width="128" alt="DotBrain Icon">
 </p>
 
-# AI-PKM-Bar
+# DotBrain-Bar
 
 ### Built for Humans. Optimized for AI.
 
@@ -21,7 +21,7 @@
 
 메모를 쓰고, 자료를 모으고, 문서를 만드는 건 쉽습니다. 하지만 그걸 체계적으로 분류하고, 태그를 달고, 적절한 위치에 놓는 건 별개의 노동입니다. PARA 방법론(Projects, Areas, Resources, Archive)이 좋은 프레임워크라는 건 알지만, 매번 수동으로 분류하다 보면 결국 인박스에 파일이 쌓이기만 합니다.
 
-**AI-PKM MenuBar**는 이 정리 과정을 AI에게 맡깁니다:
+**DotBrain**는 이 정리 과정을 AI에게 맡깁니다:
 
 - **파일을 인박스에 드롭하면** AI가 내용을 읽고, PARA 분류하고, 적절한 폴더로 이동
 - **프론트매터**를 자동 생성하여 Obsidian 위키링크와 완벽 호환
@@ -56,7 +56,7 @@ ProjectContextBuilder — 기존 프로젝트/폴더 구조를 AI 컨텍스트�
     └── 동명 파일 존재 → 확인 요청
     ↓
 FileMover — 파일 이동 + 프론트매터 교체 + 중복 감지
-    ├── 텍스트: 기존 frontmatter 완전 교체 → AI-PKM 규격 주입
+    ├── 텍스트: 기존 frontmatter 완전 교체 → DotBrain 규격 주입
     ├── 바이너리: _Assets/로 이동 + 동반 마크다운 생성
     └── 폴더: 통째로 이동 + [[위키링크]] 인덱스 노트 생성
     ↓
@@ -77,11 +77,11 @@ FileMover — 파일 이동 + 프론트매터 교체 + 중복 감지
 중복 제거 — 같은 폴더 내 동일 내용 파일 병합
     ↓
 AI 재분류 — 현재 위치가 맞는지 판단
-    ├── 위치 맞음 → 기존 frontmatter 교체 (AI-PKM 규격으로)
+    ├── 위치 맞음 → 기존 frontmatter 교체 (DotBrain 규격으로)
     └── 위치 틀림 → 사용자에게 이동 제안
 ```
 
-**예시:** Obsidian vault에서 가져온 `DOJANG/DOJANG/1_Project/Shinhan_Bank_DeFi/` 같은 4단계 중첩 구조를 → `DOJANG/` 아래 플랫한 파일들로 정리하고, 오래된 `level`, `workspace`, `parent` 같은 메타데이터를 AI-PKM 표준 frontmatter로 교체합니다.
+**예시:** Obsidian vault에서 가져온 `DOJANG/DOJANG/1_Project/Shinhan_Bank_DeFi/` 같은 4단계 중첩 구조를 → `DOJANG/` 아래 플랫한 파일들로 정리하고, 오래된 `level`, `workspace`, `parent` 같은 메타데이터를 DotBrain 표준 frontmatter로 교체합니다.
 
 ### 3. AI 분류 전략
 
@@ -107,7 +107,7 @@ AI 재분류 — 현재 위치가 맞는지 판단
 
 ## Frontmatter 규격
 
-AI-PKM이 생성하고 관리하는 프론트매터 표준:
+DotBrain이 생성하고 관리하는 프론트매터 표준:
 
 ```yaml
 ---
@@ -189,11 +189,11 @@ PKM Root/
 ### 원클릭 설치 (권장)
 
 ```bash
-curl -sL https://raw.githubusercontent.com/DinN0000/AI-PKM-Bar/main/install.sh | bash
+curl -sL https://raw.githubusercontent.com/DinN0000/DotBrain-Bar/main/install.sh | bash
 ```
 
 이 한 줄로 끝입니다:
-- `~/Applications/AI-PKM-MenuBar`에 바이너리 설치
+- `~/Applications/DotBrain`에 바이너리 설치
 - 로그인 시 자동 시작 등록 (LaunchAgent)
 - 비정상 종료 시 자동 재시작
 - 설치 직후 바로 실행
@@ -209,7 +209,7 @@ curl -sL https://raw.githubusercontent.com/DinN0000/AI-PKM-Bar/main/install.sh |
 설치 스크립트가 자동으로 처리하지만, 직접 다운로드한 경우:
 
 ```bash
-xattr -cr ~/Applications/AI-PKM-MenuBar
+xattr -cr ~/Applications/DotBrain
 ```
 
 또는: **시스템 설정 → 개인정보 보호 및 보안** → 하단의 "확인 없이 열기" 클릭
@@ -232,20 +232,20 @@ xattr -cr ~/Applications/AI-PKM-MenuBar
 ### 제거
 
 ```bash
-pkill -f AI-PKM-MenuBar 2>/dev/null; \
-launchctl bootout gui/$(id -u)/com.ai-pkm.menubar 2>/dev/null; \
-rm -f ~/Library/LaunchAgents/com.ai-pkm.menubar.plist; \
-rm -rf ~/Applications/AI-PKM-MenuBar.app; \
+pkill -f DotBrain 2>/dev/null; \
+launchctl bootout gui/$(id -u)/com.dotbrain.app 2>/dev/null; \
+rm -f ~/Library/LaunchAgents/com.dotbrain.app.plist; \
+rm -rf ~/Applications/DotBrain.app; \
 echo "제거 완료"
 ```
 
 ### 소스에서 직접 빌드
 
 ```bash
-git clone https://github.com/DinN0000/AI-PKM-Bar.git
-cd AI-PKM-Bar
+git clone https://github.com/DinN0000/DotBrain-Bar.git
+cd DotBrain-Bar
 swift build -c release
-# 바이너리: .build/release/AI-PKM-MenuBar
+# 바이너리: .build/release/DotBrain
 ```
 
 ### 요구사항

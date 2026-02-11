@@ -1,7 +1,7 @@
 import SwiftUI
 
 @main
-struct AI_PKM_MenuBarApp: App {
+struct DotBrainApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 
     var body: some Scene {

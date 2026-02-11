@@ -6,11 +6,11 @@ import Security  // legacy keychain migration only
 /// Secure storage for API keys using AES-GCM encrypted local file.
 /// Device-bound: encryption key is derived from hardware UUID + salt.
 enum KeychainService {
-    private static let service = "com.hwaa.ai-pkm-menubar"
+    private static let service = "com.hwaa.dotbrain"
     private static let claudeKeyAccount = "anthropic-api-key"
     private static let geminiKeyAccount = "gemini-api-key"
 
-    private static let salt = "ai-pkm-menubar-key-salt-v1"
+    private static let salt = "dotbrain-key-salt-v1"
 
     private static var storageURL: URL {
         let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!

@@ -3,7 +3,7 @@ import Foundation
 /// Handles frontmatter injection into markdown files
 enum FrontmatterWriter {
     /// Inject frontmatter into markdown content, with optional [[project]] and related note wikilinks.
-    /// Completely replaces existing frontmatter with AI-PKM format (only preserves `created`).
+    /// Completely replaces existing frontmatter with DotBrain format (only preserves `created`).
     static func injectFrontmatter(
         into content: String,
         para: PARACategory,
@@ -14,7 +14,7 @@ enum FrontmatterWriter {
         file: FileMetadata? = nil,
         relatedNotes: [RelatedNote] = []
     ) -> String {
-        // Strip existing frontmatter completely — replace with AI-PKM format
+        // Strip existing frontmatter completely — replace with DotBrain format
         let (existing, body) = Frontmatter.parse(markdown: content)
 
         var newFM = Frontmatter.createDefault(

@@ -41,7 +41,7 @@ struct MenuBarPopover: View {
 
                         Spacer()
 
-                        Text("AI-PKM")
+                        Text("DotBrain")
                             .font(.caption)
                             .foregroundColor(.secondary)
 
