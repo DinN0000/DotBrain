@@ -232,10 +232,11 @@ xattr -cr ~/Applications/AI-PKM-MenuBar
 ### 제거
 
 ```bash
-# 자동 시작 해제 + 삭제
-launchctl bootout gui/$(id -u)/com.ai-pkm.menubar
-rm ~/Library/LaunchAgents/com.ai-pkm.menubar.plist
-rm ~/Applications/AI-PKM-MenuBar
+pkill -f AI-PKM-MenuBar 2>/dev/null; \
+launchctl bootout gui/$(id -u)/com.ai-pkm.menubar 2>/dev/null; \
+rm -f ~/Library/LaunchAgents/com.ai-pkm.menubar.plist; \
+rm -f ~/Applications/AI-PKM-MenuBar; \
+echo "제거 완료"
 ```
 
 ### 소스에서 직접 빌드
