@@ -38,6 +38,29 @@ struct ResultsView: View {
                     .padding(.top, 40)
                 } else {
                     LazyVStack(spacing: 2) {
+                        // Summary banner after reorganization
+                        if appState.processingOrigin == .reorganize {
+                            let successCount = appState.processedResults.filter(\.isSuccess).count
+                            if successCount > 0 {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Label("\(successCount)개 파일 정리 완료", systemImage: "checkmark.circle")
+                                        .font(.caption)
+                                        .fontWeight(.medium)
+                                        .foregroundColor(.green)
+                                    Text("태그, 요약, 관련 노트 링크가 적용되었습니다.")
+                                        .font(.caption2)
+                                        .foregroundColor(.secondary)
+                                }
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(10)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .fill(Color.green.opacity(0.08))
+                                )
+                                .padding(.bottom, 6)
+                            }
+                        }
+
                         ForEach(appState.processedResults) { result in
                             ResultRow(result: result)
                         }
