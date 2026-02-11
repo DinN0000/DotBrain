@@ -12,7 +12,7 @@ enum FrontmatterWriter {
         source: NoteSource = .import,
         project: String? = nil,
         file: FileMetadata? = nil,
-        relatedNotes: [String] = []
+        relatedNotes: [RelatedNote] = []
     ) -> String {
         // Strip existing frontmatter completely — replace with AI-PKM format
         let (existing, body) = Frontmatter.parse(markdown: content)
@@ -33,17 +33,17 @@ enum FrontmatterWriter {
 
         var result = newFM.stringify() + "\n" + body
 
-        // Build related links section
-        var links: [String] = []
+        // Build ## Related Notes section with context descriptions
+        var lines: [String] = []
         if let project = project, !project.isEmpty, !result.contains("[[\(project)]]") {
-            links.append("[[\(project)]]")
+            lines.append("- [[\(project)]] — 소속 프로젝트")
         }
-        for note in relatedNotes where !result.contains("[[\(note)]]") {
-            links.append("[[\(note)]]")
+        for note in relatedNotes where !result.contains("[[\(note.name)]]") {
+            lines.append("- [[\(note.name)]] — \(note.context)")
         }
 
-        if !links.isEmpty {
-            result += "\n\n---\nrelated:: " + links.joined(separator: ", ") + "\n"
+        if !lines.isEmpty {
+            result += "\n\n## Related Notes\n" + lines.joined(separator: "\n") + "\n"
         }
 
         return result

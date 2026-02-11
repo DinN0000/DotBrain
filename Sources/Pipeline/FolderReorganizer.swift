@@ -138,6 +138,10 @@ struct FolderReorganizer {
             }
         }
 
+        // Update MOC for the reorganized folder
+        let mocGenerator = MOCGenerator(pkmRoot: pkmRoot)
+        try? await mocGenerator.generateMOC(folderPath: folderPath, folderName: subfolder, para: category)
+
         onProgress?(0.95, "완료 정리 중...")
 
         NotificationService.sendProcessingComplete(
@@ -385,17 +389,17 @@ struct FolderReorganizer {
             file: existing.file
         )
 
-        // Build related links
+        // Build ## Related Notes section with context descriptions
         var relatedBody = body
-        var links: [String] = []
+        var lines: [String] = []
         if let project = classification.project, !project.isEmpty, !relatedBody.contains("[[\(project)]]") {
-            links.append("[[\(project)]]")
+            lines.append("- [[\(project)]] — 소속 프로젝트")
         }
-        for note in classification.relatedNotes where !relatedBody.contains("[[\(note)]]") {
-            links.append("[[\(note)]]")
+        for note in classification.relatedNotes where !relatedBody.contains("[[\(note.name)]]") {
+            lines.append("- [[\(note.name)]] — \(note.context)")
         }
-        if !links.isEmpty {
-            relatedBody += "\n\n---\nrelated:: " + links.joined(separator: ", ") + "\n"
+        if !lines.isEmpty {
+            relatedBody += "\n\n## Related Notes\n" + lines.joined(separator: "\n") + "\n"
         }
 
         let updatedContent = newFM.stringify() + "\n" + relatedBody

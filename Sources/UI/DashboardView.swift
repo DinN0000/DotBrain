@@ -3,6 +3,9 @@ import SwiftUI
 struct DashboardView: View {
     @EnvironmentObject var appState: AppState
     @State private var stats = PKMStatistics()
+    @State private var auditReport: AuditReport?
+    @State private var isAuditing: Bool = false
+    @State private var repairResult: RepairResult?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -28,6 +31,64 @@ struct DashboardView: View {
                         StatCard(title: "전체 파일", value: "\(stats.totalFiles)", icon: "doc.fill")
                         StatCard(title: "중복 발견", value: "\(stats.duplicatesFound)", icon: "doc.on.doc.fill")
                         StatCard(title: "API 비용", value: String(format: "$%.3f", stats.apiCost), icon: "dollarsign.circle.fill")
+                    }
+
+                    // MOC regeneration button
+                    Button(action: {
+                        Task {
+                            let mocGenerator = MOCGenerator(pkmRoot: appState.pkmRootPath)
+                            await mocGenerator.regenerateAll()
+                        }
+                    }) {
+                        HStack {
+                            Image(systemName: "doc.text.magnifyingglass")
+                            Text("MOC 전체 갱신")
+                        }
+                        .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.regular)
+
+                    // Full audit button
+                    Button(action: {
+                        isAuditing = true
+                        auditReport = nil
+                        repairResult = nil
+                        let rootPath = appState.pkmRootPath
+                        DispatchQueue.global(qos: .userInitiated).async {
+                            let auditor = VaultAuditor(pkmRoot: rootPath)
+                            let report = auditor.audit()
+                            DispatchQueue.main.async {
+                                auditReport = report
+                                isAuditing = false
+                            }
+                        }
+                    }) {
+                        HStack {
+                            Image(systemName: "checkmark.shield")
+                            Text("전체 점검")
+                        }
+                        .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.regular)
+                    .disabled(isAuditing)
+
+                    // Audit progress / results
+                    if isAuditing {
+                        HStack(spacing: 8) {
+                            ProgressView()
+                                .controlSize(.small)
+                            Text("볼트 점검 중...")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 8)
+                    }
+
+                    if let report = auditReport {
+                        auditResultsView(report: report)
                     }
 
                     // Category breakdown
@@ -119,6 +180,80 @@ struct DashboardView: View {
         formatter.unitsStyle = .abbreviated
         return formatter.localizedString(for: date, relativeTo: Date())
     }
+
+    // MARK: - Audit Results
+
+    @ViewBuilder
+    private func auditResultsView(report: AuditReport) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("점검 결과")
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                Spacer()
+                Text("총 \(report.totalScanned)개 파일 검사")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+            }
+
+            Divider()
+
+            AuditRow(icon: "link", label: "깨진 링크", count: report.brokenLinks.count)
+            AuditRow(icon: "doc.badge.ellipsis", label: "프론트매터 누락", count: report.missingFrontmatter.count)
+            AuditRow(icon: "tag", label: "태그 없음", count: report.untaggedFiles.count)
+            AuditRow(icon: "folder.badge.questionmark", label: "PARA 미지정", count: report.missingPARA.count)
+
+            if let result = repairResult {
+                Divider()
+
+                if result.linksFixed > 0 {
+                    AuditRepairRow(icon: "checkmark.circle.fill", label: "링크 \(result.linksFixed)건 수정")
+                }
+                if result.frontmatterInjected > 0 {
+                    AuditRepairRow(icon: "checkmark.circle.fill", label: "프론트매터 \(result.frontmatterInjected)건 주입")
+                }
+                if result.paraFixed > 0 {
+                    AuditRepairRow(icon: "checkmark.circle.fill", label: "PARA \(result.paraFixed)건 수정")
+                }
+                if result.linksFixed == 0 && result.frontmatterInjected == 0 && result.paraFixed == 0 {
+                    AuditRepairRow(icon: "checkmark.circle.fill", label: "수정할 항목 없음")
+                }
+            }
+
+            HStack(spacing: 8) {
+                if report.totalIssues > 0 && repairResult == nil {
+                    Button(action: {
+                        let auditor = VaultAuditor(pkmRoot: appState.pkmRootPath)
+                        repairResult = auditor.repair(report: report)
+                    }) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "wrench.and.screwdriver")
+                            Text("자동 복구")
+                        }
+                        .font(.caption)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.small)
+                }
+
+                Spacer()
+
+                Button(action: {
+                    auditReport = nil
+                    repairResult = nil
+                }) {
+                    Text("닫기")
+                        .font(.caption)
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+            }
+            .padding(.top, 4)
+        }
+        .padding()
+        .background(Color.primary.opacity(0.03))
+        .cornerRadius(8)
+    }
 }
 
 struct StatCard: View {
@@ -169,6 +304,46 @@ struct CategoryBar: View {
                 .monospacedDigit()
                 .foregroundColor(.secondary)
                 .frame(width: 30, alignment: .trailing)
+        }
+    }
+}
+
+struct AuditRow: View {
+    let icon: String
+    let label: String
+    let count: Int
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: icon)
+                .font(.caption)
+                .foregroundColor(count > 0 ? .orange : .green)
+                .frame(width: 16)
+            Text(label)
+                .font(.caption)
+            Spacer()
+            Text("\(count)건")
+                .font(.caption)
+                .monospacedDigit()
+                .foregroundColor(count > 0 ? .primary : .secondary)
+        }
+    }
+}
+
+struct AuditRepairRow: View {
+    let icon: String
+    let label: String
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: icon)
+                .font(.caption)
+                .foregroundColor(.green)
+                .frame(width: 16)
+            Text(label)
+                .font(.caption)
+                .foregroundColor(.green)
+            Spacer()
         }
     }
 }

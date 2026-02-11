@@ -107,11 +107,22 @@ struct ProjectContextBuilder {
         return sections.isEmpty ? "기존 문서 없음" : sections.joined(separator: "\n\n")
     }
 
+    /// PARA-based linking density limits
+    private func linkDensityLimit(for para: PARACategory) -> Int {
+        switch para {
+        case .project: return 10
+        case .area: return 5
+        case .resource: return 3
+        case .archive: return 1
+        }
+    }
+
     /// Build related note suggestions for a classified file.
-    /// Returns note names from the same project/folder that share tags.
-    func findRelatedNotes(tags: [String], project: String?, para: PARACategory, targetFolder: String) -> [String] {
+    /// Returns notes with context descriptions from tag overlap analysis.
+    /// Linking density varies by PARA category: Project=10, Area=5, Resource=3, Archive=1.
+    func findRelatedNotes(tags: [String], project: String?, para: PARACategory, targetFolder: String) -> [RelatedNote] {
         let fm = FileManager.default
-        var candidates: [(name: String, score: Int)] = []
+        var candidates: [(name: String, score: Int, context: String)] = []
 
         // Scan the target folder for existing notes
         let basePath: String
@@ -135,11 +146,12 @@ struct ProjectContextBuilder {
 
             let (entryFM, _) = Frontmatter.parse(markdown: content)
             let entryTags = Set(entryFM.tags.map { $0.lowercased() })
-            let overlap = tagSet.intersection(entryTags).count
+            let sharedTags = tagSet.intersection(entryTags)
 
-            if overlap > 0 {
+            if !sharedTags.isEmpty {
                 let baseName = (entry as NSString).deletingPathExtension
-                candidates.append((name: baseName, score: overlap))
+                let context = "공유 태그: " + sharedTags.sorted().joined(separator: ", ")
+                candidates.append((name: baseName, score: sharedTags.count, context: context))
             }
         }
 
@@ -171,24 +183,27 @@ struct ProjectContextBuilder {
 
                     let (entryFM, _) = Frontmatter.parse(markdown: content)
                     let entryTags = Set(entryFM.tags.map { $0.lowercased() })
-                    let overlap = tagSet.intersection(entryTags).count
+                    let sharedTags = tagSet.intersection(entryTags)
 
-                    if overlap >= 2 { // Cross-category needs stronger signal
+                    if sharedTags.count >= 2 { // Cross-category needs stronger signal
                         let baseName = (file as NSString).deletingPathExtension
-                        candidates.append((name: baseName, score: overlap))
+                        let tagList = sharedTags.sorted().joined(separator: ", ")
+                        let context = "\(crossCat.folderName)에서 발견 — 공유 태그: \(tagList)"
+                        candidates.append((name: baseName, score: sharedTags.count, context: context))
                     }
                 }
             }
         }
 
-        // Return top 5 by score, deduplicated
+        // Apply PARA-based density limit, deduplicated
+        let limit = linkDensityLimit(for: para)
         let sorted = candidates.sorted { $0.score > $1.score }
         var seen = Set<String>()
-        return sorted.compactMap { candidate in
+        return sorted.compactMap { candidate -> RelatedNote? in
             guard !seen.contains(candidate.name) else { return nil }
             seen.insert(candidate.name)
-            return candidate.name
-        }.prefix(5).map { $0 }
+            return RelatedNote(name: candidate.name, context: candidate.context)
+        }.prefix(limit).map { $0 }
     }
 
     // MARK: - Private Helpers

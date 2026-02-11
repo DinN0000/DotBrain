@@ -358,9 +358,9 @@ struct OnboardingView: View {
                 .frame(maxHeight: 120)
                 .padding(.horizontal, 24)
             } else {
-                Text("등록된 프로젝트 없음")
+                Text("최소 1개의 프로젝트를 등록해야 합니다")
                     .font(.caption)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(.orange)
                     .padding(.vertical, 8)
             }
 
@@ -373,21 +373,13 @@ struct OnboardingView: View {
 
                 Spacer()
 
-                if projects.isEmpty {
-                    Button(action: completeOnboarding) {
-                        Text("건너뛰기")
-                            .frame(minWidth: 80)
-                    }
-                    .buttonStyle(.bordered)
-                    .controlSize(.regular)
-                } else {
-                    Button(action: completeOnboarding) {
-                        Text("완료")
-                            .frame(minWidth: 80)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.regular)
+                Button(action: completeOnboarding) {
+                    Text("완료")
+                        .frame(minWidth: 80)
                 }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.regular)
+                .disabled(projects.isEmpty)
             }
             .padding(.horizontal, 40)
             .padding(.bottom, 24)
