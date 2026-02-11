@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-REPO="DinN0000/AI-PKM-Bar"
+REPO="DinN0000/DotBrain"
 APP_NAME="DotBrain"
 APP_BUNDLE="$APP_NAME.app"
 INSTALL_DIR="$HOME/Applications"
