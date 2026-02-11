@@ -280,10 +280,11 @@ final class AppState: ObservableObject {
         checkConfirmationsComplete()
     }
 
-    /// Copy files into _Inbox/ folder, return (added count, failed file names)
+    /// Copy files into _Inbox/ folder, return (added count, skipped code files)
     struct AddFilesResult {
         let added: Int
         let failedFiles: [String]
+        let skippedCode: [String]
     }
 
     func addFilesToInbox(urls: [URL]) async -> Int {
@@ -300,13 +301,35 @@ final class AppState: ObservableObject {
 
         var added = 0
         var failedFiles: [String] = []
+        var skippedCode: [String] = []
         for url in urls {
             let fileName = url.lastPathComponent
+
+            // Skip code project folders
+            var isDir: ObjCBool = false
+            if fm.fileExists(atPath: url.path, isDirectory: &isDir), isDir.boolValue {
+                if InboxScanner.isCodeProject(at: url.path, fm: fm) {
+                    skippedCode.append(fileName)
+                    continue
+                }
+            }
+
+            // Skip code/dev files by extension
+            let ext = (fileName as NSString).pathExtension.lowercased()
+            let codeExts: Set<String> = [
+                "swift", "py", "js", "ts", "jsx", "tsx", "go", "rs", "java",
+                "c", "cpp", "h", "hpp", "cs", "rb", "php", "kt", "scala",
+                "m", "mm", "sh", "bash", "vue", "svelte",
+            ]
+            if codeExts.contains(ext) {
+                skippedCode.append(fileName)
+                continue
+            }
+
             var destPath = (inboxPath as NSString).appendingPathComponent(fileName)
 
             // Conflict resolution
             if fm.fileExists(atPath: destPath) {
-                let ext = (fileName as NSString).pathExtension
                 let base = (fileName as NSString).deletingPathExtension
                 var counter = 2
                 repeat {
@@ -329,7 +352,7 @@ final class AppState: ObservableObject {
         }
 
         await refreshInboxCount()
-        return AddFilesResult(added: added, failedFiles: failedFiles)
+        return AddFilesResult(added: added, failedFiles: failedFiles, skippedCode: skippedCode)
     }
 
     func resetToInbox() {

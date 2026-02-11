@@ -16,12 +16,47 @@ struct InboxScanner {
 
     private static let ignoredPrefixes = [".", "_"]
 
-    /// Ignored extensions (system/temp files)
+    /// Ignored extensions (system/temp files + code files)
     private static let ignoredExtensions: Set<String> = [
+        // System/temp
         "tmp", "swp", "lock", "part",
+        // Source code
+        "swift", "py", "js", "ts", "jsx", "tsx", "go", "rs", "java",
+        "c", "cpp", "h", "hpp", "cs", "rb", "php", "kt", "scala",
+        "m", "mm", "r", "lua", "pl", "sh", "bash", "zsh", "fish",
+        "vue", "svelte", "astro",
+        // Config/build
+        "json", "toml", "yml", "yaml", "xml", "ini", "cfg", "conf",
+        "gradle", "cmake", "makefile",
+        // Compiled/binary dev artifacts
+        "o", "a", "so", "dylib", "class", "pyc", "pyo",
+        "wasm", "dll", "exe", "bin",
+        // Package/lock files
+        "resolved",
     ]
 
-    /// Scan inbox and return top-level items (both files and folders)
+    /// Dev project marker files — if a folder contains any of these, it's a code project
+    private static let codeProjectMarkers: Set<String> = [
+        ".git", ".gitignore", "Package.swift", "package.json",
+        "Cargo.toml", "go.mod", "pom.xml", "build.gradle",
+        "Makefile", "CMakeLists.txt", "Gemfile", "requirements.txt",
+        "pyproject.toml", "setup.py", "tsconfig.json", ".xcodeproj",
+        ".xcworkspace", "Podfile", "pubspec.yaml", ".sln", ".csproj",
+    ]
+
+    /// Dev file names to always skip (even without extension check)
+    private static let ignoredFileNames: Set<String> = [
+        "package.json", "package-lock.json", "yarn.lock", "pnpm-lock.yaml",
+        "Cargo.lock", "Gemfile.lock", "Podfile.lock", "go.sum",
+        "Makefile", "Dockerfile", "docker-compose.yml",
+        ".gitignore", ".gitmodules", ".editorconfig", ".prettierrc",
+        ".eslintrc", ".eslintrc.js", ".eslintrc.json",
+        "tsconfig.json", "webpack.config.js", "vite.config.ts",
+        "LICENSE", "LICENSE.md", "CONTRIBUTING.md", "CHANGELOG.md",
+    ]
+
+    /// Scan inbox and return top-level items (both files and folders).
+    /// Skips code files and code project folders automatically.
     func scan() -> [String] {
         let inboxPath = PKMPathManager(root: pkmRoot).inboxPath
         let fm = FileManager.default
@@ -44,6 +79,15 @@ struct InboxScanner {
             }
 
             guard fm.fileExists(atPath: fullPath) else { return nil }
+
+            // Skip code project folders
+            var isDir: ObjCBool = false
+            if fm.fileExists(atPath: fullPath, isDirectory: &isDir), isDir.boolValue {
+                if Self.isCodeProject(at: fullPath, fm: fm) {
+                    print("[InboxScanner] 코드 프로젝트 건너뜀: \(name)")
+                    return nil
+                }
+            }
 
             // Log large file warnings
             if let attrs = try? fm.attributesOfItem(atPath: fullPath),
@@ -75,12 +119,20 @@ struct InboxScanner {
 
     private func shouldInclude(_ name: String) -> Bool {
         guard !Self.ignoredFiles.contains(name) else { return false }
+        guard !Self.ignoredFileNames.contains(name) else { return false }
         guard !Self.ignoredPrefixes.contains(where: { name.hasPrefix($0) }) else { return false }
 
         let ext = (name as NSString).pathExtension.lowercased()
         guard !Self.ignoredExtensions.contains(ext) else { return false }
 
         return true
+    }
+
+    /// Detect if a folder is a code/dev project by checking for marker files
+    static func isCodeProject(at dirPath: String, fm: FileManager) -> Bool {
+        guard let entries = try? fm.contentsOfDirectory(atPath: dirPath) else { return false }
+        let entrySet = Set(entries)
+        return !codeProjectMarkers.isDisjoint(with: entrySet)
     }
 
     private func isSymbolicLink(_ path: String, fileManager fm: FileManager) -> Bool {

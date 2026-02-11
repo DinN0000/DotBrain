@@ -176,8 +176,14 @@ struct InboxStatusView: View {
         group.notify(queue: .main) {
             guard !urls.isEmpty else { return }
             Task {
-                let count = await appState.addFilesToInbox(urls: urls)
-                showFeedback("\(count)개 파일 추가됨")
+                let result = await appState.addFilesToInboxDetailed(urls: urls)
+                if !result.skippedCode.isEmpty && result.added == 0 {
+                    showFeedback("코드 파일은 PKM에 넣을 수 없습니다")
+                } else if !result.skippedCode.isEmpty {
+                    showFeedback("\(result.added)개 추가 (코드 \(result.skippedCode.count)개 건너뜀)")
+                } else {
+                    showFeedback("\(result.added)개 파일 추가됨")
+                }
             }
         }
     }
@@ -197,8 +203,14 @@ struct InboxStatusView: View {
         guard !urls.isEmpty else { return }
 
         Task {
-            let count = await appState.addFilesToInbox(urls: urls)
-            showFeedback("\(count)개 파일 붙여넣기 완료")
+            let result = await appState.addFilesToInboxDetailed(urls: urls)
+            if !result.skippedCode.isEmpty && result.added == 0 {
+                showFeedback("코드 파일은 PKM에 넣을 수 없습니다")
+            } else if !result.skippedCode.isEmpty {
+                showFeedback("\(result.added)개 추가 (코드 \(result.skippedCode.count)개 건너뜀)")
+            } else {
+                showFeedback("\(result.added)개 파일 붙여넣기 완료")
+            }
         }
     }
 
