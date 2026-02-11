@@ -126,11 +126,24 @@ struct PKMPathManager {
             - `[[위키링크]]` 형식 사용 (Obsidian 호환)
             - 파일명에 특수문자 피하기
             
+            ## ⚠️ 중요: 코드 파일 금지
+            
+            **이 폴더 안에서 코드를 작성하지 마세요!**
+            
+            - DotBrain이 코드 파일 (.swift, .ts, .py, .js 등)을 자동 삭제합니다
+            - 개발 프로젝트는 이 PKM 폴더 **밖에서** 작업하세요
+            - 이 폴더는 지식/문서 관리 전용입니다
+            
+            코드 작성이 필요하면:
+            1. PKM 폴더 밖의 별도 디렉토리에서 작업
+            2. 코드 관련 **문서/노트**만 이 PKM에 저장
+            
             ## AI 작업 권장사항
             
             - 읽기: 자유롭게 탐색
             - 쓰기: 기존 노트 수정 시 프론트매터 유지
-            - 생성: 적절한 PARA 폴더에 생성, 프론트매터 포함
+            - 생성: 마크다운 노트만, 적절한 PARA 폴더에
+            - 코드: **절대 이 폴더 안에서 작성 금지**
             """
             try claudeContent.write(toFile: claudeMdPath, atomically: true, encoding: .utf8)
         }
@@ -162,6 +175,12 @@ struct PKMPathManager {
             - 프론트매터 형식 유지
             - 위키링크 `[[노트명]]` 사용
             - 새 노트는 적절한 PARA 폴더에 생성
+            
+            ## ⚠️ 코드 작성 금지
+            
+            **이 폴더 안에서 코드 파일을 생성하지 마세요.**
+            DotBrain이 코드 파일을 자동 삭제합니다.
+            개발 작업은 이 PKM 폴더 밖에서 하세요.
             """
             try agentsContent.write(toFile: agentsMdPath, atomically: true, encoding: .utf8)
         }
@@ -190,6 +209,13 @@ struct PKMPathManager {
             - Preserve existing frontmatter when editing
             - Use [[wikilinks]] for internal links
             - Include frontmatter with para, tags, summary for new notes
+            
+            ## ⚠️ NO CODE FILES
+            
+            DO NOT create code files (.swift, .ts, .py, .js, etc.) in this folder!
+            DotBrain automatically deletes code files during cleanup.
+            Do all development work OUTSIDE this PKM folder.
+            This folder is for knowledge/documentation only.
             """
             try cursorContent.write(toFile: cursorRulesPath, atomically: true, encoding: .utf8)
         }
