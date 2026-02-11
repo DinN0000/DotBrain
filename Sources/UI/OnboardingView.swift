@@ -119,22 +119,32 @@ struct OnboardingView: View {
                 .font(.title3)
                 .fontWeight(.semibold)
 
-            Text("파일 분류에 Claude AI를 사용합니다")
+            Text("파일 분류에 AI를 사용합니다")
                 .font(.subheadline)
                 .foregroundColor(.secondary)
 
             // API key guide link
             Button(action: {
-                if let url = URL(string: "https://console.anthropic.com/settings/keys") {
-                    NSWorkspace.shared.open(url)
+                let url: URL
+                if appState.selectedProvider == .gemini {
+                    url = URL(string: "https://aistudio.google.com/apikey")!
+                } else {
+                    url = URL(string: "https://console.anthropic.com/settings/keys")!
                 }
+                NSWorkspace.shared.open(url)
             }) {
                 HStack(spacing: 4) {
                     Text("API 키가 없다면?")
                         .font(.caption)
-                    Text("console.anthropic.com에서 발급")
-                        .font(.caption)
-                        .underline()
+                    if appState.selectedProvider == .gemini {
+                        Text("aistudio.google.com에서 발급 (무료)")
+                            .font(.caption)
+                            .underline()
+                    } else {
+                        Text("console.anthropic.com에서 발급")
+                            .font(.caption)
+                            .underline()
+                    }
                 }
                 .foregroundColor(.secondary)
             }
@@ -144,12 +154,21 @@ struct OnboardingView: View {
                 .padding(.horizontal, 24)
 
             VStack(alignment: .leading, spacing: 2) {
-                Text("* Claude 구독과 별도로 API 결제 등록이 필요합니다")
-                    .font(.caption)
-                    .foregroundColor(.orange)
-                Text("파일당 약 $0.002 (Haiku) / 불확실 시 ~$0.01 (Sonnet)")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                if appState.selectedProvider == .gemini {
+                    Text("💡 Gemini는 무료 티어로 시작 가능")
+                        .font(.caption)
+                        .foregroundColor(.green)
+                    Text("분당 15회, 일 1500회 무료")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                } else {
+                    Text("* Claude 구독과 별도로 API 결제 등록이 필요합니다")
+                        .font(.caption)
+                        .foregroundColor(.orange)
+                    Text("파일당 약 $0.002 (Haiku) / 불확실 시 ~$0.01 (Sonnet)")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
             }
             .padding(.horizontal, 24)
 

@@ -1,9 +1,9 @@
 import Foundation
 
-/// 2-stage document classifier (Haiku batch → Sonnet precise)
-/// Ported from Companion-Bot/src/pkm/classifier.ts
+/// 2-stage document classifier (Fast batch → Precise for uncertain)
+/// Supports Claude (Haiku/Sonnet) and Gemini (Flash/Pro)
 actor Classifier {
-    private let client = ClaudeAPIClient()
+    private let aiService = AIService()
     private let batchSize = 10
     private let confidenceThreshold = 0.8
     private let previewLength = 200
@@ -112,11 +112,7 @@ actor Classifier {
 
         let prompt = buildStage1Prompt(previews, projectContext: projectContext, subfolderContext: subfolderContext)
 
-        let response = try await client.sendMessage(
-            model: ClaudeAPIClient.haikuModel,
-            maxTokens: 4096,
-            userMessage: prompt
-        )
+        let response = try await aiService.sendFast(maxTokens: 4096, message: prompt)
 
         var results: [String: ClassifyResult.Stage1Item] = [:]
         if let items = parseJSONSafe([Stage1RawItem].self, from: response) {
@@ -162,11 +158,7 @@ actor Classifier {
             subfolderContext: subfolderContext
         )
 
-        let response = try await client.sendMessage(
-            model: ClaudeAPIClient.sonnetModel,
-            maxTokens: 2048,
-            userMessage: prompt
-        )
+        let response = try await aiService.sendPrecise(maxTokens: 2048, message: prompt)
 
         if let item = parseJSONSafe(Stage2RawItem.self, from: response),
            let para = PARACategory(rawValue: item.para) {
