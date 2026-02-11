@@ -148,6 +148,16 @@ struct InboxProcessor {
             }
         }
 
+        // Update MOCs for affected folders
+        let affectedFolders = Set(processed.filter(\.isSuccess).compactMap { result -> String? in
+            let dir = (result.targetPath as NSString).deletingLastPathComponent
+            return dir.isEmpty ? nil : dir
+        })
+        if !affectedFolders.isEmpty {
+            let mocGenerator = MOCGenerator(pkmRoot: pkmRoot)
+            await mocGenerator.updateMOCsForFolders(affectedFolders)
+        }
+
         onProgress?(0.95, "완료 정리 중...")
 
         // Send notification

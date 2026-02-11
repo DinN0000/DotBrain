@@ -35,6 +35,8 @@ final class AppState: ObservableObject {
     @Published var pkmRootPath: String {
         didSet {
             UserDefaults.standard.set(pkmRootPath, forKey: "pkmRootPath")
+            inboxWatchdog?.stop()
+            setupWatchdog()
         }
     }
 
@@ -48,6 +50,8 @@ final class AppState: ObservableObject {
     @Published var hasAPIKey: Bool = false
     @Published var hasClaudeKey: Bool = false
     @Published var hasGeminiKey: Bool = false
+
+    private var inboxWatchdog: InboxWatchdog?
 
     func updateAPIKeyStatus() {
         hasClaudeKey = KeychainService.getAPIKey() != nil
@@ -106,9 +110,23 @@ final class AppState: ObservableObject {
 
         // Coach marks disabled — no longer shown
         self.showCoachMarks = false
+
+        // Start inbox watchdog
+        setupWatchdog()
     }
 
     // MARK: - Actions
+
+    func setupWatchdog() {
+        let inboxPath = PKMPathManager(root: pkmRootPath).inboxPath
+        inboxWatchdog = InboxWatchdog(folderPath: inboxPath) { [weak self] in
+            Task { @MainActor in
+                guard let self = self, !self.isProcessing else { return }
+                await self.refreshInboxCount()
+            }
+        }
+        inboxWatchdog?.start()
+    }
 
     func refreshInboxCount() async {
         let scanner = InboxScanner(pkmRoot: pkmRootPath)

@@ -1,5 +1,11 @@
 import Foundation
 
+/// A related note with context description for semantic linking
+struct RelatedNote: Codable, Equatable {
+    let name: String
+    let context: String
+}
+
 /// Result of AI classification for a single file
 struct ClassifyResult: Codable {
     let para: PARACategory
@@ -8,7 +14,7 @@ struct ClassifyResult: Codable {
     let targetFolder: String
     var project: String?
     var confidence: Double
-    var relatedNotes: [String] = []
+    var relatedNotes: [RelatedNote] = []
 
     /// Stage 1 batch classification item from Haiku
     struct Stage1Item: Codable {

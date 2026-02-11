@@ -15,15 +15,13 @@ struct APIKeyInputView: View {
     var onSaved: (() -> Void)?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 10) {
             providerSection(
                 provider: .claude,
                 keyInput: $claudeKeyInput,
                 showingKey: $showingClaudeKey,
                 hasKey: appState.hasClaudeKey
             )
-
-            Divider()
 
             providerSection(
                 provider: .gemini,
@@ -44,6 +42,13 @@ struct APIKeyInputView: View {
 
     // MARK: - Provider Section
 
+    private func providerAccentColor(_ provider: AIProvider) -> Color {
+        switch provider {
+        case .claude: return Color(red: 0.85, green: 0.45, blue: 0.25) // Anthropic orange-brown
+        case .gemini: return Color(red: 0.25, green: 0.52, blue: 0.96) // Google blue
+        }
+    }
+
     @ViewBuilder
     private func providerSection(
         provider: AIProvider,
@@ -52,13 +57,20 @@ struct APIKeyInputView: View {
         hasKey: Bool
     ) -> some View {
         let isActive = appState.selectedProvider == provider
+        let accent = providerAccentColor(provider)
 
         VStack(alignment: .leading, spacing: 8) {
-            // Header: provider name + status
-            HStack {
+            // Header: provider name + active indicator + model pipeline
+            HStack(spacing: 6) {
+                // Active dot indicator
+                Circle()
+                    .fill(isActive ? accent : Color.secondary.opacity(0.3))
+                    .frame(width: 8, height: 8)
+
                 Text(provider.displayName)
                     .font(.subheadline)
-                    .fontWeight(.medium)
+                    .fontWeight(isActive ? .bold : .medium)
+                    .foregroundColor(isActive ? .primary : .secondary)
 
                 Spacer()
 
@@ -69,7 +81,7 @@ struct APIKeyInputView: View {
                         .foregroundColor(.white)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 2)
-                        .background(Capsule().fill(Color.green))
+                        .background(Capsule().fill(accent))
                 } else if hasKey {
                     Button("활성화") {
                         withAnimation(.easeOut(duration: 0.15)) {
@@ -80,6 +92,14 @@ struct APIKeyInputView: View {
                     .buttonStyle(.bordered)
                     .controlSize(.mini)
                 }
+            }
+
+            // Model pipeline info (only for active provider)
+            if isActive {
+                Text(provider.modelPipeline)
+                    .font(.caption2)
+                    .foregroundColor(accent)
+                    .padding(.leading, 14)
             }
 
             // API Key input
@@ -127,6 +147,15 @@ struct APIKeyInputView: View {
                 }
             }
         }
+        .padding(10)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(isActive ? accent.opacity(0.06) : Color.clear)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .strokeBorder(isActive ? accent.opacity(0.3) : Color.clear, lineWidth: 1.5)
+        )
     }
 
     private func saveKey(_ key: String, provider: AIProvider) {
