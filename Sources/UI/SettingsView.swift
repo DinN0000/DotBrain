@@ -6,8 +6,8 @@ struct SettingsView: View {
     @State private var isStructureReady = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            // Header
+        VStack(spacing: 0) {
+            // Header (fixed)
             HStack {
                 Button(action: { appState.currentScreen = .inbox }) {
                     Image(systemName: "chevron.left")
@@ -19,88 +19,94 @@ struct SettingsView: View {
 
                 Spacer()
             }
+            .padding()
 
             Divider()
 
-            // API Key Section
-            APIKeyInputView()
+            // Scrollable content
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    // API Key Section
+                    APIKeyInputView()
 
-            Divider()
+                    Divider()
 
-            // PKM Root Path
-            VStack(alignment: .leading, spacing: 8) {
-                Text("PKM 폴더 경로")
-                    .font(.subheadline)
-                    .fontWeight(.medium)
+                    // PKM Root Path
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("PKM 폴더 경로")
+                            .font(.subheadline)
+                            .fontWeight(.medium)
 
-                HStack {
-                    Text(appState.pkmRootPath)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
+                        HStack {
+                            Text(appState.pkmRootPath)
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                                .lineLimit(1)
+                                .truncationMode(.middle)
 
-                    Spacer()
+                            Spacer()
 
-                    Button("변경") {
-                        showFolderPicker = true
-                    }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
-                }
-
-                if isStructureReady {
-                    Label("PARA 구조 확인됨", systemImage: "checkmark.circle.fill")
-                        .font(.caption)
-                        .foregroundColor(.green)
-                } else {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Label("PARA 폴더 구조 없음", systemImage: "exclamationmark.triangle.fill")
-                            .font(.caption)
-                            .foregroundColor(.orange)
-
-                        Button(action: {
-                            let pathManager = PKMPathManager(root: appState.pkmRootPath)
-                            try? pathManager.initializeStructure()
-                            isStructureReady = pathManager.isInitialized()
-                        }) {
-                            HStack {
-                                Image(systemName: "folder.badge.plus")
-                                Text("폴더 구조 만들기")
+                            Button("변경") {
+                                showFolderPicker = true
                             }
-                            .frame(maxWidth: .infinity)
+                            .buttonStyle(.bordered)
+                            .controlSize(.small)
                         }
-                        .buttonStyle(.bordered)
-                        .controlSize(.small)
+
+                        if isStructureReady {
+                            Label("PARA 구조 확인됨", systemImage: "checkmark.circle.fill")
+                                .font(.caption)
+                                .foregroundColor(.green)
+                        } else {
+                            VStack(alignment: .leading, spacing: 6) {
+                                Label("PARA 폴더 구조 없음", systemImage: "exclamationmark.triangle.fill")
+                                    .font(.caption)
+                                    .foregroundColor(.orange)
+
+                                Button(action: {
+                                    let pathManager = PKMPathManager(root: appState.pkmRootPath)
+                                    try? pathManager.initializeStructure()
+                                    isStructureReady = pathManager.isInitialized()
+                                }) {
+                                    HStack {
+                                        Image(systemName: "folder.badge.plus")
+                                        Text("폴더 구조 만들기")
+                                    }
+                                    .frame(maxWidth: .infinity)
+                                }
+                                .buttonStyle(.bordered)
+                                .controlSize(.small)
+                            }
+                        }
+                    }
+
+                    Divider()
+
+                    // Info
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("비용 안내")
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+                        Text(appState.selectedProvider.costInfo)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        if appState.selectedProvider == .claude {
+                            Text("불확실한 파일은 Sonnet 4.5로 재분류 (약 $0.01)")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        } else {
+                            Text("불확실한 파일은 Gemini Pro로 재분류")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
                     }
                 }
+                .padding()
             }
 
             Divider()
 
-            // Info
-            VStack(alignment: .leading, spacing: 4) {
-                Text("비용 안내")
-                    .font(.subheadline)
-                    .fontWeight(.medium)
-                Text(appState.selectedProvider.costInfo)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                if appState.selectedProvider == .claude {
-                    Text("불확실한 파일은 Sonnet 4.5로 재분류 (약 $0.01)")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                } else {
-                    Text("불확실한 파일은 Gemini Pro로 재분류")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-            }
-
-            Spacer()
-
-            Divider()
-
+            // Footer (fixed)
             Button(action: { NSApp.terminate(nil) }) {
                 HStack {
                     Image(systemName: "power")
@@ -110,8 +116,8 @@ struct SettingsView: View {
             }
             .buttonStyle(.bordered)
             .controlSize(.small)
+            .padding()
         }
-        .padding()
         .onAppear {
             isStructureReady = PKMPathManager(root: appState.pkmRootPath).isInitialized()
         }

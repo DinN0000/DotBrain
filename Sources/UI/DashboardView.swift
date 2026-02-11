@@ -11,14 +11,15 @@ struct DashboardView: View {
         VStack(spacing: 0) {
             // Header
             HStack {
-                Text("대시보드")
-                    .font(.headline)
-                Spacer()
                 Button(action: { appState.currentScreen = .inbox }) {
-                    Image(systemName: "xmark")
-                        .foregroundColor(.secondary)
+                    Image(systemName: "chevron.left")
                 }
                 .buttonStyle(.plain)
+
+                Text("대시보드")
+                    .font(.headline)
+
+                Spacer()
             }
             .padding()
 

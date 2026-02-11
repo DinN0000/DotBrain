@@ -14,20 +14,15 @@ struct ReorganizeView: View {
         VStack(spacing: 0) {
             // Header
             HStack {
-                HoverTextLink(label: "뒤로", color: .secondary) {
-                    appState.currentScreen = .inbox
+                Button(action: { appState.currentScreen = .inbox }) {
+                    Image(systemName: "chevron.left")
                 }
-
-                Spacer()
+                .buttonStyle(.plain)
 
                 Text("폴더 정리")
                     .font(.headline)
 
                 Spacer()
-
-                Text("뒤로")
-                    .font(.caption)
-                    .hidden()
             }
             .padding()
 
