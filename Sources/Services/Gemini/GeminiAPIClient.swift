@@ -14,8 +14,8 @@ actor GeminiAPIClient {
 
     // MARK: - Models
 
-    static let flashModel = "gemini-2.0-flash"
-    static let proModel = "gemini-1.5-pro"
+    static let flashModel = "gemini-2.5-flash"
+    static let proModel = "gemini-2.5-pro"
 
     // MARK: - Request/Response Types
 
@@ -114,17 +114,36 @@ actor GeminiAPIClient {
             throw GeminiAPIError.invalidResponse
         }
 
-        let geminiResponse = try JSONDecoder().decode(GenerateContentResponse.self, from: data)
+        // Handle HTTP errors first — try to extract error message from response body
+        if httpResponse.statusCode != 200 {
+            if let geminiResponse = try? JSONDecoder().decode(GenerateContentResponse.self, from: data),
+               let error = geminiResponse.error {
+                throw GeminiAPIError.apiError(
+                    status: error.code ?? httpResponse.statusCode,
+                    message: error.message ?? "HTTP \(httpResponse.statusCode)"
+                )
+            }
+            // Fallback: try to read raw error text
+            let rawBody = String(data: data, encoding: .utf8) ?? ""
+            let preview = String(rawBody.prefix(200))
+            print("[GeminiAPI] HTTP \(httpResponse.statusCode): \(preview)")
+            throw GeminiAPIError.httpError(status: httpResponse.statusCode)
+        }
+
+        let geminiResponse: GenerateContentResponse
+        do {
+            geminiResponse = try JSONDecoder().decode(GenerateContentResponse.self, from: data)
+        } catch {
+            let rawBody = String(data: data, encoding: .utf8) ?? ""
+            print("[GeminiAPI] JSON 파싱 실패: \(String(rawBody.prefix(300)))")
+            throw GeminiAPIError.invalidResponse
+        }
 
         if let error = geminiResponse.error {
             throw GeminiAPIError.apiError(
-                status: error.code ?? httpResponse.statusCode,
+                status: error.code ?? 0,
                 message: error.message ?? "Unknown error"
             )
-        }
-
-        if httpResponse.statusCode != 200 {
-            throw GeminiAPIError.httpError(status: httpResponse.statusCode)
         }
 
         let text = geminiResponse.text
