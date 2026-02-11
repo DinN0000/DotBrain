@@ -42,6 +42,16 @@ trap 'rm -rf "$TMP_DIR"' EXIT
 curl -sL "$DOWNLOAD_URL" -o "$TMP_DIR/$APP_NAME"
 chmod +x "$TMP_DIR/$APP_NAME"
 
+# Download icon
+ICON_URL=$(curl -sL "https://api.github.com/repos/$REPO/releases/latest" \
+    | grep '"browser_download_url"' \
+    | grep "AppIcon.icns" \
+    | head -1 \
+    | sed -E 's/.*"(https[^"]+)".*/\1/')
+if [ -n "$ICON_URL" ]; then
+    curl -sL "$ICON_URL" -o "$TMP_DIR/AppIcon.icns"
+fi
+
 # Stop running instance if any
 pkill -f "$APP_NAME" 2>/dev/null || true
 sleep 1
@@ -56,6 +66,11 @@ mkdir -p "$APP_PATH/Contents/Resources"
 
 # Copy binary
 cp "$TMP_DIR/$APP_NAME" "$EXECUTABLE"
+
+# Copy icon if downloaded
+if [ -f "$TMP_DIR/AppIcon.icns" ]; then
+    cp "$TMP_DIR/AppIcon.icns" "$APP_PATH/Contents/Resources/AppIcon.icns"
+fi
 
 # Info.plist
 cat > "$APP_PATH/Contents/Info.plist" << 'INFOPLIST'
@@ -75,6 +90,8 @@ cat > "$APP_PATH/Contents/Info.plist" << 'INFOPLIST'
     <string>1.0.0</string>
     <key>CFBundleExecutable</key>
     <string>AI-PKM-MenuBar</string>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>LSUIElement</key>
