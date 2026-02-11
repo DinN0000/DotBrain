@@ -180,14 +180,67 @@ PKM Root/
 
 ---
 
-## 설치 및 실행
+## 설치
+
+### 원클릭 설치 (권장)
 
 ```bash
-# 빌드
-swift build
+curl -sL https://raw.githubusercontent.com/DinN0000/AI-PKM-Bar/main/install.sh | bash
+```
 
-# 실행
-swift run AI-PKM-MenuBar
+이 한 줄로 끝입니다:
+- `~/Applications/AI-PKM-MenuBar`에 바이너리 설치
+- 로그인 시 자동 시작 등록 (LaunchAgent)
+- 비정상 종료 시 자동 재시작
+- 설치 직후 바로 실행
+
+메뉴바에 `·‿·` 아이콘이 나타나면 성공입니다.
+
+### 설치 중 문제가 생기면
+
+<details>
+<summary><b>"확인되지 않은 개발자" / "손상되어 열 수 없음" 경고</b></summary>
+
+이 앱은 Apple 코드서명이 없어서 macOS Gatekeeper가 차단할 수 있습니다.
+설치 스크립트가 자동으로 처리하지만, 직접 다운로드한 경우:
+
+```bash
+xattr -cr ~/Applications/AI-PKM-MenuBar
+```
+
+또는: **시스템 설정 → 개인정보 보호 및 보안** → 하단의 "확인 없이 열기" 클릭
+</details>
+
+<details>
+<summary><b>폴더 접근 권한 팝업</b></summary>
+
+첫 실행 시 PKM 폴더에 접근할 때 macOS가 권한을 물어봅니다.
+**"허용"을 눌러주세요** — 이게 없으면 파일을 읽거나 이동할 수 없습니다.
+</details>
+
+<details>
+<summary><b>메뉴바에 아이콘이 안 보임</b></summary>
+
+메뉴바 공간이 부족하면 아이콘이 숨겨질 수 있습니다.
+메뉴바 왼쪽의 다른 아이콘을 ⌘+드래그로 제거하거나, Bartender/Ice 같은 앱으로 정리하세요.
+</details>
+
+### 제거
+
+```bash
+# 자동 시작 해제 + 삭제
+launchctl bootout gui/$(id -u)/com.ai-pkm.menubar
+rm ~/Library/LaunchAgents/com.ai-pkm.menubar.plist
+rm ~/Applications/AI-PKM-MenuBar
+```
+
+### 소스에서 직접 빌드
+
+```bash
+git clone https://github.com/DinN0000/AI-PKM-Bar.git
+cd AI-PKM-Bar
+swift build -c release
+# 바이너리: .build/release/AI-PKM-MenuBar
 ```
 
 ### 요구사항
@@ -195,10 +248,10 @@ swift run AI-PKM-MenuBar
 - API 키: [Anthropic Claude](https://console.anthropic.com/settings/keys) 또는 [Google Gemini](https://aistudio.google.com/apikey) (하나만 있어도 동작)
 
 ### 초기 설정
-1. 앱 실행 → 온보딩
+1. 앱 실행 → 메뉴바의 `·‿·` 클릭 → 온보딩 시작
 2. AI 제공자 선택 (Gemini / Claude) → API 키 입력
 3. PKM 폴더 경로 선택 → PARA 구조 자동 생성
-4. 파일 드롭 → 끝
+4. `_Inbox/`에 파일 드롭 → 끝
 
 ---
 
