@@ -104,11 +104,8 @@ final class AppState: ObservableObject {
             self.currentScreen = .settings
         }
 
-        // Show coach marks on first inbox visit after onboarding
-        if UserDefaults.standard.bool(forKey: "onboardingCompleted")
-            && !UserDefaults.standard.bool(forKey: "hasSeenCoachMarks") {
-            self.showCoachMarks = true
-        }
+        // Coach marks disabled — no longer shown
+        self.showCoachMarks = false
     }
 
     // MARK: - Actions
@@ -236,20 +233,12 @@ final class AppState: ObservableObject {
         checkConfirmationsComplete()
     }
 
-    /// Delete a pending file entirely (with confirmation dialog)
+    /// Delete a pending file — move to macOS Trash
     func deleteConfirmation(_ confirmation: PendingConfirmation) {
-        let alert = NSAlert()
-        alert.messageText = "파일을 삭제하시겠습니까?"
-        alert.informativeText = "\"\(confirmation.fileName)\"을(를) 영구적으로 삭제합니다. 이 작업은 되돌릴 수 없습니다."
-        alert.alertStyle = .warning
-        alert.addButton(withTitle: "삭제")
-        alert.addButton(withTitle: "취소")
-
-        guard alert.runModal() == .alertFirstButtonReturn else { return }
-
         pendingConfirmations.removeAll { $0.id == confirmation.id }
         do {
-            try FileManager.default.removeItem(atPath: confirmation.filePath)
+            let fileURL = URL(fileURLWithPath: confirmation.filePath)
+            try FileManager.default.trashItem(at: fileURL, resultingItemURL: nil)
             processedResults.append(ProcessedFileResult(
                 fileName: confirmation.fileName,
                 para: .archive,

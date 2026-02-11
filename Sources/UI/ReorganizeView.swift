@@ -6,15 +6,15 @@ struct ReorganizeView: View {
     @State private var selectedSubfolder: String?
     @State private var isButtonHovered = false
 
-    /// ARA categories only (no Project)
-    private let araCategories: [PARACategory] = [.area, .resource, .archive]
+    /// All PARA categories
+    private let paraCategories: [PARACategory] = [.project, .area, .resource, .archive]
 
     private var subfolderMap: [PARACategory: [(name: String, fileCount: Int)]] {
         let pathManager = PKMPathManager(root: appState.pkmRootPath)
         let fm = FileManager.default
         var map: [PARACategory: [(name: String, fileCount: Int)]] = [:]
 
-        for cat in araCategories {
+        for cat in paraCategories {
             let basePath = pathManager.paraPath(for: cat)
             guard let entries = try? fm.contentsOfDirectory(atPath: basePath) else {
                 map[cat] = []
@@ -28,12 +28,8 @@ struct ReorganizeView: View {
                 var isDir: ObjCBool = false
                 guard fm.fileExists(atPath: fullPath, isDirectory: &isDir), isDir.boolValue else { continue }
 
-                // Count files (exclude index note, _Assets, hidden)
-                let indexName = "\(entry).md"
-                let fileCount = (try? fm.contentsOfDirectory(atPath: fullPath))?
-                    .filter { name in
-                        !name.hasPrefix(".") && !name.hasPrefix("_") && name != indexName
-                    }.count ?? 0
+                // Count all content files recursively (exclude hidden, _-prefixed, and index notes)
+                let fileCount = countFilesRecursively(at: fullPath, folderName: entry, fm: fm)
 
                 folders.append((name: entry, fileCount: fileCount))
             }
@@ -70,7 +66,7 @@ struct ReorganizeView: View {
             // Folder list
             ScrollView {
                 LazyVStack(spacing: 0) {
-                    ForEach(araCategories, id: \.self) { category in
+                    ForEach(paraCategories, id: \.self) { category in
                         let folders = subfolderMap[category] ?? []
                         if !folders.isEmpty {
                             categorySection(category: category, folders: folders)
@@ -128,6 +124,25 @@ struct ReorganizeView: View {
             }
             .padding()
         }
+    }
+
+    /// Recursively count content files inside a folder
+    private func countFilesRecursively(at path: String, folderName: String, fm: FileManager) -> Int {
+        guard let enumerator = fm.enumerator(atPath: path) else { return 0 }
+        var count = 0
+        while let relativePath = enumerator.nextObject() as? String {
+            let fullPath = (path as NSString).appendingPathComponent(relativePath)
+            var isDir: ObjCBool = false
+            guard fm.fileExists(atPath: fullPath, isDirectory: &isDir), !isDir.boolValue else { continue }
+            let fileName = (fullPath as NSString).lastPathComponent
+            guard !fileName.hasPrefix("."), !fileName.hasPrefix("_") else { continue }
+            // Skip index/placeholder files
+            let baseName = (fileName as NSString).deletingPathExtension
+            let parentDirName = ((fullPath as NSString).deletingLastPathComponent as NSString).lastPathComponent
+            if baseName == parentDirName || baseName == folderName { continue }
+            count += 1
+        }
+        return count
     }
 
     // MARK: - Category Section

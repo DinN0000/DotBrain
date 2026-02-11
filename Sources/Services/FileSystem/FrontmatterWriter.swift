@@ -2,7 +2,8 @@ import Foundation
 
 /// Handles frontmatter injection into markdown files
 enum FrontmatterWriter {
-    /// Inject frontmatter into markdown content, with optional [[project]] wikilink
+    /// Inject frontmatter into markdown content, with optional [[project]] wikilink.
+    /// Completely replaces existing frontmatter with AI-PKM format (only preserves `created`).
     static func injectFrontmatter(
         into content: String,
         para: PARACategory,
@@ -12,7 +13,10 @@ enum FrontmatterWriter {
         project: String? = nil,
         file: FileMetadata? = nil
     ) -> String {
-        let fm = Frontmatter.createDefault(
+        // Strip existing frontmatter completely — replace with AI-PKM format
+        let (existing, body) = Frontmatter.parse(markdown: content)
+
+        var newFM = Frontmatter.createDefault(
             para: para,
             tags: tags,
             summary: summary,
@@ -20,7 +24,13 @@ enum FrontmatterWriter {
             project: project,
             file: file
         )
-        var result = fm.inject(into: content)
+
+        // Only preserve `created` from existing frontmatter
+        if let existingCreated = existing.created {
+            newFM.created = existingCreated
+        }
+
+        var result = newFM.stringify() + "\n" + body
 
         // Append [[project]] wikilink if related project exists and not already linked
         if let project = project, !project.isEmpty, !result.contains("[[\(project)]]") {

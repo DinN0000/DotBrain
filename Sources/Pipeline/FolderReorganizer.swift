@@ -1,8 +1,8 @@
 import Foundation
 import CryptoKit
 
-/// Reorganizes an existing ARA subfolder:
-/// Scan → Extract → AI Classify → Compare/Process
+/// Reorganizes an existing PARA subfolder:
+/// Flatten → Scan → Extract → AI Classify → Compare/Process
 struct FolderReorganizer {
     let pkmRoot: String
     let category: PARACategory
@@ -23,7 +23,15 @@ struct FolderReorganizer {
         let folderPath = (pathManager.paraPath(for: category) as NSString)
             .appendingPathComponent(subfolder)
 
-        // Scan files (exclude index note and _Assets/)
+        onProgress?(0.02, "폴더 구조 정리 중...")
+
+        // Step 1: Flatten nested folder hierarchy
+        let flattenCount = flattenFolder(at: folderPath)
+        if flattenCount > 0 {
+            onProgress?(0.05, "\(flattenCount)개 파일 플랫화 완료")
+        }
+
+        // Step 2: Scan files (now flat)
         let files = scanFolder(at: folderPath)
 
         guard !files.isEmpty else {
@@ -32,7 +40,7 @@ struct FolderReorganizer {
 
         onProgress?(0.05, "\(files.count)개 파일 발견")
 
-        // Deduplicate first
+        // Step 3: Deduplicate
         let (uniqueFiles, dupResults) = deduplicateFiles(files, in: folderPath)
         var processed = dupResults
 
@@ -98,7 +106,7 @@ struct FolderReorganizer {
             let locationMatches = targetCategory == currentCategory && targetFolder == currentFolder
 
             if locationMatches {
-                // Location correct — update frontmatter/tags with AI values (preserve created only)
+                // Location correct — replace frontmatter with AI-PKM format
                 let result = updateFrontmatter(
                     at: input.filePath,
                     classification: classification
@@ -133,9 +141,113 @@ struct FolderReorganizer {
         )
     }
 
+    // MARK: - Flatten
+
+    /// Flatten nested folder hierarchy: move all content files to top level,
+    /// delete placeholder/index files and empty directories.
+    /// Returns the number of files moved.
+    @discardableResult
+    private func flattenFolder(at dirPath: String) -> Int {
+        let fm = FileManager.default
+        let topFolderName = (dirPath as NSString).lastPathComponent
+
+        guard let enumerator = fm.enumerator(atPath: dirPath) else { return 0 }
+
+        var filesToMove: [(source: String, fileName: String)] = []
+        var placeholderFiles: [String] = []
+        var directories: [String] = []
+
+        while let relativePath = enumerator.nextObject() as? String {
+            let fullPath = (dirPath as NSString).appendingPathComponent(relativePath)
+            var isDir: ObjCBool = false
+            guard fm.fileExists(atPath: fullPath, isDirectory: &isDir) else { continue }
+
+            if isDir.boolValue {
+                directories.append(fullPath)
+                continue
+            }
+
+            let fileName = (fullPath as NSString).lastPathComponent
+
+            // Skip hidden files
+            guard !fileName.hasPrefix(".") else { continue }
+
+            // Check if top-level file (not nested) — leave as is
+            let components = relativePath.components(separatedBy: "/")
+            guard components.count > 1 else { continue }
+
+            // Check if placeholder/index file:
+            // - filename matches parent directory name (e.g. 3_Resource/3_Resource.md)
+            // - filename starts with _ (e.g. _Assets/_Assets.md)
+            let parentDir = (fullPath as NSString).deletingLastPathComponent
+            let parentDirName = (parentDir as NSString).lastPathComponent
+            let baseName = (fileName as NSString).deletingPathExtension
+
+            let isPlaceholder = baseName == parentDirName
+                || baseName == topFolderName  // inner DOJANG/DOJANG.md → becomes the index note handled separately
+                || fileName.hasPrefix("_")
+
+            if isPlaceholder {
+                // Special case: if this is the workspace root note (e.g. DOJANG/DOJANG/DOJANG.md),
+                // check if it has real content worth keeping as the index note
+                if baseName == topFolderName {
+                    let indexDest = (dirPath as NSString).appendingPathComponent("\(topFolderName).md")
+                    if !fm.fileExists(atPath: indexDest) {
+                        // Move it as the index note instead of deleting
+                        try? fm.moveItem(atPath: fullPath, toPath: indexDest)
+                        continue
+                    }
+                }
+                placeholderFiles.append(fullPath)
+                continue
+            }
+
+            filesToMove.append((source: fullPath, fileName: fileName))
+        }
+
+        // Move nested content files to top level
+        var movedCount = 0
+        for file in filesToMove {
+            let destPath = (dirPath as NSString).appendingPathComponent(file.fileName)
+            if fm.fileExists(atPath: destPath) {
+                // Name conflict — append suffix
+                let ext = (file.fileName as NSString).pathExtension
+                let base = (file.fileName as NSString).deletingPathExtension
+                var counter = 2
+                var resolved = destPath
+                while fm.fileExists(atPath: resolved) {
+                    let newName = ext.isEmpty ? "\(base)_\(counter)" : "\(base)_\(counter).\(ext)"
+                    resolved = (dirPath as NSString).appendingPathComponent(newName)
+                    counter += 1
+                }
+                try? fm.moveItem(atPath: file.source, toPath: resolved)
+            } else {
+                try? fm.moveItem(atPath: file.source, toPath: destPath)
+            }
+            movedCount += 1
+        }
+
+        // Delete placeholder files
+        for placeholder in placeholderFiles {
+            try? fm.removeItem(atPath: placeholder)
+        }
+
+        // Delete empty directories (deepest first by path length)
+        let sortedDirs = directories.sorted { $0.count > $1.count }
+        for dir in sortedDirs {
+            let contents = (try? fm.contentsOfDirectory(atPath: dir)) ?? []
+            let nonHidden = contents.filter { !$0.hasPrefix(".") }
+            if nonHidden.isEmpty {
+                try? fm.removeItem(atPath: dir)
+            }
+        }
+
+        return movedCount
+    }
+
     // MARK: - Scan
 
-    /// Scan folder for files, excluding index note and _Assets/
+    /// Scan folder for top-level files, excluding index note and _Assets/
     private func scanFolder(at dirPath: String) -> [String] {
         let fm = FileManager.default
         guard let entries = try? fm.contentsOfDirectory(atPath: dirPath) else { return [] }
@@ -149,7 +261,6 @@ struct FolderReorganizer {
             let fullPath = (dirPath as NSString).appendingPathComponent(name)
             var isDir: ObjCBool = false
             guard fm.fileExists(atPath: fullPath, isDirectory: &isDir) else { return nil }
-            // Skip directories (like nested _Assets)
             guard !isDir.boolValue else { return nil }
             return fullPath
         }.sorted()
@@ -229,7 +340,7 @@ struct FolderReorganizer {
 
     // MARK: - Frontmatter Update
 
-    /// Update frontmatter with AI values, preserving only `created`
+    /// Replace frontmatter with AI-PKM format, preserving only `created`
     private func updateFrontmatter(
         at filePath: String,
         classification: ClassifyResult
@@ -249,21 +360,16 @@ struct FolderReorganizer {
         let (existing, body) = Frontmatter.parse(markdown: content)
 
         // Build new frontmatter — AI values override everything except `created`
-        var newFM = Frontmatter(
+        let newFM = Frontmatter(
             para: classification.para,
             tags: classification.tags,
             created: existing.created ?? Frontmatter.today(),
             status: .active,
             summary: classification.summary,
-            source: existing.source ?? .import,
+            source: .import,
             project: classification.project,
             file: existing.file
         )
-
-        // Preserve created from existing
-        if let created = existing.created {
-            newFM.created = created
-        }
 
         let updatedContent = newFM.stringify() + "\n" + body
         do {

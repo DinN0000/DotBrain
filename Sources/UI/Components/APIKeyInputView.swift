@@ -33,23 +33,24 @@ struct APIKeyInputView: View {
 
             Divider()
 
-            // Gemini API Key
-            apiKeySection(
-                title: "Gemini API Key",
-                keyInput: $geminiKeyInput,
-                showingKey: $showingGeminiKey,
-                provider: .gemini,
-                hasKey: appState.hasGeminiKey
-            )
-
-            // Claude API Key
-            apiKeySection(
-                title: "Claude API Key",
-                keyInput: $claudeKeyInput,
-                showingKey: $showingClaudeKey,
-                provider: .claude,
-                hasKey: appState.hasClaudeKey
-            )
+            // Selected provider's API Key
+            if appState.selectedProvider == .gemini {
+                apiKeySection(
+                    title: "Gemini API Key",
+                    keyInput: $geminiKeyInput,
+                    showingKey: $showingGeminiKey,
+                    provider: .gemini,
+                    hasKey: appState.hasGeminiKey
+                )
+            } else {
+                apiKeySection(
+                    title: "Claude API Key",
+                    keyInput: $claudeKeyInput,
+                    showingKey: $showingClaudeKey,
+                    provider: .claude,
+                    hasKey: appState.hasClaudeKey
+                )
+            }
 
             // Current provider status
             if appState.hasAPIKey {
@@ -92,11 +93,6 @@ struct APIKeyInputView: View {
                         .font(.caption)
                 }
 
-                if provider == appState.selectedProvider {
-                    Text("(활성)")
-                        .font(.caption2)
-                        .foregroundColor(.blue)
-                }
             }
 
             HStack {
