@@ -56,6 +56,7 @@ struct FolderReorganizer {
         let projectContext = contextBuilder.buildProjectContext()
         let subfolderContext = contextBuilder.buildSubfolderContext()
         let projectNames = contextBuilder.extractProjectNames(from: projectContext)
+        let weightedContext = contextBuilder.buildWeightedContext()
 
         onProgress?(0.15, "프로젝트 컨텍스트 로드 완료")
 
@@ -83,16 +84,29 @@ struct FolderReorganizer {
             projectContext: projectContext,
             subfolderContext: subfolderContext,
             projectNames: projectNames,
+            weightedContext: weightedContext,
             onProgress: { [onProgress] progress, status in
                 let mappedProgress = 0.3 + progress * 0.4
                 onProgress?(mappedProgress, status)
             }
         )
 
+        // Enrich with related notes
+        var enrichedClassifications = classifications
+        for (i, classification) in enrichedClassifications.enumerated() {
+            let related = contextBuilder.findRelatedNotes(
+                tags: classification.tags,
+                project: classification.project,
+                para: classification.para,
+                targetFolder: classification.targetFolder
+            )
+            enrichedClassifications[i].relatedNotes = related
+        }
+
         // Compare and process
         var needsConfirmation: [PendingConfirmation] = []
 
-        for (i, classification) in classifications.enumerated() {
+        for (i, classification) in enrichedClassifications.enumerated() {
             let progress = 0.7 + Double(i) / Double(classifications.count) * 0.25
             let input = inputs[i]
             onProgress?(progress, "\(input.fileName) 처리 중...")
@@ -371,7 +385,20 @@ struct FolderReorganizer {
             file: existing.file
         )
 
-        let updatedContent = newFM.stringify() + "\n" + body
+        // Build related links
+        var relatedBody = body
+        var links: [String] = []
+        if let project = classification.project, !project.isEmpty, !relatedBody.contains("[[\(project)]]") {
+            links.append("[[\(project)]]")
+        }
+        for note in classification.relatedNotes where !relatedBody.contains("[[\(note)]]") {
+            links.append("[[\(note)]]")
+        }
+        if !links.isEmpty {
+            relatedBody += "\n\n---\nrelated:: " + links.joined(separator: ", ") + "\n"
+        }
+
+        let updatedContent = newFM.stringify() + "\n" + relatedBody
         do {
             try updatedContent.write(toFile: filePath, atomically: true, encoding: .utf8)
         } catch {

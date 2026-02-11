@@ -8,6 +8,7 @@ struct ClassifyResult: Codable {
     let targetFolder: String
     var project: String?
     var confidence: Double
+    var relatedNotes: [String] = []
 
     /// Stage 1 batch classification item from Haiku
     struct Stage1Item: Codable {

@@ -278,7 +278,8 @@ struct FileMover {
             para: classification.para,
             tags: classification.tags,
             summary: classification.summary,
-            project: classification.project
+            project: classification.project,
+            relatedNotes: classification.relatedNotes
         )
 
         try taggedContent.write(toFile: resolvedPath, atomically: true, encoding: .utf8)

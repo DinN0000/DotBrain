@@ -2,7 +2,7 @@ import Foundation
 
 /// Handles frontmatter injection into markdown files
 enum FrontmatterWriter {
-    /// Inject frontmatter into markdown content, with optional [[project]] wikilink.
+    /// Inject frontmatter into markdown content, with optional [[project]] and related note wikilinks.
     /// Completely replaces existing frontmatter with AI-PKM format (only preserves `created`).
     static func injectFrontmatter(
         into content: String,
@@ -11,7 +11,8 @@ enum FrontmatterWriter {
         summary: String,
         source: NoteSource = .import,
         project: String? = nil,
-        file: FileMetadata? = nil
+        file: FileMetadata? = nil,
+        relatedNotes: [String] = []
     ) -> String {
         // Strip existing frontmatter completely — replace with AI-PKM format
         let (existing, body) = Frontmatter.parse(markdown: content)
@@ -32,9 +33,17 @@ enum FrontmatterWriter {
 
         var result = newFM.stringify() + "\n" + body
 
-        // Append [[project]] wikilink if related project exists and not already linked
+        // Build related links section
+        var links: [String] = []
         if let project = project, !project.isEmpty, !result.contains("[[\(project)]]") {
-            result += "\n\n---\nrelated:: [[\(project)]]\n"
+            links.append("[[\(project)]]")
+        }
+        for note in relatedNotes where !result.contains("[[\(note)]]") {
+            links.append("[[\(note)]]")
+        }
+
+        if !links.isEmpty {
+            result += "\n\n---\nrelated:: " + links.joined(separator: ", ") + "\n"
         }
 
         return result

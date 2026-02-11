@@ -16,6 +16,7 @@ actor Classifier {
         projectContext: String,
         subfolderContext: String,
         projectNames: [String],
+        weightedContext: String = "",
         onProgress: ((Double, String) -> Void)? = nil
     ) async throws -> [ClassifyResult] {
         guard !files.isEmpty else { return [] }
@@ -33,7 +34,8 @@ actor Classifier {
             let results = try await classifyBatchStage1(
                 batch,
                 projectContext: projectContext,
-                subfolderContext: subfolderContext
+                subfolderContext: subfolderContext,
+                weightedContext: weightedContext
             )
             for (key, value) in results {
                 stage1Results[key] = value
@@ -56,7 +58,8 @@ actor Classifier {
                 let result = try await classifySingleStage2(
                     file,
                     projectContext: projectContext,
-                    subfolderContext: subfolderContext
+                    subfolderContext: subfolderContext,
+                    weightedContext: weightedContext
                 )
                 stage2Results[file.fileName] = result
             }
@@ -104,13 +107,14 @@ actor Classifier {
     private func classifyBatchStage1(
         _ files: [ClassifyInput],
         projectContext: String,
-        subfolderContext: String
+        subfolderContext: String,
+        weightedContext: String
     ) async throws -> [String: ClassifyResult.Stage1Item] {
         let previews = files.map { file in
             (fileName: file.fileName, preview: String(file.content.prefix(previewLength)))
         }
 
-        let prompt = buildStage1Prompt(previews, projectContext: projectContext, subfolderContext: subfolderContext)
+        let prompt = buildStage1Prompt(previews, projectContext: projectContext, subfolderContext: subfolderContext, weightedContext: weightedContext)
 
         let response = try await aiService.sendFast(maxTokens: 4096, message: prompt)
 
@@ -149,13 +153,15 @@ actor Classifier {
     private func classifySingleStage2(
         _ file: ClassifyInput,
         projectContext: String,
-        subfolderContext: String
+        subfolderContext: String,
+        weightedContext: String
     ) async throws -> ClassifyResult.Stage2Item {
         let prompt = buildStage2Prompt(
             fileName: file.fileName,
             content: file.content,
             projectContext: projectContext,
-            subfolderContext: subfolderContext
+            subfolderContext: subfolderContext,
+            weightedContext: weightedContext
         )
 
         let response = try await aiService.sendPrecise(maxTokens: 2048, message: prompt)
@@ -187,11 +193,24 @@ actor Classifier {
     private func buildStage1Prompt(
         _ files: [(fileName: String, preview: String)],
         projectContext: String,
-        subfolderContext: String
+        subfolderContext: String,
+        weightedContext: String
     ) -> String {
         let fileList = files.enumerated().map { (i, f) in
             "[\(i)] 파일명: \(f.fileName)\n미리보기: \(f.preview)"
         }.joined(separator: "\n\n")
+
+        let weightedSection = weightedContext.isEmpty ? "" : """
+
+        ## 기존 문서 맥락 (가중치 기반)
+        아래 기존 문서 정보를 참고하여, 새 문서가 기존 문서와 태그나 주제가 겹치면 같은 카테고리/폴더로 분류하세요.
+        🔴 Project 문서와 겹치면 → 해당 프로젝트 연결 가중치 높음
+        🟡 Area/Resource 문서와 겹치면 → 해당 폴더 연결 가중치 중간
+        ⚪ Archive는 참고만 (낮은 가중치)
+
+        \(weightedContext)
+
+        """
 
         return """
         당신은 PARA 방법론 기반 문서 분류 전문가입니다.
@@ -201,7 +220,7 @@ actor Classifier {
 
         ## 기존 하위 폴더
         \(subfolderContext)
-
+        \(weightedSection)
         ## 분류 규칙
         - project: 해당 프로젝트의 직접적인 작업 문서만 (액션 아이템, 체크리스트, 마감 관련 문서). 반드시 project 필드에 프로젝트명 기재.
         - area: 유지보수, 모니터링, 운영, 지속적 책임 영역의 문서
@@ -237,8 +256,21 @@ actor Classifier {
         fileName: String,
         content: String,
         projectContext: String,
-        subfolderContext: String
+        subfolderContext: String,
+        weightedContext: String
     ) -> String {
+        let weightedSection = weightedContext.isEmpty ? "" : """
+
+        ## 기존 문서 맥락 (가중치 기반)
+        아래 기존 문서 정보를 참고하여, 이 문서가 기존 문서와 태그나 주제가 겹치면 같은 카테고리/폴더로 분류하세요.
+        🔴 Project 문서와 겹치면 → 해당 프로젝트 연결 가중치 높음
+        🟡 Area/Resource 문서와 겹치면 → 해당 폴더 연결 가중치 중간
+        ⚪ Archive는 참고만 (낮은 가중치)
+
+        \(weightedContext)
+
+        """
+
         return """
         당신은 PARA 방법론 기반 문서 분류 전문가입니다. 이 문서를 정밀하게 분석해주세요.
 
@@ -247,7 +279,7 @@ actor Classifier {
 
         ## 기존 하위 폴더
         \(subfolderContext)
-
+        \(weightedSection)
         ## 분류 규칙
         - project: 해당 프로젝트의 직접적인 작업 문서만 (액션 아이템, 체크리스트, 마감 관련 문서). 반드시 project 필드에 프로젝트명 기재.
         - area: 유지보수, 모니터링, 운영, 지속적 책임 영역의 문서

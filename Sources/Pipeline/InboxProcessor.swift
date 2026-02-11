@@ -28,6 +28,7 @@ struct InboxProcessor {
         let projectContext = contextBuilder.buildProjectContext()
         let subfolderContext = contextBuilder.buildSubfolderContext()
         let projectNames = contextBuilder.extractProjectNames(from: projectContext)
+        let weightedContext = contextBuilder.buildWeightedContext()
 
         onProgress?(0.1, "프로젝트 컨텍스트 로드 완료")
 
@@ -55,6 +56,7 @@ struct InboxProcessor {
             projectContext: projectContext,
             subfolderContext: subfolderContext,
             projectNames: projectNames,
+            weightedContext: weightedContext,
             onProgress: { [onProgress] progress, status in
                 // Map classifier's 0-1 progress to our 0.3-0.7 range
                 let mappedProgress = 0.3 + progress * 0.4
@@ -62,13 +64,25 @@ struct InboxProcessor {
             }
         )
 
+        // Enrich with related notes
+        var enrichedClassifications = classifications
+        for (i, classification) in enrichedClassifications.enumerated() {
+            let related = contextBuilder.findRelatedNotes(
+                tags: classification.tags,
+                project: classification.project,
+                para: classification.para,
+                targetFolder: classification.targetFolder
+            )
+            enrichedClassifications[i].relatedNotes = related
+        }
+
         // Move files
         let mover = FileMover(pkmRoot: pkmRoot)
         var processed: [ProcessedFileResult] = []
         var needsConfirmation: [PendingConfirmation] = []
         var failed = 0
 
-        for (i, classification) in classifications.enumerated() {
+        for (i, classification) in enrichedClassifications.enumerated() {
             let progress = 0.7 + Double(i) / Double(classifications.count) * 0.25
             let input = inputs[i]
             onProgress?(progress, "\(input.fileName) 이동 중...")
