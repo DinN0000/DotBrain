@@ -25,7 +25,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
 
         if let button = statusItem?.button {
-            button.title = appState.menuBarFace
+            button.image = makeMenuBarImage(appState.menuBarFace)
             button.action = #selector(togglePopover)
             button.target = self
         }
@@ -65,8 +65,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func updateMenuBarIcon() {
-        statusItem?.button?.title = appState.menuBarFace
-        statusItem?.button?.image = nil
+        statusItem?.button?.title = ""
+        statusItem?.button?.image = makeMenuBarImage(appState.menuBarFace)
+    }
+
+    /// Render face text into an NSImage for precise vertical alignment in menu bar
+    private func makeMenuBarImage(_ text: String) -> NSImage {
+        let font = NSFont.monospacedSystemFont(ofSize: 13, weight: .medium)
+        let attrs: [NSAttributedString.Key: Any] = [
+            .font: font,
+            .foregroundColor: NSColor.controlTextColor
+        ]
+        let size = (text as NSString).size(withAttributes: attrs)
+        let imageSize = NSSize(width: ceil(size.width) + 2, height: 22)
+
+        let image = NSImage(size: imageSize, flipped: false) { rect in
+            let y = (rect.height - size.height) / 2
+            (text as NSString).draw(at: NSPoint(x: 1, y: y), withAttributes: attrs)
+            return true
+        }
+        image.isTemplate = true
+        return image
     }
 
     @objc private func togglePopover() {
