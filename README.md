@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="Resources/app-icon.png" width="128" alt="AI-PKM MenuBar Icon">
+</p>
+
 # AI-PKM MenuBar
 
 ### Built for Humans. Optimized for AI.
