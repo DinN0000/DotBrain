@@ -8,7 +8,7 @@ enum NotificationService {
         if failed > 0 {
             body += " (\(failed)개 실패)"
         }
-        send(title: "AI-PKM 인박스 정리", body: body)
+        send(title: "DotBrain 인박스 정리", body: body)
     }
 
     static func send(title: String, body: String) {

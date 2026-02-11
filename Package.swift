@@ -3,7 +3,7 @@
 import PackageDescription
 
 let package = Package(
-    name: "AI-PKM-MenuBar",
+    name: "DotBrain",
     platforms: [
         .macOS(.v13)
     ],
@@ -12,7 +12,7 @@ let package = Package(
     ],
     targets: [
         .executableTarget(
-            name: "AI-PKM-MenuBar",
+            name: "DotBrain",
             dependencies: ["ZIPFoundation"],
             path: "Sources",
             resources: [

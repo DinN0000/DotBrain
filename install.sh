@@ -2,16 +2,16 @@
 set -euo pipefail
 
 REPO="DinN0000/AI-PKM-Bar"
-APP_NAME="AI-PKM-MenuBar"
+APP_NAME="DotBrain"
 APP_BUNDLE="$APP_NAME.app"
 INSTALL_DIR="$HOME/Applications"
 APP_PATH="$INSTALL_DIR/$APP_BUNDLE"
 EXECUTABLE="$APP_PATH/Contents/MacOS/$APP_NAME"
 LAUNCHAGENT_DIR="$HOME/Library/LaunchAgents"
-PLIST_NAME="com.ai-pkm.menubar"
+PLIST_NAME="com.dotbrain.app"
 PLIST_PATH="$LAUNCHAGENT_DIR/$PLIST_NAME.plist"
 
-echo "=== AI-PKM MenuBar 설치 ==="
+echo "=== DotBrain 설치 ==="
 echo ""
 
 # Detect architecture
@@ -81,15 +81,15 @@ cat > "$APP_PATH/Contents/Info.plist" << 'INFOPLIST'
     <key>CFBundleName</key>
     <string>AI-PKM</string>
     <key>CFBundleDisplayName</key>
-    <string>AI-PKM MenuBar</string>
+    <string>DotBrain</string>
     <key>CFBundleIdentifier</key>
-    <string>com.hwaa.ai-pkm-menubar</string>
+    <string>com.hwaa.dotbrain</string>
     <key>CFBundleVersion</key>
     <string>1.0.0</string>
     <key>CFBundleShortVersionString</key>
     <string>1.0.0</string>
     <key>CFBundleExecutable</key>
-    <string>AI-PKM-MenuBar</string>
+    <string>DotBrain</string>
     <key>CFBundleIconFile</key>
     <string>AppIcon</string>
     <key>CFBundlePackageType</key>

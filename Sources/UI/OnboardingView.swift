@@ -120,7 +120,7 @@ struct OnboardingView: View {
                 .foregroundColor(.primary)
                 .padding(.bottom, 12)
 
-            Text("AI-PKM에 오신 걸 환영합니다")
+            Text("DotBrain에 오신 걸 환영합니다")
                 .font(.title3)
                 .fontWeight(.semibold)
                 .padding(.bottom, 6)
