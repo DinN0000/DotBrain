@@ -32,20 +32,36 @@ struct InboxProcessor {
 
         onProgress?(0.1, "프로젝트 컨텍스트 로드 완료")
 
-        // Extract content from all files
-        var inputs: [ClassifyInput] = []
-        for (i, filePath) in files.enumerated() {
-            let progress = 0.1 + Double(i) / Double(files.count) * 0.2
-            let fileName = (filePath as NSString).lastPathComponent
-            onProgress?(progress, "\(fileName) 내용 추출 중...")
+        // Extract content from all files — parallel using TaskGroup
+        let inputs: [ClassifyInput] = await withTaskGroup(
+            of: ClassifyInput.self,
+            returning: [ClassifyInput].self
+        ) { group in
+            for filePath in files {
+                group.addTask {
+                    let content = self.extractContent(from: filePath)
+                    let fileName = (filePath as NSString).lastPathComponent
+                    return ClassifyInput(
+                        filePath: filePath,
+                        content: content,
+                        fileName: fileName
+                    )
+                }
+            }
 
-            let content = extractContent(from: filePath)
-            inputs.append(ClassifyInput(
-                filePath: filePath,
-                content: content,
-                fileName: fileName
-            ))
+            var collected: [ClassifyInput] = []
+            collected.reserveCapacity(files.count)
+            for await input in group {
+                collected.append(input)
+            }
+
+            // Preserve original file order for stable classification
+            return collected.sorted { a, b in
+                files.firstIndex(of: a.filePath)! < files.firstIndex(of: b.filePath)!
+            }
         }
+
+        onProgress?(0.3, "\(inputs.count)개 파일 내용 추출 완료")
 
         onProgress?(0.3, "AI 분류 시작...")
 
@@ -64,16 +80,28 @@ struct InboxProcessor {
             }
         )
 
-        // Enrich with related notes
-        var enrichedClassifications = classifications
-        for (i, classification) in enrichedClassifications.enumerated() {
-            let related = contextBuilder.findRelatedNotes(
-                tags: classification.tags,
-                project: classification.project,
-                para: classification.para,
-                targetFolder: classification.targetFolder
-            )
-            enrichedClassifications[i].relatedNotes = related
+        // Enrich with related notes — parallel (CPU-bound tag matching)
+        let enrichedClassifications: [ClassifyResult] = await withTaskGroup(
+            of: (Int, [RelatedNote]).self,
+            returning: [ClassifyResult].self
+        ) { group in
+            for (i, classification) in classifications.enumerated() {
+                group.addTask {
+                    let related = contextBuilder.findRelatedNotes(
+                        tags: classification.tags,
+                        project: classification.project,
+                        para: classification.para,
+                        targetFolder: classification.targetFolder
+                    )
+                    return (i, related)
+                }
+            }
+
+            var results = classifications
+            for await (index, related) in group {
+                results[index].relatedNotes = related
+            }
+            return results
         }
 
         // Move files

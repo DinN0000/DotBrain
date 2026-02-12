@@ -27,19 +27,47 @@ actor Classifier {
             Array(files[$0..<min($0 + batchSize, files.count)])
         }
 
-        for (i, batch) in batches.enumerated() {
-            let progress = Double(i) / Double(batches.count) * 0.6
-            onProgress?(progress, "Stage 1: 배치 \(i + 1)/\(batches.count) 분류 중...")
+        // Stage 1: Process batches concurrently (max 3 concurrent API calls)
+        let maxConcurrentBatches = 3
 
-            let results = try await classifyBatchStage1(
-                batch,
-                projectContext: projectContext,
-                subfolderContext: subfolderContext,
-                weightedContext: weightedContext
-            )
-            for (key, value) in results {
-                stage1Results[key] = value
+        stage1Results = try await withThrowingTaskGroup(
+            of: [String: ClassifyResult.Stage1Item].self,
+            returning: [String: ClassifyResult.Stage1Item].self
+        ) { group in
+            var activeTasks = 0
+            var batchIndex = 0
+            var combined: [String: ClassifyResult.Stage1Item] = [:]
+
+            for batch in batches {
+                if activeTasks >= maxConcurrentBatches {
+                    if let results = try await group.next() {
+                        for (key, value) in results {
+                            combined[key] = value
+                        }
+                        activeTasks -= 1
+                    }
+                }
+
+                let idx = batchIndex
+                group.addTask {
+                    return try await self.classifyBatchStage1(
+                        batch,
+                        projectContext: projectContext,
+                        subfolderContext: subfolderContext,
+                        weightedContext: weightedContext
+                    )
+                }
+                activeTasks += 1
+                batchIndex += 1
+                onProgress?(Double(idx) / Double(batches.count) * 0.6, "Stage 1: 배치 \(idx + 1)/\(batches.count) 분류 중...")
             }
+
+            for try await results in group {
+                for (key, value) in results {
+                    combined[key] = value
+                }
+            }
+            return combined
         }
 
         // Stage 2: Sonnet for uncertain files
@@ -51,17 +79,40 @@ actor Classifier {
         var stage2Results: [String: ClassifyResult.Stage2Item] = [:]
 
         if !uncertainFiles.isEmpty {
-            for (i, file) in uncertainFiles.enumerated() {
-                let progress = 0.6 + Double(i) / Double(uncertainFiles.count) * 0.3
-                onProgress?(progress, "Stage 2: \(file.fileName) 정밀 분류 중...")
+            // Stage 2: Process uncertain files concurrently (max 5)
+            let maxConcurrentStage2 = 5
 
-                let result = try await classifySingleStage2(
-                    file,
-                    projectContext: projectContext,
-                    subfolderContext: subfolderContext,
-                    weightedContext: weightedContext
-                )
-                stage2Results[file.fileName] = result
+            stage2Results = try await withThrowingTaskGroup(
+                of: (String, ClassifyResult.Stage2Item).self,
+                returning: [String: ClassifyResult.Stage2Item].self
+            ) { group in
+                var activeTasks = 0
+                var combined: [String: ClassifyResult.Stage2Item] = [:]
+
+                for file in uncertainFiles {
+                    if activeTasks >= maxConcurrentStage2 {
+                        if let (fileName, result) = try await group.next() {
+                            combined[fileName] = result
+                            activeTasks -= 1
+                        }
+                    }
+
+                    group.addTask {
+                        let result = try await self.classifySingleStage2(
+                            file,
+                            projectContext: projectContext,
+                            subfolderContext: subfolderContext,
+                            weightedContext: weightedContext
+                        )
+                        return (file.fileName, result)
+                    }
+                    activeTasks += 1
+                }
+
+                for try await (fileName, result) in group {
+                    combined[fileName] = result
+                }
+                return combined
             }
         }
 
