@@ -6,7 +6,7 @@ import Foundation
 enum AICompanionService {
 
     /// Bump this when companion file content changes — triggers overwrite on existing vaults
-    static let version = 2
+    static let version = 3
 
     /// Generate all AI companion files in the PKM root (first-time only)
     static func generateAll(pkmRoot: String) throws {
@@ -129,6 +129,12 @@ enum AICompanionService {
     3. **각 폴더의 인덱스 노트** 확인: `폴더명/폴더명.md` (MOC 역할)
     4. **Grep 검색**으로 태그/키워드 기반 탐색 (아래 검색 패턴 참조)
     5. **관련 노트 링크** 따라가기: 프론트매터 `project` 필드 및 `## Related Notes` 섹션
+
+    ### MOC (Map of Content)
+
+    각 하위 폴더에 `폴더명/폴더명.md` 파일이 MOC 역할을 합니다.
+    MOC에는 해당 폴더의 모든 노트가 `[[위키링크]] — 요약` 형식으로 나열됩니다.
+    폴더 전체를 파악하려면 개별 파일 대신 MOC를 먼저 읽으세요.
 
     ---
 
@@ -298,6 +304,12 @@ enum AICompanionService {
 
     각 에이전트 파일에 상세 워크플로가 정의되어 있습니다.
 
+    ## 스킬
+
+    | 스킬 | 파일 | 역할 |
+    |------|------|------|
+    | 바이너리 처리 | `.claude/skills/inbox-processor/SKILL.md` | PDF/PPTX/이미지 텍스트 추출 |
+
     ---
 
     ## 규칙
@@ -338,58 +350,46 @@ enum AICompanionService {
     private static let agentsMdContent = """
     # AGENTS.md — DotBrain PKM Workspace
 
-    이 PKM은 DotBrain으로 관리되는 PARA 방법론 기반 지식 베이스입니다.
-
-    ## 폴더 구조
-
-    - `_Inbox/`: 처리 대기 (DotBrain이 자동 분류, **수정 금지**)
-    - `1_Project/`: 활성 프로젝트 (목표 + 기한)
-    - `2_Area/`: 지속 관리 영역 (기한 없는 책임)
-    - `3_Resource/`: 참고 자료 (관심사, 학습)
-    - `4_Archive/`: 완료/비활성 항목
-    - `.Templates/`: 노트 템플릿
-    - `.claude/`: AI 에이전트 및 스킬 정의
+    이 파일은 AI 에이전트의 **행동 규칙**을 정의합니다.
+    볼트 구조와 검색 방법은 `CLAUDE.md`를 참조하세요.
 
     ## 에이전트 시스템
 
-    특화된 워크플로를 위한 에이전트가 정의되어 있습니다:
+    | 트리거 문구 | 에이전트 | 파일 |
+    |---|---|---|
+    | "인박스 정리해줘" | 인박스 분류 | `.claude/agents/inbox-agent.md` |
+    | "프로젝트 만들어줘" | 프로젝트 관리 | `.claude/agents/project-agent.md` |
+    | "OO 관련 자료 찾아줘" | 검색 | `.claude/agents/search-agent.md` |
 
-    | 에이전트 | 파일 | 역할 |
-    |---------|------|------|
-    | 인박스 분류 | `.claude/agents/inbox-agent.md` | 파일 분류, 프론트매터 삽입, 관련 노트 연결 |
-    | 프로젝트 관리 | `.claude/agents/project-agent.md` | 프로젝트 생성/완료/재활성화/이름변경 |
-    | 검색 | `.claude/agents/search-agent.md` | 태그/키워드/본문 검색 |
+    ## 프론트매터 병합 정책
 
-    ## 탐색 방법
+    - 기존 `para`, `tags`, `created`, `status`, `summary`, `source`, `project` 값이 있으면 덮어쓰지 않음
+    - 빈 필드만 AI가 채움 (예: summary가 비어있으면 생성, 있으면 유지)
+    - `tags`는 기존 태그에 추가만 가능, 삭제 금지
 
-    1. **CLAUDE.md** 먼저 읽기 — 전체 구조와 규칙
-    2. **인덱스 노트** 확인: `폴더명/폴더명.md` (각 폴더의 MOC)
-    3. **프론트매터 검색**: `tags`, `para`, `project`, `status` 필드로 필터링
-    4. **관련 노트**: `## Related Notes` 섹션의 위키링크 따라가기
+    ## 관련 노트 링크 규칙
 
-    ## 프론트매터 필드 (8개)
-
-    - `para`: project | area | resource | archive
-    - `tags`: [태그 배열, 최대 5개]
-    - `created`: YYYY-MM-DD
-    - `status`: active | draft | completed | on-hold
-    - `summary`: 2-3문장 요약
-    - `source`: original | meeting | literature | import
-    - `project`: 관련 프로젝트명 (폴더명과 일치)
-    - `file`: 바이너리 동반 노트용 {name, format, size_kb}
-
-    ## 수정 규칙
-
-    - 프론트매터 기존 값 유지 (빈 필드만 채우기)
     - `[[위키링크]]` 형식 사용
-    - 새 노트는 적절한 PARA 폴더에 생성
-    - 관련 노트 링크에 컨텍스트 설명 포함
+    - 같은 폴더 내 노트: 태그 1개 이상 겹치면 링크 후보
+    - 인접 PARA 카테고리 (Area ↔ Resource): 태그 2개 이상 겹칠 때만 크로스 링크
+    - 링크에 반드시 컨텍스트 설명 포함: `[[노트명]] — 왜 참조하는지`
 
-    ## ⚠️ 코드 작성 금지
+    ## 링크 밀도 제한 (PARA별)
 
-    **이 폴더 안에서 코드 파일을 생성하지 마세요.**
-    DotBrain이 코드 파일을 자동 삭제합니다.
-    개발 작업은 이 PKM 폴더 밖에서 하세요.
+    | PARA | 최대 관련 노트 수 |
+    |------|-----------------|
+    | Project | 10 |
+    | Area | 5 |
+    | Resource | 3 |
+    | Archive | 1 |
+
+    ## 금지 사항
+
+    - `_Inbox/` 수정 금지 (DotBrain이 자동 처리)
+    - 코드 파일 생성 금지 (DotBrain이 자동 삭제)
+    - 기존 프론트매터 값 덮어쓰기 금지
+    - 기존 태그 삭제 금지
+    - 개발 작업은 이 PKM 폴더 밖에서
     """
 
     // MARK: - .cursorrules
@@ -417,10 +417,10 @@ enum AICompanionService {
     - `.claude/agents/`: AI agent workflow definitions
 
     ## Navigation Priority
-    1. Read `CLAUDE.md` first for full structure and rules
-    2. Check index notes: `FolderName/FolderName.md` (MOC for each folder)
+    1. Check **MOC (index notes)**: `FolderName/FolderName.md` — lists all notes in folder with `[[wikilink]] — summary` format
+    2. Read `CLAUDE.md` for detailed structure, frontmatter schema, and classification rules
     3. Search by frontmatter fields using grep patterns
-    4. Follow `[[wikilinks]]` in Related Notes sections
+    4. Follow `[[wikilinks]]` in `## Related Notes` sections — each link has context explaining why to visit
 
     ## Frontmatter Schema (8 fields)
     ```yaml
@@ -648,6 +648,8 @@ enum AICompanionService {
     ```
     Grep("tags:.*검색어", glob: "**/*.md")
     ```
+    태그는 `tags: ["tag1", "tag2"]` 인라인 배열 형식입니다.
+    정확한 태그 매칭이 필요하면: `Grep("\"검색어\"", glob: "**/*.md")`
 
     **2단계: 본문 키워드 검색**
     ```
