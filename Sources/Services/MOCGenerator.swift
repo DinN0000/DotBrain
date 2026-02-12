@@ -122,6 +122,8 @@ struct MOCGenerator {
             (.archive, pathManager.archivePath),
         ]
 
+        // Collect all folder tasks first, then run concurrently (max 3 API calls)
+        var folderTasks: [(para: PARACategory, folderPath: String, folderName: String)] = []
         for (para, basePath) in categories {
             guard let folders = try? fm.contentsOfDirectory(atPath: basePath) else { continue }
             for folder in folders {
@@ -129,12 +131,30 @@ struct MOCGenerator {
                 let folderPath = (basePath as NSString).appendingPathComponent(folder)
                 var isDir: ObjCBool = false
                 guard fm.fileExists(atPath: folderPath, isDirectory: &isDir), isDir.boolValue else { continue }
+                folderTasks.append((para: para, folderPath: folderPath, folderName: folder))
+            }
+        }
 
-                do {
-                    try await generateMOC(folderPath: folderPath, folderName: folder, para: para)
-                } catch {
-                    print("[MOCGenerator] MOC 갱신 실패: \(folder) — \(error.localizedDescription)")
+        let maxConcurrentMOC = 3
+        await withTaskGroup(of: Void.self) { group in
+            var activeTasks = 0
+            for task in folderTasks {
+                if activeTasks >= maxConcurrentMOC {
+                    await group.next()
+                    activeTasks -= 1
                 }
+                group.addTask {
+                    do {
+                        try await self.generateMOC(
+                            folderPath: task.folderPath,
+                            folderName: task.folderName,
+                            para: task.para
+                        )
+                    } catch {
+                        print("[MOCGenerator] MOC 갱신 실패: \(task.folderName) — \(error.localizedDescription)")
+                    }
+                }
+                activeTasks += 1
             }
         }
     }
