@@ -21,6 +21,10 @@ struct MenuBarPopover: View {
                     ReorganizeView()
                 case .dashboard:
                     DashboardView()
+                case .search:
+                    SearchView()
+                case .projectManage:
+                    ProjectManageView()
                 }
 
                 // Footer (hidden during onboarding and settings)
@@ -35,6 +39,12 @@ struct MenuBarPopover: View {
 
                         Button(action: { appState.currentScreen = .dashboard }) {
                             Image(systemName: "chart.bar.fill")
+                                .foregroundColor(.secondary)
+                        }
+                        .buttonStyle(.plain)
+
+                        Button(action: { appState.currentScreen = .search }) {
+                            Image(systemName: "magnifyingglass")
                                 .foregroundColor(.secondary)
                         }
                         .buttonStyle(.plain)

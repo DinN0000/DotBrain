@@ -73,6 +73,9 @@ struct PKMPathManager {
         
         // Create AI companion files for Claude Code / Cursor / OpenClaw compatibility
         try createAICompanionFiles()
+
+        // Create .Templates/ folder with default templates
+        try TemplateService.initializeTemplates(pkmRoot: root)
     }
     
     /// Create AI companion files (CLAUDE.md, AGENTS.md, .cursorrules)
