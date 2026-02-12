@@ -1,10 +1,12 @@
 import Foundation
 
-/// Generates AI companion files for PKM vault
-/// (CLAUDE.md, AGENTS.md, .cursorrules, .claude/agents/, .claude/skills/)
+/// AI Companion 파일 생성 서비스
+/// PKM 볼트에 AI 도구용 가이드 파일을 생성/갱신한다.
+/// - CLAUDE.md (Claude Code), AGENTS.md (OpenClaw/Codex), .cursorrules (Cursor)
+/// - .claude/agents/ (에이전트 워크플로), .claude/skills/ (스킬 정의)
 enum AICompanionService {
 
-    /// Bump this when companion file content changes — triggers overwrite on existing vaults
+    /// Companion 파일 버전 — 내용 변경 시 올리면 기존 볼트도 자동 갱신
     static let version = 2
 
     /// Generate all AI companion files in the PKM root (first-time only)
