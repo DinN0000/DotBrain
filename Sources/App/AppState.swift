@@ -117,6 +117,9 @@ final class AppState: ObservableObject {
         // Coach marks disabled — no longer shown
         self.showCoachMarks = false
 
+        // Update AI companion files if version changed
+        AICompanionService.updateIfNeeded(pkmRoot: pkmRootPath)
+
         // Start inbox watchdog
         setupWatchdog()
     }

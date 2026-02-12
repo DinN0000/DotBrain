@@ -4,13 +4,70 @@ import Foundation
 /// (CLAUDE.md, AGENTS.md, .cursorrules, .claude/agents/, .claude/skills/)
 enum AICompanionService {
 
-    /// Generate all AI companion files in the PKM root
+    /// Bump this when companion file content changes — triggers overwrite on existing vaults
+    static let version = 2
+
+    /// Generate all AI companion files in the PKM root (first-time only)
     static func generateAll(pkmRoot: String) throws {
         try generateClaudeMd(pkmRoot: pkmRoot)
         try generateAgentsMd(pkmRoot: pkmRoot)
         try generateCursorRules(pkmRoot: pkmRoot)
         try generateClaudeAgents(pkmRoot: pkmRoot)
         try generateClaudeSkills(pkmRoot: pkmRoot)
+        try writeVersion(pkmRoot: pkmRoot)
+    }
+
+    /// Check version and regenerate if outdated — call on every app launch
+    static func updateIfNeeded(pkmRoot: String) {
+        let versionFile = (pkmRoot as NSString).appendingPathComponent(".dotbrain-companion-version")
+
+        // Read current version
+        let currentVersion = (try? String(contentsOfFile: versionFile, encoding: .utf8))
+            .flatMap { Int($0.trimmingCharacters(in: .whitespacesAndNewlines)) } ?? 0
+
+        guard currentVersion < version else { return }
+
+        // Force-regenerate all companion files
+        do {
+            try forceGenerateAll(pkmRoot: pkmRoot)
+            try writeVersion(pkmRoot: pkmRoot)
+        } catch {
+            // Non-fatal — vault still works without updated companion files
+        }
+    }
+
+    /// Overwrite all companion files regardless of existence
+    private static func forceGenerateAll(pkmRoot: String) throws {
+        let fm = FileManager.default
+
+        // Root-level files: just overwrite
+        let claudePath = (pkmRoot as NSString).appendingPathComponent("CLAUDE.md")
+        try claudeMdContent.write(toFile: claudePath, atomically: true, encoding: .utf8)
+
+        let agentsPath = (pkmRoot as NSString).appendingPathComponent("AGENTS.md")
+        try agentsMdContent.write(toFile: agentsPath, atomically: true, encoding: .utf8)
+
+        let cursorPath = (pkmRoot as NSString).appendingPathComponent(".cursorrules")
+        try cursorRulesContent.write(toFile: cursorPath, atomically: true, encoding: .utf8)
+
+        // .claude/agents/
+        let agentsDir = (pkmRoot as NSString).appendingPathComponent(".claude/agents")
+        try fm.createDirectory(atPath: agentsDir, withIntermediateDirectories: true)
+        for (name, content) in [("inbox-agent", inboxAgentContent), ("project-agent", projectAgentContent), ("search-agent", searchAgentContent)] {
+            let path = (agentsDir as NSString).appendingPathComponent("\(name).md")
+            try content.write(toFile: path, atomically: true, encoding: .utf8)
+        }
+
+        // .claude/skills/
+        let skillsDir = (pkmRoot as NSString).appendingPathComponent(".claude/skills/inbox-processor")
+        try fm.createDirectory(atPath: skillsDir, withIntermediateDirectories: true)
+        let skillPath = (skillsDir as NSString).appendingPathComponent("SKILL.md")
+        try skillContent.write(toFile: skillPath, atomically: true, encoding: .utf8)
+    }
+
+    private static func writeVersion(pkmRoot: String) throws {
+        let versionFile = (pkmRoot as NSString).appendingPathComponent(".dotbrain-companion-version")
+        try "\(version)".write(toFile: versionFile, atomically: true, encoding: .utf8)
     }
 
     // MARK: - CLAUDE.md
