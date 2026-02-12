@@ -43,7 +43,7 @@ enum TemplateService {
 
     # {{title}}
 
-    ## 관련 노트
+    ## Related Notes
 
     """
 
@@ -65,7 +65,7 @@ enum TemplateService {
 
     ## 포함된 노트
 
-    ## 관련 노트
+    ## Related Notes
 
     """
 
@@ -87,7 +87,7 @@ enum TemplateService {
 
     ## 핵심 내용
 
-    ## 관련 노트
+    ## Related Notes
 
     """
 

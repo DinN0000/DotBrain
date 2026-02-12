@@ -6,7 +6,7 @@ import Foundation
 enum AICompanionService {
 
     /// Bump this when companion file content changes — triggers overwrite on existing vaults
-    static let version = 3
+    static let version = 4
 
     /// Generate all AI companion files in the PKM root (first-time only)
     static func generateAll(pkmRoot: String) throws {
@@ -63,19 +63,29 @@ enum AICompanionService {
             }
         }
 
-        // .claude/agents/ — DotBrain 전용, 덮어쓰기
+        // .claude/agents/ — marker-based safe update
         let agentsDir = (pkmRoot as NSString).appendingPathComponent(".claude/agents")
         try fm.createDirectory(atPath: agentsDir, withIntermediateDirectories: true)
         for (name, content) in [("inbox-agent", inboxAgentContent), ("project-agent", projectAgentContent), ("search-agent", searchAgentContent)] {
             let path = (agentsDir as NSString).appendingPathComponent("\(name).md")
-            try content.write(toFile: path, atomically: true, encoding: .utf8)
+            let wrapped = "\(markerStart)\n\(content)\n\(markerEnd)"
+            if fm.fileExists(atPath: path) {
+                try replaceMarkerSection(at: path, with: wrapped)
+            } else {
+                try wrapped.write(toFile: path, atomically: true, encoding: .utf8)
+            }
         }
 
-        // .claude/skills/ — DotBrain 전용, 덮어쓰기
+        // .claude/skills/ — marker-based safe update
         let skillsDir = (pkmRoot as NSString).appendingPathComponent(".claude/skills/inbox-processor")
         try fm.createDirectory(atPath: skillsDir, withIntermediateDirectories: true)
         let skillPath = (skillsDir as NSString).appendingPathComponent("SKILL.md")
-        try skillContent.write(toFile: skillPath, atomically: true, encoding: .utf8)
+        let wrappedSkill = "\(markerStart)\n\(skillContent)\n\(markerEnd)"
+        if fm.fileExists(atPath: skillPath) {
+            try replaceMarkerSection(at: skillPath, with: wrappedSkill)
+        } else {
+            try wrappedSkill.write(toFile: skillPath, atomically: true, encoding: .utf8)
+        }
     }
 
     /// Replace content between DotBrain markers, keep everything else
@@ -83,10 +93,11 @@ enum AICompanionService {
         let existing = try String(contentsOfFile: path, encoding: .utf8)
 
         if let startRange = existing.range(of: markerStart),
-           let endRange = existing.range(of: markerEnd) {
+           let endRange = existing.range(of: markerEnd),
+           startRange.lowerBound < endRange.lowerBound {
             // Markers found — replace only between them (inclusive)
             var updated = existing
-            updated.replaceSubrange(startRange.lowerBound...endRange.upperBound, with: newSection)
+            updated.replaceSubrange(startRange.lowerBound..<endRange.upperBound, with: newSection)
             // Remove trailing newline duplication
             updated = updated.replacingOccurrences(of: "\n\n\n", with: "\n\n")
             try updated.write(toFile: path, atomically: true, encoding: .utf8)
@@ -413,8 +424,10 @@ enum AICompanionService {
     - `2_Area/`: Ongoing responsibilities without deadlines
     - `3_Resource/`: Reference materials and interests
     - `4_Archive/`: Completed or inactive items
+    - `_Assets/`: Global attachments (binary files)
     - `.Templates/`: Note templates (Note.md, Project.md, Asset.md)
     - `.claude/agents/`: AI agent workflow definitions
+    - `.claude/skills/`: AI skill definitions
 
     ## Navigation Priority
     1. Check **MOC (index notes)**: `FolderName/FolderName.md` — lists all notes in folder with `[[wikilink]] — summary` format
@@ -626,7 +639,7 @@ enum AICompanionService {
 
     ## 포함된 노트
 
-    ## 관련 노트
+    ## Related Notes
     ```
     """
 
@@ -745,7 +758,7 @@ enum AICompanionService {
 
     (추출된 텍스트 요약)
 
-    ## 관련 노트
+    ## Related Notes
     ```
 
     ## 파일 배치

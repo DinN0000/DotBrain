@@ -32,7 +32,7 @@ struct ProjectManager {
         )
 
         // Add project-specific sections
-        let fullContent = indexContent + "\n## 목적\n\n\(summary)\n\n## 현재 상태\n\n진행 중\n\n## 관련 노트\n\n"
+        let fullContent = indexContent + "\n## 목적\n\n\(summary)\n\n## 현재 상태\n\n진행 중\n\n## Related Notes\n\n"
 
         let indexPath = (projectDir as NSString).appendingPathComponent("\(safeName).md")
         try fullContent.write(toFile: indexPath, atomically: true, encoding: .utf8)
