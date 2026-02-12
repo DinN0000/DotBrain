@@ -82,8 +82,9 @@ struct FolderReorganizer {
             for await input in group {
                 collected.append(input)
             }
+            let fileIndex = Dictionary(uniqueKeysWithValues: uniqueFiles.enumerated().map { ($1, $0) })
             return collected.sorted { a, b in
-                uniqueFiles.firstIndex(of: a.filePath)! < uniqueFiles.firstIndex(of: b.filePath)!
+                (fileIndex[a.filePath] ?? Int.max) < (fileIndex[b.filePath] ?? Int.max)
             }
         }
 
@@ -104,6 +105,10 @@ struct FolderReorganizer {
                 onProgress?(mappedProgress, status)
             }
         )
+
+        // Record estimated API cost
+        let estimatedCost = Double(inputs.count) * 0.001  // ~$0.001 per file (rough estimate)
+        StatisticsService.addApiCost(estimatedCost)
 
         // Enrich with related notes — parallel
         let enrichedClassifications: [ClassifyResult] = await withTaskGroup(
@@ -132,9 +137,8 @@ struct FolderReorganizer {
         // Compare and process
         var needsConfirmation: [PendingConfirmation] = []
 
-        for (i, classification) in enrichedClassifications.enumerated() {
-            let progress = 0.7 + Double(i) / Double(classifications.count) * 0.25
-            let input = inputs[i]
+        for (i, (classification, input)) in zip(enrichedClassifications, inputs).enumerated() {
+            let progress = 0.7 + Double(i) / Double(max(enrichedClassifications.count, 1)) * 0.25
             onProgress?(progress, "\(input.fileName) 처리 중...")
 
             let currentCategory = category
@@ -152,6 +156,13 @@ struct FolderReorganizer {
                     classification: classification
                 )
                 processed.append(result)
+                if result.isSuccess {
+                    StatisticsService.recordActivity(
+                        fileName: input.fileName,
+                        category: classification.para.rawValue,
+                        action: "reorganized"
+                    )
+                }
             } else {
                 // Location wrong — ask user to confirm move
                 needsConfirmation.append(PendingConfirmation(
@@ -323,7 +334,8 @@ struct FolderReorganizer {
             if let existingPath = seen[hash] {
                 // Duplicate — merge tags and delete
                 mergeTagsFromFile(source: filePath, into: existingPath)
-                try? FileManager.default.removeItem(atPath: filePath)
+                try? FileManager.default.trashItem(at: URL(fileURLWithPath: filePath), resultingItemURL: nil)
+                StatisticsService.incrementDuplicates()
                 results.append(ProcessedFileResult(
                     fileName: (filePath as NSString).lastPathComponent,
                     para: category,

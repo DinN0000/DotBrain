@@ -7,6 +7,8 @@ struct DashboardView: View {
     @State private var isAuditing: Bool = false
     @State private var repairResult: RepairResult?
     @State private var statusMessage: String = ""
+    @State private var isEnriching: Bool = false
+    @State private var isMOCRegenerating: Bool = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -37,9 +39,12 @@ struct DashboardView: View {
 
                     // MOC regeneration button
                     Button(action: {
+                        guard !isMOCRegenerating else { return }
+                        isMOCRegenerating = true
                         Task {
                             let mocGenerator = MOCGenerator(pkmRoot: appState.pkmRootPath)
                             await mocGenerator.regenerateAll()
+                            await MainActor.run { isMOCRegenerating = false }
                         }
                     }) {
                         HStack {
@@ -50,6 +55,7 @@ struct DashboardView: View {
                     }
                     .buttonStyle(.bordered)
                     .controlSize(.regular)
+                    .disabled(isMOCRegenerating)
 
                     // Full audit button
                     Button(action: {
@@ -57,10 +63,10 @@ struct DashboardView: View {
                         auditReport = nil
                         repairResult = nil
                         let rootPath = appState.pkmRootPath
-                        DispatchQueue.global(qos: .userInitiated).async {
+                        Task.detached(priority: .userInitiated) {
                             let auditor = VaultAuditor(pkmRoot: rootPath)
                             let report = auditor.audit()
-                            DispatchQueue.main.async {
+                            await MainActor.run {
                                 auditReport = report
                                 isAuditing = false
                             }
@@ -89,6 +95,8 @@ struct DashboardView: View {
 
                     // Note enrichment button
                     Button(action: {
+                        guard !isEnriching else { return }
+                        isEnriching = true
                         Task {
                             let enricher = NoteEnricher(pkmRoot: appState.pkmRootPath)
                             let pathManager = PKMPathManager(root: appState.pkmRootPath)
@@ -106,6 +114,7 @@ struct DashboardView: View {
 
                             await MainActor.run {
                                 statusMessage = "\(totalEnriched)개 노트 메타데이터 보완 완료"
+                                isEnriching = false
                             }
                         }
                     }) {
@@ -117,6 +126,7 @@ struct DashboardView: View {
                     }
                     .buttonStyle(.bordered)
                     .controlSize(.regular)
+                    .disabled(isEnriching)
 
                     if !statusMessage.isEmpty {
                         Text(statusMessage)
@@ -274,8 +284,14 @@ struct DashboardView: View {
             HStack(spacing: 8) {
                 if report.totalIssues > 0 && repairResult == nil {
                     Button(action: {
-                        let auditor = VaultAuditor(pkmRoot: appState.pkmRootPath)
-                        repairResult = auditor.repair(report: report)
+                        let rootPath = appState.pkmRootPath
+                        Task.detached(priority: .userInitiated) {
+                            let auditor = VaultAuditor(pkmRoot: rootPath)
+                            let result = auditor.repair(report: report)
+                            await MainActor.run {
+                                repairResult = result
+                            }
+                        }
                     }) {
                         HStack(spacing: 4) {
                             Image(systemName: "wrench.and.screwdriver")

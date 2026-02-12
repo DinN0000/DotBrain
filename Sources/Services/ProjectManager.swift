@@ -232,10 +232,12 @@ struct ProjectManager {
 
                 for file in files where file.hasSuffix(".md") {
                     let filePath = (folderPath as NSString).appendingPathComponent(file)
-                    guard var content = try? String(contentsOfFile: filePath, encoding: .utf8) else { continue }
-                    if content.contains(pattern) {
-                        content = content.replacingOccurrences(of: pattern, with: replacement)
-                        try? content.write(toFile: filePath, atomically: true, encoding: .utf8)
+                    guard let content = try? String(contentsOfFile: filePath, encoding: .utf8) else { continue }
+                    // Remove any existing replacement to prevent double-marking
+                    let normalized = content.replacingOccurrences(of: replacement, with: pattern)
+                    let updated = normalized.replacingOccurrences(of: pattern, with: replacement)
+                    if updated != content {
+                        try? updated.write(toFile: filePath, atomically: true, encoding: .utf8)
                         count += 1
                     }
                 }

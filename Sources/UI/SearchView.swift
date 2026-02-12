@@ -5,6 +5,7 @@ struct SearchView: View {
     @State private var query: String = ""
     @State private var results: [SearchResult] = []
     @State private var hasSearched: Bool = false
+    @State private var isSearching: Bool = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -50,8 +51,20 @@ struct SearchView: View {
             .padding(.horizontal)
             .padding(.top, 8)
 
+            // Search in progress
+            if isSearching {
+                HStack(spacing: 8) {
+                    ProgressView()
+                        .controlSize(.small)
+                    Text("검색 중...")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+
             // Results
-            if hasSearched {
+            if !isSearching && hasSearched {
                 if results.isEmpty {
                     VStack(spacing: 8) {
                         Image(systemName: "magnifyingglass")
@@ -82,7 +95,9 @@ struct SearchView: View {
                         .padding(.vertical, 4)
                     }
                 }
-            } else {
+            }
+
+            if !isSearching && !hasSearched {
                 VStack(spacing: 8) {
                     Image(systemName: "text.magnifyingglass")
                         .font(.title2)
@@ -98,10 +113,19 @@ struct SearchView: View {
     }
 
     private func performSearch() {
-        guard !query.trimmingCharacters(in: .whitespaces).isEmpty else { return }
-        let searcher = VaultSearcher(pkmRoot: appState.pkmRootPath)
-        results = searcher.search(query: query)
-        hasSearched = true
+        let trimmed = query.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty, !isSearching else { return }
+        isSearching = true
+        let pkmRoot = appState.pkmRootPath
+        Task.detached(priority: .userInitiated) {
+            let searcher = VaultSearcher(pkmRoot: pkmRoot)
+            let searchResults = searcher.search(query: trimmed)
+            await MainActor.run {
+                results = searchResults
+                hasSearched = true
+                isSearching = false
+            }
+        }
     }
 }
 

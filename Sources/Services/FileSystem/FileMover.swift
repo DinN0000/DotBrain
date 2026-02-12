@@ -205,8 +205,9 @@ struct FileMover {
         let fileSize = (try? fm.attributesOfItem(atPath: filePath)[.size] as? Int) ?? 0
         let maxHashSize = 500 * 1024 * 1024  // 500MB
         if fileSize <= maxHashSize,
-           let sourceData = fm.contents(atPath: filePath),
-           let dupPath = findDuplicateByData(sourceData, in: assetsDir) {
+           let sourceHash = streamingHash(at: filePath),
+           let dupPath = findDuplicateByHash(sourceHash, in: assetsDir) {
+            StatisticsService.incrementDuplicates()
             // Merge tags into companion markdown if it exists
             let dupFileName = (dupPath as NSString).lastPathComponent
             let companionPath = (targetDir as NSString).appendingPathComponent("\(dupFileName).md")
@@ -257,6 +258,7 @@ struct FileMover {
 
         // Duplicate check: compare body against existing .md files in target
         if let dupPath = findDuplicateByBody(sourceBody, in: targetDir) {
+            StatisticsService.incrementDuplicates()
             // Merge tags into existing file
             let dupFileName = (dupPath as NSString).lastPathComponent
             mergeTags(classification.tags, into: dupPath)
@@ -291,6 +293,21 @@ struct FileMover {
             targetPath: resolvedPath,
             tags: classification.tags
         )
+    }
+
+    // MARK: - Streaming Hash
+
+    /// Compute SHA256 hash by reading in 1MB chunks instead of loading entire file
+    private func streamingHash(at path: String) -> SHA256Digest? {
+        guard let handle = FileHandle(forReadingAtPath: path) else { return nil }
+        defer { try? handle.close() }
+        var hasher = SHA256()
+        while true {
+            let chunk = handle.readData(ofLength: 1024 * 1024) // 1MB chunks
+            guard !chunk.isEmpty else { break }
+            hasher.update(data: chunk)
+        }
+        return hasher.finalize()
     }
 
     // MARK: - Duplicate Detection
@@ -329,17 +346,15 @@ struct FileMover {
         return nil
     }
 
-    /// Find a duplicate binary file by comparing raw data hash
-    private func findDuplicateByData(_ sourceData: Data, in dirPath: String) -> String? {
+    /// Find a duplicate binary file by comparing streaming hash digests
+    private func findDuplicateByHash(_ sourceHash: SHA256Digest, in dirPath: String) -> String? {
         let fm = FileManager.default
         guard let entries = try? fm.contentsOfDirectory(atPath: dirPath) else { return nil }
 
-        let sourceHash = SHA256.hash(data: sourceData)
-
         for entry in entries {
             let filePath = (dirPath as NSString).appendingPathComponent(entry)
-            guard let existingData = fm.contents(atPath: filePath) else { continue }
-            if SHA256.hash(data: existingData) == sourceHash {
+            guard let existingHash = streamingHash(at: filePath) else { continue }
+            if existingHash == sourceHash {
                 return filePath
             }
         }

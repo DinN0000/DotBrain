@@ -68,15 +68,6 @@ struct MenuBarPopover: View {
                 }
             }
 
-            // Coach mark overlay
-            if appState.showCoachMarks && appState.currentScreen == .inbox {
-                CoachMarkOverlay {
-                    withAnimation {
-                        appState.showCoachMarks = false
-                        UserDefaults.standard.set(true, forKey: "hasSeenCoachMarks")
-                    }
-                }
-            }
         }
         .frame(width: 360, height: 480)
     }

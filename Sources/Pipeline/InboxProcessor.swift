@@ -56,8 +56,9 @@ struct InboxProcessor {
             }
 
             // Preserve original file order for stable classification
+            let fileIndex = Dictionary(uniqueKeysWithValues: files.enumerated().map { ($1, $0) })
             return collected.sorted { a, b in
-                files.firstIndex(of: a.filePath)! < files.firstIndex(of: b.filePath)!
+                (fileIndex[a.filePath] ?? Int.max) < (fileIndex[b.filePath] ?? Int.max)
             }
         }
 
@@ -79,6 +80,10 @@ struct InboxProcessor {
                 onProgress?(mappedProgress, status)
             }
         )
+
+        // Record estimated API cost
+        let estimatedCost = Double(inputs.count) * 0.001  // ~$0.001 per file (rough estimate)
+        StatisticsService.addApiCost(estimatedCost)
 
         // Enrich with related notes — parallel (CPU-bound tag matching)
         let enrichedClassifications: [ClassifyResult] = await withTaskGroup(
@@ -110,9 +115,8 @@ struct InboxProcessor {
         var needsConfirmation: [PendingConfirmation] = []
         var failed = 0
 
-        for (i, classification) in enrichedClassifications.enumerated() {
-            let progress = 0.7 + Double(i) / Double(classifications.count) * 0.25
-            let input = inputs[i]
+        for (i, (classification, input)) in zip(enrichedClassifications, inputs).enumerated() {
+            let progress = 0.7 + Double(i) / Double(max(enrichedClassifications.count, 1)) * 0.25
             onProgress?(progress, "\(input.fileName) 이동 중...")
 
             // Low confidence: ask user

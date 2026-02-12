@@ -205,7 +205,11 @@ struct Frontmatter {
             lines.append("para: \(para.rawValue)")
         }
         if !tags.isEmpty {
-            let escapedTags = tags.map { Frontmatter.escapeYAML($0) }
+            let escapedTags = tags.map { tag in
+                let escaped = tag.replacingOccurrences(of: "\\", with: "\\\\")
+                                 .replacingOccurrences(of: "\"", with: "\\\"")
+                return "\"\(escaped)\""
+            }
             lines.append("tags: [\(escapedTags.joined(separator: ", "))]")
         }
         if let created = created {

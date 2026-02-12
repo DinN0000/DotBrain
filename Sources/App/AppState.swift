@@ -6,6 +6,12 @@ import SwiftUI
 final class AppState: ObservableObject {
     static let shared = AppState()
 
+    private static let codeExtensions: Set<String> = [
+        "swift", "py", "js", "ts", "jsx", "tsx", "go", "rs", "java",
+        "c", "cpp", "h", "hpp", "cs", "rb", "php", "kt", "scala",
+        "m", "mm", "sh", "bash", "vue", "svelte",
+    ]
+
     // MARK: - Published State
 
     enum Screen {
@@ -27,7 +33,6 @@ final class AppState: ObservableObject {
     @Published var processingStatus: String = ""
     @Published var processedResults: [ProcessedFileResult] = []
     @Published var pendingConfirmations: [PendingConfirmation] = []
-    @Published var showCoachMarks: Bool = false
     @Published var reorganizeCategory: PARACategory?
     @Published var reorganizeSubfolder: String?
     @Published var processingOrigin: Screen = .inbox
@@ -113,9 +118,6 @@ final class AppState: ObservableObject {
         } else if !self.hasAPIKey {
             self.currentScreen = .settings
         }
-
-        // Coach marks disabled — no longer shown
-        self.showCoachMarks = false
 
         // Update AI companion files if version changed (marker-safe)
         AICompanionService.updateIfNeeded(pkmRoot: pkmRootPath)
@@ -343,12 +345,7 @@ final class AppState: ObservableObject {
 
             // Skip code/dev files by extension
             let ext = (fileName as NSString).pathExtension.lowercased()
-            let codeExts: Set<String> = [
-                "swift", "py", "js", "ts", "jsx", "tsx", "go", "rs", "java",
-                "c", "cpp", "h", "hpp", "cs", "rb", "php", "kt", "scala",
-                "m", "mm", "sh", "bash", "vue", "svelte",
-            ]
-            if codeExts.contains(ext) {
+            if Self.codeExtensions.contains(ext) {
                 skippedCode.append(fileName)
                 continue
             }

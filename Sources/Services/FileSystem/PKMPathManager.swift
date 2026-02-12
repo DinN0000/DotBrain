@@ -23,10 +23,13 @@ struct PKMPathManager {
 
     /// Sanitize a folder name to prevent path traversal attacks
     private func sanitizeFolderName(_ name: String) -> String {
-        // Remove path traversal components and absolute path prefixes
         let components = name.components(separatedBy: "/")
         let safe = components.filter { $0 != ".." && $0 != "." && !$0.isEmpty }
-        return safe.joined(separator: "/")
+        let limited = Array(safe.prefix(3))
+        return limited.map { component in
+            let cleaned = component.replacingOccurrences(of: "\0", with: "")
+            return String(cleaned.prefix(255))
+        }.joined(separator: "/")
     }
 
     /// Get the target directory for a classification result
@@ -34,8 +37,9 @@ struct PKMPathManager {
         if result.para == .project, let project = result.project {
             let safeProject = sanitizeFolderName(project)
             let targetPath = (projectsPath as NSString).appendingPathComponent(safeProject)
-            // Verify the resolved path is within projectsPath
-            guard targetPath.hasPrefix(projectsPath) else { return projectsPath }
+            let resolvedBase = URL(fileURLWithPath: projectsPath).standardizedFileURL.resolvingSymlinksInPath().path
+            let resolvedTarget = URL(fileURLWithPath: targetPath).standardizedFileURL.resolvingSymlinksInPath().path
+            guard resolvedTarget.hasPrefix(resolvedBase) else { return projectsPath }
             return targetPath
         }
 
@@ -45,8 +49,9 @@ struct PKMPathManager {
         }
         let safeFolder = sanitizeFolderName(result.targetFolder)
         let targetPath = (base as NSString).appendingPathComponent(safeFolder)
-        // Verify the resolved path is within the PARA base directory
-        guard targetPath.hasPrefix(base) else { return base }
+        let resolvedBase = URL(fileURLWithPath: base).standardizedFileURL.resolvingSymlinksInPath().path
+        let resolvedTarget = URL(fileURLWithPath: targetPath).standardizedFileURL.resolvingSymlinksInPath().path
+        guard resolvedTarget.hasPrefix(resolvedBase) else { return base }
         return targetPath
     }
 

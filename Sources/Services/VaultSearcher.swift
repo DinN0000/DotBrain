@@ -91,7 +91,7 @@ struct VaultSearcher {
                     }
 
                     // Body match
-                    if body.lowercased().contains(queryLower) {
+                    if body.range(of: queryLower, options: .caseInsensitive) != nil {
                         results.append(SearchResult(
                             noteName: noteName,
                             filePath: filePath,
@@ -107,6 +107,6 @@ struct VaultSearcher {
             }
         }
 
-        return results.sorted { $0.relevanceScore > $1.relevanceScore }
+        return Array(results.sorted { $0.relevanceScore > $1.relevanceScore }.prefix(200))
     }
 }

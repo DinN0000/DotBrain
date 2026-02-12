@@ -97,18 +97,35 @@ struct NoteEnricher {
         let fm = FileManager.default
         guard let files = try? fm.contentsOfDirectory(atPath: folderPath) else { return [] }
 
+        let mdFiles = files.filter { $0.hasSuffix(".md") && !$0.hasPrefix(".") && !$0.hasPrefix("_") }
+            .map { (folderPath as NSString).appendingPathComponent($0) }
+
         var results: [EnrichResult] = []
-        for file in files where file.hasSuffix(".md") && !file.hasPrefix(".") && !file.hasPrefix("_") {
-            let filePath = (folderPath as NSString).appendingPathComponent(file)
-            do {
-                let result = try await enrichNote(at: filePath)
-                if result.fieldsUpdated > 0 {
-                    results.append(result)
+
+        await withTaskGroup(of: EnrichResult?.self) { group in
+            var active = 0
+            var index = 0
+
+            while index < mdFiles.count || !group.isEmpty {
+                // Launch up to 3 concurrent tasks
+                while active < 3 && index < mdFiles.count {
+                    let filePath = mdFiles[index]
+                    index += 1
+                    active += 1
+                    group.addTask {
+                        try? await self.enrichNote(at: filePath)
+                    }
                 }
-            } catch {
-                print("[NoteEnricher] \(file) 보완 실패: \(error.localizedDescription)")
+
+                if let result = await group.next() {
+                    active -= 1
+                    if let r = result {
+                        results.append(r)
+                    }
+                }
             }
         }
+
         return results
     }
 

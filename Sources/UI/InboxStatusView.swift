@@ -159,6 +159,7 @@ struct InboxStatusView: View {
     // MARK: - Drag & Drop
 
     private func handleDrop(_ providers: [NSItemProvider]) {
+        let lock = NSLock()
         var urls: [URL] = []
         let group = DispatchGroup()
 
@@ -168,7 +169,7 @@ struct InboxStatusView: View {
             provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { item, _ in
                 defer { group.leave() }
                 if let data = item as? Data, let url = URL(dataRepresentation: data, relativeTo: nil) {
-                    urls.append(url)
+                    lock.withLock { urls.append(url) }
                 }
             }
         }
