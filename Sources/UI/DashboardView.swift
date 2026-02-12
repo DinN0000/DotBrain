@@ -41,8 +41,9 @@ struct DashboardView: View {
                     Button(action: {
                         guard !isMOCRegenerating else { return }
                         isMOCRegenerating = true
-                        Task {
-                            let mocGenerator = MOCGenerator(pkmRoot: appState.pkmRootPath)
+                        let rootPath = appState.pkmRootPath
+                        Task.detached(priority: .userInitiated) {
+                            let mocGenerator = MOCGenerator(pkmRoot: rootPath)
                             await mocGenerator.regenerateAll()
                             await MainActor.run { isMOCRegenerating = false }
                         }
@@ -97,9 +98,10 @@ struct DashboardView: View {
                     Button(action: {
                         guard !isEnriching else { return }
                         isEnriching = true
-                        Task {
-                            let enricher = NoteEnricher(pkmRoot: appState.pkmRootPath)
-                            let pathManager = PKMPathManager(root: appState.pkmRootPath)
+                        let rootPath = appState.pkmRootPath
+                        Task.detached(priority: .userInitiated) {
+                            let enricher = NoteEnricher(pkmRoot: rootPath)
+                            let pathManager = PKMPathManager(root: rootPath)
                             let fm = FileManager.default
                             var totalEnriched = 0
 
