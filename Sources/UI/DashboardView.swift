@@ -103,19 +103,21 @@ struct DashboardView: View {
                             let enricher = NoteEnricher(pkmRoot: rootPath)
                             let pathManager = PKMPathManager(root: rootPath)
                             let fm = FileManager.default
-                            var totalEnriched = 0
+                            let categories = [pathManager.projectsPath, pathManager.areaPath, pathManager.resourcePath]
+                            var count = 0
 
-                            for basePath in [pathManager.projectsPath, pathManager.areaPath, pathManager.resourcePath] {
+                            for basePath in categories {
                                 guard let folders = try? fm.contentsOfDirectory(atPath: basePath) else { continue }
                                 for folder in folders where !folder.hasPrefix(".") && !folder.hasPrefix("_") {
                                     let folderPath = (basePath as NSString).appendingPathComponent(folder)
                                     let results = await enricher.enrichFolder(at: folderPath)
-                                    totalEnriched += results.count
+                                    count += results.count
                                 }
                             }
 
+                            let total = count
                             await MainActor.run {
-                                statusMessage = "\(totalEnriched)개 노트 메타데이터 보완 완료"
+                                statusMessage = "\(total)개 노트 메타데이터 보완 완료"
                                 isEnriching = false
                             }
                         }
