@@ -71,7 +71,7 @@ struct PKMPathManager {
             try fm.createDirectory(atPath: folder, withIntermediateDirectories: true)
         }
         
-        // Create AI companion files for Claude Code / Cursor / OpenClaw compatibility
+        // AI Companion 파일 생성 (CLAUDE.md, AGENTS.md, .cursorrules, 에이전트, 스킬)
         try AICompanionService.generateAll(pkmRoot: root)
 
         // Create .Templates/ folder with default templates
