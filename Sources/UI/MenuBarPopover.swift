@@ -4,70 +4,67 @@ struct MenuBarPopover: View {
     @EnvironmentObject var appState: AppState
 
     var body: some View {
-        ZStack {
-            VStack(spacing: 0) {
-                switch appState.currentScreen {
-                case .onboarding:
-                    OnboardingView()
-                case .inbox:
-                    InboxStatusView()
-                case .processing:
-                    ProcessingView()
-                case .results:
-                    ResultsView()
-                case .settings:
-                    SettingsView()
-                case .reorganize:
-                    ReorganizeView()
-                case .dashboard:
-                    DashboardView()
-                case .search:
-                    SearchView()
-                case .projectManage:
-                    ProjectManageView()
-                }
-
-                // Footer (hidden during onboarding and settings)
-                if appState.currentScreen != .settings && appState.currentScreen != .onboarding {
-                    Divider()
-                    HStack {
-                        Button(action: { appState.currentScreen = .settings }) {
-                            Image(systemName: "gear")
-                                .foregroundColor(.secondary)
-                        }
-                        .buttonStyle(.plain)
-
-                        Button(action: { appState.currentScreen = .dashboard }) {
-                            Image(systemName: "chart.bar.fill")
-                                .foregroundColor(.secondary)
-                        }
-                        .buttonStyle(.plain)
-
-                        Button(action: { appState.currentScreen = .search }) {
-                            Image(systemName: "magnifyingglass")
-                                .foregroundColor(.secondary)
-                        }
-                        .buttonStyle(.plain)
-
-                        Spacer()
-
-                        Text("DotBrain")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-
-                        Spacer()
-
-                        Button(action: { NSApp.terminate(nil) }) {
-                            Image(systemName: "power")
-                                .foregroundColor(.secondary)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                    .padding(.horizontal)
-                    .padding(.vertical, 8)
-                }
+        VStack(spacing: 0) {
+            switch appState.currentScreen {
+            case .onboarding:
+                OnboardingView()
+            case .inbox:
+                InboxStatusView()
+            case .processing:
+                ProcessingView()
+            case .results:
+                ResultsView()
+            case .settings:
+                SettingsView()
+            case .reorganize:
+                ReorganizeView()
+            case .dashboard:
+                DashboardView()
+            case .search:
+                SearchView()
+            case .projectManage:
+                ProjectManageView()
             }
 
+            // Footer (hidden during onboarding and settings)
+            if appState.currentScreen != .settings && appState.currentScreen != .onboarding {
+                Divider()
+                HStack {
+                    Button(action: { appState.currentScreen = .settings }) {
+                        Image(systemName: "gear")
+                            .foregroundColor(.secondary)
+                    }
+                    .buttonStyle(.plain)
+
+                    Button(action: { appState.currentScreen = .dashboard }) {
+                        Image(systemName: "chart.bar.fill")
+                            .foregroundColor(.secondary)
+                    }
+                    .buttonStyle(.plain)
+
+                    Button(action: { appState.currentScreen = .search }) {
+                        Image(systemName: "magnifyingglass")
+                            .foregroundColor(.secondary)
+                    }
+                    .buttonStyle(.plain)
+
+                    Spacer()
+
+                    Text("DotBrain")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+
+                    Spacer()
+
+                    Button(action: { NSApp.terminate(nil) }) {
+                        Image(systemName: "power")
+                            .foregroundColor(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(.horizontal)
+                .padding(.vertical, 8)
+            }
         }
         .frame(width: 360, height: 480)
     }

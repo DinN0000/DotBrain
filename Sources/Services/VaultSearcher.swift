@@ -2,6 +2,7 @@ import Foundation
 
 struct VaultSearcher {
     let pkmRoot: String
+    private static let maxResults = 200
 
     private var pathManager: PKMPathManager {
         PKMPathManager(root: pkmRoot)
@@ -107,6 +108,6 @@ struct VaultSearcher {
             }
         }
 
-        return Array(results.sorted { $0.relevanceScore > $1.relevanceScore }.prefix(200))
+        return Array(results.sorted { $0.relevanceScore > $1.relevanceScore }.prefix(Self.maxResults))
     }
 }

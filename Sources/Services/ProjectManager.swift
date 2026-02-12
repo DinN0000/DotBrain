@@ -170,18 +170,28 @@ struct ProjectManager {
     // MARK: - Private Helpers
 
     private func sanitizeName(_ name: String) -> String {
-        name.replacingOccurrences(of: "/", with: "_")
-            .replacingOccurrences(of: "..", with: "")
-            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let components = name.components(separatedBy: "/")
+        let safe = components.filter { $0 != ".." && $0 != "." && !$0.isEmpty }
+        return safe.prefix(3).map { component in
+            let cleaned = component
+                .replacingOccurrences(of: "\0", with: "")
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            return String(cleaned.prefix(255))
+        }.joined(separator: "/")
     }
 
+    /// Recursively update all .md files under a directory via FileManager.enumerator (single OS call)
     private func updateAllNotes(in directory: String, status: NoteStatus, para: PARACategory) throws -> Int {
         let fm = FileManager.default
-        guard let files = try? fm.contentsOfDirectory(atPath: directory) else { return 0 }
         var count = 0
 
-        for file in files where file.hasSuffix(".md") {
-            let filePath = (directory as NSString).appendingPathComponent(file)
+        guard let enumerator = fm.enumerator(atPath: directory) else { return 0 }
+        while let relativePath = enumerator.nextObject() as? String {
+            guard relativePath.hasSuffix(".md") else { continue }
+            let fileName = (relativePath as NSString).lastPathComponent
+            guard !fileName.hasPrefix("."), !fileName.hasPrefix("_") else { continue }
+
+            let filePath = (directory as NSString).appendingPathComponent(relativePath)
             guard var content = try? String(contentsOfFile: filePath, encoding: .utf8) else { continue }
 
             let (existing, body) = Frontmatter.parse(markdown: content)
@@ -197,50 +207,79 @@ struct ProjectManager {
     }
 
     private func markReferencesCompleted(projectName: String) {
-        replaceInVault(
+        markInVault(
             pattern: "[[\(projectName)]]",
             replacement: "[[\(projectName)]] (완료됨)"
         )
     }
 
     private func unmarkReferencesCompleted(projectName: String) {
-        replaceInVault(
+        markInVault(
             pattern: "[[\(projectName)]] (완료됨)",
             replacement: "[[\(projectName)]]"
         )
     }
 
     private func updateWikiLinks(from oldName: String, to newName: String) -> Int {
-        replaceInVault(
+        renameInVault(
             pattern: "[[\(oldName)]]",
             replacement: "[[\(newName)]]"
         )
     }
 
-    @discardableResult
-    private func replaceInVault(pattern: String, replacement: String) -> Int {
+    /// Collect all .md files across PARA categories recursively (single enumerator per category)
+    private func collectVaultMarkdownFiles() -> [String] {
         let fm = FileManager.default
         let categories = [pathManager.projectsPath, pathManager.areaPath, pathManager.resourcePath, pathManager.archivePath]
-        var count = 0
+        var files: [String] = []
 
         for basePath in categories {
-            guard let folders = try? fm.contentsOfDirectory(atPath: basePath) else { continue }
-            for folder in folders {
-                guard !folder.hasPrefix("."), !folder.hasPrefix("_") else { continue }
-                let folderPath = (basePath as NSString).appendingPathComponent(folder)
-                guard let files = try? fm.contentsOfDirectory(atPath: folderPath) else { continue }
+            guard let enumerator = fm.enumerator(atPath: basePath) else { continue }
+            while let relativePath = enumerator.nextObject() as? String {
+                guard relativePath.hasSuffix(".md") else { continue }
+                let fileName = (relativePath as NSString).lastPathComponent
+                guard !fileName.hasPrefix("."), !fileName.hasPrefix("_") else { continue }
+                // Skip hidden/system directories
+                let components = relativePath.components(separatedBy: "/")
+                guard !components.contains(where: { $0.hasPrefix(".") || $0.hasPrefix("_") }) else { continue }
+                files.append((basePath as NSString).appendingPathComponent(relativePath))
+            }
+        }
 
-                for file in files where file.hasSuffix(".md") {
-                    let filePath = (folderPath as NSString).appendingPathComponent(file)
-                    guard let content = try? String(contentsOfFile: filePath, encoding: .utf8) else { continue }
-                    // Remove any existing replacement to prevent double-marking
-                    let normalized = content.replacingOccurrences(of: replacement, with: pattern)
-                    let updated = normalized.replacingOccurrences(of: pattern, with: replacement)
-                    if updated != content {
-                        try? updated.write(toFile: filePath, atomically: true, encoding: .utf8)
-                        count += 1
-                    }
-                }
+        return files
+    }
+
+    /// Replace with normalization — prevents double-marking for mark/unmark operations
+    @discardableResult
+    private func markInVault(pattern: String, replacement: String) -> Int {
+        let files = collectVaultMarkdownFiles()
+        var count = 0
+
+        for filePath in files {
+            guard let content = try? String(contentsOfFile: filePath, encoding: .utf8) else { continue }
+            let normalized = content.replacingOccurrences(of: replacement, with: pattern)
+            let updated = normalized.replacingOccurrences(of: pattern, with: replacement)
+            if updated != content {
+                try? updated.write(toFile: filePath, atomically: true, encoding: .utf8)
+                count += 1
+            }
+        }
+
+        return count
+    }
+
+    /// Simple replace — for wiki link renames where normalization would be destructive
+    @discardableResult
+    private func renameInVault(pattern: String, replacement: String) -> Int {
+        let files = collectVaultMarkdownFiles()
+        var count = 0
+
+        for filePath in files {
+            guard let content = try? String(contentsOfFile: filePath, encoding: .utf8) else { continue }
+            let updated = content.replacingOccurrences(of: pattern, with: replacement)
+            if updated != content {
+                try? updated.write(toFile: filePath, atomically: true, encoding: .utf8)
+                count += 1
             }
         }
 

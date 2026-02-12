@@ -1,7 +1,7 @@
 import Foundation
 
 /// Enriches individual note metadata without moving the file
-struct NoteEnricher {
+struct NoteEnricher: Sendable {
     let pkmRoot: String
     private let aiService = AIService()
     private let maxContentLength = 5000
@@ -17,7 +17,7 @@ struct NoteEnricher {
         // Determine which fields need filling
         let needsPara = existing.para == nil
         let needsTags = existing.tags.isEmpty
-        let needsSummary = existing.summary == nil || (existing.summary ?? "").isEmpty
+        let needsSummary = (existing.summary ?? "").isEmpty
         let needsSource = existing.source == nil
 
         // If all fields are present, nothing to do
@@ -83,6 +83,7 @@ struct NoteEnricher {
         }
         if updated.status == nil {
             updated.status = .active
+            fieldsUpdated += 1
         }
 
         // Write back
