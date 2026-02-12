@@ -6,6 +6,7 @@ struct DashboardView: View {
     @State private var auditReport: AuditReport?
     @State private var isAuditing: Bool = false
     @State private var repairResult: RepairResult?
+    @State private var statusMessage: String = ""
 
     var body: some View {
         VStack(spacing: 0) {
@@ -74,6 +75,55 @@ struct DashboardView: View {
                     .buttonStyle(.bordered)
                     .controlSize(.regular)
                     .disabled(isAuditing)
+
+                    // Project management button
+                    Button(action: { appState.currentScreen = .projectManage }) {
+                        HStack {
+                            Image(systemName: "folder.badge.gearshape")
+                            Text("프로젝트 관리")
+                        }
+                        .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.regular)
+
+                    // Note enrichment button
+                    Button(action: {
+                        Task {
+                            let enricher = NoteEnricher(pkmRoot: appState.pkmRootPath)
+                            let pathManager = PKMPathManager(root: appState.pkmRootPath)
+                            let fm = FileManager.default
+                            var totalEnriched = 0
+
+                            for basePath in [pathManager.projectsPath, pathManager.areaPath, pathManager.resourcePath] {
+                                guard let folders = try? fm.contentsOfDirectory(atPath: basePath) else { continue }
+                                for folder in folders where !folder.hasPrefix(".") && !folder.hasPrefix("_") {
+                                    let folderPath = (basePath as NSString).appendingPathComponent(folder)
+                                    let results = await enricher.enrichFolder(at: folderPath)
+                                    totalEnriched += results.count
+                                }
+                            }
+
+                            await MainActor.run {
+                                statusMessage = "\(totalEnriched)개 노트 메타데이터 보완 완료"
+                            }
+                        }
+                    }) {
+                        HStack {
+                            Image(systemName: "text.badge.star")
+                            Text("노트 메타데이터 보완")
+                        }
+                        .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.regular)
+
+                    if !statusMessage.isEmpty {
+                        Text(statusMessage)
+                            .font(.caption)
+                            .foregroundColor(.green)
+                            .padding(.vertical, 4)
+                    }
 
                     // Audit progress / results
                     if isAuditing {

@@ -3,7 +3,7 @@ import Foundation
 /// Handles frontmatter injection into markdown files
 enum FrontmatterWriter {
     /// Inject frontmatter into markdown content, with optional [[project]] and related note wikilinks.
-    /// Completely replaces existing frontmatter with DotBrain format (only preserves `created`).
+    /// Merges with existing frontmatter — existing values take priority over AI-generated ones.
     static func injectFrontmatter(
         into content: String,
         para: PARACategory,
@@ -26,10 +26,15 @@ enum FrontmatterWriter {
             file: file
         )
 
-        // Only preserve `created` from existing frontmatter
-        if let existingCreated = existing.created {
-            newFM.created = existingCreated
-        }
+        // Merge policy: existing values take priority over AI-generated ones
+        if existing.para != nil { newFM.para = existing.para }
+        if !existing.tags.isEmpty { newFM.tags = existing.tags }
+        if let existingCreated = existing.created { newFM.created = existingCreated }
+        if existing.status != nil { newFM.status = existing.status }
+        if let s = existing.summary, !s.isEmpty { newFM.summary = s }
+        if existing.source != nil { newFM.source = existing.source }
+        if let p = existing.project, !p.isEmpty { newFM.project = p }
+        if existing.file != nil { newFM.file = existing.file }
 
         var result = newFM.stringify() + "\n" + body
 

@@ -16,6 +16,8 @@ final class AppState: ObservableObject {
         case settings
         case reorganize
         case dashboard
+        case search
+        case projectManage
     }
 
     @Published var currentScreen: Screen = .inbox
@@ -80,6 +82,10 @@ final class AppState: ObservableObject {
         case .reorganize:
             return "·_·?"
         case .dashboard:
+            return "·_·"
+        case .search:
+            return "·_·?"
+        case .projectManage:
             return "·_·"
         }
     }
