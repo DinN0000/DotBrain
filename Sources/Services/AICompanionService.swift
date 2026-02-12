@@ -36,21 +36,33 @@ enum AICompanionService {
         }
     }
 
-    /// Overwrite all companion files regardless of existence
+    private static let markerStart = "<!-- DotBrain:start -->"
+    private static let markerEnd = "<!-- DotBrain:end -->"
+
+    /// Update all AI guide files, preserving user content outside markers
     private static func forceGenerateAll(pkmRoot: String) throws {
         let fm = FileManager.default
 
-        // Root-level files: just overwrite
-        let claudePath = (pkmRoot as NSString).appendingPathComponent("CLAUDE.md")
-        try claudeMdContent.write(toFile: claudePath, atomically: true, encoding: .utf8)
+        // Root-level files: marker-based safe update
+        let files: [(String, String)] = [
+            ("CLAUDE.md", claudeMdContent),
+            ("AGENTS.md", agentsMdContent),
+            (".cursorrules", cursorRulesContent),
+        ]
 
-        let agentsPath = (pkmRoot as NSString).appendingPathComponent("AGENTS.md")
-        try agentsMdContent.write(toFile: agentsPath, atomically: true, encoding: .utf8)
+        for (fileName, content) in files {
+            let path = (pkmRoot as NSString).appendingPathComponent(fileName)
+            let wrapped = "\(markerStart)\n\(content)\n\(markerEnd)"
 
-        let cursorPath = (pkmRoot as NSString).appendingPathComponent(".cursorrules")
-        try cursorRulesContent.write(toFile: cursorPath, atomically: true, encoding: .utf8)
+            if fm.fileExists(atPath: path) {
+                try replaceMarkerSection(at: path, with: wrapped)
+            } else {
+                let withUserSection = wrapped + "\n\n<!-- 아래에 자유롭게 추가하세요 -->\n"
+                try withUserSection.write(toFile: path, atomically: true, encoding: .utf8)
+            }
+        }
 
-        // .claude/agents/
+        // .claude/agents/ — DotBrain 전용, 덮어쓰기
         let agentsDir = (pkmRoot as NSString).appendingPathComponent(".claude/agents")
         try fm.createDirectory(atPath: agentsDir, withIntermediateDirectories: true)
         for (name, content) in [("inbox-agent", inboxAgentContent), ("project-agent", projectAgentContent), ("search-agent", searchAgentContent)] {
@@ -58,11 +70,30 @@ enum AICompanionService {
             try content.write(toFile: path, atomically: true, encoding: .utf8)
         }
 
-        // .claude/skills/
+        // .claude/skills/ — DotBrain 전용, 덮어쓰기
         let skillsDir = (pkmRoot as NSString).appendingPathComponent(".claude/skills/inbox-processor")
         try fm.createDirectory(atPath: skillsDir, withIntermediateDirectories: true)
         let skillPath = (skillsDir as NSString).appendingPathComponent("SKILL.md")
         try skillContent.write(toFile: skillPath, atomically: true, encoding: .utf8)
+    }
+
+    /// Replace content between DotBrain markers, keep everything else
+    private static func replaceMarkerSection(at path: String, with newSection: String) throws {
+        let existing = try String(contentsOfFile: path, encoding: .utf8)
+
+        if let startRange = existing.range(of: markerStart),
+           let endRange = existing.range(of: markerEnd) {
+            // Markers found — replace only between them (inclusive)
+            var updated = existing
+            updated.replaceSubrange(startRange.lowerBound...endRange.upperBound, with: newSection)
+            // Remove trailing newline duplication
+            updated = updated.replacingOccurrences(of: "\n\n\n", with: "\n\n")
+            try updated.write(toFile: path, atomically: true, encoding: .utf8)
+        } else {
+            // No markers — prepend DotBrain section, keep entire existing content as user section
+            let merged = newSection + "\n\n<!-- 아래는 기존 사용자 내용입니다 -->\n\n" + existing
+            try merged.write(toFile: path, atomically: true, encoding: .utf8)
+        }
     }
 
     private static func writeVersion(pkmRoot: String) throws {
@@ -76,7 +107,8 @@ enum AICompanionService {
         let fm = FileManager.default
         let path = (pkmRoot as NSString).appendingPathComponent("CLAUDE.md")
         guard !fm.fileExists(atPath: path) else { return }
-        try claudeMdContent.write(toFile: path, atomically: true, encoding: .utf8)
+        let content = "\(markerStart)\n\(claudeMdContent)\n\(markerEnd)\n\n<!-- 아래에 자유롭게 추가하세요 -->\n"
+        try content.write(toFile: path, atomically: true, encoding: .utf8)
     }
 
     private static let claudeMdContent = """
@@ -298,7 +330,8 @@ enum AICompanionService {
         let fm = FileManager.default
         let path = (pkmRoot as NSString).appendingPathComponent("AGENTS.md")
         guard !fm.fileExists(atPath: path) else { return }
-        try agentsMdContent.write(toFile: path, atomically: true, encoding: .utf8)
+        let content = "\(markerStart)\n\(agentsMdContent)\n\(markerEnd)\n\n<!-- 아래에 자유롭게 추가하세요 -->\n"
+        try content.write(toFile: path, atomically: true, encoding: .utf8)
     }
 
     private static let agentsMdContent = """
@@ -364,7 +397,8 @@ enum AICompanionService {
         let fm = FileManager.default
         let path = (pkmRoot as NSString).appendingPathComponent(".cursorrules")
         guard !fm.fileExists(atPath: path) else { return }
-        try cursorRulesContent.write(toFile: path, atomically: true, encoding: .utf8)
+        let content = "\(markerStart)\n\(cursorRulesContent)\n\(markerEnd)\n\n<!-- 아래에 자유롭게 추가하세요 -->\n"
+        try content.write(toFile: path, atomically: true, encoding: .utf8)
     }
 
     private static let cursorRulesContent = """
