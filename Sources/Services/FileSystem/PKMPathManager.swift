@@ -71,7 +71,7 @@ struct PKMPathManager {
             try fm.createDirectory(atPath: folder, withIntermediateDirectories: true)
         }
         
-        // AI Companion 파일 생성 (CLAUDE.md, AGENTS.md, .cursorrules, 에이전트, 스킬)
+        // Generate AI companion files (CLAUDE.md, AGENTS.md, .cursorrules, agents, skills)
         try AICompanionService.generateAll(pkmRoot: root)
 
         // Create .Templates/ folder with default templates

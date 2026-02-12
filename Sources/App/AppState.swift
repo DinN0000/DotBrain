@@ -117,7 +117,7 @@ final class AppState: ObservableObject {
         // Coach marks disabled — no longer shown
         self.showCoachMarks = false
 
-        // AI Companion 파일 버전 확인 → 갱신 필요 시 마커 영역만 교체
+        // Update AI companion files if version changed (marker-safe)
         AICompanionService.updateIfNeeded(pkmRoot: pkmRootPath)
 
         // Start inbox watchdog
