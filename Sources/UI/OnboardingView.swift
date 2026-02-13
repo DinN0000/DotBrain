@@ -358,7 +358,16 @@ struct OnboardingView: View {
                             .font(.caption)
                     }
 
-                    Button(action: { showingKey.toggle() }) {
+                    Button(action: {
+                        showingKey.toggle()
+                        if showingKey, keyInput == "••••••••", provider.hasAPIKey() {
+                            if let key = provider == .claude ? KeychainService.getAPIKey() : KeychainService.getGeminiAPIKey() {
+                                keyInput = key
+                            }
+                        } else if !showingKey, provider.hasAPIKey(), keyInput.hasPrefix(provider.keyPrefix) {
+                            keyInput = "••••••••"
+                        }
+                    }) {
                         Image(systemName: showingKey ? "eye.slash" : "eye")
                     }
                     .buttonStyle(.plain)
@@ -371,7 +380,7 @@ struct OnboardingView: View {
                     }
                     .buttonStyle(.bordered)
                     .controlSize(.small)
-                    .disabled(keyInput.isEmpty)
+                    .disabled(keyInput.isEmpty || keyInput == "••••••••")
 
                     if let msg = keySaveMessage {
                         Text(msg)
