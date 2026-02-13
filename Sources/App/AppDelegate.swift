@@ -80,7 +80,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let imageSize = NSSize(width: ceil(size.width) + 2, height: 22)
 
         let image = NSImage(size: imageSize, flipped: false) { rect in
-            let y = (rect.height - size.height) / 2
+            let y = (rect.height - size.height) / 2 + 1
             (text as NSString).draw(at: NSPoint(x: 1, y: y), withAttributes: attrs)
             return true
         }
