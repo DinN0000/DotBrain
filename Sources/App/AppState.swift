@@ -99,7 +99,7 @@ final class AppState: ObservableObject {
 
     private init() {
         self.pkmRootPath = UserDefaults.standard.string(forKey: "pkmRootPath")
-            ?? (NSHomeDirectory() + "/Documents/PKM-DotBrain")
+            ?? (NSHomeDirectory() + "/Documents/DotBrain")
 
         // Load saved provider or default to Gemini (free tier available)
         if let savedProvider = UserDefaults.standard.string(forKey: "selectedProvider"),

@@ -45,8 +45,9 @@ curl -sL https://raw.githubusercontent.com/DinN0000/DotBrain/main/install.sh | b
 <summary><b>소스에서 직접 빌드</b></summary>
 
 ```bash
-git clone https://github.com/DinN0000/DotBrain.git
-cd DotBrain
+# PKM 데이터 폴더(~/Documents/DotBrain)와 겹치지 않도록 별도 경로에 클론
+git clone https://github.com/DinN0000/DotBrain.git ~/Developer/DotBrain
+cd ~/Developer/DotBrain
 swift build -c release
 # 바이너리: .build/release/DotBrain
 ```
@@ -269,8 +270,8 @@ PARA(Projects, Areas, Resources, Archive) 프레임워크는 사람이 설계한
 
 2단계 분류 전략(Fast → Precise)도 같은 철학입니다. 대부분의 파일은 가벼운 모델로 빠르게 분류하고, 정말 애매한 것만 정밀 모델에 보냅니다. "AI가 다 해줄 테니 비싼 모델 쓰세요"가 아니라, **사용자의 비용 감각을 존중하는 설계**입니다.
 
-### 소스 코드와 사용자 데이터의 분리
+### 코드 파일 필터링
 
 PKM 폴더에 개발 파일이 섞이면 생기는 문제, 다들 경험해보셨을 겁니다. AI가 `node_modules`를 "리소스"로 분류한다거나, `.gitignore`에 프론트매터를 주입한다거나.
 
-DotBrain은 기본 PKM 경로를 `PKM-DotBrain`이라는 별도 폴더로 분리하고, 코드 파일(`.swift`, `.py`, `.js` 등)이 감지되면 경고를 띄웁니다. 지식 관리 도구가 개발 환경을 침범하지 않도록, 그리고 그 반대도 일어나지 않도록.
+DotBrain은 코드 파일(`.swift`, `.py`, `.js` 등)이 인박스에 들어오면 자동으로 건너뛰고 경고를 띄웁니다. 지식 관리 도구가 개발 환경을 침범하지 않도록, 그리고 그 반대도 일어나지 않도록.
