@@ -754,6 +754,8 @@ struct OnboardingView: View {
 
     private func completeOnboarding() {
         UserDefaults.standard.set(true, forKey: "onboardingCompleted")
+        AICompanionService.updateIfNeeded(pkmRoot: appState.pkmRootPath)
+        appState.setupWatchdog()
         appState.currentScreen = .inbox
     }
 }

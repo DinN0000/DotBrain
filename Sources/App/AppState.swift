@@ -119,11 +119,11 @@ final class AppState: ObservableObject {
             self.currentScreen = .settings
         }
 
-        // Update AI companion files if version changed (marker-safe)
-        AICompanionService.updateIfNeeded(pkmRoot: pkmRootPath)
-
-        // Start inbox watchdog
-        setupWatchdog()
+        // Only start services if onboarding is already completed
+        if UserDefaults.standard.bool(forKey: "onboardingCompleted") {
+            AICompanionService.updateIfNeeded(pkmRoot: pkmRootPath)
+            setupWatchdog()
+        }
     }
 
     // MARK: - Actions
