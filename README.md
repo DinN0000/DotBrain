@@ -233,7 +233,7 @@ DotBrain은 사용자의 Obsidian 볼트에 `CLAUDE.md`, `AGENTS.md`, `.cursorru
 
 ---
 
-## ❓ 문제 해결
+## ❓ Troubleshooting
 
 <details>
 <summary><b>"확인되지 않은 개발자" / "손상되어 열 수 없음"</b></summary>
