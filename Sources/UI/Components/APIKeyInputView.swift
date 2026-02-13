@@ -114,7 +114,16 @@ struct APIKeyInputView: View {
                         .font(.caption)
                 }
 
-                Button(action: { showingKey.wrappedValue.toggle() }) {
+                Button(action: {
+                    showingKey.wrappedValue.toggle()
+                    if showingKey.wrappedValue, keyInput.wrappedValue == "••••••••", hasKey {
+                        if let key = provider == .claude ? KeychainService.getAPIKey() : KeychainService.getGeminiAPIKey() {
+                            keyInput.wrappedValue = key
+                        }
+                    } else if !showingKey.wrappedValue, hasKey, keyInput.wrappedValue.hasPrefix(provider.keyPrefix) {
+                        keyInput.wrappedValue = "••••••••"
+                    }
+                }) {
                     Image(systemName: showingKey.wrappedValue ? "eye.slash" : "eye")
                 }
                 .buttonStyle(.plain)
