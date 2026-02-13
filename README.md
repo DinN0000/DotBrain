@@ -22,7 +22,6 @@ Context는 AI의 탐색 기반이 되어, 당신의 지식을 더 깊이 이해�
 ## 🧐 What is DotBrain?
 
 지식 관리의 병목은 축적이 아니라 **활용**입니다.
-
 자료는 쉽게 쌓이지만,
 찾기 좋게 정리하고 맥락을 연결하는 일은 어렵습니다.
 
@@ -83,10 +82,10 @@ _Inbox/에 파일 추가 (드래그앤드롭 / Cmd+V)
     ↓
 파일 이동 + 프론트매터 주입 + 중복 감지
     ↓
-결과 화면
+분류 완료
 ```
 
-### 폴더 재정리
+### 폴더 정리
 
 기존 PARA 폴더를 AI가 다시 정리합니다:
 
@@ -102,7 +101,7 @@ AI 재분류
     └── 위치 틀림 → 사용자에게 이동 제안
 ```
 
-### AI 분류 전략
+### AI 비용 효율
 
 | 단계 | 모델 | 비용 | 방식 |
 |------|------|------|------|
@@ -111,9 +110,7 @@ AI 재분류
 
 대부분의 파일은 Stage 1에서 끝납니다. 100개 파일 기준 Claude ~$0.20, Gemini는 무료 티어 내 가능.
 
----
-
-## Frontmatter 표준화
+### Frontmatter 표준화
 
 DotBrain은 모든 노트에 대해 사람과 AI가 모두 이해할 수 있는 표준 규격을 적용합니다.
 
@@ -187,42 +184,6 @@ PKM Root/
 | 같은 이름, 다른 내용 | 파일명 비교 | 사용자에게 확인 |
 | 인덱스 노트와 이름 충돌 | `폴더명.md` 비교 | 사용자에게 확인 |
 
----
-
-## 설치 참고
-
-### 설치 스크립트가 하는 일
-
-- `~/Applications/DotBrain.app` 번들 생성
-- 로그인 시 자동 시작 (LaunchAgent)
-- 비정상 종료 시 자동 재시작
-
-### 문제 해결
-
-<details>
-<summary><b>"확인되지 않은 개발자" / "손상되어 열 수 없음"</b></summary>
-
-Apple 코드서명이 없어서 Gatekeeper가 차단할 수 있습니다. 설치 스크립트가 자동 처리하지만, 직접 다운로드한 경우:
-
-```bash
-xattr -cr ~/Applications/DotBrain.app
-```
-
-또는: **시스템 설정 → 개인정보 보호 및 보안** → "확인 없이 열기"
-</details>
-
-<details>
-<summary><b>폴더 접근 권한 팝업</b></summary>
-
-첫 실행 시 PKM 폴더 접근 권한을 물어봅니다. **"허용"** 필수.
-</details>
-
-<details>
-<summary><b>메뉴바에 아이콘이 안 보임</b></summary>
-
-메뉴바 공간 부족일 수 있습니다. 다른 아이콘을 ⌘+드래그로 제거하거나, Bartender/Ice로 정리하세요.
-</details>
-
 ### 제거
 
 ```bash
@@ -233,9 +194,7 @@ rm -rf ~/Applications/DotBrain.app; \
 echo "제거 완료"
 ```
 
----
-
-## 기술 스택
+### 기술 스택
 
 - **Swift 5.9** + SwiftUI + Combine
 - **macOS 메뉴바 앱** — `NSStatusItem` + `NSPopover`
@@ -246,7 +205,7 @@ echo "제거 완료"
 
 ---
 
-## Design Philosophy
+## 🎨 Design Philosophy
 
 DotBrain의 모든 설계 결정에는 하나의 질문이 깔려 있습니다:
 
@@ -256,19 +215,15 @@ DotBrain의 모든 설계 결정에는 하나의 질문이 깔려 있습니다:
 
 ### Frontmatter as Contract
 
-YAML frontmatter는 사람과 AI 사이의 **계약서**입니다.
-
-사람 쪽에서 보면, Obsidian을 열었을 때 바로 보이고 직접 고칠 수 있는 익숙한 포맷입니다. AI 쪽에서 보면, 파싱 한 번이면 분류·검색·요약에 필요한 모든 정보가 나오는 구조화된 데이터입니다.
-
-핵심 원칙은 이렇습니다: **사람이 언제든 편집할 수 있되, 생성과 관리는 AI가 한다.** 사용자는 메타데이터를 직접 채우는 노동에서 해방되고, AI는 일관된 규격의 데이터를 얻습니다. 서로 양보한 게 아니라, 둘 다 원하는 걸 가져간 겁니다.
+YAML Frontmatter는 사람과 AI 사이의 계약서입니다. 사용자는 언제든 이 값을 수정할 수 있고, AI는 이 값을 기준으로 문서를 처리합니다. 사람이 직접 메타데이터를 채우는 노동에서 해방되면서도, 통제권은 잃지 않도록 설계했습니다.
 
 ### Wiki-links + MOC — 양쪽 모두를 위한 네비게이션
 
-MOC는 **Map of Content**, 쉽게 말해 "이 폴더에 뭐가 있는지 한눈에 보여주는 인덱스 노트"입니다. 예를 들어 `1_Project/DOJANG/` 폴더에 파일이 10개 있으면, DotBrain은 `DOJANG.md`라는 MOC를 자동 생성해서 그 안에 있는 노트들을 `[[위키링크]]`로 정리해둡니다.
+MOC(Map of Content) 파일은 사람에게는 목차지만, AI에게는 지식 그래프의 **진입점(Entry Point)**입니다. DotBrain이 생성하는 [[위키링크]] 구조는 AI 에이전트가 로컬 파일 시스템을 효과적으로 탐색할 수 있게 합니다.
 
-`[[위키링크]]`는 Obsidian 사용자에게 클릭 한 번으로 노트 간 점프가 가능한 당연한 기능이죠. 그런데 AI 에이전트 입장에서 보면, 이건 **그래프의 엣지**입니다. MOC는 그래프의 진입점이 되고, 위키링크를 따라가면 관련 노트를 전부 탐색할 수 있습니다.
+### Classification, not Creation
 
-같은 구조가 사람에게는 **목차**로, AI에게는 **인덱스**로 작동합니다. 별도의 AI 전용 포맷 없이.
+PARA는 사람이 설계한 체계입니다. DotBrain은 이 체계 안에서 파일을 분류할 뿐, 체계 자체를 임의로 바꾸지 않습니다. 휴먼 리더블한 문서 체계를 유지하며 AI 최적화를 수행합니다.
 
 ### AI Companion Files — 볼트를 AI-ready로
 
@@ -276,8 +231,46 @@ DotBrain은 사용자의 Obsidian 볼트에 `CLAUDE.md`, `AGENTS.md`, `.cursorru
 
 여기서 중요한 건 **업데이트 방식**입니다. `<!-- DotBrain:start -->` / `<!-- DotBrain:end -->` 마커 사이의 내용만 DotBrain이 관리하고, 마커 바깥은 절대 건드리지 않습니다. 사용자가 직접 추가한 커스텀 지시사항이 앱 업데이트 때마다 날아가는 일은 없습니다.
 
-### 분류는 AI가, 구조는 사람이
+---
 
-PARA(Projects, Areas, Resources, Archive) 프레임워크는 사람이 설계한 체계입니다. DotBrain의 AI는 이 체계 **안에서** 파일을 분류할 뿐, 체계 자체를 만들거나 바꾸지 않습니다.
+## ❓ 문제 해결
 
-2단계 분류 전략(Fast → Precise)도 같은 철학입니다. 대부분의 파일은 가벼운 모델로 빠르게 분류하고, 정말 애매한 것만 정밀 모델에 보냅니다. "AI가 다 해줄 테니 비싼 모델 쓰세요"가 아니라, **사용자의 비용 감각을 존중하는 설계**입니다.
+<details>
+<summary><b>"확인되지 않은 개발자" / "손상되어 열 수 없음"</b></summary>
+
+Apple 코드서명이 없어서 Gatekeeper가 차단할 수 있습니다.
+
+```bash
+xattr -cr ~/Applications/DotBrain.app
+```
+
+또는: **시스템 설정 → 개인정보 보호 및 보안** → "확인 없이 열기"를 클릭하세요.
+</details>
+
+<details>
+<summary><b>폴더 접근 권한 팝업</b></summary>
+
+첫 실행 시 PKM 폴더 접근 권한 요청에 반드시 **"허용"**을 선택해야 합니다.
+</details>
+
+<details>
+<summary><b>메뉴바에 아이콘이 안 보임</b></summary>
+
+메뉴바 공간 부족일 수 있습니다. 다른 아이콘을 ⌘+드래그로 제거하거나, Bartender/Ice로 정리하세요.
+</details>
+
+<details>
+<summary><b>앱 제거 방법</b></summary>
+
+```bash
+pkill -f DotBrain 2>/dev/null; \
+rm -f ~/Library/LaunchAgents/com.dotbrain.app.plist; \
+rm -rf ~/Applications/DotBrain.app; \
+echo "제거 완료"
+```
+
+</details>
+
+<p align="center">
+Made by Hwaa
+</p>
