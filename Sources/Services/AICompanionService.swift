@@ -6,7 +6,7 @@ import Foundation
 enum AICompanionService {
 
     /// Bump this when companion file content changes — triggers overwrite on existing vaults
-    static let version = 8
+    static let version = 9
 
     /// Generate all AI companion files in the PKM root (first-time only)
     static func generateAll(pkmRoot: String) throws {
@@ -79,6 +79,7 @@ enum AICompanionService {
             ("link-health-agent", linkHealthAgentContent),
             ("tag-cleanup-agent", tagCleanupAgentContent),
             ("stale-review-agent", staleReviewAgentContent),
+            ("para-move-agent", paraMoveAgentContent),
         ] {
             let path = (agentsDir as NSString).appendingPathComponent("\(name).md")
             let wrapped = "\(markerStart)\n\(content)\n\(markerEnd)"
@@ -364,6 +365,61 @@ enum AICompanionService {
 
     ---
 
+    ## ⚠️ AI 파일/폴더 이동 필수 규칙
+
+    **AI가 파일이나 폴더를 이동할 때 반드시 아래 전체 체크리스트를 수행해야 합니다.**
+    파일 이동(`mv`)만 하고 메타데이터를 갱신하지 않으면 볼트 무결성이 깨집니다.
+
+    ### 이동 감지 키워드
+
+    다음 표현이 나오면 이동 작업으로 인식:
+    - "보내줘", "옮겨줘", "이동해줘", "Archive로", "귀속", "에 넣어줘"
+    - "이 프로젝트 끝났어", "더 이상 안 써", "비활성화해줘"
+    - "다시 활성화해줘", "꺼내줘"
+
+    ### 이동 유형별 처리
+
+    | 유형 | 예시 | para 변경 | status 변경 |
+    |------|------|-----------|-------------|
+    | **아카이브** | Project → Archive | `archive` | `completed` |
+    | **활성화** | Archive → Project | `project` | `active` |
+    | **카테고리 이동** | Project → Area | 대상 카테고리 | 유지 |
+    | **폴더 내 이동** | DOJANG → PoC-신한은행 하위 | 유지 | 유지 |
+
+    ### 필수 체크리스트 (모든 이동에 적용)
+
+    이동 작업 시 **반드시** 다음 7단계를 순서대로 수행:
+
+    1. **파일/폴더 이동** — `mv`로 대상 이동
+    2. **프론트매터 갱신** — 이동 대상의 모든 `.md` 파일:
+       - `para:` 필드를 새 카테고리에 맞게 변경
+       - `status:` 필드를 이동 유형에 맞게 변경
+       - Archive 이동 시: `para: archive`, `status: completed`
+       - `project:` 필드가 있으면 새 상위 프로젝트명으로 갱신
+    3. **출발지 MOC 갱신** — 원래 있던 폴더의 `폴더명.md`에서:
+       - 이동한 항목의 `[[위키링크]]` 줄 제거
+       - summary의 폴더/문서 수 갱신
+    4. **도착지 MOC 갱신** — 새로 들어간 폴더의 `폴더명.md`에:
+       - `[[위키링크]] — 설명` 형식으로 항목 추가
+       - summary의 폴더/문서 수 갱신
+    5. **상위 카테고리 MOC 갱신** — `1_Project.md`, `4_Archive.md` 등:
+       - 카테고리 간 이동이면 양쪽 MOC 갱신
+       - summary의 폴더 수 갱신
+    6. **하위 파일 일괄 처리** — 폴더 이동인 경우:
+       - 폴더 내 모든 `.md` 파일의 프론트매터도 동일하게 갱신
+    7. **결과 보고** — 변경 사항 테이블로 보고
+
+    ### 검증 질문 (자가 점검)
+
+    이동 완료 후 스스로 확인:
+    - ✅ 이동한 모든 파일의 `para:` 필드가 새 위치와 일치하는가?
+    - ✅ 출발지 MOC에서 이동 항목이 제거되었는가?
+    - ✅ 도착지 MOC에 이동 항목이 추가되었는가?
+    - ✅ 카테고리 MOC의 폴더 수가 정확한가?
+    - ✅ 하위 파일의 프론트매터도 모두 갱신되었는가?
+
+    ---
+
     ## 관련 노트 링크
 
     DotBrain은 **AI 시맨틱 분석**으로 관련 노트를 연결합니다:
@@ -393,6 +449,7 @@ enum AICompanionService {
     | 트리거 문구 | 에이전트 | 파일 |
     |---|---|---|
     | "인박스 정리해줘" | 인박스 분류 | `.claude/agents/inbox-agent.md` |
+    | "OO 옮겨줘/보내줘/귀속" | PARA 이동 | `.claude/agents/para-move-agent.md` |
     | "프로젝트 만들어줘" | 프로젝트 관리 | `.claude/agents/project-agent.md` |
     | "OO 관련 자료 찾아줘" | 검색 | `.claude/agents/search-agent.md` |
     | "OO 종합해줘" | 종합/브리핑 | `.claude/agents/synthesis-agent.md` |
@@ -463,6 +520,7 @@ enum AICompanionService {
     | 트리거 문구 | 에이전트 | 파일 |
     |---|---|---|
     | "인박스 정리해줘" | 인박스 분류 | `.claude/agents/inbox-agent.md` |
+    | "OO 옮겨줘/보내줘/귀속" | PARA 이동 | `.claude/agents/para-move-agent.md` |
     | "프로젝트 만들어줘" | 프로젝트 관리 | `.claude/agents/project-agent.md` |
     | "OO 관련 자료 찾아줘" | 검색 | `.claude/agents/search-agent.md` |
     | "OO 종합해줘" | 종합/브리핑 | `.claude/agents/synthesis-agent.md` |
@@ -636,6 +694,7 @@ enum AICompanionService {
             ("link-health-agent", linkHealthAgentContent),
             ("tag-cleanup-agent", tagCleanupAgentContent),
             ("stale-review-agent", staleReviewAgentContent),
+            ("para-move-agent", paraMoveAgentContent),
         ]
 
         for (name, content) in agents {
@@ -1317,6 +1376,76 @@ enum AICompanionService {
     - 삭제는 절대 제안하지 않음 — 아카이브만 제안
     - 프론트매터 자동 채우기는 AI 추론, 사용자 확인 필요
     - `created` 필드는 절대 변경하지 않음
+    """
+
+    private static let paraMoveAgentContent = """
+    # PARA 이동 에이전트
+
+    파일/폴더의 PARA 카테고리 간 이동 및 폴더 내 재배치를 처리합니다.
+    이동 시 프론트매터, MOC, 카운트를 자동으로 갱신합니다.
+
+    ## 트리거
+
+    - "OO를 Archive로 보내줘"
+    - "OO 옮겨줘", "OO 이동해줘"
+    - "OO는 OO에 귀속이야", "OO에 넣어줘"
+    - "이 프로젝트 끝났어", "더 이상 안 써"
+    - "OO 다시 꺼내줘", "OO 활성화해줘"
+
+    ## 이동 유형 판별
+
+    사용자 의도를 파악하여 유형 결정:
+
+    | 유형 | 판별 기준 | 예시 |
+    |------|-----------|------|
+    | **아카이브** | "끝났어", "Archive", "비활성", "안 써" | "Project_Clair Archive로 보내줘" |
+    | **활성화** | "꺼내줘", "다시 시작", "활성화" | "PoC-Toss 다시 꺼내줘" |
+    | **카테고리 이동** | "Area로", "Resource로" 등 명시적 카테고리 | "이건 Resource로 옮겨줘" |
+    | **폴더 내 이동** | "귀속", "하위로", "안에 넣어줘" | "DOJANG은 PoC-신한은행에 귀속이야" |
+
+    ## 워크플로
+
+    ### Step 1: 이동 대상 확인
+    1. 사용자가 언급한 파일/폴더의 현재 위치 확인
+    2. 이동 대상이 폴더인 경우 하위 파일 목록 확인
+    3. 이동 목적지 경로 결정
+
+    ### Step 2: 파일/폴더 이동
+
+    ### Step 3: 프론트매터 갱신
+    이동한 모든 `.md` 파일에 대해:
+    - **아카이브**: `para: archive`, `status: completed`
+    - **활성화**: `para: project`, `status: active`
+    - **카테고리 이동**: `para:` → 대상 카테고리, status 유지
+    - **폴더 내 이동**: para/status 유지, `project:` 필드만 갱신
+
+    ### Step 4: MOC 갱신
+    - **출발지 MOC**: 이동 항목 `[[위키링크]]` 줄 제거
+    - **도착지 MOC**: `[[위키링크]] — 설명` 형식으로 추가
+    - **카테고리 MOC**: 폴더 수 갱신
+
+    ### Step 5: 결과 보고
+    변경 사항을 테이블로 보고
+
+    ## 다중 이동
+    여러 항목 동시 이동 시:
+    1. 파일 이동을 먼저 모두 수행
+    2. 프론트매터를 일괄 갱신
+    3. MOC를 한 번에 갱신
+    4. 전체 결과를 하나의 테이블로 보고
+
+    ## 검증 (자가 점검)
+    - ✅ 이동한 모든 파일의 `para:` 필드가 새 위치와 일치?
+    - ✅ 출발지 MOC에서 이동 항목 제거됨?
+    - ✅ 도착지 MOC에 이동 항목 추가됨?
+    - ✅ 카테고리 MOC 폴더 수 정확?
+    - ✅ 하위 파일 프론트매터 모두 갱신됨?
+
+    ## 주의 사항
+    - `_Inbox/`는 이동 대상/목적지로 사용 불가
+    - 인덱스 노트(MOC) 파일명이 폴더명과 같은 경우 충돌 확인
+    - 대상 폴더에 같은 이름의 파일이 있으면 사용자에게 확인
+    - 위키링크는 파일명 기반이므로 경로 이동으로는 깨지지 않음
     """
 
     // MARK: - .claude/skills/
