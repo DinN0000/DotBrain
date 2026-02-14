@@ -118,38 +118,51 @@ actor Classifier {
 
         onProgress?(0.9, "결과 정리 중...")
 
-        // Combine results
+        // Combine results with project validation
         return files.map { file in
-            if let s2 = stage2Results[file.fileName] {
-                return ClassifyResult(
+            var result: ClassifyResult
+            let s2 = stage2Results[file.fileName]
+            let s1 = stage1Results[file.fileName]
+
+            // Capture raw project name before fuzzy matching
+            let rawProject = s2?.project ?? s1?.project
+
+            if let s2 = s2 {
+                result = ClassifyResult(
                     para: s2.para,
                     tags: s2.tags,
                     summary: s2.summary,
                     targetFolder: s2.targetFolder,
-                    project: s2.project.flatMap { fuzzyMatchProject($0, projectNames: projectNames) },
+                    project: rawProject.flatMap { fuzzyMatchProject($0, projectNames: projectNames) },
                     confidence: s2.confidence ?? 0.9
                 )
-            }
-
-            if let s1 = stage1Results[file.fileName] {
-                return ClassifyResult(
+            } else if let s1 = s1 {
+                result = ClassifyResult(
                     para: s1.para,
                     tags: s1.tags,
                     summary: "",
                     targetFolder: stripParaPrefix(s1.targetFolder ?? ""),
-                    project: s1.project.flatMap { fuzzyMatchProject($0, projectNames: projectNames) },
+                    project: rawProject.flatMap { fuzzyMatchProject($0, projectNames: projectNames) },
                     confidence: s1.confidence
+                )
+            } else {
+                // Fallback
+                result = ClassifyResult(
+                    para: .resource,
+                    tags: [],
+                    summary: "",
+                    targetFolder: "",
+                    confidence: 0
                 )
             }
 
-            // Fallback
-            return ClassifyResult(
-                para: .resource,
-                tags: [],
-                summary: "",
-                targetFolder: "",
-                confidence: 0
-            )
+            // para가 project인데 매칭 프로젝트 없으면 → suggestedProject에 원래 이름 보존
+            // InboxProcessor가 PendingConfirmation을 생성하도록 para: .project 유지
+            if result.para == .project && result.project == nil {
+                result.suggestedProject = rawProject
+            }
+
+            return result
         }
     }
 
@@ -273,13 +286,16 @@ actor Classifier {
         \(subfolderContext)
         \(weightedSection)
         ## 분류 규칙
-        - project: 해당 프로젝트의 직접적인 작업 문서만 (액션 아이템, 체크리스트, 마감 관련 문서). 반드시 project 필드에 프로젝트명 기재.
+        - project: 활성 프로젝트 목록에 있는 프로젝트의 직접적인 작업 문서만 (액션 아이템, 체크리스트, 마감 관련 문서). 반드시 project 필드에 위 목록의 정확한 프로젝트명을 기재.
         - area: 유지보수, 모니터링, 운영, 지속적 책임 영역의 문서
         - resource: 분석 자료, 가이드, 레퍼런스, 하우투, 학습 자료
         - archive: 완료된 작업, 오래된 내용, 더 이상 활성이 아닌 문서
 
         ⚠️ 프로젝트와 관련된 참고 자료는 project가 아니라 resource로, 운영/관리 문서는 area로 분류하세요.
+        ⚠️ 포트폴리오, 이력서, 프로젝트 소개/설명/개요 문서는 resource입니다 (직접 작업 문서가 아님).
+        ⚠️ 프로젝트에 대한 분석/리뷰/회고는 resource 또는 archive입니다.
         ⚠️ para가 project가 아니더라도, 활성 프로젝트와 관련이 있으면 project 필드에 해당 프로젝트명을 기재하세요. 관련 없으면 생략.
+        ⚠️ 활성 프로젝트 목록에 없지만 명확히 프로젝트 작업(회의록, 체크리스트, 마감일, 진행 상태)인 문서는 para: "project", project: "제안할_프로젝트명"으로 분류하세요. 시스템이 사용자에게 확인합니다.
 
         ## 분류할 파일 목록
         \(fileList)
@@ -332,13 +348,16 @@ actor Classifier {
         \(subfolderContext)
         \(weightedSection)
         ## 분류 규칙
-        - project: 해당 프로젝트의 직접적인 작업 문서만 (액션 아이템, 체크리스트, 마감 관련 문서). 반드시 project 필드에 프로젝트명 기재.
+        - project: 활성 프로젝트 목록에 있는 프로젝트의 직접적인 작업 문서만 (액션 아이템, 체크리스트, 마감 관련 문서). 반드시 project 필드에 위 목록의 정확한 프로젝트명을 기재.
         - area: 유지보수, 모니터링, 운영, 지속적 책임 영역의 문서
         - resource: 분석 자료, 가이드, 레퍼런스, 하우투, 학습 자료
         - archive: 완료된 작업, 오래된 내용, 더 이상 활성이 아닌 문서
 
         ⚠️ 프로젝트와 관련된 참고 자료는 project가 아니라 resource로, 운영/관리 문서는 area로 분류하세요.
+        ⚠️ 포트폴리오, 이력서, 프로젝트 소개/설명/개요 문서는 resource입니다 (직접 작업 문서가 아님).
+        ⚠️ 프로젝트에 대한 분석/리뷰/회고는 resource 또는 archive입니다.
         ⚠️ para가 project가 아니더라도, 활성 프로젝트와 관련이 있으면 project 필드에 해당 프로젝트명을 기재하세요. 관련 없으면 생략.
+        ⚠️ 활성 프로젝트 목록에 없지만 명확히 프로젝트 작업(회의록, 체크리스트, 마감일, 진행 상태)인 문서는 para: "project", project: "제안할_프로젝트명"으로 분류하세요. 시스템이 사용자에게 확인합니다.
 
         ## 대상 파일
         파일명: \(fileName)
@@ -451,9 +470,10 @@ actor Classifier {
         return result
     }
 
-    /// Fuzzy match AI-returned project name against actual folder names
-    private func fuzzyMatchProject(_ aiName: String, projectNames: [String]) -> String {
-        guard !projectNames.isEmpty else { return aiName }
+    /// Fuzzy match AI-returned project name against actual folder names.
+    /// Returns nil if no match found — prevents creating arbitrary new project folders.
+    private func fuzzyMatchProject(_ aiName: String, projectNames: [String]) -> String? {
+        guard !projectNames.isEmpty else { return nil }
         if projectNames.contains(aiName) { return aiName }
 
         let normalize = { (s: String) -> String in
@@ -475,6 +495,7 @@ actor Classifier {
             }
         }
 
-        return aiName
+        // No match → do not create new project
+        return nil
     }
 }

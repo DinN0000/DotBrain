@@ -118,6 +118,23 @@ struct InboxProcessor {
                 continue
             }
 
+            // Unmatched project: AI thinks it's project work but no matching project exists
+            if classification.para == .project && classification.project == nil {
+                let suggestedName = classification.suggestedProject ?? ""
+                needsConfirmation.append(PendingConfirmation(
+                    fileName: input.fileName,
+                    filePath: input.filePath,
+                    content: String(input.content.prefix(500)),
+                    options: generateUnmatchedProjectOptions(
+                        for: classification,
+                        projectNames: projectNames
+                    ),
+                    reason: .unmatchedProject,
+                    suggestedProjectName: suggestedName
+                ))
+                continue
+            }
+
             // Index note conflict: file name matches 폴더명.md — ask user instead of auto-renaming
             if mover.wouldConflictWithIndexNote(fileName: input.fileName, classification: classification) {
                 needsConfirmation.append(PendingConfirmation(
@@ -290,6 +307,48 @@ struct InboxProcessor {
             }
         }
         return String(content.prefix(5000))
+    }
+
+    /// Generate options for files classified as project but with no matching project
+    private func generateUnmatchedProjectOptions(
+        for base: ClassifyResult,
+        projectNames: [String]
+    ) -> [ClassifyResult] {
+        var options: [ClassifyResult] = []
+
+        // Option 1: Resource (safe fallback)
+        options.append(ClassifyResult(
+            para: .resource,
+            tags: base.tags,
+            summary: base.summary,
+            targetFolder: base.targetFolder,
+            project: nil,
+            confidence: 0.7
+        ))
+
+        // Option 2: Archive (completed project)
+        options.append(ClassifyResult(
+            para: .archive,
+            tags: base.tags,
+            summary: base.summary,
+            targetFolder: base.suggestedProject ?? "",
+            project: nil,
+            confidence: 0.5
+        ))
+
+        // Option 3: Existing projects (top 3, in case fuzzy match was too strict)
+        for projectName in projectNames.prefix(3) {
+            options.append(ClassifyResult(
+                para: .project,
+                tags: base.tags,
+                summary: base.summary,
+                targetFolder: "",
+                project: projectName,
+                confidence: 0.5
+            ))
+        }
+
+        return options
     }
 
     /// Generate alternative classification options for uncertain files

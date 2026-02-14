@@ -399,6 +399,43 @@ final class AppState: ObservableObject {
         checkConfirmationsComplete()
     }
 
+    /// Create a new project and move the file into it
+    func createProjectAndClassify(_ confirmation: PendingConfirmation, projectName: String) async {
+        pendingConfirmations.removeAll { $0.id == confirmation.id }
+
+        let pm = ProjectManager(pkmRoot: pkmRootPath)
+        do {
+            let _ = try pm.createProject(name: projectName)
+
+            // Build classification pointing to new project
+            let base = confirmation.options.first ?? ClassifyResult(
+                para: .project, tags: [], summary: "", targetFolder: "",
+                project: projectName, confidence: 1.0
+            )
+            let classification = ClassifyResult(
+                para: .project,
+                tags: base.tags,
+                summary: base.summary,
+                targetFolder: "",
+                project: projectName,
+                confidence: 1.0
+            )
+
+            let mover = FileMover(pkmRoot: pkmRootPath)
+            let result = try await mover.moveFile(at: confirmation.filePath, with: classification)
+            processedResults.append(result)
+        } catch {
+            processedResults.append(ProcessedFileResult(
+                fileName: confirmation.fileName,
+                para: .project,
+                targetPath: "",
+                tags: [],
+                status: .error("프로젝트 생성 실패: \(error.localizedDescription)")
+            ))
+        }
+        checkConfirmationsComplete()
+    }
+
     /// Copy files into _Inbox/ folder, return (added count, skipped code files)
     struct AddFilesResult {
         let added: Int
@@ -595,6 +632,7 @@ struct PendingConfirmation: Identifiable {
         case indexNoteConflict
         case nameConflict
         case misclassified
+        case unmatchedProject
     }
 
     let id = UUID()
@@ -603,4 +641,5 @@ struct PendingConfirmation: Identifiable {
     let content: String
     let options: [ClassifyResult]
     var reason: Reason = .lowConfidence
+    var suggestedProjectName: String?
 }

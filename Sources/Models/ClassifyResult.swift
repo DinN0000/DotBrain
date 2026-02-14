@@ -8,13 +8,15 @@ struct RelatedNote: Codable, Equatable {
 
 /// Result of AI classification for a single file
 struct ClassifyResult: Codable {
-    let para: PARACategory
+    var para: PARACategory
     let tags: [String]
     let summary: String
     let targetFolder: String
     var project: String?
     var confidence: Double
     var relatedNotes: [RelatedNote] = []
+    /// AI's raw project name when fuzzyMatch failed — preserved for user confirmation
+    var suggestedProject: String?
 
     /// Stage 1 batch classification item from Haiku
     struct Stage1Item: Codable {
