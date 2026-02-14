@@ -9,6 +9,7 @@ struct InboxProcessor {
     struct Result {
         var processed: [ProcessedFileResult]
         var needsConfirmation: [PendingConfirmation]
+        var affectedFolders: Set<String>
         var total: Int
         var failed: Int
     }
@@ -18,7 +19,7 @@ struct InboxProcessor {
         let files = scanner.scan()
 
         guard !files.isEmpty else {
-            return Result(processed: [], needsConfirmation: [], total: 0, failed: 0)
+            return Result(processed: [], needsConfirmation: [], affectedFolders: [], total: 0, failed: 0)
         }
 
         onProgress?(0.05, "\(files.count)개 파일 발견")
@@ -191,6 +192,7 @@ struct InboxProcessor {
         return Result(
             processed: processed,
             needsConfirmation: needsConfirmation,
+            affectedFolders: affectedFolders,
             total: files.count,
             failed: failed
         )
