@@ -6,7 +6,7 @@ import Foundation
 enum AICompanionService {
 
     /// Bump this when companion file content changes — triggers overwrite on existing vaults
-    static let version = 6
+    static let version = 7
 
     /// Generate all AI companion files in the PKM root (first-time only)
     static func generateAll(pkmRoot: String) throws {
@@ -200,6 +200,21 @@ enum AICompanionService {
     4. 전체 파일 AI 재분류
     5. **잘못 분류된 파일 자동 이동** (relocated 상태로 표시)
     6. 프론트매터 갱신 + 관련 노트 링크 + MOC 업데이트
+
+    ### PARA 관리
+    대시보드 → "PARA 관리"에서:
+    - **카테고리 간 폴더 이동**: 우클릭 → Project↔Area↔Resource↔Archive 간 이동
+    - **프로젝트 인라인 생성**: + 버튼으로 새 프로젝트 즉시 생성
+    - **폴더별 자동 정리**: 우클릭 → 자동 정리로 해당 폴더 AI 재분류
+    - **Finder 열기**: 우클릭으로 해당 폴더 바로 열기
+    - 이동 시 내부 노트의 프론트매터(`para` 필드)와 볼트 내 `[[위키링크]]` 자동 갱신
+
+    ### 볼트 전체 재정리
+    대시보드 → "전체 재정리"에서:
+    - **전체 볼트** 또는 **카테고리별** 스캔 선택
+    - AI가 각 파일의 현재 위치 vs 추천 위치를 비교
+    - 체크박스로 이동할 파일 선택 → 실행
+    - 최대 200개 파일 스캔 (API 비용 제어)
 
     ### 볼트 감사 (Audit)
     볼트 전체 건강 검사:
@@ -433,6 +448,16 @@ enum AICompanionService {
     - AI가 전체 프론트매터를 재생성 (`created`만 보존)
     - 잘못 분류된 파일은 올바른 PARA 위치로 자동 이동 (relocated)
 
+    **PARA 카테고리 이동 시:**
+    - 폴더 내 모든 노트의 `para` 필드를 대상 카테고리로 갱신
+    - 볼트 전체에서 해당 폴더 내 파일의 `[[위키링크]]` 경로 자동 갱신
+    - 인덱스 노트에 이동 이력 기록
+
+    **볼트 전체 재정리 시:**
+    - AI가 현재 위치와 추천 위치를 비교하여 이동 필요 파일 식별
+    - 사용자가 체크박스로 선택한 파일만 이동
+    - 이동 시 프론트매터 + WikiLink 자동 갱신
+
     ## 관련 노트 링크 규칙
 
     DotBrain은 **AI 시맨틱 분석**으로 관련 노트를 찾습니다:
@@ -481,6 +506,8 @@ enum AICompanionService {
     ## DotBrain Automation
     - **Inbox Processing**: 2-stage AI classification (Fast batch → Precise for uncertain), weighted context matching, AI semantic linking, auto MOC generation
     - **Folder Reorganization**: Flatten nested folders → deduplicate (SHA256) → AI reclassify → auto-relocate misclassified files
+    - **PARA Management**: Move folders between P/A/R/A categories, create projects, per-folder auto-reorganize (Dashboard → PARA 관리)
+    - **Vault Reorganization**: Cross-category AI scan → compare current vs recommended location → selective execution (Dashboard → 전체 재정리, max 200 files)
     - **Vault Audit**: Detect broken WikiLinks, missing frontmatter/tags/PARA → auto-repair with Levenshtein matching
 
     ## Navigation Priority
@@ -688,6 +715,14 @@ enum AICompanionService {
     2. 모든 노트의 `status` → `active`, `para` → `project`로 갱신
     3. "(완료됨)" 마크 제거
     4. 갱신된 노트 수 보고
+
+    ## PARA 카테고리 간 이동 (DotBrain UI)
+
+    DotBrain의 "PARA 관리" 화면에서 우클릭으로도 가능:
+    - Project → Area/Resource/Archive
+    - Area → Project/Resource/Archive
+    - 이동 시 내부 노트의 `para` 필드 자동 갱신
+    - 볼트 내 `[[위키링크]]` 경로 자동 갱신
 
     ## 프로젝트 이름 변경
 
