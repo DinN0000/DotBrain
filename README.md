@@ -233,6 +233,12 @@ DotBrain은 사용자의 Obsidian 볼트에 `CLAUDE.md`, `AGENTS.md`, `.cursorru
 
 ---
 
+## 📋 Changelog
+
+전체 변경 이력은 [CHANGELOG.md](CHANGELOG.md)를 참조하세요.
+
+---
+
 ## ❓ Troubleshooting
 
 <details>
