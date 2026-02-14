@@ -38,35 +38,45 @@ struct ResultsView: View {
                     .padding(.top, 40)
                 } else {
                     LazyVStack(spacing: 2) {
-                        // Summary banner after reorganization
-                        if appState.processingOrigin == .reorganize {
-                            let successCount = appState.processedResults.filter(\.isSuccess).count
-                            if successCount > 0 {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Label("\(successCount)개 파일 정리 완료", systemImage: "checkmark.circle")
-                                        .font(.caption)
-                                        .fontWeight(.medium)
-                                        .foregroundColor(.green)
-                                    Text("태그, 요약, 관련 노트 링크가 적용되었습니다.")
-                                        .font(.caption2)
-                                        .foregroundColor(.secondary)
-                                }
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(10)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 8)
-                                        .fill(Color.green.opacity(0.08))
-                                )
-                                .padding(.bottom, 6)
-                            }
-                        }
+                        // Summary card
+                        ResultsSummaryCard()
 
                         ForEach(appState.processedResults) { result in
                             ResultRow(result: result)
                         }
 
+                        // Batch actions for pending confirmations
+                        if appState.pendingConfirmations.count > 1 {
+                            HStack(spacing: 12) {
+                                Label(
+                                    "\(appState.pendingConfirmations.count)개 확인 대기",
+                                    systemImage: "questionmark.circle"
+                                )
+                                .font(.caption)
+                                .foregroundColor(.orange)
+
+                                Spacer()
+
+                                HoverTextLink(label: "모두 건너뛰기", color: .secondary) {
+                                    let items = appState.pendingConfirmations
+                                    for item in items {
+                                        appState.skipConfirmation(item)
+                                    }
+                                }
+                            }
+                            .padding(.vertical, 6)
+                            .padding(.horizontal, 6)
+                        }
+
                         ForEach(appState.pendingConfirmations) { confirmation in
                             ConfirmationRow(confirmation: confirmation)
+                        }
+
+                        // Affected folders & next steps (inbox processing only)
+                        if appState.processingOrigin == .inbox,
+                           !appState.affectedFolders.isEmpty,
+                           appState.pendingConfirmations.isEmpty {
+                            NextStepsSection()
                         }
                     }
                     .padding(.horizontal)
@@ -326,6 +336,266 @@ struct ConfirmationRow: View {
         )
         .animation(.easeOut(duration: 0.15), value: isHovered)
         .onHover { isHovered = $0 }
+    }
+}
+
+// MARK: - Results Summary Card
+
+struct ResultsSummaryCard: View {
+    @EnvironmentObject var appState: AppState
+
+    private var successCount: Int {
+        appState.processedResults.filter(\.isSuccess).count
+    }
+    private var errorCount: Int {
+        appState.processedResults.filter(\.isError).count
+    }
+    private var skippedCount: Int {
+        appState.processedResults.filter {
+            if case .skipped = $0.status { return true }
+            return false
+        }.count
+    }
+    private var relocatedCount: Int {
+        appState.processedResults.filter {
+            if case .relocated = $0.status { return true }
+            return false
+        }.count
+    }
+
+    var body: some View {
+        if successCount > 0 || errorCount > 0 {
+            VStack(alignment: .leading, spacing: 6) {
+                // Main result
+                Label(
+                    "\(successCount)개 파일 정리 완료",
+                    systemImage: "checkmark.circle"
+                )
+                .font(.caption)
+                .fontWeight(.medium)
+                .foregroundColor(.green)
+
+                // Stats row
+                HStack(spacing: 10) {
+                    if relocatedCount > 0 {
+                        HStack(spacing: 2) {
+                            Image(systemName: "arrow.right.circle")
+                                .font(.caption2)
+                                .foregroundColor(.purple)
+                            Text("\(relocatedCount) 이동")
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                    if skippedCount > 0 {
+                        HStack(spacing: 2) {
+                            Image(systemName: "arrow.uturn.backward.circle")
+                                .font(.caption2)
+                                .foregroundColor(.orange)
+                            Text("\(skippedCount) 건너뜀")
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                    if errorCount > 0 {
+                        HStack(spacing: 2) {
+                            Image(systemName: "xmark.circle")
+                                .font(.caption2)
+                                .foregroundColor(.red)
+                            Text("\(errorCount) 오류")
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                    if !appState.pendingConfirmations.isEmpty {
+                        HStack(spacing: 2) {
+                            Image(systemName: "questionmark.circle")
+                                .font(.caption2)
+                                .foregroundColor(.orange)
+                            Text("\(appState.pendingConfirmations.count) 대기")
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                }
+
+                Text("태그, 요약, 관련 노트 링크가 적용되었습니다.")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(10)
+            .background(
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(Color.green.opacity(0.08))
+            )
+            .padding(.bottom, 6)
+        }
+    }
+}
+
+// MARK: - Next Steps Section
+
+struct NextStepsSection: View {
+    @EnvironmentObject var appState: AppState
+    @State private var healthScores: [FolderHealthAnalyzer.HealthScore] = []
+    @State private var isLoaded = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 4) {
+                Image(systemName: "lightbulb.fill")
+                    .font(.caption)
+                    .foregroundColor(.orange)
+                Text("다음 단계")
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.primary)
+            }
+            .padding(.top, 8)
+
+            if !isLoaded {
+                HStack {
+                    ProgressView()
+                        .controlSize(.mini)
+                    Text("폴더 상태 분석 중...")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
+                .padding(.vertical, 4)
+            } else if healthScores.isEmpty {
+                Label("모든 폴더가 양호합니다", systemImage: "checkmark.circle")
+                    .font(.caption)
+                    .foregroundColor(.green)
+                    .padding(.vertical, 4)
+            } else {
+                ForEach(healthScores, id: \.folderPath) { score in
+                    AffectedFolderRow(healthScore: score)
+                }
+
+                if healthScores.count > 1 {
+                    HoverTextButton(label: "모두 정리") {
+                        let folders = healthScores.map {
+                            (category: $0.category, subfolder: $0.folderName)
+                        }
+                        Task {
+                            await appState.startBatchReorganizing(folders: folders)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .trailing)
+                    .padding(.top, 2)
+                }
+            }
+        }
+        .padding(10)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(Color.orange.opacity(0.06))
+        )
+        .padding(.top, 6)
+        .onAppear { analyzeAffectedFolders() }
+    }
+
+    private func analyzeAffectedFolders() {
+        let folders = appState.affectedFolders
+        let root = appState.pkmRootPath
+        Task.detached(priority: .utility) {
+            let scores = FolderHealthAnalyzer.analyzeAll(folderPaths: folders, pkmRoot: root)
+            // Show folders that need attention (score < 0.8)
+            let needsAttention = scores.filter { $0.score < 0.8 }
+            await MainActor.run {
+                healthScores = needsAttention
+                isLoaded = true
+            }
+        }
+    }
+}
+
+struct AffectedFolderRow: View {
+    let healthScore: FolderHealthAnalyzer.HealthScore
+    @EnvironmentObject var appState: AppState
+    @State private var isHovered = false
+
+    private var healthColor: Color {
+        switch healthScore.label {
+        case "urgent": return .red
+        case "attention": return .orange
+        default: return .green
+        }
+    }
+
+    private var healthIcon: String {
+        switch healthScore.label {
+        case "urgent": return "exclamationmark.triangle.fill"
+        case "attention": return "exclamationmark.circle.fill"
+        default: return "checkmark.circle.fill"
+        }
+    }
+
+    private var issueDescription: String {
+        guard let first = healthScore.issues.first else { return "" }
+        switch first {
+        case .tooManyFiles(let count):
+            return "\(count)개 파일 — 세분화 필요"
+        case .missingFrontmatter(let count, _):
+            return "\(count)개 파일 메타데이터 누락"
+        case .lowTagDiversity:
+            return "태그 다양성 부족"
+        case .noIndexNote:
+            return "인덱스 노트 없음"
+        }
+    }
+
+    var body: some View {
+        Button(action: {
+            appState.navigateToReorganizeFolder(healthScore.folderPath)
+        }) {
+            HStack(spacing: 8) {
+                Image(systemName: healthIcon)
+                    .font(.system(size: 12))
+                    .foregroundColor(healthColor)
+
+                VStack(alignment: .leading, spacing: 1) {
+                    HStack(spacing: 4) {
+                        Image(systemName: healthScore.category.icon)
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                        Text(healthScore.folderName)
+                            .font(.caption)
+                            .fontWeight(.medium)
+                            .lineLimit(1)
+                    }
+
+                    Text(issueDescription)
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
+                }
+
+                Spacer()
+
+                HStack(spacing: 2) {
+                    Text("정리")
+                        .font(.caption2)
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 8))
+                }
+                .foregroundColor(.accentColor)
+                .opacity(isHovered ? 1.0 : 0.6)
+            }
+            .padding(.vertical, 5)
+            .padding(.horizontal, 8)
+            .background(
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(isHovered ? Color.primary.opacity(0.04) : Color.clear)
+            )
+        }
+        .buttonStyle(.plain)
+        .animation(.easeOut(duration: 0.12), value: isHovered)
+        .onHover { inside in
+            isHovered = inside
+            if inside { NSCursor.pointingHand.push() } else { NSCursor.pop() }
+        }
     }
 }
 
