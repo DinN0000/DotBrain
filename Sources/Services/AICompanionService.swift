@@ -6,7 +6,7 @@ import Foundation
 enum AICompanionService {
 
     /// Bump this when companion file content changes — triggers overwrite on existing vaults
-    static let version = 5
+    static let version = 6
 
     /// Generate all AI companion files in the PKM root (first-time only)
     static func generateAll(pkmRoot: String) throws {
@@ -326,6 +326,7 @@ enum AICompanionService {
 
     ⚠️ 프로젝트와 **관련된** 참고 자료는 `project`가 아니라 `resource`로 분류 (`project` 필드에 프로젝트명 기재)
     ⚠️ 운영/관리 문서는 `project`가 아니라 `area`로 분류
+    ⚠️ 활성 프로젝트 목록에 없는 프로젝트명은 자동 생성하지 않음 → 사용자에게 확인 요청
 
     ---
 

@@ -255,6 +255,8 @@ struct ConfirmationRow: View {
     @EnvironmentObject var appState: AppState
     @State private var isHovered = false
     @State private var isConfirming = false
+    @State private var showProjectCreate = false
+    @State private var newProjectName = ""
 
     private var sortedOptions: [ClassifyResult] {
         let paraOrder: [PARACategory] = [.project, .area, .resource, .archive]
@@ -270,7 +272,9 @@ struct ConfirmationRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 8) {
-                Image(systemName: "questionmark.circle.fill")
+                Image(systemName: confirmation.reason == .unmatchedProject
+                    ? "folder.badge.questionmark"
+                    : "questionmark.circle.fill")
                     .foregroundColor(.orange)
                     .font(.system(size: 14))
 
@@ -281,7 +285,18 @@ struct ConfirmationRow: View {
                 Spacer()
             }
 
-            if confirmation.reason == .indexNoteConflict {
+            // Contextual message
+            if confirmation.reason == .unmatchedProject {
+                if let suggested = confirmation.suggestedProjectName, !suggested.isEmpty {
+                    Text("프로젝트 \"\(suggested)\"이(가) 없습니다 — 새로 만들거나 다른 위치를 선택하세요")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                } else {
+                    Text("매칭되는 프로젝트가 없습니다 — 새로 만들거나 다른 위치를 선택하세요")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            } else if confirmation.reason == .indexNoteConflict {
                 Text("인덱스 노트와 이름이 같습니다 — 다른 위치를 선택하거나 건너뛰세요")
                     .font(.caption)
                     .foregroundColor(.secondary)
@@ -295,13 +310,55 @@ struct ConfirmationRow: View {
                     .foregroundColor(.secondary)
             }
 
-            // PARA buttons
-            HStack(spacing: 4) {
-                if isConfirming {
-                    ProgressView()
-                        .controlSize(.small)
-                        .frame(maxWidth: .infinity)
+            if isConfirming {
+                ProgressView()
+                    .controlSize(.small)
+                    .frame(maxWidth: .infinity)
+            } else if confirmation.reason == .unmatchedProject {
+                // Inline project creation
+                if showProjectCreate {
+                    HStack(spacing: 4) {
+                        TextField("프로젝트 이름", text: $newProjectName)
+                            .textFieldStyle(.roundedBorder)
+                            .controlSize(.small)
+                            .onSubmit { createProject() }
+
+                        Button("생성") { createProject() }
+                            .buttonStyle(.borderedProminent)
+                            .controlSize(.small)
+                            .disabled(newProjectName.trimmingCharacters(in: .whitespaces).isEmpty)
+
+                        Button("취소") { showProjectCreate = false }
+                            .buttonStyle(.bordered)
+                            .controlSize(.small)
+                    }
                 } else {
+                    HStack(spacing: 4) {
+                        Button(action: {
+                            newProjectName = confirmation.suggestedProjectName ?? ""
+                            showProjectCreate = true
+                        }) {
+                            Label("프로젝트 생성", systemImage: "folder.badge.plus")
+                                .font(.caption2)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 4)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.small)
+
+                        ForEach(sortedOptions.filter({ $0.para != .project }), id: \.para) { option in
+                            HoverPARAButton(para: option.para) {
+                                isConfirming = true
+                                Task {
+                                    await appState.confirmClassification(confirmation, choice: option)
+                                }
+                            }
+                        }
+                    }
+                }
+            } else {
+                // Standard PARA buttons
+                HStack(spacing: 4) {
                     ForEach(sortedOptions, id: \.para) { option in
                         HoverPARAButton(para: option.para) {
                             isConfirming = true
@@ -312,7 +369,6 @@ struct ConfirmationRow: View {
                     }
                 }
             }
-            .disabled(isConfirming)
 
             // Skip / Delete
             HStack(spacing: 12) {
@@ -336,6 +392,15 @@ struct ConfirmationRow: View {
         )
         .animation(.easeOut(duration: 0.15), value: isHovered)
         .onHover { isHovered = $0 }
+    }
+
+    private func createProject() {
+        let name = newProjectName.trimmingCharacters(in: .whitespaces)
+        guard !name.isEmpty else { return }
+        isConfirming = true
+        Task {
+            await appState.createProjectAndClassify(confirmation, projectName: name)
+        }
     }
 }
 
