@@ -437,6 +437,7 @@ final class AppState: ObservableObject {
 struct ProcessedFileResult: Identifiable {
     enum Status {
         case success
+        case relocated(from: String)  // 폴더 정리에서 다른 위치로 자동 이동됨
         case skipped(String)
         case deleted
         case deduplicated(String)
@@ -452,7 +453,7 @@ struct ProcessedFileResult: Identifiable {
 
     var isSuccess: Bool {
         switch status {
-        case .success, .deduplicated: return true
+        case .success, .relocated, .deduplicated: return true
         default: return false
         }
     }

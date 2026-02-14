@@ -122,8 +122,6 @@ struct FolderReorganizer {
         }
 
         // Compare and process
-        var needsConfirmation: [PendingConfirmation] = []
-
         for (i, (classification, input)) in zip(enrichedClassifications, inputs).enumerated() {
             let progress = 0.7 + Double(i) / Double(max(enrichedClassifications.count, 1)) * 0.25
             onProgress?(progress, "\(input.fileName) 처리 중...")
@@ -151,20 +149,46 @@ struct FolderReorganizer {
                     )
                 }
             } else {
-                // Location wrong — ask user to confirm move
-                needsConfirmation.append(PendingConfirmation(
-                    fileName: input.fileName,
-                    filePath: input.filePath,
-                    content: String(input.content.prefix(500)),
-                    options: generateOptions(for: classification, projectNames: projectNames),
-                    reason: .misclassified
-                ))
+                // Location wrong — auto-move to AI-recommended location
+                let fromDisplay = "\(category.folderName)/\(subfolder)"
+                let mover = FileMover(pkmRoot: pkmRoot)
+                do {
+                    let result = try await mover.moveFile(at: input.filePath, with: classification)
+                    processed.append(ProcessedFileResult(
+                        fileName: result.fileName,
+                        para: result.para,
+                        targetPath: result.targetPath,
+                        tags: result.tags,
+                        status: .relocated(from: fromDisplay)
+                    ))
+                    StatisticsService.recordActivity(
+                        fileName: input.fileName,
+                        category: classification.para.rawValue,
+                        action: "relocated"
+                    )
+                } catch {
+                    processed.append(ProcessedFileResult(
+                        fileName: input.fileName,
+                        para: classification.para,
+                        targetPath: "",
+                        tags: classification.tags,
+                        status: .error("이동 실패: \(error.localizedDescription)")
+                    ))
+                }
             }
         }
 
-        // Update MOC for the reorganized folder
+        // Update MOCs for affected folders (source + all targets)
         let mocGenerator = MOCGenerator(pkmRoot: pkmRoot)
         try? await mocGenerator.generateMOC(folderPath: folderPath, folderName: subfolder, para: category)
+
+        let affectedFolders = Set(processed.filter(\.isSuccess).compactMap { result -> String? in
+            let dir = (result.targetPath as NSString).deletingLastPathComponent
+            return dir.isEmpty || dir == folderPath ? nil : dir
+        })
+        if !affectedFolders.isEmpty {
+            await mocGenerator.updateMOCsForFolders(affectedFolders)
+        }
 
         onProgress?(0.95, "완료 정리 중...")
 
@@ -178,7 +202,7 @@ struct FolderReorganizer {
 
         return Result(
             processed: processed,
-            needsConfirmation: needsConfirmation,
+            needsConfirmation: [],
             total: files.count
         )
     }
@@ -463,22 +487,4 @@ struct FolderReorganizer {
         return "[읽기 실패: \((filePath as NSString).lastPathComponent)]"
     }
 
-    // MARK: - Options
-
-    private func generateOptions(for base: ClassifyResult, projectNames: [String]) -> [ClassifyResult] {
-        var options: [ClassifyResult] = [base]
-
-        for cat in PARACategory.allCases where cat != base.para {
-            options.append(ClassifyResult(
-                para: cat,
-                tags: base.tags,
-                summary: base.summary,
-                targetFolder: base.targetFolder,
-                project: cat == .project ? projectNames.first : nil,
-                confidence: 0.5
-            ))
-        }
-
-        return options
-    }
 }

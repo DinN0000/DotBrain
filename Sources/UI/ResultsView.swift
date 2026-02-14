@@ -112,6 +112,7 @@ struct ResultRow: View {
     private var iconName: String {
         switch result.status {
         case .success: return "checkmark.circle.fill"
+        case .relocated: return "arrow.right.circle.fill"
         case .skipped: return "arrow.uturn.backward.circle.fill"
         case .deleted: return "trash.circle.fill"
         case .deduplicated: return "doc.on.doc.fill"
@@ -122,6 +123,7 @@ struct ResultRow: View {
     private var iconColor: Color {
         switch result.status {
         case .success: return .green
+        case .relocated: return .purple
         case .skipped: return .orange
         case .deleted: return .secondary
         case .deduplicated: return .blue
@@ -164,6 +166,20 @@ struct ResultRow: View {
                             Text(result.displayTarget)
                                 .font(.caption)
                                 .foregroundColor(.secondary)
+                        }
+                    case .relocated(let from):
+                        HStack(spacing: 4) {
+                            Text(from)
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            Image(systemName: "arrow.right")
+                                .font(.caption2)
+                                .foregroundColor(.purple)
+                            Image(systemName: result.para.icon)
+                                .font(.caption2)
+                            Text(result.displayTarget)
+                                .font(.caption)
+                                .foregroundColor(.purple)
                         }
                     case .deduplicated(let message):
                         Text(message)
