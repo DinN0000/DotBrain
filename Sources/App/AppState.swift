@@ -36,6 +36,7 @@ final class AppState: ObservableObject {
     @Published var reorganizeCategory: PARACategory?
     @Published var reorganizeSubfolder: String?
     @Published var processingOrigin: Screen = .inbox
+    @Published var affectedFolders: Set<String> = []
 
     // MARK: - Settings
 
@@ -164,6 +165,7 @@ final class AppState: ObservableObject {
         processingStatus = "시작 중..."
         processedResults = []
         pendingConfirmations = []
+        affectedFolders = []
         processingOrigin = .inbox
         currentScreen = .processing
 
@@ -182,6 +184,7 @@ final class AppState: ObservableObject {
                 let results = try await processor.process()
                 guard !Task.isCancelled else { return }
                 processedResults = results.processed
+                affectedFolders = results.affectedFolders
                 pendingConfirmations = results.needsConfirmation
                 currentScreen = .results
             } catch {
@@ -219,6 +222,7 @@ final class AppState: ObservableObject {
         processingStatus = "시작 중..."
         processedResults = []
         pendingConfirmations = []
+        affectedFolders = []
         processingOrigin = .reorganize
         currentScreen = .processing
 
@@ -239,6 +243,10 @@ final class AppState: ObservableObject {
                 let results = try await reorganizer.process()
                 guard !Task.isCancelled else { return }
                 processedResults = results.processed
+                affectedFolders = Set(results.processed.filter(\.isSuccess).compactMap { result -> String? in
+                    let dir = (result.targetPath as NSString).deletingLastPathComponent
+                    return dir.isEmpty ? nil : dir
+                })
                 pendingConfirmations = results.needsConfirmation
                 currentScreen = .results
             } catch {
@@ -247,6 +255,83 @@ final class AppState: ObservableObject {
                 }
             }
 
+            isProcessing = false
+        }
+    }
+
+    /// Reorganize multiple folders sequentially
+    func startBatchReorganizing(folders: [(category: PARACategory, subfolder: String)]) async {
+        guard !isProcessing, !folders.isEmpty else { return }
+        guard hasAPIKey else {
+            currentScreen = .settings
+            return
+        }
+
+        isProcessing = true
+        processingProgress = 0
+        processingStatus = "시작 중..."
+        processedResults = []
+        pendingConfirmations = []
+        affectedFolders = []
+        processingOrigin = .reorganize
+        currentScreen = .processing
+
+        processingTask = Task { @MainActor in
+            var allProcessed: [ProcessedFileResult] = []
+            var allConfirmations: [PendingConfirmation] = []
+            var allAffected: Set<String> = []
+
+            for (index, folder) in folders.enumerated() {
+                guard !Task.isCancelled else { break }
+                let folderProgress = Double(index) / Double(folders.count)
+
+                processingStatus = "[\(index + 1)/\(folders.count)] \(folder.subfolder) 정리 중..."
+                processingProgress = folderProgress
+
+                let reorganizer = FolderReorganizer(
+                    pkmRoot: pkmRootPath,
+                    category: folder.category,
+                    subfolder: folder.subfolder,
+                    onProgress: { [weak self] progress, status in
+                        Task { @MainActor in
+                            let scaled = folderProgress + progress / Double(folders.count)
+                            self?.processingProgress = scaled
+                            self?.processingStatus = "[\(index + 1)/\(folders.count)] \(status)"
+                        }
+                    }
+                )
+
+                do {
+                    let results = try await reorganizer.process()
+                    allProcessed.append(contentsOf: results.processed)
+                    allConfirmations.append(contentsOf: results.needsConfirmation)
+                    let affected = Set(results.processed.filter(\.isSuccess).compactMap { result -> String? in
+                        let dir = (result.targetPath as NSString).deletingLastPathComponent
+                        return dir.isEmpty ? nil : dir
+                    })
+                    allAffected.formUnion(affected)
+                } catch {
+                    if !Task.isCancelled {
+                        allProcessed.append(ProcessedFileResult(
+                            fileName: folder.subfolder,
+                            para: folder.category,
+                            targetPath: "",
+                            tags: [],
+                            status: .error(InboxProcessor.friendlyErrorMessage(error))
+                        ))
+                    }
+                }
+            }
+
+            guard !Task.isCancelled else {
+                isProcessing = false
+                return
+            }
+
+            processedResults = allProcessed
+            pendingConfirmations = allConfirmations
+            affectedFolders = allAffected
+            currentScreen = .results
             isProcessing = false
         }
     }
@@ -388,6 +473,7 @@ final class AppState: ObservableObject {
         currentScreen = .inbox
         processedResults = []
         pendingConfirmations = []
+        affectedFolders = []
         reorganizeCategory = nil
         reorganizeSubfolder = nil
         Task {
@@ -403,12 +489,35 @@ final class AppState: ObservableObject {
         }
         processedResults = []
         pendingConfirmations = []
+        affectedFolders = []
         if currentScreen == .inbox {
             reorganizeCategory = nil
             reorganizeSubfolder = nil
             Task {
                 await refreshInboxCount()
             }
+        }
+    }
+
+    /// Navigate to ReorganizeView with a specific folder pre-selected
+    func navigateToReorganizeFolder(_ folderPath: String) {
+        let pathManager = PKMPathManager(root: pkmRootPath)
+        let resolvedFolder = URL(fileURLWithPath: folderPath).resolvingSymlinksInPath().path
+        for category in PARACategory.allCases {
+            let basePath = pathManager.paraPath(for: category)
+            let resolvedBase = URL(fileURLWithPath: basePath).resolvingSymlinksInPath().path
+            guard resolvedFolder.hasPrefix(resolvedBase) else { continue }
+            let relative = String(resolvedFolder.dropFirst(resolvedBase.count))
+                .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+            let subfolder = relative.components(separatedBy: "/").first ?? ""
+            guard !subfolder.isEmpty else { continue }
+            reorganizeCategory = category
+            reorganizeSubfolder = subfolder
+            processedResults = []
+            pendingConfirmations = []
+            affectedFolders = []
+            currentScreen = .reorganize
+            return
         }
     }
 
