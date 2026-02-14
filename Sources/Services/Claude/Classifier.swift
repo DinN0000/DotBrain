@@ -421,15 +421,34 @@ actor Classifier {
 
     // MARK: - Utilities
 
-    /// Remove PARA prefix from folder path (e.g., "3_Resource/DevOps" → "DevOps")
+    /// Remove PARA prefix from folder path (e.g., "3_Resource/DevOps" → "DevOps", "Area/DevOps" → "DevOps")
     private func stripParaPrefix(_ folder: String) -> String {
         let trimmed = folder.trimmingCharacters(in: .whitespaces)
-        let pattern = #"^[1-4]_(?:Project|Area|Resource|Archive)/?"#
-        guard let regex = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive) else {
-            return trimmed
+        guard !trimmed.isEmpty else { return "" }
+
+        // Phase 1: "2_Area/DevOps" → "DevOps" (숫자 접두사 포함된 경우)
+        let numericPrefixPattern = #"^[1-4][\s_\-]?(?:Project|Area|Resource|Archive)/?"#
+        var result = trimmed
+        if let regex = try? NSRegularExpression(pattern: numericPrefixPattern, options: .caseInsensitive) {
+            result = regex.stringByReplacingMatches(in: result, range: NSRange(result.startIndex..., in: result), withTemplate: "")
         }
-        let range = NSRange(trimmed.startIndex..., in: trimmed)
-        return regex.stringByReplacingMatches(in: trimmed, range: range, withTemplate: "")
+
+        // Phase 2: "Area/DevOps" → "DevOps" (bare 카테고리명이 경로 앞에 올 때)
+        let barePrefixPattern = #"^(?:Project|Area|Resource|Archive|_?Inbox)/"#
+        if let regex = try? NSRegularExpression(pattern: barePrefixPattern, options: .caseInsensitive) {
+            result = regex.stringByReplacingMatches(in: result, range: NSRange(result.startIndex..., in: result), withTemplate: "")
+        }
+
+        // Phase 3: 전체가 bare 카테고리명이면 빈 문자열
+        let bareNames: Set<String> = [
+            "project", "area", "resource", "archive",
+            "inbox", "_inbox", "projects", "areas", "resources", "archives"
+        ]
+        if bareNames.contains(result.lowercased().trimmingCharacters(in: .whitespaces)) {
+            return ""
+        }
+
+        return result
     }
 
     /// Fuzzy match AI-returned project name against actual folder names

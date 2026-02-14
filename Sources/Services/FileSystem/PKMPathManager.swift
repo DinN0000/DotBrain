@@ -44,15 +44,42 @@ struct PKMPathManager {
         }
 
         let base = paraPath(for: result.para)
-        if result.targetFolder.isEmpty {
+        let sanitized = sanitizeTargetFolder(result.targetFolder, para: result.para)
+        if sanitized.isEmpty {
             return base
         }
-        let safeFolder = sanitizeFolderName(result.targetFolder)
+        let safeFolder = sanitizeFolderName(sanitized)
         let targetPath = (base as NSString).appendingPathComponent(safeFolder)
         let resolvedBase = URL(fileURLWithPath: base).standardizedFileURL.resolvingSymlinksInPath().path
         let resolvedTarget = URL(fileURLWithPath: targetPath).standardizedFileURL.resolvingSymlinksInPath().path
         guard resolvedTarget.hasPrefix(resolvedBase) else { return base }
         return targetPath
+    }
+
+    /// Strip PARA category names from the beginning of target folder to prevent nesting (e.g., "Area/DevOps" → "DevOps")
+    private func sanitizeTargetFolder(_ folder: String, para: PARACategory) -> String {
+        let trimmed = folder.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return "" }
+
+        let dangerousNames: Set<String> = [
+            para.folderName.lowercased(),   // "2_area"
+            para.displayName.lowercased(),  // "area"
+            para.rawValue.lowercased()      // "area"
+        ]
+        let inboxNames: Set<String> = ["inbox", "_inbox"]
+
+        let components = trimmed.components(separatedBy: "/").filter { !$0.isEmpty }
+        guard let first = components.first else { return "" }
+
+        let normalizedFirst = first.lowercased()
+            .trimmingCharacters(in: CharacterSet(charactersIn: "_"))
+            .replacingOccurrences(of: #"^[1-4][\s_\-]?"#, with: "", options: .regularExpression)
+
+        if dangerousNames.contains(normalizedFirst) || inboxNames.contains(normalizedFirst) {
+            let remaining = Array(components.dropFirst())
+            return remaining.joined(separator: "/")
+        }
+        return trimmed
     }
 
     /// Get the assets directory for a target directory
