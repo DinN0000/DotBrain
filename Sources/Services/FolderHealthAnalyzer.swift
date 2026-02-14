@@ -135,7 +135,16 @@ struct FolderHealthAnalyzer {
             }
             let data = handle.readData(ofLength: 4096)
             handle.closeFile()
-            guard let content = String(data: data, encoding: .utf8) else {
+            // readData may cut in the middle of a multi-byte UTF-8 character;
+            // try trimming up to 3 trailing bytes to recover a valid string
+            var content: String?
+            for trim in 0...min(3, data.count) {
+                if let s = String(data: data.dropLast(trim), encoding: .utf8) {
+                    content = s
+                    break
+                }
+            }
+            guard let content else {
                 missingCount += 1
                 continue
             }
