@@ -228,33 +228,45 @@ private struct FolderRow: View {
     }
 
     var body: some View {
-        HStack {
-            Image(systemName: "folder")
-                .font(.system(size: 13))
-                .foregroundColor(isSelected ? .accentColor : .primary.opacity(0.6))
+        VStack(alignment: .leading, spacing: 0) {
+            HStack {
+                Image(systemName: "folder")
+                    .font(.system(size: 13))
+                    .foregroundColor(isSelected ? .accentColor : .primary.opacity(0.6))
 
-            Text(name)
-                .font(.system(.body, design: .monospaced))
-                .lineLimit(1)
+                Text(name)
+                    .font(.system(.body, design: .monospaced))
+                    .lineLimit(1)
 
-            Spacer()
+                Spacer()
 
-            // Health indicator dot
-            if healthLabel != "good" {
-                Circle()
-                    .fill(healthColor)
-                    .frame(width: 6, height: 6)
+                // Health indicator dot
+                if healthLabel != "good" {
+                    Circle()
+                        .fill(healthColor)
+                        .frame(width: 6, height: 6)
+                }
+
+                Text("\(fileCount)")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(
+                        Capsule()
+                            .fill(Color.secondary.opacity(0.12))
+                    )
             }
 
-            Text("\(fileCount)")
-                .font(.caption)
-                .foregroundColor(.secondary)
-                .padding(.horizontal, 6)
-                .padding(.vertical, 2)
-                .background(
-                    Capsule()
-                        .fill(Color.secondary.opacity(0.12))
-                )
+            // Health issues text (shown on hover)
+            if healthLabel != "good" && isHovered && !healthIssues.isEmpty {
+                Text(healthIssues)
+                    .font(.caption2)
+                    .foregroundColor(healthColor)
+                    .padding(.leading, 21)
+                    .padding(.top, 2)
+                    .transition(.opacity)
+            }
         }
         .padding(.vertical, 6)
         .padding(.horizontal, 8)
@@ -266,8 +278,7 @@ private struct FolderRow: View {
         )
         .contentShape(Rectangle())
         .onTapGesture { action() }
-        .help(healthIssues)
-        .animation(.easeOut(duration: 0.12), value: isHovered)
+        .animation(.easeOut(duration: 0.15), value: isHovered)
         .animation(.easeOut(duration: 0.12), value: isSelected)
         .onHover { isHovered = $0 }
     }
