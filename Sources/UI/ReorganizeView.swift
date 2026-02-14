@@ -108,7 +108,7 @@ struct ReorganizeView: View {
             }
             .padding()
         }
-        .onAppear {
+        .task(id: appState.navigationId) {
             // Pre-select folder if navigated from ResultsView
             if let cat = appState.reorganizeCategory, let sub = appState.reorganizeSubfolder {
                 selectedCategory = cat
@@ -121,6 +121,7 @@ struct ReorganizeView: View {
     // MARK: - Load Folders
 
     private func loadFolders() {
+        folderMap = [:]
         isLoading = true
         let root = appState.pkmRootPath
         let cats = paraCategories
