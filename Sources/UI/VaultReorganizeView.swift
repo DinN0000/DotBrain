@@ -336,10 +336,10 @@ struct VaultReorganizeView: View {
             Divider()
 
             HStack {
+                Spacer()
                 HoverTextButton(label: "돌아가기") {
                     goBack()
                 }
-                Spacer()
             }
             .padding()
         }

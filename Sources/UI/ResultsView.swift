@@ -96,16 +96,16 @@ struct ResultsView: View {
 
             // Action buttons
             HStack {
-                HoverTextButton(label: navigateBackLabel) {
-                    appState.navigateBack()
-                }
-
-                Spacer()
-
                 if !appState.processedResults.isEmpty {
                     HoverTextButton(label: "Finder에서 열기") {
                         openInFinder()
                     }
+                }
+
+                Spacer()
+
+                HoverTextButton(label: navigateBackLabel) {
+                    appState.navigateBack()
                 }
             }
             .padding()
