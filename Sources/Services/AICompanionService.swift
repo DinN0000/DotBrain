@@ -6,7 +6,7 @@ import Foundation
 enum AICompanionService {
 
     /// Bump this when companion file content changes — triggers overwrite on existing vaults
-    static let version = 7
+    static let version = 8
 
     /// Generate all AI companion files in the PKM root (first-time only)
     static func generateAll(pkmRoot: String) throws {
@@ -69,7 +69,17 @@ enum AICompanionService {
         // .claude/agents/ — marker-based safe update
         let agentsDir = (pkmRoot as NSString).appendingPathComponent(".claude/agents")
         try fm.createDirectory(atPath: agentsDir, withIntermediateDirectories: true)
-        for (name, content) in [("inbox-agent", inboxAgentContent), ("project-agent", projectAgentContent), ("search-agent", searchAgentContent)] {
+        for (name, content) in [
+            ("inbox-agent", inboxAgentContent),
+            ("project-agent", projectAgentContent),
+            ("search-agent", searchAgentContent),
+            ("synthesis-agent", synthesisAgentContent),
+            ("review-agent", reviewAgentContent),
+            ("note-agent", noteAgentContent),
+            ("link-health-agent", linkHealthAgentContent),
+            ("tag-cleanup-agent", tagCleanupAgentContent),
+            ("stale-review-agent", staleReviewAgentContent),
+        ] {
             let path = (agentsDir as NSString).appendingPathComponent("\(name).md")
             let wrapped = "\(markerStart)\n\(content)\n\(markerEnd)"
             if fm.fileExists(atPath: path) {
@@ -80,14 +90,23 @@ enum AICompanionService {
         }
 
         // .claude/skills/ — marker-based safe update
-        let skillsDir = (pkmRoot as NSString).appendingPathComponent(".claude/skills/inbox-processor")
-        try fm.createDirectory(atPath: skillsDir, withIntermediateDirectories: true)
-        let skillPath = (skillsDir as NSString).appendingPathComponent("SKILL.md")
-        let wrappedSkill = "\(markerStart)\n\(skillContent)\n\(markerEnd)"
-        if fm.fileExists(atPath: skillPath) {
-            try replaceMarkerSection(at: skillPath, with: wrappedSkill)
-        } else {
-            try wrappedSkill.write(toFile: skillPath, atomically: true, encoding: .utf8)
+        let allSkills: [(String, String)] = [
+            ("inbox-processor", skillContent),
+            ("meeting-note", meetingNoteSkillContent),
+            ("project-status", projectStatusSkillContent),
+            ("weekly-review", weeklyReviewSkillContent),
+            ("literature-note", literatureNoteSkillContent),
+        ]
+        for (skillName, skillBody) in allSkills {
+            let skillsDir = (pkmRoot as NSString).appendingPathComponent(".claude/skills/\(skillName)")
+            try fm.createDirectory(atPath: skillsDir, withIntermediateDirectories: true)
+            let skillPath = (skillsDir as NSString).appendingPathComponent("SKILL.md")
+            let wrappedSkill = "\(markerStart)\n\(skillBody)\n\(markerEnd)"
+            if fm.fileExists(atPath: skillPath) {
+                try replaceMarkerSection(at: skillPath, with: wrappedSkill)
+            } else {
+                try wrappedSkill.write(toFile: skillPath, atomically: true, encoding: .utf8)
+            }
         }
     }
 
@@ -376,6 +395,12 @@ enum AICompanionService {
     | "인박스 정리해줘" | 인박스 분류 | `.claude/agents/inbox-agent.md` |
     | "프로젝트 만들어줘" | 프로젝트 관리 | `.claude/agents/project-agent.md` |
     | "OO 관련 자료 찾아줘" | 검색 | `.claude/agents/search-agent.md` |
+    | "OO 종합해줘" | 종합/브리핑 | `.claude/agents/synthesis-agent.md` |
+    | "주간 리뷰 해줘" | 정기 리뷰 | `.claude/agents/review-agent.md` |
+    | "노트 다듬어줘" | 노트 관리 | `.claude/agents/note-agent.md` |
+    | "링크 건강 점검해줘" | 링크 건강 | `.claude/agents/link-health-agent.md` |
+    | "태그 정리해줘" | 태그 정리 | `.claude/agents/tag-cleanup-agent.md` |
+    | "오래된 노트 점검해줘" | 콘텐츠 리뷰 | `.claude/agents/stale-review-agent.md` |
 
     각 에이전트 파일에 상세 워크플로가 정의되어 있습니다.
 
@@ -384,6 +409,10 @@ enum AICompanionService {
     | 스킬 | 파일 | 역할 |
     |------|------|------|
     | 바이너리 처리 | `.claude/skills/inbox-processor/SKILL.md` | PDF/DOCX/PPTX/이미지 텍스트 추출 |
+    | 회의록 작성 | `.claude/skills/meeting-note/SKILL.md` | 회의 내용 → 구조화된 회의록 |
+    | 프로젝트 현황 | `.claude/skills/project-status/SKILL.md` | 프로젝트 상태 보고서 생성 |
+    | 주간 리뷰 | `.claude/skills/weekly-review/SKILL.md` | 주간/월간 리뷰 보고서 |
+    | 문헌 노트 | `.claude/skills/literature-note/SKILL.md` | 외부 자료 → 구조화된 문헌 노트 |
 
     ---
 
@@ -436,6 +465,12 @@ enum AICompanionService {
     | "인박스 정리해줘" | 인박스 분류 | `.claude/agents/inbox-agent.md` |
     | "프로젝트 만들어줘" | 프로젝트 관리 | `.claude/agents/project-agent.md` |
     | "OO 관련 자료 찾아줘" | 검색 | `.claude/agents/search-agent.md` |
+    | "OO 종합해줘" | 종합/브리핑 | `.claude/agents/synthesis-agent.md` |
+    | "주간 리뷰 해줘" | 정기 리뷰 | `.claude/agents/review-agent.md` |
+    | "노트 다듬어줘" | 노트 관리 | `.claude/agents/note-agent.md` |
+    | "링크 건강 점검해줘" | 링크 건강 | `.claude/agents/link-health-agent.md` |
+    | "태그 정리해줘" | 태그 정리 | `.claude/agents/tag-cleanup-agent.md` |
+    | "오래된 노트 점검해줘" | 콘텐츠 리뷰 | `.claude/agents/stale-review-agent.md` |
 
     ## 프론트매터 병합 정책
 
@@ -510,6 +545,24 @@ enum AICompanionService {
     - **Vault Reorganization**: Cross-category AI scan → compare current vs recommended location → selective execution (Dashboard → 전체 재정리, max 200 files)
     - **Vault Audit**: Detect broken WikiLinks, missing frontmatter/tags/PARA → auto-repair with Levenshtein matching
 
+    ## AI Agents (9 agents in `.claude/agents/`)
+    - inbox-agent: Inbox classification and processing
+    - project-agent: Project lifecycle management
+    - search-agent: Vault-wide knowledge search
+    - synthesis-agent: Topic synthesis and briefing generation
+    - review-agent: Periodic vault review (weekly/monthly)
+    - note-agent: Note writing, polishing, connecting, and QA
+    - link-health-agent: WikiLink health check and orphan detection
+    - tag-cleanup-agent: Tag standardization and deduplication
+    - stale-review-agent: Stale content review and quality check
+
+    ## AI Skills (5 skills in `.claude/skills/`)
+    - inbox-processor: Binary file text extraction
+    - meeting-note: Meeting content → structured meeting note
+    - project-status: Project status report generation
+    - weekly-review: Weekly/monthly review report
+    - literature-note: External sources → structured literature note
+
     ## Navigation Priority
     1. Check **MOC (index notes)**: `FolderName/FolderName.md` — AI-generated folder summary + `[[wikilink]] — summary` list + tag cloud
     2. Read `CLAUDE.md` for detailed structure, frontmatter schema, and classification rules
@@ -577,6 +630,12 @@ enum AICompanionService {
             ("inbox-agent", inboxAgentContent),
             ("project-agent", projectAgentContent),
             ("search-agent", searchAgentContent),
+            ("synthesis-agent", synthesisAgentContent),
+            ("review-agent", reviewAgentContent),
+            ("note-agent", noteAgentContent),
+            ("link-health-agent", linkHealthAgentContent),
+            ("tag-cleanup-agent", tagCleanupAgentContent),
+            ("stale-review-agent", staleReviewAgentContent),
         ]
 
         for (name, content) in agents {
@@ -817,16 +876,467 @@ enum AICompanionService {
     - 관련도가 동일하면 활성 노트 우선
     """
 
+    private static let synthesisAgentContent = """
+    # 종합/브리핑 에이전트
+
+    ## 트리거
+    - "OO 종합해줘"
+    - "OO 브리핑 만들어줘"
+    - "OO 주제로 정리해줘"
+    - "OO에 대해 알고 있는 것 모아줘"
+
+    ## 워크플로
+
+    ### Step 1: 주제 파악 및 검색
+    사용자가 요청한 주제 키워드를 추출하고, 볼트 전체를 검색합니다:
+    ```
+    Grep("키워드", glob: "**/*.md")
+    Grep("tags:.*키워드", glob: "**/*.md")
+    ```
+
+    ### Step 2: 관련 노트 수집
+    검색 결과에서 관련 노트를 읽고 핵심 내용을 추출합니다:
+    - 프론트매터의 `tags`, `summary`, `project` 확인
+    - 본문에서 주제 관련 핵심 문장 추출
+    - `## Related Notes` 섹션의 링크를 따라가며 추가 노트 수집
+
+    ### Step 3: 종합 브리핑 생성
+    수집한 내용을 다음 구조로 종합합니다:
+
+    ```markdown
+    ---
+    para: resource
+    tags: [주제, 브리핑, 종합]
+    created: YYYY-MM-DD
+    status: active
+    summary: "OO 주제에 대한 볼트 내 지식 종합"
+    source: original
+    ---
+
+    # OO 브리핑
+
+    ## 핵심 요약
+    (3-5문장으로 주제의 전체 그림)
+
+    ## 상세 내용
+    ### 주요 발견
+    (노트에서 추출한 핵심 인사이트)
+
+    ### 데이터 포인트
+    (수치, 날짜, 구체적 사실)
+
+    ### 관점과 논쟁
+    (상충하는 의견이 있으면 정리)
+
+    ## 출처 노트
+    - [[노트1]] — 핵심 분석 자료
+    - [[노트2]] — 배경 정보
+
+    ## 지식 갭
+    (볼트에 없는 정보, 추가 조사 필요한 부분)
+
+    ## Related Notes
+    ```
+
+    ### Step 4: 저장 위치 결정
+    - 특정 프로젝트 관련 → `1_Project/프로젝트명/`
+    - 일반 주제 → `3_Resource/적절한폴더/`
+    - 사용자에게 위치 확인
+
+    ### Step 5: MOC 갱신
+    저장 폴더의 인덱스 노트에 브리핑 등록
+
+    ## 주의사항
+    - 볼트에 없는 정보를 지어내지 않음
+    - 출처 노트를 반드시 명시
+    - "지식 갭" 섹션으로 부족한 부분 투명하게 표시
+    """
+
+    private static let reviewAgentContent = """
+    # 정기 리뷰 에이전트
+
+    ## 트리거
+    - "주간 리뷰 해줘"
+    - "월간 리뷰 해줘"
+    - "볼트 리뷰해줘"
+    - "이번 주 정리해줘"
+
+    ## 워크플로
+
+    ### Step 1: 기간 결정
+    - "주간" → 최근 7일
+    - "월간" → 최근 30일
+    - 명시 없으면 → 주간(7일) 기본
+
+    ### Step 2: 활동 스캔
+
+    **최근 생성된 노트:**
+    ```
+    Grep("^created: YYYY-MM-", glob: "**/*.md")
+    ```
+    날짜 범위 내 생성된 노트를 수집합니다.
+
+    **최근 수정된 파일:**
+    파일 시스템 수정일 기준으로 변경된 파일을 확인합니다.
+
+    **프로젝트 상태 점검:**
+    ```
+    Glob("1_Project/*/")
+    ```
+    각 프로젝트의 인덱스 노트에서 status를 확인합니다.
+
+    ### Step 3: 건강 지표 수집
+
+    - **인박스 잔량**: `Glob("_Inbox/*")` → 미처리 파일 수
+    - **드래프트 노트**: `Grep("^status: draft", glob: "**/*.md")` → 미완성 노트
+    - **고아 노트**: 다른 노트에서 링크되지 않은 노트 (link-health-agent 로직 참조)
+    - **태그 없는 노트**: `tags: []`인 노트 수
+
+    ### Step 4: 리뷰 보고서 생성
+
+    `.claude/skills/weekly-review/SKILL.md`의 템플릿을 사용하여 보고서를 생성합니다.
+
+    ### Step 5: 액션 아이템 제안
+
+    리뷰 결과에 기반한 실행 가능한 제안:
+    - "드래프트 3개를 완성하거나 아카이브하세요"
+    - "인박스에 5개 파일이 대기 중입니다"
+    - "ProjectX에 2주간 업데이트가 없습니다"
+    - "고아 노트 7개를 연결하거나 정리하세요"
+
+    ### Step 6: 저장
+    `3_Resource/Reviews/` 폴더에 `review_YYYY-MM-DD.md`로 저장
+
+    ## 주의사항
+    - 판단을 내리지 않고 사실만 보고
+    - 액션 아이템은 구체적이고 실행 가능하게
+    - 이전 리뷰가 있으면 비교하여 트렌드 언급
+    """
+
+    private static let noteAgentContent = """
+    # 노트 관리 에이전트
+
+    ## 트리거
+    - "노트 써줘" (작성 모드)
+    - "노트 다듬어줘" (다듬기 모드)
+    - "이 노트 연결해줘" (연결 모드)
+    - "노트 QA해줘" (품질 검사 모드)
+
+    ## 모드 1: 작성 (Write)
+
+    트리거: "노트 써줘", "OO에 대한 노트 만들어줘"
+
+    ### 워크플로
+    1. 사용자에게 주제/내용 확인
+    2. 기존 관련 노트 검색 → 중복 방지
+    3. 적절한 PARA 카테고리와 폴더 결정
+    4. 프론트매터 포함 노트 생성:
+       ```yaml
+       ---
+       para: (AI 판단)
+       tags: [주제관련태그]
+       created: YYYY-MM-DD
+       status: active
+       summary: "내용 요약"
+       source: original
+       ---
+       ```
+    5. `## Related Notes` 섹션에 관련 노트 링크
+    6. 대상 폴더의 MOC 갱신
+
+    ## 모드 2: 다듬기 (Polish)
+
+    트리거: "노트 다듬어줘", "이 노트 개선해줘"
+
+    ### 워크플로
+    1. 대상 노트 읽기
+    2. 다음 항목 점검 및 개선:
+       - 프론트매터 빈 필드 채우기
+       - 문장 다듬기 (명확성, 간결성)
+       - 구조화 (헤딩, 리스트, 볼드)
+       - 맞춤법/문법 교정
+    3. 변경 사항 요약 보고
+    4. **원본 의미를 변경하지 않음**
+
+    ## 모드 3: 연결 (Connect)
+
+    트리거: "이 노트 연결해줘", "관련 노트 찾아서 연결해줘"
+
+    ### 워크플로
+    1. 대상 노트의 주제/태그/키워드 분석
+    2. 볼트 전체에서 관련 노트 검색:
+       ```
+       Grep("tags:.*키워드", glob: "**/*.md")
+       Grep("키워드", glob: "**/*.md")
+       ```
+    3. 관련도 순으로 최대 5개 선별
+    4. `## Related Notes` 섹션 갱신:
+       ```markdown
+       - [[관련노트]] — 연결 이유 설명
+       ```
+    5. 양방향 링크: 관련 노트에도 역방향 링크 추가
+
+    ## 모드 4: QA (Quality Assurance)
+
+    트리거: "노트 QA해줘", "노트 품질 검사해줘"
+
+    ### 워크플로
+    1. 대상 노트(또는 폴더) 읽기
+    2. 다음 품질 기준 점검:
+       - ✅ 프론트매터 완전성 (8개 필드)
+       - ✅ 태그 존재 여부
+       - ✅ summary 필드 품질
+       - ✅ Related Notes 존재 여부
+       - ✅ 깨진 [[위키링크]]
+       - ✅ 내용 길이 적절성
+       - ✅ PARA 분류 정확성
+    3. 점수와 개선점 보고:
+       ```
+       | 항목 | 상태 | 비고 |
+       |------|------|------|
+       | 프론트매터 | ✅ | 완전 |
+       | 태그 | ⚠️ | 1개만 있음 |
+       | Related Notes | ❌ | 없음 |
+       ```
+    4. "자동 수정할까요?" 제안
+
+    ## 공통 규칙
+    - 기존 프론트매터 값 보존
+    - 기존 태그 삭제 금지
+    - 작업 후 MOC 갱신
+    """
+
+    private static let linkHealthAgentContent = """
+    # 링크 건강 에이전트
+
+    ## 트리거
+    - "링크 건강 점검해줘"
+    - "깨진 링크 확인해줘"
+    - "고아 노트 찾아줘"
+    - "링크 분석해줘"
+
+    ## 워크플로
+
+    ### Step 1: 모든 위키링크 수집
+    볼트 전체에서 `[[위키링크]]`를 추출합니다:
+    ```
+    Grep("\\[\\[.+?\\]\\]", glob: "**/*.md")
+    ```
+
+    ### Step 2: 깨진 링크 탐지
+    각 `[[링크대상]]`에 대해 실제 파일 존재 여부를 확인합니다:
+    ```
+    Glob("**/링크대상.md")
+    ```
+    - 존재하지 않으면 → 깨진 링크
+    - Levenshtein 거리 ≤ 3인 유사 파일 검색 → 자동 수정 후보 제시
+
+    ### Step 3: 고아 노트 탐지
+    다른 어떤 노트에서도 `[[참조]]`되지 않는 노트를 찾습니다:
+    - 인덱스 노트(MOC)는 제외 (고아여도 정상)
+    - `.Templates/`, `.claude/` 등 시스템 폴더 제외
+
+    ### Step 4: 링크 밀도 분석
+    각 노트의 링크 수를 분석합니다:
+    - 링크 0개 → "고립된 노트" (연결 필요)
+    - 링크 10개 이상 → "허브 노트" (정상)
+
+    ### Step 5: 보고서 생성
+
+    ```markdown
+    # 링크 건강 보고서 (YYYY-MM-DD)
+
+    ## 요약
+    - 전체 노트: N개
+    - 전체 링크: N개
+    - 깨진 링크: N개
+    - 고아 노트: N개
+
+    ## 깨진 링크
+    | 파일 | 깨진 링크 | 수정 후보 |
+    |------|----------|----------|
+    | note_a.md | [[없는노트]] | [[비슷한노트]] ? |
+
+    ## 고아 노트
+    | 파일 | 위치 | 제안 |
+    |------|------|------|
+    | lonely.md | 3_Resource/Topic | 연결 또는 아카이브 |
+
+    ## 고립된 노트 (링크 0개)
+    (목록)
+    ```
+
+    ### Step 6: 자동 수정 제안
+    - "깨진 링크 N개를 자동 수정할까요?"
+    - "고아 노트를 관련 노트에 연결할까요?"
+    - 사용자 확인 후 실행
+
+    ## 주의사항
+    - 자동 수정은 Levenshtein 거리 ≤ 3인 경우만
+    - 삭제는 절대 하지 않음 — 연결 또는 아카이브만 제안
+    """
+
+    private static let tagCleanupAgentContent = """
+    # 태그 정리 에이전트
+
+    ## 트리거
+    - "태그 정리해줘"
+    - "태그 통일해줘"
+    - "중복 태그 찾아줘"
+    - "태그 현황 보여줘"
+
+    ## 워크플로
+
+    ### Step 1: 전체 태그 수집
+    볼트의 모든 마크다운 파일에서 `tags:` 필드를 파싱합니다:
+    ```
+    Grep("^tags:", glob: "**/*.md")
+    ```
+    태그 형식: `tags: [태그1, 태그2]` (인라인 YAML 배열)
+
+    ### Step 2: 태그 분석
+
+    **빈도 집계:**
+    각 태그의 사용 횟수를 집계합니다.
+
+    **유사 태그 탐지:**
+    - 대소문자 차이: `DeFi` vs `defi` vs `DEFI`
+    - 하이픈/언더스코어: `web-dev` vs `web_dev`
+    - 단수/복수: `meeting` vs `meetings`
+    - 영한 혼용: `blockchain` vs `블록체인`
+
+    **고빈도/저빈도 분석:**
+    - 1회만 사용된 태그 → 통합 또는 삭제 후보
+    - 50회 이상 사용된 태그 → 세분화 필요 여부
+
+    ### Step 3: 정리 계획 제시
+
+    ```markdown
+    # 태그 정리 계획
+
+    ## 통합 제안 (유사 태그)
+    | 현재 | 통합 대상 | 영향 파일 |
+    |------|----------|----------|
+    | DeFi, defi, DEFI | DeFi | 15개 |
+    | web-dev, web_dev | web-dev | 8개 |
+
+    ## 삭제 후보 (1회 사용)
+    | 태그 | 파일 | 대체 제안 |
+    |------|------|----------|
+    | 임시메모 | note_x.md | 메모 |
+
+    ## 태그 클라우드 (상위 20)
+    DeFi(42) 회의록(35) 리서치(28) ...
+    ```
+
+    ### Step 4: 사용자 승인 후 실행
+    - 각 통합/삭제에 대해 사용자 확인
+    - 프론트매터의 `tags` 필드를 일괄 수정
+    - 영향받은 MOC 갱신
+
+    ## 주의사항
+    - 태그 삭제는 반드시 사용자 확인 후
+    - 대체 태그 없이 삭제하지 않음
+    - 기존 태그 추가만 가능, 자동 삭제 금지 (사용자 명시적 요청 시에만)
+    """
+
+    private static let staleReviewAgentContent = """
+    # 콘텐츠 리뷰 에이전트
+
+    ## 트리거
+    - "오래된 노트 점검해줘"
+    - "콘텐츠 품질 검사해줘"
+    - "정리 필요한 노트 찾아줘"
+    - "볼트 품질 점검해줘"
+
+    ## 워크플로
+
+    ### Step 1: 오래된 노트 탐지
+    다음 기준으로 "stale" 노트를 식별합니다:
+    - `status: active`인데 90일 이상 수정 없음
+    - `status: draft`인데 30일 이상 수정 없음
+    - `para: project`인데 해당 프로젝트가 이미 아카이브됨
+
+    ```
+    Grep("^status: active", glob: "**/*.md")
+    Grep("^status: draft", glob: "**/*.md")
+    ```
+    파일 수정일을 확인하여 기간 초과 여부 판단.
+
+    ### Step 2: 품질 점검
+    각 노트의 품질 지표를 검사합니다:
+
+    **프론트매터 완전성:**
+    - 필수 필드: `para`, `tags`, `created`, `status`, `summary`
+    - 비어 있거나 누락된 필드 탐지
+
+    **내용 품질:**
+    - 본문 50자 미만 → "내용 부족"
+    - 프론트매터만 있고 본문 없음 → "빈 노트"
+    - `## Related Notes` 없음 → "연결 부족"
+
+    **PARA 정합성:**
+    - 파일 위치와 `para` 필드 불일치 → "분류 불일치"
+    - 예: `1_Project/`에 있는데 `para: resource`
+
+    ### Step 3: 보고서 생성
+
+    ```markdown
+    # 콘텐츠 품질 보고서 (YYYY-MM-DD)
+
+    ## 요약
+    - 전체 노트: N개
+    - 오래된 노트 (90일+): N개
+    - 미완성 드래프트 (30일+): N개
+    - 품질 이슈: N개
+
+    ## 오래된 활성 노트
+    | 파일 | 위치 | 마지막 수정 | 제안 |
+    |------|------|------------|------|
+    | old_note.md | 2_Area/Ops | 120일 전 | 아카이브? |
+
+    ## 미완성 드래프트
+    | 파일 | 위치 | 생성일 | 제안 |
+    |------|------|--------|------|
+    | draft.md | 1_Project/X | 45일 전 | 완성 또는 삭제? |
+
+    ## 품질 이슈
+    | 파일 | 이슈 | 심각도 |
+    |------|------|--------|
+    | empty.md | 빈 노트 | 높음 |
+    | no_tags.md | 태그 없음 | 중간 |
+    ```
+
+    ### Step 4: 액션 제안
+    - "오래된 노트 N개를 아카이브할까요?"
+    - "미완성 드래프트 N개를 정리할까요?"
+    - "프론트매터 빈 필드를 자동 채울까요?"
+    - 사용자 확인 후 실행
+
+    ## 주의사항
+    - 삭제는 절대 제안하지 않음 — 아카이브만 제안
+    - 프론트매터 자동 채우기는 AI 추론, 사용자 확인 필요
+    - `created` 필드는 절대 변경하지 않음
+    """
+
     // MARK: - .claude/skills/
 
     private static func generateClaudeSkills(pkmRoot: String) throws {
         let fm = FileManager.default
-        let skillsDir = (pkmRoot as NSString).appendingPathComponent(".claude/skills/inbox-processor")
-        try fm.createDirectory(atPath: skillsDir, withIntermediateDirectories: true)
-
-        let path = (skillsDir as NSString).appendingPathComponent("SKILL.md")
-        if !fm.fileExists(atPath: path) {
-            try skillContent.write(toFile: path, atomically: true, encoding: .utf8)
+        let allSkills: [(String, String)] = [
+            ("inbox-processor", skillContent),
+            ("meeting-note", meetingNoteSkillContent),
+            ("project-status", projectStatusSkillContent),
+            ("weekly-review", weeklyReviewSkillContent),
+            ("literature-note", literatureNoteSkillContent),
+        ]
+        for (skillName, skillBody) in allSkills {
+            let skillsDir = (pkmRoot as NSString).appendingPathComponent(".claude/skills/\(skillName)")
+            try fm.createDirectory(atPath: skillsDir, withIntermediateDirectories: true)
+            let path = (skillsDir as NSString).appendingPathComponent("SKILL.md")
+            if !fm.fileExists(atPath: path) {
+                try skillBody.write(toFile: path, atomically: true, encoding: .utf8)
+            }
         }
     }
 
@@ -884,5 +1394,280 @@ enum AICompanionService {
     ## 텍스트 제한
 
     추출 텍스트는 최대 5,000자로 제한합니다.
+    """
+
+    private static let meetingNoteSkillContent = """
+    # 회의록 작성 스킬
+
+    ## 용도
+    회의 내용(음성 전사, 메모, 요약)을 구조화된 회의록 노트로 변환합니다.
+
+    ## 입력
+    - 회의 제목 또는 주제
+    - 회의 원문 (전사 텍스트, 메모, 또는 요약)
+    - (선택) 참석자, 날짜, 관련 프로젝트
+
+    ## 출력 형식
+
+    ```yaml
+    ---
+    para: (project 또는 area)
+    tags: [회의록, 프로젝트명]
+    created: YYYY-MM-DD
+    status: active
+    summary: "회의 핵심 내용 2-3문장"
+    source: meeting
+    project: "관련프로젝트명"
+    ---
+    ```
+
+    ```markdown
+    # 회의 제목 (YYYY-MM-DD)
+
+    ## 참석자
+    - 이름1, 이름2, ...
+
+    ## 안건
+    1. 안건1
+    2. 안건2
+
+    ## 논의 내용
+
+    ### 안건1: 제목
+    - 핵심 논의 포인트
+    - 결정 사항
+
+    ### 안건2: 제목
+    - 핵심 논의 포인트
+
+    ## 결정 사항
+    - [ ] 담당자: 액션 아이템 1 (기한: MM/DD)
+    - [ ] 담당자: 액션 아이템 2
+
+    ## 다음 단계
+    - 후속 회의 일정
+    - 확인 필요 사항
+
+    ## Related Notes
+    - [[관련노트]] — 연결 이유
+    ```
+
+    ## 처리 규칙
+    - 원문의 핵심만 추출, 불필요한 대화 제거
+    - 액션 아이템은 체크박스 형식 (`- [ ]`)
+    - 담당자가 명확하면 반드시 기재
+    - 관련 프로젝트가 있으면 `project` 필드 기재
+    - 저장 위치: 관련 프로젝트 폴더 또는 `2_Area/`
+
+    ## 파일명 규칙
+    `meeting_MMDD_주제.md` (예: `meeting_0215_스프린트리뷰.md`)
+    """
+
+    private static let projectStatusSkillContent = """
+    # 프로젝트 현황 보고서 스킬
+
+    ## 용도
+    특정 프로젝트의 모든 노트를 분석하여 현황 보고서를 생성합니다.
+
+    ## 입력
+    - 프로젝트명 (1_Project/ 아래 폴더명)
+
+    ## 워크플로
+
+    ### 1. 프로젝트 노트 수집
+    ```
+    Glob("1_Project/프로젝트명/**/*.md")
+    Grep("^project: 프로젝트명", glob: "**/*.md")
+    ```
+
+    ### 2. 노트 분석
+    - 각 노트의 `status` 집계 (active/draft/completed/on-hold)
+    - 최근 수정된 노트 식별
+    - 액션 아이템 (`- [ ]`, `- [x]`) 수집
+    - 관련 다른 프로젝트 노트 확인
+
+    ### 3. 보고서 생성
+
+    ## 출력 형식
+
+    ```markdown
+    # 프로젝트명 — 현황 보고서 (YYYY-MM-DD)
+
+    ## 요약
+    (프로젝트 인덱스 노트의 목적/설명)
+
+    ## 현재 상태
+    - 전체 노트: N개
+    - 활성: N개 | 드래프트: N개 | 완료: N개 | 보류: N개
+
+    ## 최근 활동 (7일)
+    | 노트 | 상태 | 마지막 수정 |
+    |------|------|------------|
+    | [[note1]] | active | 2일 전 |
+
+    ## 미완료 액션 아이템
+    - [ ] 항목1 (출처: [[meeting_0210]])
+    - [ ] 항목2 (출처: [[task_list]])
+
+    ## 완료 항목
+    - [x] 항목A (출처: [[meeting_0205]])
+
+    ## 관련 자료 (프로젝트 외부)
+    - [[리소스노트]] — 참고 자료 (3_Resource/)
+
+    ## 주의 사항
+    - (오래된 드래프트, 누락된 정보 등)
+    ```
+
+    ## 저장
+    `1_Project/프로젝트명/status_YYYY-MM-DD.md`
+    """
+
+    private static let weeklyReviewSkillContent = """
+    # 주간/월간 리뷰 스킬
+
+    ## 용도
+    볼트 전체의 주간 또는 월간 활동을 분석하여 리뷰 보고서를 생성합니다.
+    `review-agent`가 이 스킬을 사용합니다.
+
+    ## 입력
+    - 리뷰 기간: "주간" (7일) 또는 "월간" (30일)
+    - (선택) 시작일
+
+    ## 출력 형식
+
+    ```yaml
+    ---
+    para: resource
+    tags: [리뷰, 주간리뷰]
+    created: YYYY-MM-DD
+    status: completed
+    summary: "YYYY-MM-DD 주간 리뷰"
+    source: original
+    ---
+    ```
+
+    ```markdown
+    # 주간 리뷰 (MM/DD ~ MM/DD)
+
+    ## 이번 주 요약
+    - 새로 생성된 노트: N개
+    - 수정된 노트: N개
+    - 완료된 항목: N개
+
+    ## 프로젝트별 진행
+    ### ProjectA
+    - 새 노트 2개, 완료 항목 3개
+    - 주요 진전: (요약)
+
+    ### ProjectB
+    - 새 노트 1개
+    - 주요 진전: (요약)
+
+    ## 새로 추가된 노트
+    | 노트 | 위치 | 태그 |
+    |------|------|------|
+    | [[new_note]] | 3_Resource/Topic | 키워드 |
+
+    ## 인박스 현황
+    - 처리 완료: N개
+    - 대기 중: N개
+
+    ## 볼트 건강
+    - 전체 노트 수: N개
+    - 깨진 링크: N개
+    - 태그 없는 노트: N개
+    - 드래프트 노트: N개
+
+    ## 다음 주 제안
+    - [ ] 드래프트 N개 완성 필요
+    - [ ] 오래된 노트 N개 리뷰 필요
+    - [ ] 프로젝트X 업데이트 필요
+
+    ## Related Notes
+    - [[이전 리뷰]] — 트렌드 비교
+    ```
+
+    ## 저장
+    `3_Resource/Reviews/review_YYYY-MM-DD.md`
+    (Reviews 폴더가 없으면 자동 생성)
+    """
+
+    private static let literatureNoteSkillContent = """
+    # 문헌 노트 스킬
+
+    ## 용도
+    외부 자료(논문, 기사, 책, 영상)를 구조화된 문헌 노트로 변환합니다.
+
+    ## 입력
+    - URL, 제목, 또는 원문 텍스트
+    - (선택) 관련 프로젝트, 추가 메모
+
+    ## 출력 형식
+
+    ```yaml
+    ---
+    para: resource
+    tags: [문헌, 주제태그]
+    created: YYYY-MM-DD
+    status: active
+    summary: "자료 핵심 내용 2-3문장"
+    source: literature
+    project: "관련프로젝트명"
+    ---
+    ```
+
+    ```markdown
+    # 자료 제목
+
+    ## 메타데이터
+    - **저자**: 이름
+    - **출처**: URL 또는 출판 정보
+    - **날짜**: 발행일
+    - **유형**: 논문 | 기사 | 책 | 영상 | 보고서
+
+    ## 핵심 요약
+    (자료의 핵심 내용 3-5문장)
+
+    ## 주요 내용
+
+    ### 핵심 주장/발견
+    1. 포인트 1
+    2. 포인트 2
+    3. 포인트 3
+
+    ### 데이터/증거
+    - 주요 수치나 데이터 포인트
+
+    ### 방법론 (해당 시)
+    - 연구 방법, 분석 프레임워크
+
+    ## 나의 생각
+    (사용자의 코멘트, 의견, 질문 — 사용자가 제공한 경우)
+
+    ## 인용/발췌
+    > "핵심 인용문" (p.XX)
+
+    ## 적용 가능성
+    - 어떤 프로젝트/영역에 활용 가능한지
+    - 후속 조사가 필요한 부분
+
+    ## Related Notes
+    - [[관련노트]] — 연결 이유
+    ```
+
+    ## 처리 규칙
+    - URL이 주어지면 내용을 읽고 요약 (WebFetch 활용)
+    - 원문이 길면 핵심만 추출 (최대 5,000자)
+    - 저자의 주장과 사용자의 의견을 명확히 구분
+    - `source: literature` 필수
+    - 관련 프로젝트가 있으면 `project` 필드 기재
+
+    ## 파일명 규칙
+    `저자_제목요약.md` 또는 `제목요약.md`
+    (예: `Buterin_Endgame.md`, `DeFi_Risk_Report_2026.md`)
+
+    ## 저장 위치
+    `3_Resource/적절한주제폴더/`
     """
 }
