@@ -19,6 +19,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Hide dock icon
         NSApp.setActivationPolicy(.accessory)
+
+        // Auto-open popover on first launch
+        if !UserDefaults.standard.bool(forKey: "onboardingCompleted") {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                self?.openPopover()
+            }
+        }
     }
 
     private func setupStatusItem() {
@@ -26,6 +33,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         if let button = statusItem?.button {
             button.image = makeMenuBarImage(appState.menuBarFace)
+            button.toolTip = "DotBrain — 파일 정리 도우미"
             button.action = #selector(togglePopover)
             button.target = self
         }
@@ -80,7 +88,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let imageSize = NSSize(width: ceil(size.width) + 2, height: 22)
 
         let image = NSImage(size: imageSize, flipped: false) { rect in
-            let y = (rect.height - size.height) / 2 + 1
+            let y = (rect.height - size.height) / 2 + 2
             (text as NSString).draw(at: NSPoint(x: 1, y: y), withAttributes: attrs)
             return true
         }
@@ -89,20 +97,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func togglePopover() {
-        guard let popover = popover, let button = statusItem?.button else { return }
+        guard let popover = popover else { return }
 
         if popover.isShown {
             popover.performClose(nil)
         } else {
-            popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+            openPopover()
+        }
+    }
 
-            // Bring app to front
-            NSApp.activate(ignoringOtherApps: true)
+    private func openPopover() {
+        guard let popover = popover, let button = statusItem?.button, !popover.isShown else { return }
 
-            // Refresh inbox count
-            Task {
-                await appState.refreshInboxCount()
-            }
+        popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+        NSApp.activate(ignoringOtherApps: true)
+
+        Task {
+            await appState.refreshInboxCount()
         }
     }
 }

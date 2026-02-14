@@ -178,13 +178,7 @@ struct InboxStatusView: View {
             guard !urls.isEmpty else { return }
             Task {
                 let result = await appState.addFilesToInboxDetailed(urls: urls)
-                if !result.skippedCode.isEmpty && result.added == 0 {
-                    showFeedback("코드 파일은 PKM에 넣을 수 없습니다")
-                } else if !result.skippedCode.isEmpty {
-                    showFeedback("\(result.added)개 추가 (코드 \(result.skippedCode.count)개 건너뜀)")
-                } else {
-                    showFeedback("\(result.added)개 파일 추가됨")
-                }
+                showDropFeedback(result)
             }
         }
     }
@@ -205,13 +199,27 @@ struct InboxStatusView: View {
 
         Task {
             let result = await appState.addFilesToInboxDetailed(urls: urls)
-            if !result.skippedCode.isEmpty && result.added == 0 {
-                showFeedback("코드 파일은 PKM에 넣을 수 없습니다")
-            } else if !result.skippedCode.isEmpty {
-                showFeedback("\(result.added)개 추가 (코드 \(result.skippedCode.count)개 건너뜀)")
-            } else {
-                showFeedback("\(result.added)개 파일 붙여넣기 완료")
-            }
+            showDropFeedback(result)
+        }
+    }
+
+    private func showDropFeedback(_ result: AppState.AddFilesResult) {
+        var parts: [String] = []
+
+        if result.added > 0 {
+            parts.append("\(result.added)개 추가됨")
+        }
+        if !result.skippedCode.isEmpty {
+            parts.append("코드 \(result.skippedCode.count)개 건너뜀")
+        }
+        if !result.failedFiles.isEmpty {
+            parts.append("\(result.failedFiles.count)개 실패")
+        }
+
+        if parts.isEmpty {
+            showFeedback("추가할 수 있는 파일이 없습니다")
+        } else {
+            showFeedback(parts.joined(separator: " · "))
         }
     }
 

@@ -6,6 +6,10 @@ final class InboxWatchdog {
     private let folderPath: String
     private let onChange: () -> Void
     private var debounceWorkItem: DispatchWorkItem?
+    private var retryCount = 0
+    private var retryTimer: DispatchSourceTimer?
+    private static let maxRetries = 3
+    private static let retryInterval: TimeInterval = 10.0
 
     /// Debounce interval in seconds (avoid rapid-fire refreshes)
     private let debounceInterval: TimeInterval = 2.0
@@ -21,9 +25,13 @@ final class InboxWatchdog {
 
     /// Start watching the inbox folder
     func start() {
-        // Ensure folder exists
-        let fm = FileManager.default
-        try? fm.createDirectory(atPath: folderPath, withIntermediateDirectories: true)
+        // Only watch if folder already exists — never create it
+        guard FileManager.default.fileExists(atPath: folderPath) else {
+            scheduleRetry()
+            return
+        }
+        retryCount = 0
+        cancelRetry()
 
         let fd = open(folderPath, O_EVTONLY)
         guard fd >= 0 else {
@@ -54,9 +62,32 @@ final class InboxWatchdog {
     /// Stop watching
     func stop() {
         debounceWorkItem?.cancel()
+        cancelRetry()
         source?.cancel()
         source = nil
         print("[InboxWatchdog] 감시 중지")
+    }
+
+    private func scheduleRetry() {
+        guard retryCount < Self.maxRetries else {
+            print("[InboxWatchdog] 폴더 대기 포기 (\(Self.maxRetries)회 시도): \(folderPath)")
+            return
+        }
+        retryCount += 1
+        print("[InboxWatchdog] 폴더 없음, \(Self.retryInterval)초 후 재시도 (\(retryCount)/\(Self.maxRetries))")
+
+        let timer = DispatchSource.makeTimerSource(queue: DispatchQueue.global(qos: .utility))
+        timer.schedule(deadline: .now() + Self.retryInterval)
+        timer.setEventHandler { [weak self] in
+            self?.start()
+        }
+        retryTimer = timer
+        timer.resume()
+    }
+
+    private func cancelRetry() {
+        retryTimer?.cancel()
+        retryTimer = nil
     }
 
     private func handleChange() {

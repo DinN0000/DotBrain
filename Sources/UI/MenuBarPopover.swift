@@ -48,6 +48,17 @@ struct MenuBarPopover: View {
                     }
                     .buttonStyle(.plain)
 
+                    Button(action: {
+                        if let url = URL(string: "https://github.com/DinN0000/DotBrain#readme") {
+                            NSWorkspace.shared.open(url)
+                        }
+                    }) {
+                        Image(systemName: "questionmark.circle")
+                            .foregroundColor(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                    .help("도움말")
+
                     Spacer()
 
                     Text("DotBrain")

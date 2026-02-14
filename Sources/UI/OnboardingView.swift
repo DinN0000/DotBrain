@@ -2,7 +2,7 @@ import SwiftUI
 
 struct OnboardingView: View {
     @EnvironmentObject var appState: AppState
-    @State private var step: Int = 0
+    @State private var step: Int
     @State private var showFolderPicker = false
     @State private var newProjectName: String = ""
     @State private var projects: [String] = []
@@ -10,26 +10,30 @@ struct OnboardingView: View {
     @State private var keyInput: String = ""
     @State private var showingKey: Bool = false
     @State private var keySaveMessage: String?
-    @State private var direction: Int = 1 // 1 = forward, -1 = back
+    @State private var direction: Int = 1
+    @State private var folderError: String?
+    @State private var showFolderError = false
 
-    private let totalSteps = 5
+    private let totalSteps = 4
+
+    init() {
+        let saved = UserDefaults.standard.integer(forKey: "onboardingStep")
+        _step = State(initialValue: saved)
+    }
 
     var body: some View {
         VStack(spacing: 0) {
-            // Step indicator
             stepIndicator
                 .padding(.top, 16)
                 .padding(.bottom, 8)
 
-            // Step content
             Group {
                 switch step {
                 case 0: welcomeStep
-                case 1: providerStep
-                case 2: apiKeyStep
-                case 3: folderStep
-                case 4: projectStep
-                default: projectStep
+                case 1: folderStep
+                case 2: projectStep
+                case 3: providerAndKeyStep
+                default: providerAndKeyStep
                 }
             }
             .transition(direction > 0
@@ -42,11 +46,17 @@ struct OnboardingView: View {
         .animation(.easeInOut(duration: 0.25), value: step)
         .onChange(of: appState.pkmRootPath) { _ in
             isStructureReady = PKMPathManager(root: appState.pkmRootPath).isInitialized()
+            projects = []
         }
         .fileImporter(isPresented: $showFolderPicker, allowedContentTypes: [.folder]) { result in
             if case .success(let url) = result {
                 appState.pkmRootPath = url.path
             }
+        }
+        .alert("폴더 생성 실패", isPresented: $showFolderError) {
+            Button("확인") {}
+        } message: {
+            Text(folderError ?? "알 수 없는 오류가 발생했습니다.")
         }
     }
 
@@ -88,28 +98,16 @@ struct OnboardingView: View {
     private func goNext() {
         direction = 1
         step += 1
+        UserDefaults.standard.set(step, forKey: "onboardingStep")
     }
 
     private func goBack() {
         direction = -1
         step -= 1
+        UserDefaults.standard.set(step, forKey: "onboardingStep")
     }
 
-    private var navButtons: some View {
-        HStack {
-            if step > 0 {
-                Button("이전") { goBack() }
-                    .buttonStyle(.bordered)
-                    .controlSize(.regular)
-            }
-
-            Spacer()
-        }
-        .padding(.horizontal, 32)
-        .padding(.bottom, 20)
-    }
-
-    // MARK: - Step 1: Welcome
+    // MARK: - Step 0: Welcome
 
     private var welcomeStep: some View {
         VStack(spacing: 0) {
@@ -125,7 +123,7 @@ struct OnboardingView: View {
                 .fontWeight(.semibold)
                 .padding(.bottom, 6)
 
-            Text("파일을 던지면 AI가 PARA 구조로 정리합니다")
+            Text("파일을 추가하면 AI가 PARA 구조로 정리합니다")
                 .font(.subheadline)
                 .foregroundColor(.secondary)
                 .padding(.bottom, 20)
@@ -174,32 +172,71 @@ struct OnboardingView: View {
         }
     }
 
-    // MARK: - Step 2: Provider Selection
+    // MARK: - Step 1: Folder Setup
 
-    private var providerStep: some View {
+    private var folderStep: some View {
         VStack(spacing: 0) {
             stepHeader(
-                title: "AI 제공자 선택",
-                desc: "파일 분류에 사용할 AI를 선택하세요.\n나중에 설정에서 변경할 수 있습니다."
+                title: "PKM 폴더 설정",
+                desc: "파일이 정리될 폴더를 선택하세요.\n다음 단계로 넘어가면 PARA 구조가 생성됩니다."
             )
 
             Spacer()
 
-            VStack(spacing: 10) {
-                providerCard(
-                    provider: .gemini,
-                    badge: "무료로 시작 가능",
-                    badgeColor: .green,
-                    details: "Flash (빠름) → Pro (정밀)\n무료 티어: 분당 15회, 일 1500회"
-                )
+            VStack(alignment: .leading, spacing: 12) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("저장 경로")
+                        .font(.caption)
+                        .fontWeight(.medium)
 
-                providerCard(
-                    provider: .claude,
-                    badge: "API 결제 필요",
-                    badgeColor: .orange,
-                    details: "Haiku 4.5 (빠름) → Sonnet 4.5 (정밀)\n파일당 약 $0.002~$0.01"
-                )
+                    HStack {
+                        Image(systemName: "folder")
+                            .foregroundColor(.secondary)
+                            .font(.caption)
+                        Text(appState.pkmRootPath)
+                            .font(.system(.caption, design: .monospaced))
+                            .foregroundColor(.secondary)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+
+                        Spacer()
+
+                        Button("변경") {
+                            showFolderPicker = true
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.mini)
+                    }
+                }
+
+                Divider()
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("생성될 폴더 구조")
+                        .font(.caption)
+                        .fontWeight(.medium)
+
+                    if isStructureReady {
+                        Label("PARA 구조 확인됨", systemImage: "checkmark.circle.fill")
+                            .font(.caption)
+                            .foregroundColor(.green)
+                    }
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        folderPreviewRow("_Inbox/", desc: "파일을 여기에 넣으면 분류 시작")
+                        folderPreviewRow("1_Project/", desc: "진행 중인 프로젝트")
+                        folderPreviewRow("2_Area/", desc: "지속 관리 영역")
+                        folderPreviewRow("3_Resource/", desc: "참고 자료")
+                        folderPreviewRow("4_Archive/", desc: "보관")
+                    }
+                    .padding(8)
+                    .background(Color.secondary.opacity(0.03))
+                    .cornerRadius(6)
+                }
             }
+            .padding(14)
+            .background(Color.secondary.opacity(0.05))
+            .cornerRadius(8)
             .padding(.horizontal, 24)
 
             Spacer()
@@ -212,9 +249,10 @@ struct OnboardingView: View {
                 Spacer()
 
                 Button(action: {
-                    keyInput = ""
-                    keySaveMessage = nil
-                    showingKey = false
+                    if !isStructureReady {
+                        if !validateAndCreateFolder() { return }
+                    }
+                    loadExistingProjects()
                     goNext()
                 }) {
                     Text("다음")
@@ -227,6 +265,269 @@ struct OnboardingView: View {
             .padding(.bottom, 20)
         }
         .padding(.horizontal)
+        .onAppear {
+            isStructureReady = PKMPathManager(root: appState.pkmRootPath).isInitialized()
+        }
+    }
+
+    private func folderPreviewRow(_ name: String, desc: String) -> some View {
+        HStack(spacing: 6) {
+            Text(name)
+                .font(.system(.caption2, design: .monospaced))
+                .fontWeight(.medium)
+                .frame(width: 80, alignment: .leading)
+            Text(desc)
+                .font(.caption2)
+                .foregroundColor(.secondary)
+        }
+    }
+
+    // MARK: - Step 2: Project Registration
+
+    private var projectStep: some View {
+        VStack(spacing: 0) {
+            stepHeader(
+                title: "프로젝트 등록",
+                desc: "진행 중인 프로젝트를 등록하세요.\nAI가 관련 파일을 이 프로젝트로 분류합니다."
+            )
+
+            Spacer()
+
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(alignment: .top, spacing: 8) {
+                    Image(systemName: "info.circle")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Project는 직접 등록합니다")
+                            .font(.caption)
+                            .fontWeight(.medium)
+                        Text("Area, Resource, Archive는 AI가 자동 분류합니다.")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
+                .padding(10)
+                .background(Color.secondary.opacity(0.05))
+                .cornerRadius(6)
+
+                HStack(spacing: 8) {
+                    TextField("프로젝트명 (예: MyApp)", text: $newProjectName)
+                        .textFieldStyle(.roundedBorder)
+                        .font(.subheadline)
+                        .onSubmit { addProject() }
+
+                    Button(action: addProject) {
+                        Image(systemName: "plus")
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.regular)
+                    .disabled(newProjectName.trimmingCharacters(in: .whitespaces).isEmpty)
+                }
+
+                if !projects.isEmpty {
+                    ScrollView {
+                        VStack(spacing: 3) {
+                            ForEach(projects, id: \.self) { name in
+                                HStack(spacing: 8) {
+                                    Image(systemName: "folder.fill")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                    Text(name)
+                                        .font(.subheadline)
+
+                                    Spacer()
+
+                                    Button(action: { removeProject(name) }) {
+                                        Image(systemName: "xmark")
+                                            .font(.caption2)
+                                            .foregroundColor(.secondary)
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 6)
+                                .background(Color.secondary.opacity(0.05))
+                                .cornerRadius(6)
+                            }
+                        }
+                    }
+                    .frame(maxHeight: 90)
+                } else {
+                    Text("최소 1개의 프로젝트를 등록해주세요")
+                        .font(.caption)
+                        .foregroundColor(.orange)
+                        .padding(.vertical, 4)
+                }
+            }
+            .padding(.horizontal, 24)
+
+            Spacer()
+
+            HStack {
+                Button("이전") { goBack() }
+                    .buttonStyle(.bordered)
+                    .controlSize(.regular)
+
+                Spacer()
+
+                Button(action: { goNext() }) {
+                    Text("다음")
+                        .frame(minWidth: 80)
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.regular)
+                .disabled(projects.isEmpty)
+            }
+            .padding(.horizontal, 32)
+            .padding(.bottom, 20)
+        }
+        .padding(.horizontal)
+    }
+
+    // MARK: - Step 3: Provider + API Key (Combined)
+
+    private var providerAndKeyStep: some View {
+        let provider = appState.selectedProvider
+
+        return VStack(spacing: 0) {
+            stepHeader(
+                title: "AI 설정",
+                desc: "파일 분류에 사용할 AI를 선택하고\nAPI 키를 입력하세요."
+            )
+
+            ScrollView {
+                VStack(spacing: 14) {
+                    // Provider selection
+                    VStack(spacing: 8) {
+                        providerCard(
+                            provider: .gemini,
+                            badge: "무료로 시작 가능",
+                            badgeColor: .green,
+                            details: "빠른 모델(Flash) → 정밀 모델(Pro)\n무료 티어: 분당 15회, 일 1,500회"
+                        )
+
+                        providerCard(
+                            provider: .claude,
+                            badge: "API 결제 필요",
+                            badgeColor: .orange,
+                            details: "빠른 모델(Haiku) → 정밀 모델(Sonnet)\n파일당 약 $0.002~$0.01"
+                        )
+                    }
+
+                    Divider()
+
+                    // API key input inline
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack(spacing: 6) {
+                            Text("\(provider.displayName) API 키")
+                                .font(.caption)
+                                .fontWeight(.semibold)
+
+                            Button(action: {
+                                let url: URL
+                                if provider == .gemini {
+                                    url = URL(string: "https://aistudio.google.com/apikey")!
+                                } else {
+                                    url = URL(string: "https://console.anthropic.com/settings/keys")!
+                                }
+                                NSWorkspace.shared.open(url)
+                            }) {
+                                HStack(spacing: 2) {
+                                    Image(systemName: "arrow.up.right.square")
+                                        .font(.caption2)
+                                    Text("키 발급")
+                                        .font(.caption2)
+                                }
+                            }
+                            .buttonStyle(.bordered)
+                            .controlSize(.mini)
+                        }
+
+                        HStack {
+                            if showingKey {
+                                TextField(provider.keyPlaceholder, text: $keyInput)
+                                    .textFieldStyle(.roundedBorder)
+                                    .font(.system(.caption, design: .monospaced))
+                            } else {
+                                SecureField(provider.keyPlaceholder, text: $keyInput)
+                                    .textFieldStyle(.roundedBorder)
+                                    .font(.caption)
+                            }
+
+                            Button(action: {
+                                showingKey.toggle()
+                                if showingKey, keyInput == "••••••••", provider.hasAPIKey() {
+                                    if let key = provider == .claude ? KeychainService.getAPIKey() : KeychainService.getGeminiAPIKey() {
+                                        keyInput = key
+                                    }
+                                } else if !showingKey, provider.hasAPIKey(), keyInput.hasPrefix(provider.keyPrefix) {
+                                    keyInput = "••••••••"
+                                }
+                            }) {
+                                Image(systemName: showingKey ? "eye.slash" : "eye")
+                            }
+                            .buttonStyle(.plain)
+                            .font(.caption)
+                        }
+
+                        HStack(spacing: 8) {
+                            Button("저장") {
+                                saveAPIKey(provider: provider)
+                            }
+                            .buttonStyle(.bordered)
+                            .controlSize(.small)
+                            .disabled(keyInput.isEmpty || keyInput == "••••••••")
+
+                            if let msg = keySaveMessage {
+                                Text(msg)
+                                    .font(.caption2)
+                                    .foregroundColor(msg == "저장 완료" ? .green : .orange)
+                            }
+
+                            Spacer()
+
+                            if appState.hasAPIKey {
+                                Label("준비됨", systemImage: "checkmark.circle.fill")
+                                    .font(.caption)
+                                    .foregroundColor(.green)
+                            }
+                        }
+                    }
+                    .padding(12)
+                    .background(Color.secondary.opacity(0.05))
+                    .cornerRadius(8)
+                }
+                .padding(.horizontal, 24)
+            }
+
+            HStack {
+                Button("이전") { goBack() }
+                    .buttonStyle(.bordered)
+                    .controlSize(.regular)
+
+                Spacer()
+
+                Button(action: completeOnboarding) {
+                    Text("설정 완료")
+                        .frame(minWidth: 80)
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.regular)
+                .disabled(!appState.hasAPIKey)
+            }
+            .padding(.horizontal, 32)
+            .padding(.bottom, 20)
+        }
+        .padding(.horizontal)
+        .onAppear {
+            keyInput = ""
+            keySaveMessage = nil
+            showingKey = false
+            if provider.hasAPIKey() {
+                keyInput = "••••••••"
+            }
+        }
     }
 
     private func providerCard(provider: AIProvider, badge: String, badgeColor: Color, details: String) -> some View {
@@ -235,10 +536,15 @@ struct OnboardingView: View {
         return Button(action: {
             withAnimation(.easeOut(duration: 0.15)) {
                 appState.selectedProvider = provider
+                keyInput = ""
+                keySaveMessage = nil
+                showingKey = false
+                if provider.hasAPIKey() {
+                    keyInput = "••••••••"
+                }
             }
         }) {
             HStack(alignment: .top, spacing: 12) {
-                // Radio circle
                 ZStack {
                     Circle()
                         .strokeBorder(isSelected ? Color.primary : Color.secondary.opacity(0.4), lineWidth: 1.5)
@@ -289,398 +595,6 @@ struct OnboardingView: View {
         .buttonStyle(.plain)
     }
 
-    // MARK: - Step 3: API Key
-
-    private var apiKeyStep: some View {
-        let provider = appState.selectedProvider
-
-        return VStack(spacing: 0) {
-            stepHeader(
-                title: "\(provider.rawValue) API 키 입력",
-                desc: "AI를 사용하려면 API 키가 필요합니다."
-            )
-
-            Spacer()
-
-            // How to get a key
-            VStack(alignment: .leading, spacing: 8) {
-                Text("API 키 발급 방법")
-                    .font(.caption)
-                    .fontWeight(.semibold)
-
-                if provider == .gemini {
-                    instructionRow(num: "1", text: "aistudio.google.com/apikey 접속")
-                    instructionRow(num: "2", text: "Google 계정으로 로그인")
-                    instructionRow(num: "3", text: "\"Create API Key\" 클릭")
-                    instructionRow(num: "4", text: "생성된 키를 아래에 붙여넣기")
-                } else {
-                    instructionRow(num: "1", text: "console.anthropic.com 접속")
-                    instructionRow(num: "2", text: "Settings → API Keys")
-                    instructionRow(num: "3", text: "\"Create Key\" 클릭")
-                    instructionRow(num: "4", text: "생성된 키를 아래에 붙여넣기")
-                }
-
-                Button(action: {
-                    let url: URL
-                    if provider == .gemini {
-                        url = URL(string: "https://aistudio.google.com/apikey")!
-                    } else {
-                        url = URL(string: "https://console.anthropic.com/settings/keys")!
-                    }
-                    NSWorkspace.shared.open(url)
-                }) {
-                    HStack(spacing: 4) {
-                        Image(systemName: "arrow.up.right.square")
-                            .font(.caption2)
-                        Text("브라우저에서 열기")
-                            .font(.caption)
-                    }
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.mini)
-            }
-            .padding(12)
-            .background(Color.secondary.opacity(0.05))
-            .cornerRadius(8)
-            .padding(.horizontal, 24)
-            .padding(.bottom, 14)
-
-            // Key input
-            VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    if showingKey {
-                        TextField(provider.keyPlaceholder, text: $keyInput)
-                            .textFieldStyle(.roundedBorder)
-                            .font(.system(.caption, design: .monospaced))
-                    } else {
-                        SecureField(provider.keyPlaceholder, text: $keyInput)
-                            .textFieldStyle(.roundedBorder)
-                            .font(.caption)
-                    }
-
-                    Button(action: {
-                        showingKey.toggle()
-                        if showingKey, keyInput == "••••••••", provider.hasAPIKey() {
-                            if let key = provider == .claude ? KeychainService.getAPIKey() : KeychainService.getGeminiAPIKey() {
-                                keyInput = key
-                            }
-                        } else if !showingKey, provider.hasAPIKey(), keyInput.hasPrefix(provider.keyPrefix) {
-                            keyInput = "••••••••"
-                        }
-                    }) {
-                        Image(systemName: showingKey ? "eye.slash" : "eye")
-                    }
-                    .buttonStyle(.plain)
-                    .font(.caption)
-                }
-
-                HStack(spacing: 8) {
-                    Button("저장") {
-                        saveAPIKey(provider: provider)
-                    }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
-                    .disabled(keyInput.isEmpty || keyInput == "••••••••")
-
-                    if let msg = keySaveMessage {
-                        Text(msg)
-                            .font(.caption2)
-                            .foregroundColor(msg == "저장 완료" ? .green : .orange)
-                    }
-
-                    Spacer()
-
-                    if appState.hasAPIKey {
-                        Label("준비됨", systemImage: "checkmark.circle.fill")
-                            .font(.caption)
-                            .foregroundColor(.green)
-                    }
-                }
-            }
-            .padding(.horizontal, 24)
-
-            Spacer()
-
-            HStack {
-                Button("이전") { goBack() }
-                    .buttonStyle(.bordered)
-                    .controlSize(.regular)
-
-                Spacer()
-
-                Button(action: { goNext() }) {
-                    Text("다음")
-                        .frame(minWidth: 80)
-                }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.regular)
-                .disabled(!appState.hasAPIKey)
-            }
-            .padding(.horizontal, 32)
-            .padding(.bottom, 20)
-        }
-        .padding(.horizontal)
-        .onAppear {
-            if provider.hasAPIKey() {
-                keyInput = "••••••••"
-            }
-        }
-    }
-
-    private func instructionRow(num: String, text: String) -> some View {
-        HStack(alignment: .top, spacing: 8) {
-            Text(num)
-                .font(.system(.caption, design: .monospaced))
-                .fontWeight(.bold)
-                .foregroundColor(.secondary)
-                .frame(width: 14)
-            Text(text)
-                .font(.caption)
-                .foregroundColor(.secondary)
-        }
-    }
-
-    private func saveAPIKey(provider: AIProvider) {
-        if keyInput.hasPrefix(provider.keyPrefix) {
-            let saved = provider.saveAPIKey(keyInput)
-            keySaveMessage = saved ? "저장 완료" : "저장 실패"
-            appState.updateAPIKeyStatus()
-        } else {
-            keySaveMessage = "\(provider.keyPlaceholder)로 시작하는 키를 입력하세요"
-        }
-    }
-
-    // MARK: - Step 4: Folder Setup
-
-    private var folderStep: some View {
-        VStack(spacing: 0) {
-            stepHeader(
-                title: "PKM 폴더 설정",
-                desc: "파일이 정리될 폴더를 선택하세요.\n이 안에 PARA 폴더 구조가 만들어집니다."
-            )
-
-            Spacer()
-
-            VStack(alignment: .leading, spacing: 12) {
-                // Current path
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("현재 경로")
-                        .font(.caption)
-                        .fontWeight(.medium)
-
-                    HStack {
-                        Image(systemName: "folder")
-                            .foregroundColor(.secondary)
-                            .font(.caption)
-                        Text(appState.pkmRootPath)
-                            .font(.system(.caption, design: .monospaced))
-                            .foregroundColor(.secondary)
-                            .lineLimit(1)
-                            .truncationMode(.middle)
-
-                        Spacer()
-
-                        Button("변경") {
-                            showFolderPicker = true
-                        }
-                        .buttonStyle(.bordered)
-                        .controlSize(.mini)
-                    }
-                }
-
-                Divider()
-
-                // Structure status
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("폴더 구조")
-                        .font(.caption)
-                        .fontWeight(.medium)
-
-                    if isStructureReady {
-                        Label("PARA 구조 확인됨", systemImage: "checkmark.circle.fill")
-                            .font(.caption)
-                            .foregroundColor(.green)
-
-                        VStack(alignment: .leading, spacing: 2) {
-                            folderPreviewRow("_Inbox/", desc: "파일을 여기에 넣으면 분류 시작")
-                            folderPreviewRow("1_Project/", desc: "진행 중인 프로젝트")
-                            folderPreviewRow("2_Area/", desc: "지속 관리 영역")
-                            folderPreviewRow("3_Resource/", desc: "참고 자료")
-                            folderPreviewRow("4_Archive/", desc: "보관")
-                        }
-                        .padding(8)
-                        .background(Color.secondary.opacity(0.03))
-                        .cornerRadius(6)
-                    } else {
-                        Label("아직 PARA 폴더가 없습니다", systemImage: "exclamationmark.triangle.fill")
-                            .font(.caption)
-                            .foregroundColor(.orange)
-
-                        Button(action: createFolderStructure) {
-                            HStack {
-                                Image(systemName: "folder.badge.plus")
-                                Text("지금 만들기")
-                            }
-                            .frame(maxWidth: .infinity)
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .controlSize(.small)
-                        .tint(.primary.opacity(0.85))
-                    }
-                }
-            }
-            .padding(14)
-            .background(Color.secondary.opacity(0.05))
-            .cornerRadius(8)
-            .padding(.horizontal, 24)
-
-            Spacer()
-
-            HStack {
-                Button("이전") { goBack() }
-                    .buttonStyle(.bordered)
-                    .controlSize(.regular)
-
-                Spacer()
-
-                Button(action: {
-                    loadExistingProjects()
-                    goNext()
-                }) {
-                    Text("다음")
-                        .frame(minWidth: 80)
-                }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.regular)
-                .disabled(!isStructureReady)
-            }
-            .padding(.horizontal, 32)
-            .padding(.bottom, 20)
-        }
-        .padding(.horizontal)
-        .onAppear {
-            isStructureReady = PKMPathManager(root: appState.pkmRootPath).isInitialized()
-        }
-    }
-
-    private func folderPreviewRow(_ name: String, desc: String) -> some View {
-        HStack(spacing: 6) {
-            Text(name)
-                .font(.system(.caption2, design: .monospaced))
-                .fontWeight(.medium)
-                .frame(width: 80, alignment: .leading)
-            Text(desc)
-                .font(.caption2)
-                .foregroundColor(.secondary)
-        }
-    }
-
-    // MARK: - Step 5: Project + Complete
-
-    private var projectStep: some View {
-        VStack(spacing: 0) {
-            stepHeader(
-                title: "프로젝트 등록",
-                desc: "지금 진행 중인 작업이 있다면 등록하세요.\nAI가 관련 파일을 이 프로젝트로 분류합니다."
-            )
-
-            Spacer()
-
-            VStack(alignment: .leading, spacing: 10) {
-                // Info box
-                HStack(alignment: .top, spacing: 8) {
-                    Image(systemName: "info.circle")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Project만 직접 관리합니다")
-                            .font(.caption)
-                            .fontWeight(.medium)
-                        Text("Area, Resource, Archive는 AI가 자동 분류합니다.")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                }
-                .padding(10)
-                .background(Color.secondary.opacity(0.05))
-                .cornerRadius(6)
-
-                // Add project input
-                HStack(spacing: 8) {
-                    TextField("프로젝트명 (예: MyApp)", text: $newProjectName)
-                        .textFieldStyle(.roundedBorder)
-                        .font(.subheadline)
-                        .onSubmit { addProject() }
-
-                    Button(action: addProject) {
-                        Image(systemName: "plus")
-                    }
-                    .buttonStyle(.bordered)
-                    .controlSize(.regular)
-                    .disabled(newProjectName.trimmingCharacters(in: .whitespaces).isEmpty)
-                }
-
-                // Project list
-                if !projects.isEmpty {
-                    ScrollView {
-                        VStack(spacing: 3) {
-                            ForEach(projects, id: \.self) { name in
-                                HStack(spacing: 8) {
-                                    Image(systemName: "folder.fill")
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                    Text(name)
-                                        .font(.subheadline)
-
-                                    Spacer()
-
-                                    Button(action: { removeProject(name) }) {
-                                        Image(systemName: "xmark")
-                                            .font(.caption2)
-                                            .foregroundColor(.secondary)
-                                    }
-                                    .buttonStyle(.plain)
-                                }
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 6)
-                                .background(Color.secondary.opacity(0.05))
-                                .cornerRadius(6)
-                            }
-                        }
-                    }
-                    .frame(maxHeight: 90)
-                } else {
-                    Text("최소 1개의 프로젝트를 등록해주세요")
-                        .font(.caption)
-                        .foregroundColor(.orange)
-                        .padding(.vertical, 4)
-                }
-            }
-            .padding(.horizontal, 24)
-
-            Spacer()
-
-            HStack {
-                Button("이전") { goBack() }
-                    .buttonStyle(.bordered)
-                    .controlSize(.regular)
-
-                Spacer()
-
-                Button(action: completeOnboarding) {
-                    Text("설정 완료")
-                        .frame(minWidth: 80)
-                }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.regular)
-                .disabled(projects.isEmpty)
-            }
-            .padding(.horizontal, 32)
-            .padding(.bottom, 20)
-        }
-        .padding(.horizontal)
-    }
-
     // MARK: - Shared Components
 
     private func stepHeader(title: String, desc: String) -> some View {
@@ -700,12 +614,43 @@ struct OnboardingView: View {
         .padding(.bottom, 8)
     }
 
+    private func instructionRow(num: String, text: String) -> some View {
+        HStack(alignment: .top, spacing: 8) {
+            Text(num)
+                .font(.system(.caption, design: .monospaced))
+                .fontWeight(.bold)
+                .foregroundColor(.secondary)
+                .frame(width: 14)
+            Text(text)
+                .font(.caption)
+                .foregroundColor(.secondary)
+        }
+    }
+
     // MARK: - Actions
 
-    private func createFolderStructure() {
-        let pathManager = PKMPathManager(root: appState.pkmRootPath)
-        try? pathManager.initializeStructure()
-        isStructureReady = pathManager.isInitialized()
+    private func validateAndCreateFolder() -> Bool {
+        let path = appState.pkmRootPath
+        let fm = FileManager.default
+
+        // Check if parent directory is writable
+        let parent = (path as NSString).deletingLastPathComponent
+        if fm.fileExists(atPath: parent) && !fm.isWritableFile(atPath: parent) {
+            folderError = "선택한 경로에 쓰기 권한이 없습니다.\n다른 경로를 선택해주세요."
+            showFolderError = true
+            return false
+        }
+
+        let pathManager = PKMPathManager(root: path)
+        do {
+            try pathManager.initializeStructure()
+            isStructureReady = pathManager.isInitialized()
+            return true
+        } catch {
+            folderError = "폴더 생성에 실패했습니다: \(error.localizedDescription)\n다른 경로를 선택해주세요."
+            showFolderError = true
+            return false
+        }
     }
 
     private func loadExistingProjects() {
@@ -721,28 +666,39 @@ struct OnboardingView: View {
         }.sorted()
     }
 
+    private func sanitizeProjectName(_ raw: String) -> String {
+        let invalid = CharacterSet(charactersIn: "/:\\0\t\n\r")
+        let cleaned = raw.components(separatedBy: invalid).joined()
+        return String(cleaned.prefix(255)).trimmingCharacters(in: .whitespaces)
+    }
+
     private func addProject() {
-        let name = newProjectName.trimmingCharacters(in: .whitespaces)
+        let raw = newProjectName.trimmingCharacters(in: .whitespaces)
+        let name = sanitizeProjectName(raw)
         guard !name.isEmpty, !projects.contains(name) else { return }
 
         let pathManager = PKMPathManager(root: appState.pkmRootPath)
         let projectDir = (pathManager.projectsPath as NSString).appendingPathComponent(name)
         let fm = FileManager.default
 
-        try? fm.createDirectory(atPath: projectDir, withIntermediateDirectories: true)
-        let indexPath = (projectDir as NSString).appendingPathComponent("\(name).md")
-        if !fm.fileExists(atPath: indexPath) {
-            let content = FrontmatterWriter.createIndexNote(
-                folderName: name,
-                para: .project,
-                description: "\(name) 프로젝트"
-            )
-            try? content.write(toFile: indexPath, atomically: true, encoding: .utf8)
+        do {
+            try fm.createDirectory(atPath: projectDir, withIntermediateDirectories: true)
+            let indexPath = (projectDir as NSString).appendingPathComponent("\(name).md")
+            if !fm.fileExists(atPath: indexPath) {
+                let content = FrontmatterWriter.createIndexNote(
+                    folderName: name,
+                    para: .project,
+                    description: "\(name) 프로젝트"
+                )
+                try content.write(toFile: indexPath, atomically: true, encoding: .utf8)
+            }
+            projects.append(name)
+            projects.sort()
+            newProjectName = ""
+        } catch {
+            // Show inline feedback if project creation fails
+            newProjectName = ""
         }
-
-        projects.append(name)
-        projects.sort()
-        newProjectName = ""
     }
 
     private func removeProject(_ name: String) {
@@ -752,8 +708,19 @@ struct OnboardingView: View {
         projects.removeAll { $0 == name }
     }
 
+    private func saveAPIKey(provider: AIProvider) {
+        if keyInput.hasPrefix(provider.keyPrefix) {
+            let saved = provider.saveAPIKey(keyInput)
+            keySaveMessage = saved ? "저장 완료" : "저장 실패"
+            appState.updateAPIKeyStatus()
+        } else {
+            keySaveMessage = "\(provider.keyPlaceholder)로 시작하는 키를 입력하세요"
+        }
+    }
+
     private func completeOnboarding() {
         UserDefaults.standard.set(true, forKey: "onboardingCompleted")
+        UserDefaults.standard.removeObject(forKey: "onboardingStep")
         AICompanionService.updateIfNeeded(pkmRoot: appState.pkmRootPath)
         appState.setupWatchdog()
         appState.currentScreen = .inbox

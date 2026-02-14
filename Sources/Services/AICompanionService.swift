@@ -20,6 +20,9 @@ enum AICompanionService {
 
     /// Check version and regenerate if outdated — call on every app launch
     static func updateIfNeeded(pkmRoot: String) {
+        // Skip if PKM root doesn't exist yet
+        guard FileManager.default.fileExists(atPath: pkmRoot) else { return }
+
         let versionFile = (pkmRoot as NSString).appendingPathComponent(".dotbrain-companion-version")
 
         // Read current version

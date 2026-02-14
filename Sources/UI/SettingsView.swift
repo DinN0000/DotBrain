@@ -26,6 +26,29 @@ struct SettingsView: View {
             // Scrollable content
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
+                    // Provider Switcher
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("AI 제공자")
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+
+                        Picker("", selection: Binding(
+                            get: { appState.selectedProvider },
+                            set: { appState.selectedProvider = $0 }
+                        )) {
+                            ForEach(AIProvider.allCases) { provider in
+                                Text(provider.displayName).tag(provider)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+
+                        Text(appState.selectedProvider.modelPipeline)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+
+                    Divider()
+
                     // API Key Section
                     APIKeyInputView()
 

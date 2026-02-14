@@ -43,7 +43,9 @@ final class AppState: ObservableObject {
         didSet {
             UserDefaults.standard.set(pkmRootPath, forKey: "pkmRootPath")
             inboxWatchdog?.stop()
-            setupWatchdog()
+            if UserDefaults.standard.bool(forKey: "onboardingCompleted") {
+                setupWatchdog()
+            }
         }
     }
 
@@ -115,6 +117,9 @@ final class AppState: ObservableObject {
 
         if !UserDefaults.standard.bool(forKey: "onboardingCompleted") {
             self.currentScreen = .onboarding
+        } else if !FileManager.default.fileExists(atPath: pkmRootPath) {
+            // PKM folder was deleted — send user to settings to recreate
+            self.currentScreen = .settings
         } else if !self.hasAPIKey {
             self.currentScreen = .settings
         }
