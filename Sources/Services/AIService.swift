@@ -1,11 +1,16 @@
 import Foundation
 
 /// Provider-agnostic AI service that routes to Claude or Gemini
-/// with retry logic, exponential backoff, and provider fallback
+/// with adaptive rate limiting, retry logic, and provider fallback
 actor AIService {
+    static let shared = AIService()
+
     private let claudeClient = ClaudeAPIClient()
     private let geminiClient = GeminiAPIClient()
+    private let rateLimiter = RateLimiter.shared
     private let maxRetries = 3
+
+    private init() {}
 
     /// Current provider (read from UserDefaults)
     private var currentProvider: AIProvider {
@@ -57,9 +62,9 @@ actor AIService {
         }
     }
 
-    // MARK: - API Call with Retry
+    // MARK: - API Call with Retry + Rate Limiting
 
-    /// Send a message with retry logic and exponential backoff
+    /// Send a message with adaptive rate limiting, retry logic, and provider fallback
     func sendMessage(
         model: String,
         maxTokens: Int,
@@ -81,25 +86,33 @@ actor AIService {
     ) async throws -> String {
         var lastError: Error?
 
-        for attempt in 0..<maxRetries {
+        for _ in 0..<maxRetries {
+            // Rate limiter controls pacing — waits if needed
+            await rateLimiter.acquire(for: provider)
+
+            let start = ContinuousClock.now
             do {
-                return try await sendDirect(
+                let result = try await sendDirect(
                     provider: provider,
                     model: model,
                     maxTokens: maxTokens,
                     userMessage: userMessage
                 )
+                await rateLimiter.recordSuccess(for: provider, duration: ContinuousClock.now - start)
+                return result
             } catch {
                 lastError = error
+
+                let is429 = isRateLimitError(error)
+                let isServerErr = isServerError(error)
+                if is429 || isServerErr {
+                    await rateLimiter.recordFailure(for: provider, isRateLimit: is429)
+                }
 
                 // Don't retry on non-retryable errors
                 if !isRetryable(error) { break }
 
-                // Exponential backoff: 1s, 2s, 4s
-                if attempt < maxRetries - 1 {
-                    let delay = UInt64(pow(2.0, Double(attempt))) * 1_000_000_000
-                    try? await Task.sleep(nanoseconds: delay)
-                }
+                // Rate limiter handles pacing for next attempt — no manual sleep needed
             }
         }
 
@@ -111,12 +124,16 @@ actor AIService {
 
             do {
                 print("[AIService] 주 제공자 실패, \(fallback.rawValue)로 폴백 시도")
-                return try await sendDirect(
+                await rateLimiter.acquire(for: fallback)
+                let start = ContinuousClock.now
+                let result = try await sendDirect(
                     provider: fallback,
                     model: fallbackModel,
                     maxTokens: maxTokens,
                     userMessage: userMessage
                 )
+                await rateLimiter.recordSuccess(for: fallback, duration: ContinuousClock.now - start)
+                return result
             } catch {
                 // Fallback also failed, throw original error
             }
@@ -145,6 +162,46 @@ actor AIService {
                 userMessage: userMessage
             )
         }
+    }
+
+    // MARK: - Error Classification
+
+    /// Check if error is a rate limit (429) error
+    private func isRateLimitError(_ error: Error) -> Bool {
+        if let e = error as? ClaudeAPIError {
+            switch e {
+            case .httpError(let s): return s == 429
+            case .apiError(let s, _): return s == 429
+            default: return false
+            }
+        }
+        if let e = error as? GeminiAPIError {
+            switch e {
+            case .httpError(let s): return s == 429
+            case .apiError(let s, _): return s == 429
+            default: return false
+            }
+        }
+        return false
+    }
+
+    /// Check if error is a server error (5xx)
+    private func isServerError(_ error: Error) -> Bool {
+        if let e = error as? ClaudeAPIError {
+            switch e {
+            case .httpError(let s): return s >= 500
+            case .apiError(let s, _): return s >= 500
+            default: return false
+            }
+        }
+        if let e = error as? GeminiAPIError {
+            switch e {
+            case .httpError(let s): return s >= 500
+            case .apiError(let s, _): return s >= 500
+            default: return false
+            }
+        }
+        return false
     }
 
     /// Check if an error is worth retrying
