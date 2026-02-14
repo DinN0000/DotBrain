@@ -37,29 +37,31 @@ struct DashboardView: View {
                         StatCard(title: "API 비용", value: String(format: "$%.3f", stats.apiCost), icon: "dollarsign.circle.fill")
                     }
 
-                    // MOC regeneration button
-                    Button(action: {
-                        guard !isMOCRegenerating else { return }
-                        isMOCRegenerating = true
-                        let rootPath = appState.pkmRootPath
-                        Task.detached(priority: .userInitiated) {
-                            let mocGenerator = MOCGenerator(pkmRoot: rootPath)
-                            await mocGenerator.regenerateAll()
-                            await MainActor.run { isMOCRegenerating = false }
-                        }
-                    }) {
-                        HStack {
-                            Image(systemName: "doc.text.magnifyingglass")
-                            Text("MOC 전체 갱신")
-                        }
-                        .frame(maxWidth: .infinity)
+                    // PARA management button
+                    DashboardActionButton(
+                        icon: "folder.badge.gearshape",
+                        title: "PARA 관리",
+                        subtitle: "폴더 이동 · 아카이브 · 복원"
+                    ) {
+                        appState.currentScreen = .paraManage
                     }
-                    .buttonStyle(.bordered)
-                    .controlSize(.regular)
-                    .disabled(isMOCRegenerating)
+
+                    // Vault-wide reorganization button
+                    DashboardActionButton(
+                        icon: "arrow.triangle.2.circlepath",
+                        title: "파일 위치 점검",
+                        subtitle: "AI가 잘못된 위치의 파일을 찾아 이동 제안"
+                    ) {
+                        appState.currentScreen = .vaultReorganize
+                    }
 
                     // Full audit button
-                    Button(action: {
+                    DashboardActionButton(
+                        icon: "checkmark.shield",
+                        title: "오류 검사",
+                        subtitle: "깨진 링크 · 누락 태그 · 분류 오류 탐지",
+                        isDisabled: isAuditing
+                    ) {
                         isAuditing = true
                         auditReport = nil
                         repairResult = nil
@@ -72,41 +74,15 @@ struct DashboardView: View {
                                 isAuditing = false
                             }
                         }
-                    }) {
-                        HStack {
-                            Image(systemName: "checkmark.shield")
-                            Text("전체 점검")
-                        }
-                        .frame(maxWidth: .infinity)
                     }
-                    .buttonStyle(.bordered)
-                    .controlSize(.regular)
-                    .disabled(isAuditing)
-
-                    // PARA management button
-                    Button(action: { appState.currentScreen = .paraManage }) {
-                        HStack {
-                            Image(systemName: "folder.badge.gearshape")
-                            Text("PARA 관리")
-                        }
-                        .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.bordered)
-                    .controlSize(.regular)
-
-                    // Vault-wide reorganization button
-                    Button(action: { appState.currentScreen = .vaultReorganize }) {
-                        HStack {
-                            Image(systemName: "arrow.triangle.2.circlepath")
-                            Text("전체 재정리")
-                        }
-                        .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.bordered)
-                    .controlSize(.regular)
 
                     // Note enrichment button
-                    Button(action: {
+                    DashboardActionButton(
+                        icon: "text.badge.star",
+                        title: "태그 · 요약 보완",
+                        subtitle: "비어있는 메타데이터를 AI로 보완",
+                        isDisabled: isEnriching
+                    ) {
                         guard !isEnriching else { return }
                         isEnriching = true
                         let rootPath = appState.pkmRootPath
@@ -132,16 +108,24 @@ struct DashboardView: View {
                                 isEnriching = false
                             }
                         }
-                    }) {
-                        HStack {
-                            Image(systemName: "text.badge.star")
-                            Text("노트 메타데이터 보완")
-                        }
-                        .frame(maxWidth: .infinity)
                     }
-                    .buttonStyle(.bordered)
-                    .controlSize(.regular)
-                    .disabled(isEnriching)
+
+                    // MOC regeneration button
+                    DashboardActionButton(
+                        icon: "doc.text.magnifyingglass",
+                        title: "폴더 요약 갱신",
+                        subtitle: "각 폴더의 인덱스 노트를 최신 내용으로 재생성",
+                        isDisabled: isMOCRegenerating
+                    ) {
+                        guard !isMOCRegenerating else { return }
+                        isMOCRegenerating = true
+                        let rootPath = appState.pkmRootPath
+                        Task.detached(priority: .userInitiated) {
+                            let mocGenerator = MOCGenerator(pkmRoot: rootPath)
+                            await mocGenerator.regenerateAll()
+                            await MainActor.run { isMOCRegenerating = false }
+                        }
+                    }
 
                     if !statusMessage.isEmpty {
                         Text(statusMessage)
@@ -427,5 +411,45 @@ struct AuditRepairRow: View {
                 .foregroundColor(.green)
             Spacer()
         }
+    }
+}
+
+struct DashboardActionButton: View {
+    let icon: String
+    let title: String
+    let subtitle: String
+    var isDisabled: Bool = false
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 10) {
+                Image(systemName: icon)
+                    .font(.system(size: 16))
+                    .foregroundColor(.accentColor)
+                    .frame(width: 24)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                    Text(subtitle)
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
+                }
+
+                Spacer()
+
+                Image(systemName: "chevron.right")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+            }
+            .padding(.vertical, 4)
+            .frame(maxWidth: .infinity)
+        }
+        .buttonStyle(.bordered)
+        .controlSize(.regular)
+        .disabled(isDisabled)
     }
 }
