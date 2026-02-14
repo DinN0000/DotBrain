@@ -39,6 +39,7 @@ final class AppState: ObservableObject {
     @Published var reorganizeSubfolder: String?
     @Published var processingOrigin: Screen = .inbox
     @Published var affectedFolders: Set<String> = []
+    @Published var navigationId = UUID()
 
     // MARK: - Settings
 
@@ -536,6 +537,7 @@ final class AppState: ObservableObject {
         processedResults = []
         pendingConfirmations = []
         affectedFolders = []
+        navigationId = UUID()
         if currentScreen == .inbox {
             reorganizeCategory = nil
             reorganizeSubfolder = nil

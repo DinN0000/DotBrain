@@ -4,6 +4,14 @@ import AppKit
 struct ResultsView: View {
     @EnvironmentObject var appState: AppState
 
+    private var navigateBackLabel: String {
+        switch appState.processingOrigin {
+        case .reorganize: return "폴더 목록"
+        case .paraManage: return "PARA 관리"
+        default: return "돌아가기"
+        }
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             // Header
@@ -88,7 +96,7 @@ struct ResultsView: View {
 
             // Action buttons
             HStack {
-                HoverTextButton(label: "돌아가기") {
+                HoverTextButton(label: navigateBackLabel) {
                     appState.navigateBack()
                 }
 

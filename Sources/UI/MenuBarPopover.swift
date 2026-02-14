@@ -18,6 +18,7 @@ struct MenuBarPopover: View {
                 SettingsView()
             case .reorganize:
                 ReorganizeView()
+                    .id(appState.navigationId)
             case .dashboard:
                 DashboardView()
             case .search:
@@ -26,6 +27,7 @@ struct MenuBarPopover: View {
                 ProjectManageView()
             case .paraManage:
                 PARAManageView()
+                    .id(appState.navigationId)
             case .vaultReorganize:
                 VaultReorganizeView()
             }
