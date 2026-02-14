@@ -5,8 +5,15 @@ struct ReorganizeView: View {
     @State private var selectedCategory: PARACategory?
     @State private var selectedSubfolder: String?
     @State private var isButtonHovered = false
-    @State private var folderMap: [PARACategory: [(name: String, fileCount: Int)]] = [:]
+    @State private var folderMap: [PARACategory: [FolderInfo]] = [:]
     @State private var isLoading = true
+
+    struct FolderInfo: Identifiable {
+        var id: String { name }
+        let name: String
+        let fileCount: Int
+        let healthLabel: String // "good", "attention", "urgent"
+    }
 
     private let paraCategories: [PARACategory] = [.project, .area, .resource, .archive]
 
@@ -101,6 +108,11 @@ struct ReorganizeView: View {
             .padding()
         }
         .onAppear {
+            // Pre-select folder if navigated from ResultsView
+            if let cat = appState.reorganizeCategory, let sub = appState.reorganizeSubfolder {
+                selectedCategory = cat
+                selectedSubfolder = sub
+            }
             loadFolders()
         }
     }
@@ -111,7 +123,7 @@ struct ReorganizeView: View {
         isLoading = true
         let root = appState.pkmRootPath
         let cats = paraCategories
-        Task.detached {
+        Task.detached(priority: .utility) {
             let map = ReorganizeScanner.scan(pkmRoot: root, categories: cats)
             await MainActor.run {
                 folderMap = map
@@ -123,7 +135,7 @@ struct ReorganizeView: View {
     // MARK: - Category Section
 
     @ViewBuilder
-    private func categorySection(category: PARACategory, folders: [(name: String, fileCount: Int)]) -> some View {
+    private func categorySection(category: PARACategory, folders: [FolderInfo]) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 4) {
                 Image(systemName: category.icon)
@@ -136,10 +148,11 @@ struct ReorganizeView: View {
             }
             .padding(.vertical, 6)
 
-            ForEach(folders, id: \.name) { folder in
+            ForEach(folders) { folder in
                 FolderRow(
                     name: folder.name,
                     fileCount: folder.fileCount,
+                    healthLabel: folder.healthLabel,
                     isSelected: selectedCategory == category && selectedSubfolder == folder.name
                 ) {
                     selectedCategory = category
@@ -156,10 +169,10 @@ private enum ReorganizeScanner {
     static func scan(
         pkmRoot: String,
         categories: [PARACategory]
-    ) -> [PARACategory: [(name: String, fileCount: Int)]] {
+    ) -> [PARACategory: [ReorganizeView.FolderInfo]] {
         let pathManager = PKMPathManager(root: pkmRoot)
         let fm = FileManager.default
-        var map: [PARACategory: [(name: String, fileCount: Int)]] = [:]
+        var map: [PARACategory: [ReorganizeView.FolderInfo]] = [:]
 
         for cat in categories {
             let basePath = pathManager.paraPath(for: cat)
@@ -168,36 +181,26 @@ private enum ReorganizeScanner {
                 continue
             }
 
-            var folders: [(name: String, fileCount: Int)] = []
+            var folders: [ReorganizeView.FolderInfo] = []
             for entry in entries.sorted() {
                 guard !entry.hasPrefix("."), !entry.hasPrefix("_") else { continue }
                 let fullPath = (basePath as NSString).appendingPathComponent(entry)
                 var isDir: ObjCBool = false
                 guard fm.fileExists(atPath: fullPath, isDirectory: &isDir), isDir.boolValue else { continue }
 
-                let fileCount = countFiles(at: fullPath, folderName: entry, fm: fm)
-                folders.append((name: entry, fileCount: fileCount))
+                let health = FolderHealthAnalyzer.analyze(
+                    folderPath: fullPath, folderName: entry, category: cat
+                )
+                folders.append(ReorganizeView.FolderInfo(
+                    name: entry,
+                    fileCount: health.fileCount,
+                    healthLabel: health.label
+                ))
             }
             map[cat] = folders
         }
 
         return map
-    }
-
-    private static func countFiles(at path: String, folderName: String, fm: FileManager) -> Int {
-        guard let enumerator = fm.enumerator(atPath: path) else { return 0 }
-        var count = 0
-        while let relativePath = enumerator.nextObject() as? String {
-            let fullPath = (path as NSString).appendingPathComponent(relativePath)
-            var isDir: ObjCBool = false
-            guard fm.fileExists(atPath: fullPath, isDirectory: &isDir), !isDir.boolValue else { continue }
-            let fileName = (fullPath as NSString).lastPathComponent
-            guard !fileName.hasPrefix("."), !fileName.hasPrefix("_") else { continue }
-            let baseName = (fileName as NSString).deletingPathExtension
-            if baseName == folderName { continue }
-            count += 1
-        }
-        return count
     }
 }
 
@@ -206,9 +209,18 @@ private enum ReorganizeScanner {
 private struct FolderRow: View {
     let name: String
     let fileCount: Int
+    let healthLabel: String
     let isSelected: Bool
     let action: () -> Void
     @State private var isHovered = false
+
+    private var healthColor: Color {
+        switch healthLabel {
+        case "urgent": return .red
+        case "attention": return .orange
+        default: return .green
+        }
+    }
 
     var body: some View {
         Button(action: action) {
@@ -222,6 +234,13 @@ private struct FolderRow: View {
                     .lineLimit(1)
 
                 Spacer()
+
+                // Health indicator dot
+                if healthLabel != "good" {
+                    Circle()
+                        .fill(healthColor)
+                        .frame(width: 6, height: 6)
+                }
 
                 Text("\(fileCount)")
                     .font(.caption)
