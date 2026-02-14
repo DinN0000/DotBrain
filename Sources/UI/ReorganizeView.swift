@@ -228,46 +228,45 @@ private struct FolderRow: View {
     }
 
     var body: some View {
-        Button(action: action) {
-            HStack {
-                Image(systemName: "folder")
-                    .font(.system(size: 13))
-                    .foregroundColor(isSelected ? .accentColor : .primary.opacity(0.6))
+        HStack {
+            Image(systemName: "folder")
+                .font(.system(size: 13))
+                .foregroundColor(isSelected ? .accentColor : .primary.opacity(0.6))
 
-                Text(name)
-                    .font(.system(.body, design: .monospaced))
-                    .lineLimit(1)
+            Text(name)
+                .font(.system(.body, design: .monospaced))
+                .lineLimit(1)
 
-                Spacer()
+            Spacer()
 
-                // Health indicator dot
-                if healthLabel != "good" {
-                    Circle()
-                        .fill(healthColor)
-                        .frame(width: 6, height: 6)
-                }
-
-                Text("\(fileCount)")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .background(
-                        Capsule()
-                            .fill(Color.secondary.opacity(0.12))
-                    )
+            // Health indicator dot
+            if healthLabel != "good" {
+                Circle()
+                    .fill(healthColor)
+                    .frame(width: 6, height: 6)
             }
-            .padding(.vertical, 6)
-            .padding(.horizontal, 8)
-            .background(
-                RoundedRectangle(cornerRadius: 6)
-                    .fill(isSelected
-                        ? Color.accentColor.opacity(0.12)
-                        : (isHovered ? Color.primary.opacity(0.04) : Color.clear))
-            )
+
+            Text("\(fileCount)")
+                .font(.caption)
+                .foregroundColor(.secondary)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 2)
+                .background(
+                    Capsule()
+                        .fill(Color.secondary.opacity(0.12))
+                )
         }
-        .buttonStyle(.plain)
-        .help(healthIssues.isEmpty ? "" : healthIssues)
+        .padding(.vertical, 6)
+        .padding(.horizontal, 8)
+        .background(
+            RoundedRectangle(cornerRadius: 6)
+                .fill(isSelected
+                    ? Color.accentColor.opacity(0.12)
+                    : (isHovered ? Color.primary.opacity(0.04) : Color.clear))
+        )
+        .contentShape(Rectangle())
+        .onTapGesture { action() }
+        .help(healthIssues)
         .animation(.easeOut(duration: 0.12), value: isHovered)
         .animation(.easeOut(duration: 0.12), value: isSelected)
         .onHover { isHovered = $0 }
