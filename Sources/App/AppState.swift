@@ -24,6 +24,8 @@ final class AppState: ObservableObject {
         case dashboard
         case search
         case projectManage
+        case paraManage
+        case vaultReorganize
     }
 
     @Published var currentScreen: Screen = .inbox
@@ -95,6 +97,10 @@ final class AppState: ObservableObject {
             return "·_·?"
         case .projectManage:
             return "·_·"
+        case .paraManage:
+            return "·_·"
+        case .vaultReorganize:
+            return "·_·…"
         }
     }
 
@@ -203,7 +209,8 @@ final class AppState: ObservableObject {
         isProcessing = false
         processingProgress = 0
         processingStatus = ""
-        currentScreen = processingOrigin == .reorganize ? .reorganize : .inbox
+        currentScreen = processingOrigin == .reorganize ? .reorganize
+            : processingOrigin == .paraManage ? .paraManage : .inbox
         Task {
             await refreshInboxCount()
         }
@@ -519,7 +526,9 @@ final class AppState: ObservableObject {
     }
 
     func navigateBack() {
-        if processingOrigin == .reorganize, reorganizeCategory != nil, reorganizeSubfolder != nil {
+        if processingOrigin == .paraManage, reorganizeCategory != nil, reorganizeSubfolder != nil {
+            currentScreen = .paraManage
+        } else if processingOrigin == .reorganize, reorganizeCategory != nil, reorganizeSubfolder != nil {
             currentScreen = .reorganize
         } else {
             currentScreen = .inbox

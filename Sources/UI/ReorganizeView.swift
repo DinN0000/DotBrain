@@ -13,6 +13,7 @@ struct ReorganizeView: View {
         let name: String
         let fileCount: Int
         let healthLabel: String // "good", "attention", "urgent"
+        let healthIssues: String // tooltip text for health indicator
     }
 
     private let paraCategories: [PARACategory] = [.project, .area, .resource, .archive]
@@ -153,6 +154,7 @@ struct ReorganizeView: View {
                     name: folder.name,
                     fileCount: folder.fileCount,
                     healthLabel: folder.healthLabel,
+                    healthIssues: folder.healthIssues,
                     isSelected: selectedCategory == category && selectedSubfolder == folder.name
                 ) {
                     selectedCategory = category
@@ -191,10 +193,12 @@ private enum ReorganizeScanner {
                 let health = FolderHealthAnalyzer.analyze(
                     folderPath: fullPath, folderName: entry, category: cat
                 )
+                let issuesText = health.issues.map(\.localizedDescription).joined(separator: "\n")
                 folders.append(ReorganizeView.FolderInfo(
                     name: entry,
                     fileCount: health.fileCount,
-                    healthLabel: health.label
+                    healthLabel: health.label,
+                    healthIssues: issuesText
                 ))
             }
             map[cat] = folders
@@ -210,6 +214,7 @@ private struct FolderRow: View {
     let name: String
     let fileCount: Int
     let healthLabel: String
+    let healthIssues: String
     let isSelected: Bool
     let action: () -> Void
     @State private var isHovered = false
@@ -240,6 +245,7 @@ private struct FolderRow: View {
                     Circle()
                         .fill(healthColor)
                         .frame(width: 6, height: 6)
+                        .help(healthIssues)
                 }
 
                 Text("\(fileCount)")

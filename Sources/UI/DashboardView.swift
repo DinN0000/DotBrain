@@ -83,11 +83,22 @@ struct DashboardView: View {
                     .controlSize(.regular)
                     .disabled(isAuditing)
 
-                    // Project management button
-                    Button(action: { appState.currentScreen = .projectManage }) {
+                    // PARA management button
+                    Button(action: { appState.currentScreen = .paraManage }) {
                         HStack {
                             Image(systemName: "folder.badge.gearshape")
-                            Text("프로젝트 관리")
+                            Text("PARA 관리")
+                        }
+                        .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.regular)
+
+                    // Vault-wide reorganization button
+                    Button(action: { appState.currentScreen = .vaultReorganize }) {
+                        HStack {
+                            Image(systemName: "arrow.triangle.2.circlepath")
+                            Text("전체 재정리")
                         }
                         .frame(maxWidth: .infinity)
                     }

@@ -24,9 +24,13 @@ struct MenuBarPopover: View {
                 SearchView()
             case .projectManage:
                 ProjectManageView()
+            case .paraManage:
+                PARAManageView()
+            case .vaultReorganize:
+                VaultReorganizeView()
             }
 
-            // Footer (hidden during onboarding and settings)
+            // Footer (hidden during onboarding, settings, and processing)
             if appState.currentScreen != .settings && appState.currentScreen != .onboarding {
                 Divider()
                 HStack {

@@ -11,6 +11,19 @@ struct FolderHealthAnalyzer {
         case missingFrontmatter(count: Int, total: Int)
         case lowTagDiversity(uniqueTags: Int, fileCount: Int)
         case noIndexNote
+
+        var localizedDescription: String {
+            switch self {
+            case .tooManyFiles(let count):
+                return "\(count)개 파일 — 세분화 필요"
+            case .missingFrontmatter(let count, _):
+                return "\(count)개 파일 메타데이터 누락"
+            case .lowTagDiversity:
+                return "태그 다양성 부족"
+            case .noIndexNote:
+                return "인덱스 노트 없음"
+            }
+        }
     }
 
     struct HealthScore {
