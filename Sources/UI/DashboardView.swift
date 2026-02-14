@@ -6,9 +6,10 @@ struct DashboardView: View {
     @State private var auditReport: AuditReport?
     @State private var isAuditing: Bool = false
     @State private var repairResult: RepairResult?
-    @State private var statusMessage: String = ""
     @State private var isEnriching: Bool = false
+    @State private var enrichResult: Int?
     @State private var isMOCRegenerating: Bool = false
+    @State private var mocDone: Bool = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -55,100 +56,122 @@ struct DashboardView: View {
                         appState.currentScreen = .vaultReorganize
                     }
 
-                    // Full audit button
-                    DashboardActionButton(
-                        icon: "checkmark.shield",
-                        title: "오류 검사",
-                        subtitle: "깨진 링크 · 누락 태그 · 분류 오류 탐지",
-                        isDisabled: isAuditing
-                    ) {
-                        isAuditing = true
-                        auditReport = nil
-                        repairResult = nil
-                        let rootPath = appState.pkmRootPath
-                        Task.detached(priority: .userInitiated) {
-                            let auditor = VaultAuditor(pkmRoot: rootPath)
-                            let report = auditor.audit()
-                            await MainActor.run {
-                                auditReport = report
-                                isAuditing = false
-                            }
-                        }
-                    }
-
-                    // Note enrichment button
-                    DashboardActionButton(
-                        icon: "text.badge.star",
-                        title: "태그 · 요약 보완",
-                        subtitle: "비어있는 메타데이터를 AI로 보완",
-                        isDisabled: isEnriching
-                    ) {
-                        guard !isEnriching else { return }
-                        isEnriching = true
-                        let rootPath = appState.pkmRootPath
-                        Task.detached(priority: .userInitiated) {
-                            let enricher = NoteEnricher(pkmRoot: rootPath)
-                            let pathManager = PKMPathManager(root: rootPath)
-                            let fm = FileManager.default
-                            let categories = [pathManager.projectsPath, pathManager.areaPath, pathManager.resourcePath]
-                            var count = 0
-
-                            for basePath in categories {
-                                guard let folders = try? fm.contentsOfDirectory(atPath: basePath) else { continue }
-                                for folder in folders where !folder.hasPrefix(".") && !folder.hasPrefix("_") {
-                                    let folderPath = (basePath as NSString).appendingPathComponent(folder)
-                                    let results = await enricher.enrichFolder(at: folderPath)
-                                    count += results.count
+                    // --- 오류 검사 + inline results ---
+                    VStack(spacing: 0) {
+                        DashboardActionButton(
+                            icon: "checkmark.shield",
+                            title: "오류 검사",
+                            subtitle: "깨진 링크 · 누락 태그 · 분류 오류 탐지",
+                            isDisabled: isAuditing
+                        ) {
+                            isAuditing = true
+                            auditReport = nil
+                            repairResult = nil
+                            let rootPath = appState.pkmRootPath
+                            Task.detached(priority: .userInitiated) {
+                                let auditor = VaultAuditor(pkmRoot: rootPath)
+                                let report = auditor.audit()
+                                await MainActor.run {
+                                    auditReport = report
+                                    isAuditing = false
                                 }
                             }
+                        }
 
-                            let total = count
-                            await MainActor.run {
-                                statusMessage = "\(total)개 노트 메타데이터 보완 완료"
-                                isEnriching = false
+                        if isAuditing {
+                            InlineProgress(message: "볼트 점검 중...")
+                        }
+
+                        if let report = auditReport {
+                            auditResultsView(report: report)
+                                .padding(.top, 6)
+                        }
+                    }
+
+                    // --- 태그 · 요약 보완 + inline results ---
+                    VStack(spacing: 0) {
+                        DashboardActionButton(
+                            icon: "text.badge.star",
+                            title: "태그 · 요약 보완",
+                            subtitle: "비어있는 메타데이터를 AI로 보완",
+                            isDisabled: isEnriching
+                        ) {
+                            guard !isEnriching else { return }
+                            isEnriching = true
+                            enrichResult = nil
+                            let rootPath = appState.pkmRootPath
+                            Task.detached(priority: .userInitiated) {
+                                let enricher = NoteEnricher(pkmRoot: rootPath)
+                                let pathManager = PKMPathManager(root: rootPath)
+                                let fm = FileManager.default
+                                let categories = [pathManager.projectsPath, pathManager.areaPath, pathManager.resourcePath]
+                                var count = 0
+
+                                for basePath in categories {
+                                    guard let folders = try? fm.contentsOfDirectory(atPath: basePath) else { continue }
+                                    for folder in folders where !folder.hasPrefix(".") && !folder.hasPrefix("_") {
+                                        let folderPath = (basePath as NSString).appendingPathComponent(folder)
+                                        let results = await enricher.enrichFolder(at: folderPath)
+                                        count += results.count
+                                    }
+                                }
+
+                                let total = count
+                                await MainActor.run {
+                                    enrichResult = total
+                                    isEnriching = false
+                                }
+                            }
+                        }
+
+                        if isEnriching {
+                            InlineProgress(message: "메타데이터 보완 중...")
+                        }
+
+                        if let count = enrichResult {
+                            InlineResult(
+                                icon: "checkmark.circle.fill",
+                                message: "\(count)개 노트 메타데이터 보완 완료"
+                            ) {
+                                enrichResult = nil
                             }
                         }
                     }
 
-                    // MOC regeneration button
-                    DashboardActionButton(
-                        icon: "doc.text.magnifyingglass",
-                        title: "폴더 요약 갱신",
-                        subtitle: "각 폴더의 인덱스 노트를 최신 내용으로 재생성",
-                        isDisabled: isMOCRegenerating
-                    ) {
-                        guard !isMOCRegenerating else { return }
-                        isMOCRegenerating = true
-                        let rootPath = appState.pkmRootPath
-                        Task.detached(priority: .userInitiated) {
-                            let mocGenerator = MOCGenerator(pkmRoot: rootPath)
-                            await mocGenerator.regenerateAll()
-                            await MainActor.run { isMOCRegenerating = false }
+                    // --- 폴더 요약 갱신 + inline results ---
+                    VStack(spacing: 0) {
+                        DashboardActionButton(
+                            icon: "doc.text.magnifyingglass",
+                            title: "폴더 요약 갱신",
+                            subtitle: "각 폴더의 인덱스 노트를 최신 내용으로 재생성",
+                            isDisabled: isMOCRegenerating
+                        ) {
+                            guard !isMOCRegenerating else { return }
+                            isMOCRegenerating = true
+                            mocDone = false
+                            let rootPath = appState.pkmRootPath
+                            Task.detached(priority: .userInitiated) {
+                                let mocGenerator = MOCGenerator(pkmRoot: rootPath)
+                                await mocGenerator.regenerateAll()
+                                await MainActor.run {
+                                    isMOCRegenerating = false
+                                    mocDone = true
+                                }
+                            }
                         }
-                    }
 
-                    if !statusMessage.isEmpty {
-                        Text(statusMessage)
-                            .font(.caption)
-                            .foregroundColor(.green)
-                            .padding(.vertical, 4)
-                    }
-
-                    // Audit progress / results
-                    if isAuditing {
-                        HStack(spacing: 8) {
-                            ProgressView()
-                                .controlSize(.small)
-                            Text("볼트 점검 중...")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
+                        if isMOCRegenerating {
+                            InlineProgress(message: "인덱스 노트 재생성 중...")
                         }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 8)
-                    }
 
-                    if let report = auditReport {
-                        auditResultsView(report: report)
+                        if mocDone {
+                            InlineResult(
+                                icon: "checkmark.circle.fill",
+                                message: "모든 폴더 요약 갱신 완료"
+                            ) {
+                                mocDone = false
+                            }
+                        }
                     }
 
                     // Category breakdown
@@ -411,6 +434,52 @@ struct AuditRepairRow: View {
                 .foregroundColor(.green)
             Spacer()
         }
+    }
+}
+
+struct InlineProgress: View {
+    let message: String
+
+    var body: some View {
+        HStack(spacing: 8) {
+            ProgressView()
+                .controlSize(.small)
+            Text(message)
+                .font(.caption)
+                .foregroundColor(.secondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+    }
+}
+
+struct InlineResult: View {
+    let icon: String
+    let message: String
+    let onDismiss: () -> Void
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: icon)
+                .font(.caption)
+                .foregroundColor(.green)
+            Text(message)
+                .font(.caption)
+                .foregroundColor(.green)
+            Spacer()
+            Button(action: onDismiss) {
+                Image(systemName: "xmark")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(Color.green.opacity(0.06))
+        .cornerRadius(6)
+        .padding(.top, 4)
     }
 }
 
