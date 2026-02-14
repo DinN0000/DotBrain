@@ -245,7 +245,6 @@ private struct FolderRow: View {
                     Circle()
                         .fill(healthColor)
                         .frame(width: 6, height: 6)
-                        .help(healthIssues)
                 }
 
                 Text("\(fileCount)")
@@ -268,6 +267,7 @@ private struct FolderRow: View {
             )
         }
         .buttonStyle(.plain)
+        .help(healthIssues.isEmpty ? "" : healthIssues)
         .animation(.easeOut(duration: 0.12), value: isHovered)
         .animation(.easeOut(duration: 0.12), value: isSelected)
         .onHover { isHovered = $0 }
