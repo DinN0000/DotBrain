@@ -3,7 +3,7 @@ import Foundation
 /// 2-stage document classifier (Fast batch → Precise for uncertain)
 /// Supports Claude (Haiku/Sonnet) and Gemini (Flash/Pro)
 actor Classifier {
-    private let aiService = AIService()
+    private let aiService = AIService.shared
     private let batchSize = 10
     private let confidenceThreshold = 0.8
     private let previewLength = 200

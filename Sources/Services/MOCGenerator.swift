@@ -3,7 +3,7 @@ import Foundation
 /// Generates and updates Map of Content (MOC) files for PARA folders
 struct MOCGenerator {
     let pkmRoot: String
-    private let aiService = AIService()
+    private let aiService = AIService.shared
 
     private var pathManager: PKMPathManager {
         PKMPathManager(root: pkmRoot)

@@ -3,7 +3,7 @@ import Foundation
 /// AI-based context linker that finds semantically related notes using the vault context map
 struct ContextLinker: Sendable {
     let pkmRoot: String
-    private let aiService = AIService()
+    private let aiService = AIService.shared
     private let batchSize = 5
     private let maxConcurrentBatches = 3
 

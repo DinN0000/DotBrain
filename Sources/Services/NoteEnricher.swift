@@ -3,7 +3,7 @@ import Foundation
 /// Enriches individual note metadata without moving the file
 struct NoteEnricher: Sendable {
     let pkmRoot: String
-    private let aiService = AIService()
+    private let aiService = AIService.shared
     private let maxContentLength = 5000
 
     /// Enrich a single note's frontmatter by filling empty fields with AI analysis
