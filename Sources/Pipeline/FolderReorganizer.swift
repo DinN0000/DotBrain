@@ -110,28 +110,15 @@ struct FolderReorganizer {
         let estimatedCost = Double(inputs.count) * 0.001  // ~$0.001 per file (rough estimate)
         StatisticsService.addApiCost(estimatedCost)
 
-        // Enrich with related notes — parallel
-        let enrichedClassifications: [ClassifyResult] = await withTaskGroup(
-            of: (Int, [RelatedNote]).self,
-            returning: [ClassifyResult].self
-        ) { group in
-            for (i, classification) in classifications.enumerated() {
-                group.addTask {
-                    let related = contextBuilder.findRelatedNotes(
-                        tags: classification.tags,
-                        project: classification.project,
-                        para: classification.para,
-                        targetFolder: classification.targetFolder
-                    )
-                    return (i, related)
-                }
-            }
+        // Enrich with related notes — AI-based context linking
+        let contextMap = await ContextMapBuilder(pkmRoot: pkmRoot).build()
+        let linker = ContextLinker(pkmRoot: pkmRoot)
+        let filePairs = zip(inputs, classifications).map { (input: $0, classification: $1) }
+        let relatedMap = await linker.findRelatedNotes(for: filePairs, contextMap: contextMap)
 
-            var results = classifications
-            for await (index, related) in group {
-                results[index].relatedNotes = related
-            }
-            return results
+        var enrichedClassifications = classifications
+        for (index, notes) in relatedMap {
+            enrichedClassifications[index].relatedNotes = notes
         }
 
         // Compare and process
