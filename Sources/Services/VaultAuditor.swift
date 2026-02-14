@@ -94,9 +94,17 @@ struct VaultAuditor {
                 let trimmedTarget = linkTarget.trimmingCharacters(in: .whitespaces)
                 guard !trimmedTarget.isEmpty else { continue }
 
-                // Check if the target exists as a note
-                if !noteNames.contains(trimmedTarget) {
-                    let suggestion = findClosestMatch(trimmedTarget, in: noteNames)
+                // Extract basename for path-based links: [[folder/note]] → note
+                let resolvedName: String
+                if trimmedTarget.contains("/") {
+                    resolvedName = (trimmedTarget as NSString).lastPathComponent
+                } else {
+                    resolvedName = trimmedTarget
+                }
+
+                // Check if the target (or its basename) exists as a note
+                if !noteNames.contains(trimmedTarget) && !noteNames.contains(resolvedName) {
+                    let suggestion = findClosestMatch(resolvedName, in: noteNames)
                     brokenLinks.append(AuditReport.BrokenLink(
                         filePath: filePath,
                         linkTarget: trimmedTarget,
@@ -128,8 +136,17 @@ struct VaultAuditor {
         var linksByFile: [String: [(target: String, suggestion: String)]] = [:]
         for brokenLink in report.brokenLinks {
             guard let suggestion = brokenLink.suggestion else { continue }
-            // Only fix if edit distance is small enough (<= 3)
-            if levenshteinDistance(brokenLink.linkTarget, suggestion) <= 3 {
+            // Compare using basename for path-based links
+            let targetForComparison: String
+            if brokenLink.linkTarget.contains("/") {
+                targetForComparison = (brokenLink.linkTarget as NSString).lastPathComponent
+            } else {
+                targetForComparison = brokenLink.linkTarget
+            }
+            let dist = levenshteinDistance(targetForComparison.lowercased(), suggestion.lowercased())
+            // Allow higher edit distance for longer names
+            let maxDist = max(3, targetForComparison.count / 3)
+            if dist <= maxDist {
                 linksByFile[brokenLink.filePath, default: []].append(
                     (target: brokenLink.linkTarget, suggestion: suggestion)
                 )
@@ -229,9 +246,14 @@ struct VaultAuditor {
             while let element = enumerator.nextObject() as? String {
                 let name = (element as NSString).lastPathComponent
 
-                // Skip hidden and _ prefixed files/directories
+                // Skip hidden and _ prefixed entries
                 if name.hasPrefix(".") || name.hasPrefix("_") {
-                    enumerator.skipDescendants()
+                    // Only skip descendants for directories; files need continue only
+                    let fullCheck = (folder as NSString).appendingPathComponent(element)
+                    var isDirCheck: ObjCBool = false
+                    if fm.fileExists(atPath: fullCheck, isDirectory: &isDirCheck), isDirCheck.boolValue {
+                        enumerator.skipDescendants()
+                    }
                     continue
                 }
 
@@ -293,14 +315,30 @@ struct VaultAuditor {
             return best
         }
 
-        // Levenshtein distance: find closest match within edit distance 3
+        // Levenshtein distance: scale max allowed distance by target length
+        let maxAllowed = max(3, lowerTarget.count / 3)
         var bestMatch: String?
         var bestDistance = Int.max
         for name in names {
             let dist = levenshteinDistance(lowerTarget, name.lowercased())
-            if dist < bestDistance && dist <= 3 {
+            if dist < bestDistance && dist <= maxAllowed {
                 bestDistance = dist
                 bestMatch = name
+            }
+        }
+
+        // Word-overlap match: compare underscore-separated tokens
+        if bestMatch == nil {
+            let targetWords = Set(lowerTarget.split(separator: "_").map(String.init))
+            guard targetWords.count >= 2 else { return nil }
+            var bestOverlap = 0
+            for name in names {
+                let nameWords = Set(name.lowercased().split(separator: "_").map(String.init))
+                let overlap = targetWords.intersection(nameWords).count
+                if overlap > bestOverlap && overlap >= 2 {
+                    bestOverlap = overlap
+                    bestMatch = name
+                }
             }
         }
 
