@@ -100,6 +100,8 @@ struct MOCGenerator {
 
     /// Update MOCs for all folders that were modified during processing
     func updateMOCsForFolders(_ folderPaths: Set<String>) async {
+        var parentPaths: Set<String> = []
+
         for folderPath in folderPaths {
             let folderName = (folderPath as NSString).lastPathComponent
             // Determine PARA category from path
@@ -109,7 +111,80 @@ struct MOCGenerator {
             } catch {
                 print("[MOCGenerator] MOC 갱신 실패: \(folderName) — \(error.localizedDescription)")
             }
+            // Track parent category paths for root MOC update
+            let parentPath = (folderPath as NSString).deletingLastPathComponent
+            parentPaths.insert(parentPath)
         }
+
+        // Also update the root-level category MOCs
+        for parentPath in parentPaths {
+            let para = categoryFromPath(parentPath + "/")
+            do {
+                try await generateCategoryRootMOC(basePath: parentPath, para: para)
+            } catch {
+                let name = (parentPath as NSString).lastPathComponent
+                print("[MOCGenerator] 카테고리 루트 MOC 갱신 실패: \(name) — \(error.localizedDescription)")
+            }
+        }
+    }
+
+    /// Generate a root-level index note for a PARA category (e.g., 2_Area.md listing all subfolders)
+    func generateCategoryRootMOC(basePath: String, para: PARACategory) async throws {
+        let fm = FileManager.default
+        let categoryName = (basePath as NSString).lastPathComponent
+        guard let entries = try? fm.contentsOfDirectory(atPath: basePath) else { return }
+
+        // Collect subfolders with their MOC summaries
+        var subfolders: [(name: String, summary: String, fileCount: Int)] = []
+
+        for entry in entries.sorted() {
+            guard !entry.hasPrefix("."), !entry.hasPrefix("_") else { continue }
+            let entryPath = (basePath as NSString).appendingPathComponent(entry)
+            var isDir: ObjCBool = false
+            guard fm.fileExists(atPath: entryPath, isDirectory: &isDir), isDir.boolValue else { continue }
+
+            // Try to read summary from the subfolder's own MOC
+            let subMOCPath = (entryPath as NSString).appendingPathComponent("\(entry).md")
+            var summary = ""
+            if let content = try? String(contentsOfFile: subMOCPath, encoding: .utf8) {
+                let (frontmatter, _) = Frontmatter.parse(markdown: content)
+                summary = frontmatter.summary ?? ""
+            }
+
+            // Count files in subfolder
+            let subEntries = (try? fm.contentsOfDirectory(atPath: entryPath)) ?? []
+            let fileCount = subEntries.filter {
+                !$0.hasPrefix(".") && !$0.hasPrefix("_") && $0.hasSuffix(".md") && $0 != "\(entry).md"
+            }.count
+
+            subfolders.append((name: entry, summary: summary, fileCount: fileCount))
+        }
+
+        guard !subfolders.isEmpty else { return }
+
+        // Build root MOC content
+        let frontmatter = Frontmatter.createDefault(
+            para: para,
+            tags: [],
+            summary: "\(para.displayName) 카테고리 인덱스 — \(subfolders.count)개 폴더",
+            source: .original
+        )
+
+        var content = frontmatter.stringify()
+        content += "\n\n# \(categoryName)\n\n"
+        content += "## 폴더 목록\n\n"
+
+        for folder in subfolders {
+            let countLabel = folder.fileCount > 0 ? " (\(folder.fileCount)개)" : ""
+            if folder.summary.isEmpty {
+                content += "- [[\(folder.name)]]\(countLabel)\n"
+            } else {
+                content += "- [[\(folder.name)]] — \(folder.summary)\(countLabel)\n"
+            }
+        }
+
+        let mocPath = (basePath as NSString).appendingPathComponent("\(categoryName).md")
+        try content.write(toFile: mocPath, atomically: true, encoding: .utf8)
     }
 
     /// Regenerate all MOCs across the entire vault
@@ -131,6 +206,7 @@ struct MOCGenerator {
                 let folderPath = (basePath as NSString).appendingPathComponent(folder)
                 var isDir: ObjCBool = false
                 guard fm.fileExists(atPath: folderPath, isDirectory: &isDir), isDir.boolValue else { continue }
+                // Skip .md files at category root (they're root MOCs, not subfolders)
                 folderTasks.append((para: para, folderPath: folderPath, folderName: folder))
             }
         }
@@ -155,6 +231,16 @@ struct MOCGenerator {
                     }
                 }
                 activeTasks += 1
+            }
+        }
+
+        // Generate root-level category index notes (e.g., 1_Project.md, 2_Area.md, ...)
+        for (para, basePath) in categories {
+            do {
+                try await generateCategoryRootMOC(basePath: basePath, para: para)
+            } catch {
+                let name = (basePath as NSString).lastPathComponent
+                print("[MOCGenerator] 카테고리 루트 MOC 갱신 실패: \(name) — \(error.localizedDescription)")
             }
         }
     }
