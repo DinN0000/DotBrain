@@ -407,31 +407,30 @@ struct OnboardingView: View {
         VStack(spacing: 0) {
             stepHeader(
                 title: "프로젝트 등록",
-                desc: "진행 중인 프로젝트를 등록하세요.\nAI가 관련 파일을 이 프로젝트로 분류합니다."
+                desc: "지금 진행 중인 일에 이름을 붙여주세요."
             )
 
             Spacer()
 
             VStack(alignment: .leading, spacing: 10) {
                 HStack(alignment: .top, spacing: 8) {
-                    Image(systemName: "info.circle")
+                    Image(systemName: "lightbulb.fill")
+                        .font(.caption)
+                        .foregroundColor(.blue)
+                    Text("AI는 여기 등록된 프로젝트 안에서만 파일을 분류합니다. 새 프로젝트가 필요하면 언제든 추가할 수 있습니다.")
                         .font(.caption)
                         .foregroundColor(.secondary)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Project는 직접 등록합니다")
-                            .font(.caption)
-                            .fontWeight(.medium)
-                        Text("Area, Resource, Archive는 AI가 자동 분류합니다.")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
                 }
                 .padding(10)
-                .background(Color.secondary.opacity(0.05))
+                .background(Color.blue.opacity(0.05))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 6)
+                        .stroke(Color.blue.opacity(0.15), lineWidth: 1)
+                )
                 .cornerRadius(6)
 
                 HStack(spacing: 8) {
-                    TextField("프로젝트명 (예: MyApp)", text: $newProjectName)
+                    TextField("예: 2026 마케팅 캠페인, 신규 서비스 런칭", text: $newProjectName)
                         .textFieldStyle(.roundedBorder)
                         .font(.subheadline)
                         .onSubmit { addProject() }
