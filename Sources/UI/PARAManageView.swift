@@ -11,25 +11,16 @@ struct PARAManageView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Header
-            HStack {
-                Button(action: { appState.currentScreen = .inbox }) {
-                    Image(systemName: "chevron.left")
-                }
-                .buttonStyle(.plain)
-
-                Text("PARA 관리")
-                    .font(.headline)
-
-                Spacer()
-
-                Button(action: { showNewProject.toggle() }) {
-                    Image(systemName: showNewProject ? "minus.circle" : "plus.circle")
-                }
-                .buttonStyle(.plain)
-                .help("새 프로젝트")
-            }
-            .padding()
+            BreadcrumbView(
+                current: .paraManage,
+                trailing: AnyView(
+                    Button(action: { showNewProject.toggle() }) {
+                        Image(systemName: showNewProject ? "minus.circle" : "plus.circle")
+                    }
+                    .buttonStyle(.plain)
+                    .help("새 프로젝트")
+                )
+            )
 
             Divider()
 

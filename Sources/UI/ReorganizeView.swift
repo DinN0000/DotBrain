@@ -20,19 +20,7 @@ struct ReorganizeView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Header
-            HStack {
-                Button(action: { appState.currentScreen = .inbox }) {
-                    Image(systemName: "chevron.left")
-                }
-                .buttonStyle(.plain)
-
-                Text("폴더 정리")
-                    .font(.headline)
-
-                Spacer()
-            }
-            .padding()
+            BreadcrumbView(current: .reorganize)
 
             Divider()
 

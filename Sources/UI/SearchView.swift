@@ -9,19 +9,7 @@ struct SearchView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Header
-            HStack {
-                Button(action: { appState.currentScreen = .inbox }) {
-                    Image(systemName: "chevron.left")
-                }
-                .buttonStyle(.plain)
-
-                Text("검색")
-                    .font(.headline)
-
-                Spacer()
-            }
-            .padding()
+            BreadcrumbView(current: .search)
 
             Divider()
 
