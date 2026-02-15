@@ -200,7 +200,7 @@ echo "제거 완료"
 - **macOS 메뉴바 앱** — `NSStatusItem` + `NSPopover`
 - **AI** — Claude (Haiku 4.5 + Sonnet 4.5) / Gemini (Flash + Pro) — 이중 제공자, 자동 폴백
 - **의존성** — ZIPFoundation (DOCX/PPTX/XLSX 처리)
-- **보안** — API 키는 macOS Keychain 저장
+- **보안** — API 키는 AES-GCM 암호화 파일로 기기 종속 저장 (하드웨어 UUID 기반)
 - **안정성** — 지수 백오프 재시도, 제공자 폴백, 경로 탐색 보호
 
 ---
