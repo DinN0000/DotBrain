@@ -11,6 +11,11 @@ struct SettingsView: View {
     @State private var saveMessage: String?
     @State private var showOtherProvider = false
 
+    // Update check state
+    @State private var isCheckingUpdate = false
+    @State private var latestVersion: String?
+    @State private var updateError: String?
+
     private var activeProvider: AIProvider { appState.selectedProvider }
     private var otherProvider: AIProvider { activeProvider == .claude ? .gemini : .claude }
 
@@ -295,6 +300,10 @@ struct SettingsView: View {
 
     // MARK: - App Info Section
 
+    private var currentVersion: String {
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "알 수 없음"
+    }
+
     private var appInfoSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 6) {
@@ -312,30 +321,135 @@ struct SettingsView: View {
                     .font(.caption)
                     .fontWeight(.medium)
                 Spacer()
-                Text("v\(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.5")")
+                Text("v\(currentVersion)")
                     .font(.system(.caption, design: .monospaced))
                     .foregroundColor(.secondary)
             }
 
-            Button(action: {
-                if let url = URL(string: "https://github.com/DinN0000/DotBrain") {
-                    NSWorkspace.shared.open(url)
-                }
-            }) {
-                HStack(spacing: 4) {
-                    Image(systemName: "arrow.up.right.square")
-                        .font(.caption2)
-                    Text("GitHub")
+            // Update check
+            if let latest = latestVersion {
+                if latest != currentVersion {
+                    HStack(spacing: 6) {
+                        Image(systemName: "arrow.down.circle.fill")
+                            .font(.caption)
+                            .foregroundColor(.orange)
+                        Text("v\(latest) 사용 가능")
+                            .font(.caption)
+                            .foregroundColor(.orange)
+                        Spacer()
+                        Button("업데이트") {
+                            runUpdate()
+                        }
                         .font(.caption)
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.mini)
+                    }
+                } else {
+                    HStack(spacing: 6) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.caption)
+                            .foregroundColor(.green)
+                        Text("최신 버전")
+                            .font(.caption)
+                            .foregroundColor(.green)
+                    }
                 }
             }
-            .buttonStyle(.plain)
-            .foregroundColor(.accentColor)
+
+            if let error = updateError {
+                Text(error)
+                    .font(.caption2)
+                    .foregroundColor(.red)
+            }
+
+            HStack(spacing: 12) {
+                Button(action: {
+                    if let url = URL(string: "https://github.com/DinN0000/DotBrain") {
+                        NSWorkspace.shared.open(url)
+                    }
+                }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "arrow.up.right.square")
+                            .font(.caption2)
+                        Text("GitHub")
+                            .font(.caption)
+                    }
+                }
+                .buttonStyle(.plain)
+                .foregroundColor(.accentColor)
+
+                Spacer()
+
+                Button(action: checkForUpdate) {
+                    HStack(spacing: 4) {
+                        if isCheckingUpdate {
+                            ProgressView()
+                                .controlSize(.mini)
+                        } else {
+                            Image(systemName: "arrow.triangle.2.circlepath")
+                                .font(.caption2)
+                        }
+                        Text("업데이트 확인")
+                            .font(.caption)
+                    }
+                }
+                .buttonStyle(.plain)
+                .foregroundColor(.accentColor)
+                .disabled(isCheckingUpdate)
+            }
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color.primary.opacity(0.03))
         .cornerRadius(8)
+        .onAppear { checkForUpdate() }
+    }
+
+    private func checkForUpdate() {
+        guard !isCheckingUpdate else { return }
+        isCheckingUpdate = true
+        updateError = nil
+
+        Task {
+            do {
+                let url = URL(string: "https://api.github.com/repos/DinN0000/DotBrain/releases/latest")!
+                let (data, _) = try await URLSession.shared.data(from: url)
+                if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+                   let tag = json["tag_name"] as? String {
+                    let version = tag.hasPrefix("v") ? String(tag.dropFirst()) : tag
+                    await MainActor.run {
+                        latestVersion = version
+                        isCheckingUpdate = false
+                    }
+                } else {
+                    await MainActor.run {
+                        updateError = "릴리즈 정보를 읽을 수 없습니다"
+                        isCheckingUpdate = false
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    updateError = "확인 실패: \(error.localizedDescription)"
+                    isCheckingUpdate = false
+                }
+            }
+        }
+    }
+
+    private func runUpdate() {
+        Task {
+            do {
+                let script = "curl -sL https://raw.githubusercontent.com/DinN0000/DotBrain/main/install.sh | bash"
+                let process = Process()
+                process.executableURL = URL(fileURLWithPath: "/bin/bash")
+                process.arguments = ["-c", script]
+                try process.run()
+            } catch {
+                await MainActor.run {
+                    updateError = "업데이트 실패: \(error.localizedDescription)"
+                }
+            }
+        }
     }
 
     // MARK: - Footer Bar

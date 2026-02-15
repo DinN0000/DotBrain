@@ -87,8 +87,12 @@ if [ -f "$TMP_DIR/AppIcon.icns" ]; then
     cp "$TMP_DIR/AppIcon.icns" "$APP_PATH/Contents/Resources/AppIcon.icns"
 fi
 
+# Get version from release tag (strip 'v' prefix)
+APP_VERSION=$(echo "$TAG" | sed 's/^v//')
+echo "버전: $APP_VERSION"
+
 # Info.plist
-cat > "$APP_PATH/Contents/Info.plist" << 'INFOPLIST'
+cat > "$APP_PATH/Contents/Info.plist" << INFOPLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -100,9 +104,9 @@ cat > "$APP_PATH/Contents/Info.plist" << 'INFOPLIST'
     <key>CFBundleIdentifier</key>
     <string>com.hwaa.dotbrain</string>
     <key>CFBundleVersion</key>
-    <string>1.0.0</string>
+    <string>$APP_VERSION</string>
     <key>CFBundleShortVersionString</key>
-    <string>1.0.0</string>
+    <string>$APP_VERSION</string>
     <key>CFBundleExecutable</key>
     <string>DotBrain</string>
     <key>CFBundleIconFile</key>

@@ -194,10 +194,19 @@ struct DashboardView: View {
             }
         }
         .onAppear {
-            let service = StatisticsService(pkmRoot: appState.pkmRootPath)
-            stats = service.collectStatistics()
-            scanHealthSummary()
+            refreshStats()
         }
+        .onChange(of: appState.currentScreen) { newScreen in
+            if newScreen == .dashboard {
+                refreshStats()
+            }
+        }
+    }
+
+    private func refreshStats() {
+        let service = StatisticsService(pkmRoot: appState.pkmRootPath)
+        stats = service.collectStatistics()
+        scanHealthSummary()
     }
 
     // MARK: - Vault Check Result View
@@ -372,9 +381,7 @@ struct DashboardView: View {
             await MainActor.run {
                 vaultCheckResult = snapshot
                 isVaultChecking = false
-                // Refresh stats after check
-                let service = StatisticsService(pkmRoot: root)
-                stats = service.collectStatistics()
+                refreshStats()
             }
         }
     }
