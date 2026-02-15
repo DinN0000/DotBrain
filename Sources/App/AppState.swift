@@ -25,7 +25,37 @@ final class AppState: ObservableObject {
         case search
         case projectManage
         case paraManage
+        case vaultManage
         case vaultReorganize
+
+        var parent: Screen? {
+            switch self {
+            case .paraManage, .projectManage, .search, .vaultManage:
+                return .dashboard
+            case .vaultReorganize, .reorganize:
+                return .vaultManage
+            case .results:
+                return nil
+            default:
+                return nil
+            }
+        }
+
+        var displayName: String {
+            switch self {
+            case .inbox: return "인박스"
+            case .dashboard: return "대시보드"
+            case .settings: return "설정"
+            case .paraManage: return "PARA 관리"
+            case .projectManage: return "프로젝트 관리"
+            case .search: return "검색"
+            case .vaultManage: return "볼트 관리"
+            case .vaultReorganize: return "전체 재정리"
+            case .reorganize: return "폴더 정리"
+            case .results: return "정리 결과"
+            default: return ""
+            }
+        }
     }
 
     @Published var currentScreen: Screen = .inbox
@@ -33,6 +63,9 @@ final class AppState: ObservableObject {
     @Published var isProcessing: Bool = false
     @Published var processingProgress: Double = 0
     @Published var processingStatus: String = ""
+    @Published var processingCurrentFile: String = ""
+    @Published var processingCompletedCount: Int = 0
+    @Published var processingTotalCount: Int = 0
     @Published var processedResults: [ProcessedFileResult] = []
     @Published var pendingConfirmations: [PendingConfirmation] = []
     @Published var reorganizeCategory: PARACategory?
@@ -99,6 +132,8 @@ final class AppState: ObservableObject {
         case .projectManage:
             return "·_·"
         case .paraManage:
+            return "·_·"
+        case .vaultManage:
             return "·_·"
         case .vaultReorganize:
             return "·_·…"
@@ -170,6 +205,9 @@ final class AppState: ObservableObject {
         isProcessing = true
         processingProgress = 0
         processingStatus = "시작 중..."
+        processingCurrentFile = ""
+        processingCompletedCount = 0
+        processingTotalCount = 0
         processedResults = []
         pendingConfirmations = []
         affectedFolders = []
@@ -183,6 +221,13 @@ final class AppState: ObservableObject {
                     Task { @MainActor in
                         self?.processingProgress = progress
                         self?.processingStatus = status
+                    }
+                },
+                onFileProgress: { [weak self] completed, total, fileName in
+                    Task { @MainActor in
+                        self?.processingCompletedCount = completed
+                        self?.processingTotalCount = total
+                        self?.processingCurrentFile = fileName
                     }
                 }
             )
@@ -210,6 +255,9 @@ final class AppState: ObservableObject {
         isProcessing = false
         processingProgress = 0
         processingStatus = ""
+        processingCurrentFile = ""
+        processingCompletedCount = 0
+        processingTotalCount = 0
         currentScreen = processingOrigin == .reorganize ? .reorganize
             : processingOrigin == .paraManage ? .paraManage : .inbox
         Task {
@@ -228,6 +276,9 @@ final class AppState: ObservableObject {
         isProcessing = true
         processingProgress = 0
         processingStatus = "시작 중..."
+        processingCurrentFile = ""
+        processingCompletedCount = 0
+        processingTotalCount = 0
         processedResults = []
         pendingConfirmations = []
         affectedFolders = []
@@ -243,6 +294,13 @@ final class AppState: ObservableObject {
                     Task { @MainActor in
                         self?.processingProgress = progress
                         self?.processingStatus = status
+                    }
+                },
+                onFileProgress: { [weak self] completed, total, fileName in
+                    Task { @MainActor in
+                        self?.processingCompletedCount = completed
+                        self?.processingTotalCount = total
+                        self?.processingCurrentFile = fileName
                     }
                 }
             )
@@ -278,6 +336,9 @@ final class AppState: ObservableObject {
         isProcessing = true
         processingProgress = 0
         processingStatus = "시작 중..."
+        processingCurrentFile = ""
+        processingCompletedCount = 0
+        processingTotalCount = 0
         processedResults = []
         pendingConfirmations = []
         affectedFolders = []
@@ -305,6 +366,13 @@ final class AppState: ObservableObject {
                             let scaled = folderProgress + progress / Double(folders.count)
                             self?.processingProgress = scaled
                             self?.processingStatus = "[\(index + 1)/\(folders.count)] \(status)"
+                        }
+                    },
+                    onFileProgress: { [weak self] completed, total, fileName in
+                        Task { @MainActor in
+                            self?.processingCompletedCount = completed
+                            self?.processingTotalCount = total
+                            self?.processingCurrentFile = fileName
                         }
                     }
                 )
@@ -527,10 +595,18 @@ final class AppState: ObservableObject {
     }
 
     func navigateBack() {
-        if processingOrigin == .paraManage, reorganizeCategory != nil, reorganizeSubfolder != nil {
-            currentScreen = .paraManage
-        } else if processingOrigin == .reorganize, reorganizeCategory != nil, reorganizeSubfolder != nil {
-            currentScreen = .reorganize
+        if currentScreen == .results {
+            if processingOrigin == .paraManage {
+                currentScreen = .paraManage
+            } else if processingOrigin == .reorganize {
+                currentScreen = .reorganize
+            } else if processingOrigin == .vaultReorganize {
+                currentScreen = .vaultReorganize
+            } else {
+                currentScreen = .inbox
+            }
+        } else if let parent = currentScreen.parent {
+            currentScreen = parent
         } else {
             currentScreen = .inbox
         }

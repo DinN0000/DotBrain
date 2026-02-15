@@ -14,7 +14,7 @@ struct OnboardingView: View {
     @State private var folderError: String?
     @State private var showFolderError = false
 
-    private let totalSteps = 4
+    private let totalSteps = 5
 
     init() {
         let saved = UserDefaults.standard.integer(forKey: "onboardingStep")
@@ -33,7 +33,8 @@ struct OnboardingView: View {
                 case 1: folderStep
                 case 2: projectStep
                 case 3: providerAndKeyStep
-                default: providerAndKeyStep
+                case 4: trialStep
+                default: trialStep
                 }
             }
             .transition(direction > 0
@@ -107,36 +108,75 @@ struct OnboardingView: View {
         UserDefaults.standard.set(step, forKey: "onboardingStep")
     }
 
-    // MARK: - Step 0: Welcome
+    // MARK: - Step 0: Welcome (Before/After)
 
     private var welcomeStep: some View {
         VStack(spacing: 0) {
             Spacer()
 
-            Text("·‿·")
-                .font(.system(size: 36, design: .monospaced))
-                .foregroundColor(.primary)
-                .padding(.bottom, 12)
-
             Text("DotBrain에 오신 걸 환영합니다")
                 .font(.title3)
                 .fontWeight(.semibold)
-                .padding(.bottom, 6)
+                .padding(.bottom, 4)
 
-            Text("파일을 추가하면 AI가 PARA 구조로 정리합니다")
+            Text("파일을 던지면, AI가 알아서 정리합니다")
                 .font(.subheadline)
                 .foregroundColor(.secondary)
-                .padding(.bottom, 20)
+                .padding(.bottom, 16)
 
-            VStack(alignment: .leading, spacing: 6) {
-                paraRow(letter: "P", name: "Project", desc: "진행 중인 프로젝트")
-                paraRow(letter: "A", name: "Area", desc: "지속적으로 관리하는 영역")
-                paraRow(letter: "R", name: "Resource", desc: "참고 자료 및 레퍼런스")
-                paraRow(letter: "A", name: "Archive", desc: "완료되거나 보관할 것")
+            // Before box
+            VStack(alignment: .leading, spacing: 0) {
+                Text("지금")
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.secondary)
+                    .padding(.bottom, 6)
+
+                VStack(alignment: .leading, spacing: 3) {
+                    beforeFileRow("회의록_최종_진짜최종.pdf")
+                    beforeFileRow("보고서(2).docx")
+                    beforeFileRow("스크린샷 2026-01-15.png")
+                    beforeFileRow("이름없는문서.txt")
+                    beforeFileRow("메모.md")
+                }
             }
-            .padding(14)
-            .background(Color.secondary.opacity(0.05))
+            .padding(10)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.secondary.opacity(0.08))
             .cornerRadius(8)
+            .padding(.horizontal, 32)
+
+            // Arrow
+            Image(systemName: "arrow.down")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundColor(.secondary)
+                .padding(.vertical, 8)
+
+            // After box
+            VStack(alignment: .leading, spacing: 0) {
+                Text("DotBrain으로 정리하면")
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.green)
+                    .padding(.bottom, 6)
+
+                VStack(alignment: .leading, spacing: 3) {
+                    afterFolderRow("Project/마케팅 캠페인/")
+                    afterFileRow("회의록.pdf", indent: true)
+                    afterFolderRow("Resource/")
+                    afterFileRow("보고서.docx", indent: true)
+                    afterFolderRow("Area/업무 관리/")
+                    afterFileRow("메모.md", indent: true)
+                }
+            }
+            .padding(10)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.green.opacity(0.06))
+            .cornerRadius(8)
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .strokeBorder(Color.green.opacity(0.15), lineWidth: 1)
+            )
             .padding(.horizontal, 32)
 
             Spacer()
@@ -155,21 +195,35 @@ struct OnboardingView: View {
         .padding(.horizontal)
     }
 
-    private func paraRow(letter: String, name: String, desc: String) -> some View {
-        HStack(spacing: 10) {
-            Text(letter)
-                .font(.system(.subheadline, design: .monospaced))
-                .fontWeight(.bold)
-                .frame(width: 18)
-            VStack(alignment: .leading, spacing: 1) {
-                Text(name)
-                    .font(.subheadline)
-                    .fontWeight(.medium)
-                Text(desc)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
+    private func beforeFileRow(_ name: String) -> some View {
+        HStack(spacing: 5) {
+            Text("📄")
+                .font(.caption2)
+            Text(name)
+                .font(.system(.caption, design: .monospaced))
+                .foregroundColor(.secondary)
         }
+    }
+
+    private func afterFolderRow(_ name: String) -> some View {
+        HStack(spacing: 5) {
+            Text("📁")
+                .font(.caption2)
+            Text(name)
+                .font(.system(.caption, design: .monospaced))
+                .fontWeight(.medium)
+        }
+    }
+
+    private func afterFileRow(_ name: String, indent: Bool) -> some View {
+        HStack(spacing: 5) {
+            Text("📄")
+                .font(.caption2)
+            Text(name)
+                .font(.system(.caption, design: .monospaced))
+                .foregroundColor(.secondary)
+        }
+        .padding(.leading, indent ? 20 : 0)
     }
 
     // MARK: - Step 1: Folder Setup
@@ -177,69 +231,106 @@ struct OnboardingView: View {
     private var folderStep: some View {
         VStack(spacing: 0) {
             stepHeader(
-                title: "PKM 폴더 설정",
-                desc: "파일이 정리될 폴더를 선택하세요.\n다음 단계로 넘어가면 PARA 구조가 생성됩니다."
+                title: "내 공간 만들기",
+                desc: "파일이 정리될 폴더를 선택하고, PARA 구조를 확인하세요."
             )
 
-            Spacer()
-
-            VStack(alignment: .leading, spacing: 12) {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("저장 경로")
-                        .font(.caption)
-                        .fontWeight(.medium)
-
-                    HStack {
-                        Image(systemName: "folder")
-                            .foregroundColor(.secondary)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 12) {
+                    // Folder path selection
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("저장 경로")
                             .font(.caption)
-                        Text(appState.pkmRootPath)
-                            .font(.system(.caption, design: .monospaced))
-                            .foregroundColor(.secondary)
-                            .lineLimit(1)
-                            .truncationMode(.middle)
+                            .fontWeight(.medium)
 
-                        Spacer()
+                        HStack {
+                            Image(systemName: "folder")
+                                .foregroundColor(.secondary)
+                                .font(.caption)
+                            Text(appState.pkmRootPath)
+                                .font(.system(.caption, design: .monospaced))
+                                .foregroundColor(.secondary)
+                                .lineLimit(1)
+                                .truncationMode(.middle)
 
-                        Button("변경") {
-                            showFolderPicker = true
+                            Spacer()
+
+                            Button("변경") {
+                                showFolderPicker = true
+                            }
+                            .buttonStyle(.bordered)
+                            .controlSize(.mini)
                         }
-                        .buttonStyle(.bordered)
-                        .controlSize(.mini)
                     }
-                }
 
-                Divider()
+                    Divider()
 
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("생성될 폴더 구조")
-                        .font(.caption)
-                        .fontWeight(.medium)
-
-                    if isStructureReady {
-                        Label("PARA 구조 확인됨", systemImage: "checkmark.circle.fill")
+                    // PARA explanation
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("PARA 구조")
                             .font(.caption)
-                            .foregroundColor(.green)
+                            .fontWeight(.medium)
+
+                        VStack(alignment: .leading, spacing: 8) {
+                            paraExplanationRow(
+                                folder: "Project",
+                                metaphor: "책상 위",
+                                desc: "진행 중인 일. 마감이 있는 것"
+                            )
+                            paraExplanationRow(
+                                folder: "Area",
+                                metaphor: "서랍",
+                                desc: "늘 관리하는 것. 건강, 재무, 팀 운영"
+                            )
+                            paraExplanationRow(
+                                folder: "Resource",
+                                metaphor: "책장",
+                                desc: "참고 자료. 가이드, 레퍼런스"
+                            )
+                            paraExplanationRow(
+                                folder: "Archive",
+                                metaphor: "창고",
+                                desc: "끝난 것. 완료된 프로젝트"
+                            )
+                        }
                     }
 
-                    VStack(alignment: .leading, spacing: 2) {
-                        folderPreviewRow("_Inbox/", desc: "파일을 여기에 넣으면 분류 시작")
-                        folderPreviewRow("1_Project/", desc: "진행 중인 프로젝트")
-                        folderPreviewRow("2_Area/", desc: "지속 관리 영역")
-                        folderPreviewRow("3_Resource/", desc: "참고 자료")
-                        folderPreviewRow("4_Archive/", desc: "보관")
+                    Divider()
+
+                    // Live folder preview
+                    VStack(alignment: .leading, spacing: 6) {
+                        if isStructureReady {
+                            Label("PARA 구조 확인됨", systemImage: "checkmark.circle.fill")
+                                .font(.caption)
+                                .foregroundColor(.green)
+                        } else {
+                            Text("선택한 경로 아래에 이렇게 만들어집니다:")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(abbreviatedPath(appState.pkmRootPath))
+                                .font(.system(.caption2, design: .monospaced))
+                                .fontWeight(.medium)
+                                .foregroundColor(.primary)
+                            folderTreeRow(prefix: "\u{251C}\u{2500}", name: "_Inbox/")
+                            folderTreeRow(prefix: "\u{251C}\u{2500}", name: "1_Project/")
+                            folderTreeRow(prefix: "\u{251C}\u{2500}", name: "2_Area/")
+                            folderTreeRow(prefix: "\u{251C}\u{2500}", name: "3_Resource/")
+                            folderTreeRow(prefix: "\u{2514}\u{2500}", name: "4_Archive/")
+                        }
+                        .padding(8)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(Color.secondary.opacity(0.03))
+                        .cornerRadius(6)
                     }
-                    .padding(8)
-                    .background(Color.secondary.opacity(0.03))
-                    .cornerRadius(6)
                 }
+                .padding(14)
+                .background(Color.secondary.opacity(0.05))
+                .cornerRadius(8)
+                .padding(.horizontal, 24)
             }
-            .padding(14)
-            .background(Color.secondary.opacity(0.05))
-            .cornerRadius(8)
-            .padding(.horizontal, 24)
-
-            Spacer()
 
             HStack {
                 Button("이전") { goBack() }
@@ -270,16 +361,45 @@ struct OnboardingView: View {
         }
     }
 
-    private func folderPreviewRow(_ name: String, desc: String) -> some View {
-        HStack(spacing: 6) {
-            Text(name)
-                .font(.system(.caption2, design: .monospaced))
-                .fontWeight(.medium)
-                .frame(width: 80, alignment: .leading)
+    private func paraExplanationRow(folder: String, metaphor: String, desc: String) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack(spacing: 4) {
+                Text("\u{1F4C1}")
+                    .font(.caption2)
+                Text(folder)
+                    .font(.caption)
+                    .fontWeight(.medium)
+                Text("—")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                Text(metaphor)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
             Text(desc)
                 .font(.caption2)
                 .foregroundColor(.secondary)
+                .padding(.leading, 18)
         }
+    }
+
+    private func folderTreeRow(prefix: String, name: String) -> some View {
+        HStack(spacing: 2) {
+            Text(prefix)
+                .font(.system(.caption2, design: .monospaced))
+                .foregroundColor(.secondary)
+            Text(name)
+                .font(.system(.caption2, design: .monospaced))
+                .foregroundColor(.secondary)
+        }
+    }
+
+    private func abbreviatedPath(_ path: String) -> String {
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        if path.hasPrefix(home) {
+            return "~" + path.dropFirst(home.count) + "/"
+        }
+        return path + "/"
     }
 
     // MARK: - Step 2: Project Registration
@@ -288,31 +408,30 @@ struct OnboardingView: View {
         VStack(spacing: 0) {
             stepHeader(
                 title: "프로젝트 등록",
-                desc: "진행 중인 프로젝트를 등록하세요.\nAI가 관련 파일을 이 프로젝트로 분류합니다."
+                desc: "지금 진행 중인 일에 이름을 붙여주세요."
             )
 
             Spacer()
 
             VStack(alignment: .leading, spacing: 10) {
                 HStack(alignment: .top, spacing: 8) {
-                    Image(systemName: "info.circle")
+                    Image(systemName: "lightbulb.fill")
+                        .font(.caption)
+                        .foregroundColor(.blue)
+                    Text("AI는 여기 등록된 프로젝트 안에서만 파일을 분류합니다. 새 프로젝트가 필요하면 언제든 추가할 수 있습니다.")
                         .font(.caption)
                         .foregroundColor(.secondary)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Project는 직접 등록합니다")
-                            .font(.caption)
-                            .fontWeight(.medium)
-                        Text("Area, Resource, Archive는 AI가 자동 분류합니다.")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
                 }
                 .padding(10)
-                .background(Color.secondary.opacity(0.05))
+                .background(Color.blue.opacity(0.05))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 6)
+                        .stroke(Color.blue.opacity(0.15), lineWidth: 1)
+                )
                 .cornerRadius(6)
 
                 HStack(spacing: 8) {
-                    TextField("프로젝트명 (예: MyApp)", text: $newProjectName)
+                    TextField("예: 2026 마케팅 캠페인, 신규 서비스 런칭", text: $newProjectName)
                         .textFieldStyle(.roundedBorder)
                         .font(.subheadline)
                         .onSubmit { addProject() }
@@ -392,8 +511,8 @@ struct OnboardingView: View {
 
         return VStack(spacing: 0) {
             stepHeader(
-                title: "AI 설정",
-                desc: "파일 분류에 사용할 AI를 선택하고\nAPI 키를 입력하세요."
+                title: "AI 연결",
+                desc: "AI가 파일을 읽고 분류합니다. API 키가 필요합니다."
             )
 
             ScrollView {
@@ -497,24 +616,47 @@ struct OnboardingView: View {
                     .padding(12)
                     .background(Color.secondary.opacity(0.05))
                     .cornerRadius(8)
+
+                    // Claude Code 안내
+                    HStack(alignment: .top, spacing: 8) {
+                        Image(systemName: "terminal")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        Text("API 키 없이도, 만들어진 폴더에 Claude Code를 연결해서 사용할 수 있습니다.")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    .padding(10)
+                    .background(Color.secondary.opacity(0.05))
+                    .cornerRadius(6)
                 }
                 .padding(.horizontal, 24)
             }
 
-            HStack {
-                Button("이전") { goBack() }
-                    .buttonStyle(.bordered)
+            VStack(spacing: 6) {
+                HStack {
+                    Button("이전") { goBack() }
+                        .buttonStyle(.bordered)
+                        .controlSize(.regular)
+
+                    Spacer()
+
+                    Button(action: { goNext() }) {
+                        Text("다음")
+                            .frame(minWidth: 80)
+                    }
+                    .buttonStyle(.borderedProminent)
                     .controlSize(.regular)
-
-                Spacer()
-
-                Button(action: completeOnboarding) {
-                    Text("설정 완료")
-                        .frame(minWidth: 80)
                 }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.regular)
-                .disabled(!appState.hasAPIKey)
+
+                if !appState.hasAPIKey {
+                    Button(action: { goNext() }) {
+                        Text("건너뛰기")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                }
             }
             .padding(.horizontal, 32)
             .padding(.bottom, 20)
@@ -715,6 +857,90 @@ struct OnboardingView: View {
             appState.updateAPIKeyStatus()
         } else {
             keySaveMessage = "\(provider.keyPlaceholder)로 시작하는 키를 입력하세요"
+        }
+    }
+
+    // MARK: - Step 4: Quick Start Guide
+
+    private var trialStep: some View {
+        VStack(spacing: 0) {
+            Spacer()
+
+            if appState.hasAPIKey {
+                Text("·‿·")
+                    .font(.system(size: 36, design: .monospaced))
+                    .padding(.bottom, 12)
+
+                Text("준비 완료!")
+                    .font(.title3)
+                    .fontWeight(.semibold)
+                    .padding(.bottom, 6)
+
+                Text("이제 인박스에 파일을 넣으면\nAI가 자동으로 정리합니다.")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.bottom, 20)
+
+                VStack(alignment: .leading, spacing: 8) {
+                    guideRow(icon: "1.circle.fill", text: "메뉴바에서 DotBrain을 클릭")
+                    guideRow(icon: "2.circle.fill", text: "파일을 드래그하거나 Cmd+V로 붙여넣기")
+                    guideRow(icon: "3.circle.fill", text: "\"정리하기\" 버튼을 누르면 AI가 분류")
+                }
+                .padding(14)
+                .background(Color.secondary.opacity(0.05))
+                .cornerRadius(8)
+                .padding(.horizontal, 32)
+            } else {
+                Text("·_·")
+                    .font(.system(size: 36, design: .monospaced))
+                    .padding(.bottom, 12)
+
+                Text("거의 다 됐어요!")
+                    .font(.title3)
+                    .fontWeight(.semibold)
+                    .padding(.bottom, 6)
+
+                Text("API 키 없이도 폴더 구조를 활용할 수 있습니다.")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.bottom, 20)
+
+                VStack(alignment: .leading, spacing: 8) {
+                    guideRow(icon: "terminal", text: "Claude Code로 폴더에 연결해서 사용")
+                    guideRow(icon: "gearshape", text: "설정에서 언제든 API 키를 추가 가능")
+                }
+                .padding(14)
+                .background(Color.secondary.opacity(0.05))
+                .cornerRadius(8)
+                .padding(.horizontal, 32)
+            }
+
+            Spacer()
+
+            Button(action: completeOnboarding) {
+                Text("시작하기")
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 4)
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
+            .tint(.primary.opacity(0.85))
+            .padding(.horizontal, 40)
+            .padding(.bottom, 20)
+        }
+        .padding(.horizontal)
+    }
+
+    private func guideRow(icon: String, text: String) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: icon)
+                .font(.subheadline)
+                .foregroundColor(.accentColor)
+                .frame(width: 20)
+            Text(text)
+                .font(.subheadline)
         }
     }
 
