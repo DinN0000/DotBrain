@@ -367,8 +367,21 @@ struct DashboardView: View {
                 }
             }
 
-            // 4. MOC regenerate
-            await MainActor.run { vaultCheckPhase = "폴더 요약 갱신 중..." }
+            // 4. MOC regenerate — count PARA folders for progress visibility
+            var folderCount = 0
+            for basePath in [pm.projectsPath, pm.areaPath, pm.resourcePath] {
+                if let entries = try? fm.contentsOfDirectory(atPath: basePath) {
+                    for entry in entries where !entry.hasPrefix(".") && !entry.hasPrefix("_") {
+                        let fullPath = (basePath as NSString).appendingPathComponent(entry)
+                        var isDir: ObjCBool = false
+                        if fm.fileExists(atPath: fullPath, isDirectory: &isDir), isDir.boolValue {
+                            folderCount += 1
+                        }
+                    }
+                }
+            }
+            let folderCountSnapshot = folderCount
+            await MainActor.run { vaultCheckPhase = "\(folderCountSnapshot)개 폴더 요약 갱신 중..." }
             let generator = MOCGenerator(pkmRoot: root)
             await generator.regenerateAll()
 

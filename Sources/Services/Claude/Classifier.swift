@@ -30,12 +30,14 @@ actor Classifier {
         // Stage 1: Process batches concurrently (max 3 concurrent API calls)
         let maxConcurrentBatches = 3
 
+        let totalBatches = batches.count
         stage1Results = try await withThrowingTaskGroup(
             of: [String: ClassifyResult.Stage1Item].self,
             returning: [String: ClassifyResult.Stage1Item].self
         ) { group in
             var activeTasks = 0
             var batchIndex = 0
+            var completedBatches = 0
             var combined: [String: ClassifyResult.Stage1Item] = [:]
 
             for batch in batches {
@@ -45,6 +47,8 @@ actor Classifier {
                             combined[key] = value
                         }
                         activeTasks -= 1
+                        completedBatches += 1
+                        onProgress?(Double(completedBatches) / Double(totalBatches) * 0.6, "Stage 1: 배치 \(completedBatches)/\(totalBatches) 완료")
                     }
                 }
 
@@ -59,13 +63,15 @@ actor Classifier {
                 }
                 activeTasks += 1
                 batchIndex += 1
-                onProgress?(Double(idx) / Double(batches.count) * 0.6, "Stage 1: 배치 \(idx + 1)/\(batches.count) 분류 중...")
+                onProgress?(Double(completedBatches) / Double(totalBatches) * 0.6, "배치 \(idx + 1)/\(totalBatches) 분류 중...")
             }
 
             for try await results in group {
                 for (key, value) in results {
                     combined[key] = value
                 }
+                completedBatches += 1
+                onProgress?(Double(completedBatches) / Double(totalBatches) * 0.6, "Stage 1: 배치 \(completedBatches)/\(totalBatches) 완료")
             }
             return combined
         }

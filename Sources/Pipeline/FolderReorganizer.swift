@@ -77,7 +77,18 @@ struct FolderReorganizer {
             of: ClassifyInput.self,
             returning: [ClassifyInput].self
         ) { group in
+            var collected: [ClassifyInput] = []
+            collected.reserveCapacity(uniqueFiles.count)
+            var activeTasks = 0
+            let maxConcurrent = 10
+
             for filePath in uniqueFiles {
+                if activeTasks >= maxConcurrent {
+                    if let result = await group.next() {
+                        collected.append(result)
+                    }
+                    activeTasks -= 1
+                }
                 group.addTask {
                     let content = self.extractContent(from: filePath)
                     let fileName = (filePath as NSString).lastPathComponent
@@ -87,10 +98,9 @@ struct FolderReorganizer {
                         fileName: fileName
                     )
                 }
+                activeTasks += 1
             }
 
-            var collected: [ClassifyInput] = []
-            collected.reserveCapacity(uniqueFiles.count)
             for await input in group {
                 collected.append(input)
             }
@@ -125,31 +135,36 @@ struct FolderReorganizer {
 
         // Enrich with related notes — AI-based context linking
         onPhaseChange?(.linking)
-        onProgress?(0.65, "관련 노트 연결 중...")
-        let contextMap = await ContextMapBuilder(pkmRoot: pkmRoot).build()
-        let linker = ContextLinker(pkmRoot: pkmRoot)
-
-        // Skip high-confidence files (>= 0.9) for linking
-        let filePairs: [(input: ClassifyInput, classification: ClassifyResult)] = zip(inputs, classifications)
-            .filter { $0.1.confidence < 0.9 }
-            .map { (input: $0.0, classification: $0.1) }
-        let indexMap: [String: Int] = Dictionary(uniqueKeysWithValues: inputs.enumerated().map { ($1.filePath, $0) })
-        let relatedMap = await linker.findRelatedNotes(
-            for: filePairs,
-            contextMap: contextMap,
-            onProgress: { [onProgress] progress, status in
-                let mapped = 0.65 + progress * 0.05
-                onProgress?(mapped, status)
-            }
-        )
-
         var enrichedClassifications = classifications
-        for (batchIndex, notes) in relatedMap {
-            guard batchIndex < filePairs.count else { continue }
-            let filePath = filePairs[batchIndex].input.filePath
-            if let originalIndex = indexMap[filePath] {
-                enrichedClassifications[originalIndex].relatedNotes = notes
+        let needsLinking = classifications.contains { $0.confidence < 0.9 }
+
+        if needsLinking {
+            onProgress?(0.65, "관련 노트 연결 중...")
+            let contextMap = await ContextMapBuilder(pkmRoot: pkmRoot).build()
+            let linker = ContextLinker(pkmRoot: pkmRoot)
+
+            let filePairs: [(input: ClassifyInput, classification: ClassifyResult)] = zip(inputs, classifications)
+                .filter { $0.1.confidence < 0.9 }
+                .map { (input: $0.0, classification: $0.1) }
+            let indexMap: [String: Int] = Dictionary(uniqueKeysWithValues: inputs.enumerated().map { ($1.filePath, $0) })
+            let relatedMap = await linker.findRelatedNotes(
+                for: filePairs,
+                contextMap: contextMap,
+                onProgress: { [onProgress] progress, status in
+                    let mapped = 0.65 + progress * 0.05
+                    onProgress?(mapped, status)
+                }
+            )
+
+            for (batchIndex, notes) in relatedMap {
+                guard batchIndex < filePairs.count else { continue }
+                let filePath = filePairs[batchIndex].input.filePath
+                if let originalIndex = indexMap[filePath] {
+                    enrichedClassifications[originalIndex].relatedNotes = notes
+                }
             }
+        } else {
+            onProgress?(0.7, "관련 노트 연결 건너뜀")
         }
 
         // Compare and process

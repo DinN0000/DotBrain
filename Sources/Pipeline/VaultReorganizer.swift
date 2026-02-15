@@ -83,7 +83,18 @@ struct VaultReorganizer {
             of: ClassifyInput.self,
             returning: [ClassifyInput].self
         ) { group in
+            var collected: [ClassifyInput] = []
+            collected.reserveCapacity(filesToProcess.count)
+            var activeTasks = 0
+            let maxConcurrent = 10
+
             for entry in filesToProcess {
+                if activeTasks >= maxConcurrent {
+                    if let result = await group.next() {
+                        collected.append(result)
+                    }
+                    activeTasks -= 1
+                }
                 group.addTask {
                     let content = self.extractContent(from: entry.filePath)
                     let fileName = (entry.filePath as NSString).lastPathComponent
@@ -93,10 +104,9 @@ struct VaultReorganizer {
                         fileName: fileName
                     )
                 }
+                activeTasks += 1
             }
 
-            var collected: [ClassifyInput] = []
-            collected.reserveCapacity(filesToProcess.count)
             for await input in group {
                 collected.append(input)
             }

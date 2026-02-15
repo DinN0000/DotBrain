@@ -85,8 +85,13 @@ actor AIService {
         userMessage: String
     ) async throws -> String {
         var lastError: Error?
+        let deadline = ContinuousClock.now + .seconds(120)
 
         for _ in 0..<maxRetries {
+            if ContinuousClock.now >= deadline {
+                throw AIServiceError.timeout
+            }
+
             // Rate limiter controls pacing — waits if needed
             await rateLimiter.acquire(for: provider)
 
@@ -246,5 +251,16 @@ actor AIService {
     /// Send using the precise model (Sonnet / Pro)
     func sendPrecise(maxTokens: Int = 2048, message: String) async throws -> String {
         try await sendMessage(model: preciseModel, maxTokens: maxTokens, userMessage: message)
+    }
+}
+
+enum AIServiceError: LocalizedError {
+    case timeout
+
+    var errorDescription: String? {
+        switch self {
+        case .timeout:
+            return "AI 요청 시간이 초과되었습니다 (120초). 잠시 후 다시 시도해주세요."
+        }
     }
 }
