@@ -5,6 +5,7 @@ import Foundation
 struct InboxProcessor {
     let pkmRoot: String
     let onProgress: ((Double, String) -> Void)?
+    let onFileProgress: ((Int, Int, String) -> Void)?
 
     struct Result {
         var processed: [ProcessedFileResult]
@@ -23,6 +24,7 @@ struct InboxProcessor {
         }
 
         onProgress?(0.05, "\(files.count)개 파일 발견")
+        onFileProgress?(0, files.count, "")
 
         // Build context
         let contextBuilder = ProjectContextBuilder(pkmRoot: pkmRoot)
@@ -106,6 +108,7 @@ struct InboxProcessor {
         for (i, (classification, input)) in zip(enrichedClassifications, inputs).enumerated() {
             let progress = 0.7 + Double(i) / Double(max(enrichedClassifications.count, 1)) * 0.25
             onProgress?(progress, "\(input.fileName) 이동 중...")
+            onFileProgress?(i, inputs.count, input.fileName)
 
             // Low confidence: ask user
             if classification.confidence < 0.5 {
@@ -195,6 +198,7 @@ struct InboxProcessor {
             await mocGenerator.updateMOCsForFolders(affectedFolders)
         }
 
+        onFileProgress?(inputs.count, inputs.count, "")
         onProgress?(0.95, "완료 정리 중...")
 
         // Send notification

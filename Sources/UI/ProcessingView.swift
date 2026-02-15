@@ -8,7 +8,7 @@ struct ProcessingView: View {
         if status.contains("컨텍스트") { return "준비" }
         if status.contains("추출") { return "분석" }
         if status.contains("AI") || status.contains("분류") { return "분류" }
-        if status.contains("처리 중") { return "정리" }
+        if status.contains("처리 중") || status.contains("이동 중") { return "정리" }
         if status.contains("완료") { return "마무리" }
         return "시작"
     }
@@ -21,15 +21,28 @@ struct ProcessingView: View {
         VStack(spacing: 16) {
             Spacer()
 
-            // Title
             Text(originTitle)
                 .font(.headline)
 
-            // Spinner
-            ProgressView()
-                .controlSize(.large)
+            if appState.processingTotalCount > 0 {
+                HStack(alignment: .firstTextBaseline, spacing: 4) {
+                    Text("\(appState.processingCompletedCount)")
+                        .font(.title)
+                        .fontWeight(.bold)
+                        .monospacedDigit()
+                    Text("/")
+                        .font(.title3)
+                        .foregroundColor(.secondary)
+                    Text("\(appState.processingTotalCount)")
+                        .font(.title3)
+                        .foregroundColor(.secondary)
+                        .monospacedDigit()
+                }
+            } else {
+                ProgressView()
+                    .controlSize(.large)
+            }
 
-            // Progress bar + percentage
             VStack(spacing: 6) {
                 ProgressView(value: appState.processingProgress)
                     .progressViewStyle(.linear)
@@ -41,10 +54,7 @@ struct ProcessingView: View {
                         .foregroundColor(.accentColor)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 2)
-                        .background(
-                            Capsule()
-                                .fill(Color.accentColor.opacity(0.1))
-                        )
+                        .background(Capsule().fill(Color.accentColor.opacity(0.1)))
 
                     Spacer()
 
@@ -56,27 +66,28 @@ struct ProcessingView: View {
                 .padding(.horizontal, 40)
             }
 
-            // Status text
-            Text(appState.processingStatus)
-                .font(.caption)
-                .foregroundColor(.secondary)
-                .lineLimit(2)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal)
-                .animation(.easeOut(duration: 0.2), value: appState.processingStatus)
+            if !appState.processingCurrentFile.isEmpty {
+                HStack(spacing: 6) {
+                    ProgressView()
+                        .controlSize(.small)
+                    Text(appState.processingCurrentFile)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                }
+                .padding(.horizontal, 40)
+                .transition(.opacity)
+            }
 
             Spacer()
 
-            // Cancel button
-            Button(action: {
-                appState.cancelProcessing()
-            }) {
-                Text("취소")
-            }
-            .buttonStyle(.bordered)
-            .controlSize(.small)
-            .padding(.bottom, 4)
+            Button("취소") { appState.cancelProcessing() }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .padding(.bottom, 4)
         }
         .padding()
+        .animation(.easeOut(duration: 0.2), value: appState.processingCurrentFile)
     }
 }
