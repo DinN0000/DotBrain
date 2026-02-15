@@ -230,69 +230,106 @@ struct OnboardingView: View {
     private var folderStep: some View {
         VStack(spacing: 0) {
             stepHeader(
-                title: "PKM 폴더 설정",
-                desc: "파일이 정리될 폴더를 선택하세요.\n다음 단계로 넘어가면 PARA 구조가 생성됩니다."
+                title: "내 공간 만들기",
+                desc: "파일이 정리될 폴더를 선택하고, PARA 구조를 확인하세요."
             )
 
-            Spacer()
-
-            VStack(alignment: .leading, spacing: 12) {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("저장 경로")
-                        .font(.caption)
-                        .fontWeight(.medium)
-
-                    HStack {
-                        Image(systemName: "folder")
-                            .foregroundColor(.secondary)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 12) {
+                    // Folder path selection
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("저장 경로")
                             .font(.caption)
-                        Text(appState.pkmRootPath)
-                            .font(.system(.caption, design: .monospaced))
-                            .foregroundColor(.secondary)
-                            .lineLimit(1)
-                            .truncationMode(.middle)
+                            .fontWeight(.medium)
 
-                        Spacer()
+                        HStack {
+                            Image(systemName: "folder")
+                                .foregroundColor(.secondary)
+                                .font(.caption)
+                            Text(appState.pkmRootPath)
+                                .font(.system(.caption, design: .monospaced))
+                                .foregroundColor(.secondary)
+                                .lineLimit(1)
+                                .truncationMode(.middle)
 
-                        Button("변경") {
-                            showFolderPicker = true
+                            Spacer()
+
+                            Button("변경") {
+                                showFolderPicker = true
+                            }
+                            .buttonStyle(.bordered)
+                            .controlSize(.mini)
                         }
-                        .buttonStyle(.bordered)
-                        .controlSize(.mini)
                     }
-                }
 
-                Divider()
+                    Divider()
 
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("생성될 폴더 구조")
-                        .font(.caption)
-                        .fontWeight(.medium)
-
-                    if isStructureReady {
-                        Label("PARA 구조 확인됨", systemImage: "checkmark.circle.fill")
+                    // PARA explanation
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("PARA 구조")
                             .font(.caption)
-                            .foregroundColor(.green)
+                            .fontWeight(.medium)
+
+                        VStack(alignment: .leading, spacing: 8) {
+                            paraExplanationRow(
+                                folder: "Project",
+                                metaphor: "책상 위",
+                                desc: "진행 중인 일. 마감이 있는 것"
+                            )
+                            paraExplanationRow(
+                                folder: "Area",
+                                metaphor: "서랍",
+                                desc: "늘 관리하는 것. 건강, 재무, 팀 운영"
+                            )
+                            paraExplanationRow(
+                                folder: "Resource",
+                                metaphor: "책장",
+                                desc: "참고 자료. 가이드, 레퍼런스"
+                            )
+                            paraExplanationRow(
+                                folder: "Archive",
+                                metaphor: "창고",
+                                desc: "끝난 것. 완료된 프로젝트"
+                            )
+                        }
                     }
 
-                    VStack(alignment: .leading, spacing: 2) {
-                        folderPreviewRow("_Inbox/", desc: "파일을 여기에 넣으면 분류 시작")
-                        folderPreviewRow("1_Project/", desc: "진행 중인 프로젝트")
-                        folderPreviewRow("2_Area/", desc: "지속 관리 영역")
-                        folderPreviewRow("3_Resource/", desc: "참고 자료")
-                        folderPreviewRow("4_Archive/", desc: "보관")
+                    Divider()
+
+                    // Live folder preview
+                    VStack(alignment: .leading, spacing: 6) {
+                        if isStructureReady {
+                            Label("PARA 구조 확인됨", systemImage: "checkmark.circle.fill")
+                                .font(.caption)
+                                .foregroundColor(.green)
+                        } else {
+                            Text("선택한 경로 아래에 이렇게 만들어집니다:")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(abbreviatedPath(appState.pkmRootPath))
+                                .font(.system(.caption2, design: .monospaced))
+                                .fontWeight(.medium)
+                                .foregroundColor(.primary)
+                            folderTreeRow(prefix: "\u{251C}\u{2500}", name: "_Inbox/")
+                            folderTreeRow(prefix: "\u{251C}\u{2500}", name: "1_Project/")
+                            folderTreeRow(prefix: "\u{251C}\u{2500}", name: "2_Area/")
+                            folderTreeRow(prefix: "\u{251C}\u{2500}", name: "3_Resource/")
+                            folderTreeRow(prefix: "\u{2514}\u{2500}", name: "4_Archive/")
+                        }
+                        .padding(8)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(Color.secondary.opacity(0.03))
+                        .cornerRadius(6)
                     }
-                    .padding(8)
-                    .background(Color.secondary.opacity(0.03))
-                    .cornerRadius(6)
                 }
+                .padding(14)
+                .background(Color.secondary.opacity(0.05))
+                .cornerRadius(8)
+                .padding(.horizontal, 24)
             }
-            .padding(14)
-            .background(Color.secondary.opacity(0.05))
-            .cornerRadius(8)
-            .padding(.horizontal, 24)
-
-            Spacer()
 
             HStack {
                 Button("이전") { goBack() }
@@ -323,16 +360,45 @@ struct OnboardingView: View {
         }
     }
 
-    private func folderPreviewRow(_ name: String, desc: String) -> some View {
-        HStack(spacing: 6) {
-            Text(name)
-                .font(.system(.caption2, design: .monospaced))
-                .fontWeight(.medium)
-                .frame(width: 80, alignment: .leading)
+    private func paraExplanationRow(folder: String, metaphor: String, desc: String) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack(spacing: 4) {
+                Text("\u{1F4C1}")
+                    .font(.caption2)
+                Text(folder)
+                    .font(.caption)
+                    .fontWeight(.medium)
+                Text("—")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                Text(metaphor)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
             Text(desc)
                 .font(.caption2)
                 .foregroundColor(.secondary)
+                .padding(.leading, 18)
         }
+    }
+
+    private func folderTreeRow(prefix: String, name: String) -> some View {
+        HStack(spacing: 2) {
+            Text(prefix)
+                .font(.system(.caption2, design: .monospaced))
+                .foregroundColor(.secondary)
+            Text(name)
+                .font(.system(.caption2, design: .monospaced))
+                .foregroundColor(.secondary)
+        }
+    }
+
+    private func abbreviatedPath(_ path: String) -> String {
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        if path.hasPrefix(home) {
+            return "~" + path.dropFirst(home.count) + "/"
+        }
+        return path + "/"
     }
 
     // MARK: - Step 2: Project Registration
