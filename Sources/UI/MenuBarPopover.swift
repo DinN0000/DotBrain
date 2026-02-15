@@ -28,6 +28,8 @@ struct MenuBarPopover: View {
             case .paraManage:
                 PARAManageView()
                     .id(appState.navigationId)
+            case .vaultManage:
+                VaultManageView()
             case .vaultReorganize:
                 VaultReorganizeView()
             }
