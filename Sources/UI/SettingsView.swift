@@ -15,6 +15,8 @@ struct SettingsView: View {
     @State private var isCheckingUpdate = false
     @State private var latestVersion: String?
     @State private var updateError: String?
+    @State private var updateIconRotation: Double = 0
+    @State private var updateCheckHovered = false
 
     private var activeProvider: AIProvider { appState.selectedProvider }
     private var otherProvider: AIProvider { activeProvider == .claude ? .gemini : .claude }
@@ -382,20 +384,24 @@ struct SettingsView: View {
 
                 Button(action: checkForUpdate) {
                     HStack(spacing: 4) {
-                        if isCheckingUpdate {
-                            ProgressView()
-                                .controlSize(.mini)
-                        } else {
-                            Image(systemName: "arrow.triangle.2.circlepath")
-                                .font(.caption2)
-                        }
-                        Text("업데이트 확인")
+                        Image(systemName: "arrow.triangle.2.circlepath")
+                            .font(.caption2)
+                            .rotationEffect(.degrees(updateIconRotation))
+                        Text(isCheckingUpdate ? "확인 중..." : "업데이트 확인")
                             .font(.caption)
                     }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(updateCheckHovered ? Color.accentColor.opacity(0.1) : Color.clear)
+                    )
                 }
                 .buttonStyle(.plain)
                 .foregroundColor(.accentColor)
                 .disabled(isCheckingUpdate)
+                .onHover { updateCheckHovered = $0 }
+                .animation(.easeInOut(duration: 0.15), value: updateCheckHovered)
             }
         }
         .padding(12)
@@ -409,6 +415,11 @@ struct SettingsView: View {
         guard !isCheckingUpdate else { return }
         isCheckingUpdate = true
         updateError = nil
+        latestVersion = nil
+
+        withAnimation(.linear(duration: 0.6).repeatForever(autoreverses: false)) {
+            updateIconRotation = 360
+        }
 
         Task {
             do {
@@ -418,17 +429,20 @@ struct SettingsView: View {
                    let tag = json["tag_name"] as? String {
                     let version = tag.hasPrefix("v") ? String(tag.dropFirst()) : tag
                     await MainActor.run {
+                        withAnimation { updateIconRotation = 0 }
                         latestVersion = version
                         isCheckingUpdate = false
                     }
                 } else {
                     await MainActor.run {
+                        withAnimation { updateIconRotation = 0 }
                         updateError = "릴리즈 정보를 읽을 수 없습니다"
                         isCheckingUpdate = false
                     }
                 }
             } catch {
                 await MainActor.run {
+                    withAnimation { updateIconRotation = 0 }
                     updateError = "확인 실패: \(error.localizedDescription)"
                     isCheckingUpdate = false
                 }
