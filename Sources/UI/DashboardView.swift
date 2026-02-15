@@ -35,13 +35,13 @@ struct DashboardView: View {
                         let r = stats.byCategory["resource"] ?? 0
                         let ar = stats.byCategory["archive"] ?? 0
 
-                        statButton("P", count: p, color: .primary, category: .project)
+                        statButton("P", count: p, color: .blue, category: .project)
                         Text("·").foregroundColor(.secondary)
-                        statButton("A", count: a, color: .primary, category: .area)
+                        statButton("A", count: a, color: .green, category: .area)
                         Text("·").foregroundColor(.secondary)
-                        statButton("R", count: r, color: .primary, category: .resource)
+                        statButton("R", count: r, color: .orange, category: .resource)
                         Text("·").foregroundColor(.secondary)
-                        statButton("A", count: ar, color: .secondary, category: .archive)
+                        statButton("A", count: ar, color: .gray, category: .archive)
                     }
                     .font(.caption)
                     .monospacedDigit()
@@ -74,29 +74,32 @@ struct DashboardView: View {
                     }
 
                     // Group 1: File operations
-                    DashboardCardGroup(label: "파일") {
+                    DashboardCardGroup(label: "파일", tint: .blue) {
                         DashboardHubCard(
                             icon: "folder.badge.gearshape",
                             title: "폴더 관리",
-                            subtitle: "이동 · 생성 · 정리"
+                            subtitle: "이동 · 생성 · 정리",
+                            tint: .blue
                         ) {
                             appState.currentScreen = .paraManage
                         }
                         DashboardHubCard(
                             icon: "magnifyingglass",
                             title: "검색",
-                            subtitle: "파일 · 태그 검색"
+                            subtitle: "파일 · 태그 검색",
+                            tint: .blue
                         ) {
                             appState.currentScreen = .search
                         }
                     }
 
                     // Group 2: Vault maintenance
-                    DashboardCardGroup(label: "볼트") {
+                    DashboardCardGroup(label: "볼트", tint: .orange) {
                         DashboardHubCard(
                             icon: "checkmark.shield",
                             title: "볼트 점검",
                             subtitle: "오류 검사 · 메타 보완",
+                            tint: .orange,
                             isDisabled: isVaultChecking
                         ) {
                             runVaultCheck()
@@ -104,7 +107,8 @@ struct DashboardView: View {
                         DashboardHubCard(
                             icon: "arrow.triangle.2.circlepath",
                             title: "전체 재정리",
-                            subtitle: "AI 위치 재분류"
+                            subtitle: "AI 위치 재분류",
+                            tint: .orange
                         ) {
                             appState.currentScreen = .vaultReorganize
                         }
@@ -215,7 +219,7 @@ struct DashboardView: View {
                 HStack(spacing: 6) {
                     Image(systemName: "exclamationmark.triangle")
                         .font(.caption)
-                        .foregroundColor(.secondary)
+                        .foregroundColor(.orange)
                     Text("\(result.auditTotal)건 발견")
                         .font(.caption)
                         .fontWeight(.medium)
@@ -223,7 +227,7 @@ struct DashboardView: View {
                     if result.repairCount > 0 {
                         Text("\(result.repairCount)건 자동 복구")
                             .font(.caption)
-                            .foregroundColor(.secondary)
+                            .foregroundColor(.green)
                     }
                 }
             }
@@ -233,7 +237,7 @@ struct DashboardView: View {
                 HStack(spacing: 6) {
                     Image(systemName: "text.badge.star")
                         .font(.caption)
-                        .foregroundColor(.secondary)
+                        .foregroundColor(.blue)
                     Text("\(result.enrichCount)개 메타데이터 보완")
                         .font(.caption)
                     Spacer()
@@ -245,7 +249,7 @@ struct DashboardView: View {
                 HStack(spacing: 6) {
                     Image(systemName: "doc.text.magnifyingglass")
                         .font(.caption)
-                        .foregroundColor(.secondary)
+                        .foregroundColor(.purple)
                     Text("폴더 요약 갱신 완료")
                         .font(.caption)
                     Spacer()
@@ -257,10 +261,10 @@ struct DashboardView: View {
                 HStack(spacing: 6) {
                     Image(systemName: "checkmark.circle.fill")
                         .font(.caption)
-                        .foregroundColor(.secondary)
+                        .foregroundColor(.green)
                     Text("볼트 상태 양호")
                         .font(.caption)
-                        .foregroundColor(.secondary)
+                        .foregroundColor(.green)
                     Spacer()
                 }
             }
@@ -276,7 +280,7 @@ struct DashboardView: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
-        .background(Color.primary.opacity(0.04))
+        .background(Color.green.opacity(0.06))
         .cornerRadius(8)
     }
 
@@ -437,7 +441,12 @@ struct DashboardView: View {
 
     private func activityColor(for action: String) -> Color {
         switch action {
-        case "error": return .red.opacity(0.8)
+        case "classified", "reorganized", "completed": return .green
+        case "relocated", "vault-reorganized": return .blue
+        case "deduplicated": return .purple
+        case "deleted": return .red
+        case "started": return .orange
+        case "error": return .red
         default: return .secondary
         }
     }
@@ -490,18 +499,19 @@ private struct VaultCheckResult {
 
 struct DashboardCardGroup<Content: View>: View {
     let label: String
+    let tint: Color
     @ViewBuilder let content: () -> Content
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 4) {
                 RoundedRectangle(cornerRadius: 1)
-                    .fill(Color.secondary.opacity(0.4))
+                    .fill(tint.opacity(0.5))
                     .frame(width: 2, height: 10)
                 Text(label)
                     .font(.caption2)
                     .fontWeight(.semibold)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(tint.opacity(0.7))
                     .textCase(.uppercase)
             }
             .padding(.leading, 4)
@@ -517,6 +527,7 @@ struct DashboardHubCard: View {
     let icon: String
     let title: String
     let subtitle: String
+    var tint: Color = .accentColor
     var isDisabled: Bool = false
     let action: () -> Void
 
@@ -527,11 +538,11 @@ struct DashboardHubCard: View {
             VStack(spacing: 5) {
                 ZStack {
                     Circle()
-                        .fill(Color.primary.opacity(isHovered ? 0.1 : 0.05))
+                        .fill(tint.opacity(isHovered ? 0.15 : 0.08))
                         .frame(width: 32, height: 32)
                     Image(systemName: icon)
                         .font(.system(size: 13, weight: .medium))
-                        .foregroundColor(.secondary)
+                        .foregroundColor(tint)
                 }
 
                 Text(title)
@@ -547,11 +558,11 @@ struct DashboardHubCard: View {
             .padding(.vertical, 10)
             .background(
                 RoundedRectangle(cornerRadius: 8)
-                    .fill(isHovered ? Color.primary.opacity(0.05) : Color.primary.opacity(0.02))
+                    .fill(isHovered ? tint.opacity(0.06) : Color.primary.opacity(0.02))
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 8)
-                    .strokeBorder(isHovered ? Color.primary.opacity(0.15) : Color.primary.opacity(0.06), lineWidth: 0.5)
+                    .strokeBorder(isHovered ? tint.opacity(0.2) : Color.primary.opacity(0.06), lineWidth: 0.5)
             )
         }
         .buttonStyle(.plain)
@@ -571,7 +582,7 @@ struct AuditRow: View {
         HStack(spacing: 8) {
             Image(systemName: icon)
                 .font(.caption)
-                .foregroundColor(.secondary)
+                .foregroundColor(count > 0 ? .orange : .green)
                 .frame(width: 16)
             Text(label)
                 .font(.caption)
@@ -592,11 +603,11 @@ struct AuditRepairRow: View {
         HStack(spacing: 8) {
             Image(systemName: icon)
                 .font(.caption)
-                .foregroundColor(.secondary)
+                .foregroundColor(.green)
                 .frame(width: 16)
             Text(label)
                 .font(.caption)
-                .foregroundColor(.secondary)
+                .foregroundColor(.green)
             Spacer()
         }
     }
@@ -628,10 +639,10 @@ struct InlineResult: View {
         HStack(spacing: 8) {
             Image(systemName: icon)
                 .font(.caption)
-                .foregroundColor(.secondary)
+                .foregroundColor(.green)
             Text(message)
                 .font(.caption)
-                .foregroundColor(.secondary)
+                .foregroundColor(.green)
             Spacer()
             Button(action: onDismiss) {
                 Image(systemName: "xmark")
@@ -642,7 +653,7 @@ struct InlineResult: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
-        .background(Color.primary.opacity(0.04))
+        .background(Color.green.opacity(0.06))
         .cornerRadius(6)
         .padding(.top, 4)
     }
