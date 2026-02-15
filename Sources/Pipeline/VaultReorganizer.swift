@@ -188,7 +188,8 @@ struct VaultReorganizer {
                 StatisticsService.recordActivity(
                     fileName: analysis.fileName,
                     category: analysis.recommended.para.rawValue,
-                    action: "vault-reorganized"
+                    action: "vault-reorganized",
+                    detail: "\(fromDisplay) → \(analysis.recommended.para.rawValue)/\(analysis.recommended.targetFolder)"
                 )
             } catch {
                 results.append(ProcessedFileResult(
@@ -198,6 +199,12 @@ struct VaultReorganizer {
                     tags: analysis.recommended.tags,
                     status: .error("이동 실패: \(error.localizedDescription)")
                 ))
+                StatisticsService.recordActivity(
+                    fileName: analysis.fileName,
+                    category: analysis.recommended.para.rawValue,
+                    action: "error",
+                    detail: "이동 실패: \(error.localizedDescription)"
+                )
             }
         }
 

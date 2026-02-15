@@ -28,6 +28,13 @@ struct InboxProcessor {
         onProgress?(0.05, "\(files.count)개 파일 발견")
         onFileProgress?(0, files.count, "")
 
+        StatisticsService.recordActivity(
+            fileName: "인박스 처리",
+            category: "system",
+            action: "started",
+            detail: "\(files.count)개 파일"
+        )
+
         // Build context
         let contextBuilder = ProjectContextBuilder(pkmRoot: pkmRoot)
         let projectContext = contextBuilder.buildProjectContext()
@@ -197,7 +204,8 @@ struct InboxProcessor {
                 StatisticsService.recordActivity(
                     fileName: input.fileName,
                     category: classification.para.rawValue,
-                    action: "classified"
+                    action: "classified",
+                    detail: "→ \(classification.targetFolder)"
                 )
             } catch {
                 processed.append(ProcessedFileResult(
@@ -207,6 +215,12 @@ struct InboxProcessor {
                     tags: classification.tags,
                     status: .error(Self.friendlyErrorMessage(error))
                 ))
+                StatisticsService.recordActivity(
+                    fileName: input.fileName,
+                    category: classification.para.rawValue,
+                    action: "error",
+                    detail: Self.friendlyErrorMessage(error)
+                )
                 failed += 1
             }
         }
@@ -233,6 +247,14 @@ struct InboxProcessor {
         )
 
         onProgress?(1.0, "완료!")
+
+        let successCount = processed.filter(\.isSuccess).count
+        StatisticsService.recordActivity(
+            fileName: "인박스 처리",
+            category: "system",
+            action: "completed",
+            detail: "\(successCount)/\(files.count)개 완료, \(failed)개 실패"
+        )
 
         return Result(
             processed: processed,

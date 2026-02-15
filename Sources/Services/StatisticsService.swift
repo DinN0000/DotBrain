@@ -39,13 +39,14 @@ class StatisticsService {
     }
 
     /// Record a classification activity (thread-safe)
-    static func recordActivity(fileName: String, category: String, action: String) {
+    static func recordActivity(fileName: String, category: String, action: String, detail: String = "") {
         serialQueue.sync {
             var history = loadActivityHistory()
             let entry: [String: String] = [
                 "fileName": fileName,
                 "category": category,
                 "action": action,
+                "detail": detail,
                 "date": ISO8601DateFormatter().string(from: Date()),
             ]
             history.insert(entry, at: 0)
@@ -103,7 +104,13 @@ class StatisticsService {
                   let action = dict["action"],
                   let dateStr = dict["date"],
                   let date = formatter.date(from: dateStr) else { return nil }
-            return ActivityEntry(fileName: fileName, category: category, date: date, action: action)
+            return ActivityEntry(
+                fileName: fileName,
+                category: category,
+                date: date,
+                action: action,
+                detail: dict["detail"] ?? ""
+            )
         }
     }
 

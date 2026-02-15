@@ -44,6 +44,13 @@ struct FolderReorganizer {
         onProgress?(0.05, "\(files.count)개 파일 발견")
         onFileProgress?(0, files.count, "")
 
+        StatisticsService.recordActivity(
+            fileName: "폴더 정리",
+            category: "system",
+            action: "started",
+            detail: "\(subfolder) — \(files.count)개 파일"
+        )
+
         // Step 3: Deduplicate
         let (uniqueFiles, dupResults) = deduplicateFiles(files, in: folderPath)
         var processed = dupResults
@@ -171,7 +178,8 @@ struct FolderReorganizer {
                     StatisticsService.recordActivity(
                         fileName: input.fileName,
                         category: classification.para.rawValue,
-                        action: "reorganized"
+                        action: "reorganized",
+                        detail: "→ \(classification.targetFolder)"
                     )
                 }
             } else {
@@ -190,7 +198,8 @@ struct FolderReorganizer {
                     StatisticsService.recordActivity(
                         fileName: input.fileName,
                         category: classification.para.rawValue,
-                        action: "relocated"
+                        action: "relocated",
+                        detail: "\(fromDisplay) → \(classification.para.rawValue)/\(classification.targetFolder)"
                     )
                 } catch {
                     processed.append(ProcessedFileResult(
@@ -200,6 +209,12 @@ struct FolderReorganizer {
                         tags: classification.tags,
                         status: .error("이동 실패: \(error.localizedDescription)")
                     ))
+                    StatisticsService.recordActivity(
+                        fileName: input.fileName,
+                        category: classification.para.rawValue,
+                        action: "error",
+                        detail: "이동 실패: \(error.localizedDescription)"
+                    )
                 }
             }
         }
@@ -227,6 +242,14 @@ struct FolderReorganizer {
         )
 
         onProgress?(1.0, "완료!")
+
+        let successCount = processed.filter(\.isSuccess).count
+        StatisticsService.recordActivity(
+            fileName: "폴더 정리",
+            category: "system",
+            action: "completed",
+            detail: "\(subfolder) — \(successCount)/\(files.count)개 완료"
+        )
 
         return Result(
             processed: processed,

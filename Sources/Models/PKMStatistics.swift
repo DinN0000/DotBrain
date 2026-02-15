@@ -14,5 +14,6 @@ struct ActivityEntry: Identifiable {
     let fileName: String
     let category: String
     let date: Date
-    let action: String  // "classified", "deduplicated", "deleted"
+    let action: String  // "classified", "reorganized", "relocated", "error", "started", "completed"
+    let detail: String  // target path, error message, summary, etc.
 }

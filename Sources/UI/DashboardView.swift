@@ -9,6 +9,7 @@ struct DashboardView: View {
     @State private var isVaultChecking = false
     @State private var vaultCheckPhase = ""
     @State private var vaultCheckResult: VaultCheckResult?
+    @State private var selectedActivity: ActivityEntry?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -134,26 +135,53 @@ struct DashboardView: View {
                                 .foregroundColor(.secondary)
                                 .padding(.vertical, 8)
                         } else {
-                            ForEach(stats.recentActivity.prefix(5)) { entry in
-                                HStack(spacing: 8) {
-                                    Image(systemName: activityIcon(for: entry.action))
-                                        .font(.caption)
-                                        .foregroundColor(activityColor(for: entry.action))
-                                        .frame(width: 16)
+                            ForEach(stats.recentActivity.prefix(10)) { entry in
+                                VStack(spacing: 0) {
+                                    Button {
+                                        withAnimation(.easeInOut(duration: 0.15)) {
+                                            if selectedActivity?.id == entry.id {
+                                                selectedActivity = nil
+                                            } else {
+                                                selectedActivity = entry
+                                            }
+                                        }
+                                    } label: {
+                                        HStack(spacing: 8) {
+                                            Image(systemName: activityIcon(for: entry.action))
+                                                .font(.caption)
+                                                .foregroundColor(activityColor(for: entry.action))
+                                                .frame(width: 16)
 
-                                    Text(entry.fileName)
-                                        .font(.caption)
-                                        .lineLimit(1)
+                                            Text(entry.fileName)
+                                                .font(.caption)
+                                                .lineLimit(1)
 
-                                    Spacer()
+                                            Spacer()
 
-                                    Text(entry.category)
-                                        .font(.caption2)
-                                        .foregroundColor(.secondary)
+                                            if entry.category != "system" {
+                                                Text(categoryLabel(for: entry.category))
+                                                    .font(.caption2)
+                                                    .foregroundColor(.secondary)
+                                            }
 
-                                    Text(relativeDate(entry.date))
-                                        .font(.caption2)
-                                        .foregroundColor(.secondary)
+                                            Text(relativeDate(entry.date))
+                                                .font(.caption2)
+                                                .foregroundColor(.secondary)
+
+                                            Image(systemName: selectedActivity?.id == entry.id ? "chevron.up" : "chevron.down")
+                                                .font(.system(size: 8))
+                                                .foregroundColor(.secondary)
+                                        }
+                                        .padding(.vertical, 3)
+                                        .contentShape(Rectangle())
+                                    }
+                                    .buttonStyle(.plain)
+
+                                    // Detail panel
+                                    if selectedActivity?.id == entry.id {
+                                        activityDetailView(entry)
+                                            .transition(.opacity.combined(with: .move(edge: .top)))
+                                    }
                                 }
                             }
                         }
@@ -351,21 +379,94 @@ struct DashboardView: View {
         }
     }
 
+    // MARK: - Activity Detail View
+
+    @ViewBuilder
+    private func activityDetailView(_ entry: ActivityEntry) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 6) {
+                Text(actionLabel(for: entry.action))
+                    .font(.caption2)
+                    .fontWeight(.medium)
+                    .foregroundColor(activityColor(for: entry.action))
+
+                if entry.category != "system" {
+                    Text("·")
+                        .foregroundColor(.secondary)
+                    Text(categoryLabel(for: entry.category))
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
+            }
+
+            if !entry.detail.isEmpty {
+                Text(entry.detail)
+                    .font(.caption2)
+                    .foregroundColor(.primary.opacity(0.7))
+                    .lineLimit(3)
+            }
+
+            Text(fullDate(entry.date))
+                .font(.caption2)
+                .foregroundColor(.secondary)
+        }
+        .padding(.horizontal, 24)
+        .padding(.vertical, 6)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.primary.opacity(0.02))
+        .cornerRadius(4)
+    }
+
     private func activityIcon(for action: String) -> String {
         switch action {
         case "classified": return "checkmark.circle.fill"
+        case "reorganized": return "arrow.triangle.2.circlepath"
+        case "relocated": return "arrow.right.circle.fill"
+        case "vault-reorganized": return "arrow.triangle.swap"
         case "deduplicated": return "doc.on.doc.fill"
         case "deleted": return "trash.circle.fill"
+        case "started": return "play.circle.fill"
+        case "completed": return "checkmark.seal.fill"
+        case "error": return "exclamationmark.triangle.fill"
         default: return "circle.fill"
         }
     }
 
     private func activityColor(for action: String) -> Color {
         switch action {
-        case "classified": return .green
-        case "deduplicated": return .blue
+        case "classified", "reorganized", "completed": return .green
+        case "relocated", "vault-reorganized": return .blue
+        case "deduplicated": return .purple
         case "deleted": return .red
+        case "started": return .orange
+        case "error": return .red
         default: return .secondary
+        }
+    }
+
+    private func actionLabel(for action: String) -> String {
+        switch action {
+        case "classified": return "분류 완료"
+        case "reorganized": return "정리 완료"
+        case "relocated": return "위치 이동"
+        case "vault-reorganized": return "재정리 이동"
+        case "deduplicated": return "중복 제거"
+        case "deleted": return "삭제"
+        case "started": return "처리 시작"
+        case "completed": return "처리 완료"
+        case "error": return "오류"
+        default: return action
+        }
+    }
+
+    private func categoryLabel(for category: String) -> String {
+        switch category {
+        case "project": return "프로젝트"
+        case "area": return "영역"
+        case "resource": return "자료"
+        case "archive": return "아카이브"
+        case "system": return "시스템"
+        default: return category
         }
     }
 
@@ -373,6 +474,12 @@ struct DashboardView: View {
         let formatter = RelativeDateTimeFormatter()
         formatter.unitsStyle = .abbreviated
         return formatter.localizedString(for: date, relativeTo: Date())
+    }
+
+    private func fullDate(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd HH:mm"
+        return formatter.string(from: date)
     }
 }
 
