@@ -3,7 +3,7 @@ import ZIPFoundation
 
 /// Extracts text and metadata from XLSX files (ZIP + XML)
 enum XLSXExtractor {
-    static let maxTextLength = 5000
+    static let maxTextLength = 50_000
     static let maxRowsPerSheet = 100
 
     static func extract(at path: String) -> ExtractResult {

@@ -54,11 +54,14 @@ enum FrontmatterWriter {
         return result
     }
 
-    /// Create companion markdown for binary files
+    /// Create companion markdown for binary files with AI summary + original file link
     static func createCompanionMarkdown(
         for extractResult: ExtractResult,
-        classification: ClassifyResult
+        classification: ClassifyResult,
+        aiSummary: String? = nil,
+        relatedNotes: [RelatedNote] = []
     ) -> String {
+        let fileName = extractResult.file?.name ?? "unknown"
         let fm = Frontmatter.createDefault(
             para: classification.para,
             tags: classification.tags,
@@ -70,8 +73,36 @@ enum FrontmatterWriter {
             }
         )
 
-        let body = extractResult.text ?? "파일: \(extractResult.file?.name ?? "unknown")"
-        return fm.stringify() + "\n\n" + body + "\n"
+        var result = fm.stringify() + "\n\n"
+
+        // Title
+        result += "# \(fileName)\n\n"
+
+        // AI summary or fallback to raw text
+        if let summary = aiSummary, !summary.isEmpty {
+            result += summary + "\n"
+        } else {
+            result += extractResult.text ?? "파일: \(fileName)"
+            result += "\n"
+        }
+
+        // Original file link
+        result += "\n## 원본 파일\n\n"
+        result += "![[_Assets/\(fileName)]]\n"
+
+        // Related Notes
+        var lines: [String] = []
+        if let project = classification.project, !project.isEmpty {
+            lines.append("- [[\(project)]] — 소속 프로젝트")
+        }
+        for note in relatedNotes where !result.contains("[[\(note.name)]]") {
+            lines.append("- [[\(note.name)]] — \(note.context)")
+        }
+        if !lines.isEmpty {
+            result += "\n## Related Notes\n\n" + lines.joined(separator: "\n") + "\n"
+        }
+
+        return result
     }
 
     /// Create index note for a new subfolder

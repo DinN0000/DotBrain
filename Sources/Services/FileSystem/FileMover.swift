@@ -226,11 +226,36 @@ struct FileMover {
         let resolvedAssetPath = resolveConflict(assetPath)
         try fm.moveItem(atPath: filePath, toPath: resolvedAssetPath)
 
-        // Create companion markdown
+        // Create companion markdown with AI summary
         let extractResult = BinaryExtractor.extract(at: resolvedAssetPath)
+
+        // AI summarization — use full extracted text for rich companion note
+        var aiSummary: String? = nil
+        if let fullText = extractResult.text, !fullText.isEmpty {
+            let prompt = """
+            다음은 "\(fileName)" 파일에서 추출한 텍스트입니다.
+            핵심 내용을 한국어로 요약해주세요. 마크다운 형식으로 작성하되:
+            - 문서의 주제와 목적을 첫 문단에 서술
+            - 주요 내용을 bullet point로 정리
+            - 중요한 수치, 날짜, 이름은 그대로 보존
+            - 전체 500자 이내로 간결하게
+
+            ---
+            \(fullText)
+            """
+            do {
+                aiSummary = try await AIService.shared.sendFast(maxTokens: 1024, message: prompt)
+            } catch {
+                // AI 요약 실패 시 원본 텍스트 앞부분 사용
+                aiSummary = nil
+            }
+        }
+
         let mdContent = FrontmatterWriter.createCompanionMarkdown(
             for: extractResult,
-            classification: classification
+            classification: classification,
+            aiSummary: aiSummary,
+            relatedNotes: classification.relatedNotes
         )
 
         let mdPath = (targetDir as NSString).appendingPathComponent("\(fileName).md")

@@ -279,7 +279,9 @@ struct InboxProcessor {
 
         if BinaryExtractor.isBinaryFile(filePath) {
             let result = BinaryExtractor.extract(at: filePath)
-            return result.text ?? "[바이너리 파일: \(result.file?.name ?? "unknown")]"
+            let text = result.text ?? "[바이너리 파일: \(result.file?.name ?? "unknown")]"
+            // 분류용 입력은 5000자로 제한 (AI 요약은 FileMover에서 전체 텍스트로 별도 수행)
+            return String(text.prefix(5000))
         }
 
         // Text file

@@ -3,7 +3,7 @@ import PDFKit
 
 /// Extracts text and metadata from PDF files using PDFKit
 enum PDFExtractor {
-    static let maxTextLength = 5000
+    static let maxTextLength = 50_000
 
     static func extract(at path: String) -> ExtractResult {
         let url = URL(fileURLWithPath: path)

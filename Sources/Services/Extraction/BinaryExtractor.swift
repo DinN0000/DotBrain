@@ -2,7 +2,7 @@ import Foundation
 
 /// Main dispatcher for binary file text extraction
 enum BinaryExtractor {
-    static let maxTextLength = 5000
+    static let maxTextLength = 50_000
 
     /// Supported binary file extensions
     static let binaryExtensions: Set<String> = [

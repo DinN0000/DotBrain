@@ -3,7 +3,7 @@ import ZIPFoundation
 
 /// Extracts text and metadata from PPTX files (ZIP + XML)
 enum PPTXExtractor {
-    static let maxTextLength = 5000
+    static let maxTextLength = 50_000
 
     static func extract(at path: String) -> ExtractResult {
         let url = URL(fileURLWithPath: path)
