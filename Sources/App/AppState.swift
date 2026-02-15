@@ -20,19 +20,17 @@ final class AppState: ObservableObject {
         case processing
         case results
         case settings
-        case reorganize
         case dashboard
         case search
-        case projectManage
         case paraManage
         case vaultManage
         case vaultReorganize
 
         var parent: Screen? {
             switch self {
-            case .paraManage, .projectManage, .search, .vaultManage:
+            case .paraManage, .search, .vaultManage:
                 return .dashboard
-            case .vaultReorganize, .reorganize:
+            case .vaultReorganize:
                 return .vaultManage
             case .results:
                 return nil
@@ -46,12 +44,10 @@ final class AppState: ObservableObject {
             case .inbox: return "인박스"
             case .dashboard: return "대시보드"
             case .settings: return "설정"
-            case .paraManage: return "PARA 관리"
-            case .projectManage: return "프로젝트 관리"
+            case .paraManage: return "폴더 관리"
             case .search: return "검색"
             case .vaultManage: return "볼트 관리"
             case .vaultReorganize: return "전체 재정리"
-            case .reorganize: return "폴더 정리"
             case .results: return "정리 결과"
             default: return ""
             }
@@ -73,6 +69,7 @@ final class AppState: ObservableObject {
     @Published var processingOrigin: Screen = .inbox
     @Published var affectedFolders: Set<String> = []
     @Published var navigationId = UUID()
+    @Published var paraManageInitialCategory: PARACategory?
 
     // MARK: - Settings
 
@@ -123,14 +120,10 @@ final class AppState: ObservableObject {
             return "^‿^"
         case .settings:
             return "·_·?"
-        case .reorganize:
-            return "·_·?"
         case .dashboard:
             return "·_·"
         case .search:
             return "·_·?"
-        case .projectManage:
-            return "·_·"
         case .paraManage:
             return "·_·"
         case .vaultManage:
@@ -258,8 +251,7 @@ final class AppState: ObservableObject {
         processingCurrentFile = ""
         processingCompletedCount = 0
         processingTotalCount = 0
-        currentScreen = processingOrigin == .reorganize ? .reorganize
-            : processingOrigin == .paraManage ? .paraManage : .inbox
+        currentScreen = processingOrigin == .paraManage ? .paraManage : .inbox
         Task {
             await refreshInboxCount()
         }
@@ -282,7 +274,7 @@ final class AppState: ObservableObject {
         processedResults = []
         pendingConfirmations = []
         affectedFolders = []
-        processingOrigin = .reorganize
+        processingOrigin = .paraManage
         currentScreen = .processing
 
         processingTask = Task { @MainActor in
@@ -342,7 +334,7 @@ final class AppState: ObservableObject {
         processedResults = []
         pendingConfirmations = []
         affectedFolders = []
-        processingOrigin = .reorganize
+        processingOrigin = .paraManage
         currentScreen = .processing
 
         processingTask = Task { @MainActor in
@@ -598,8 +590,6 @@ final class AppState: ObservableObject {
         if currentScreen == .results {
             if processingOrigin == .paraManage {
                 currentScreen = .paraManage
-            } else if processingOrigin == .reorganize {
-                currentScreen = .reorganize
             } else if processingOrigin == .vaultReorganize {
                 currentScreen = .vaultReorganize
             } else {
@@ -623,7 +613,7 @@ final class AppState: ObservableObject {
         }
     }
 
-    /// Navigate to ReorganizeView with a specific folder pre-selected
+    /// Navigate to PARAManageView with a specific folder's category pre-selected
     func navigateToReorganizeFolder(_ folderPath: String) {
         let pathManager = PKMPathManager(root: pkmRootPath)
         let resolvedFolder = URL(fileURLWithPath: folderPath).resolvingSymlinksInPath().path
@@ -640,7 +630,8 @@ final class AppState: ObservableObject {
             processedResults = []
             pendingConfirmations = []
             affectedFolders = []
-            currentScreen = .reorganize
+            paraManageInitialCategory = category
+            currentScreen = .paraManage
             return
         }
     }

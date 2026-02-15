@@ -3,6 +3,7 @@ import SwiftUI
 struct DashboardView: View {
     @EnvironmentObject var appState: AppState
     @State private var stats = PKMStatistics()
+    @State private var urgentFolderCount = 0
 
     var body: some View {
         VStack(spacing: 0) {
@@ -12,7 +13,7 @@ struct DashboardView: View {
 
             ScrollView {
                 VStack(spacing: 16) {
-                    // Summary line
+                    // Interactive stats line
                     HStack(spacing: 6) {
                         Image(systemName: "doc.fill")
                             .font(.caption)
@@ -28,20 +29,13 @@ struct DashboardView: View {
                         let r = stats.byCategory["resource"] ?? 0
                         let ar = stats.byCategory["archive"] ?? 0
 
-                        Text("P \(p)")
-                            .foregroundColor(.blue)
-                        Text("·")
-                            .foregroundColor(.secondary)
-                        Text("A \(a)")
-                            .foregroundColor(.green)
-                        Text("·")
-                            .foregroundColor(.secondary)
-                        Text("R \(r)")
-                            .foregroundColor(.orange)
-                        Text("·")
-                            .foregroundColor(.secondary)
-                        Text("AR \(ar)")
-                            .foregroundColor(.gray)
+                        statButton("P", count: p, color: .blue, category: .project)
+                        Text("·").foregroundColor(.secondary)
+                        statButton("A", count: a, color: .green, category: .area)
+                        Text("·").foregroundColor(.secondary)
+                        statButton("R", count: r, color: .orange, category: .resource)
+                        Text("·").foregroundColor(.secondary)
+                        statButton("AR", count: ar, color: .gray, category: .archive)
                     }
                     .font(.caption)
                     .monospacedDigit()
@@ -50,21 +44,37 @@ struct DashboardView: View {
                     .background(Color.primary.opacity(0.03))
                     .cornerRadius(8)
 
-                    // Hub cards 2x2
+                    // Health summary
+                    if urgentFolderCount > 0 {
+                        HStack(spacing: 6) {
+                            Circle()
+                                .fill(Color.red)
+                                .frame(width: 6, height: 6)
+                            Text("\(urgentFolderCount)개 폴더 점검 필요")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            Spacer()
+                            Button("보기") {
+                                appState.currentScreen = .paraManage
+                            }
+                            .font(.caption)
+                            .buttonStyle(.plain)
+                            .foregroundColor(.accentColor)
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(Color.red.opacity(0.06))
+                        .cornerRadius(6)
+                    }
+
+                    // Hub cards: 2 top + 1 full width
                     LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
                         DashboardHubCard(
                             icon: "folder.badge.gearshape",
-                            title: "PARA 관리",
-                            subtitle: "폴더 이동 · 생성"
+                            title: "폴더 관리",
+                            subtitle: "이동 · 생성 · 정리"
                         ) {
                             appState.currentScreen = .paraManage
-                        }
-                        DashboardHubCard(
-                            icon: "list.bullet.clipboard",
-                            title: "프로젝트 관리",
-                            subtitle: "추가 · 아카이브"
-                        ) {
-                            appState.currentScreen = .projectManage
                         }
                         DashboardHubCard(
                             icon: "magnifyingglass",
@@ -73,13 +83,14 @@ struct DashboardView: View {
                         ) {
                             appState.currentScreen = .search
                         }
-                        DashboardHubCard(
-                            icon: "wrench.and.screwdriver",
-                            title: "볼트 관리",
-                            subtitle: "오류 검사 · 정리 · 보완"
-                        ) {
-                            appState.currentScreen = .vaultManage
-                        }
+                    }
+
+                    DashboardHubCard(
+                        icon: "wrench.and.screwdriver",
+                        title: "볼트 관리",
+                        subtitle: "오류 검사 · 정리 · 보완"
+                    ) {
+                        appState.currentScreen = .vaultManage
                     }
 
                     // Recent activity
@@ -128,6 +139,50 @@ struct DashboardView: View {
         .onAppear {
             let service = StatisticsService(pkmRoot: appState.pkmRootPath)
             stats = service.collectStatistics()
+            scanHealthSummary()
+        }
+    }
+
+    // MARK: - Interactive Stat Button
+
+    private func statButton(_ label: String, count: Int, color: Color, category: PARACategory) -> some View {
+        Button {
+            appState.paraManageInitialCategory = category
+            appState.currentScreen = .paraManage
+        } label: {
+            Text("\(label) \(count)")
+                .foregroundColor(color)
+        }
+        .buttonStyle(.plain)
+    }
+
+    // MARK: - Health Summary
+
+    private func scanHealthSummary() {
+        let root = appState.pkmRootPath
+        Task.detached(priority: .utility) {
+            let pathManager = PKMPathManager(root: root)
+            let fm = FileManager.default
+            var count = 0
+            for cat in PARACategory.allCases {
+                let basePath = pathManager.paraPath(for: cat)
+                guard let entries = try? fm.contentsOfDirectory(atPath: basePath) else { continue }
+                for entry in entries where !entry.hasPrefix(".") && !entry.hasPrefix("_") {
+                    let fullPath = (basePath as NSString).appendingPathComponent(entry)
+                    var isDir: ObjCBool = false
+                    guard fm.fileExists(atPath: fullPath, isDirectory: &isDir), isDir.boolValue else { continue }
+                    let health = FolderHealthAnalyzer.analyze(
+                        folderPath: fullPath, folderName: entry, category: cat
+                    )
+                    if health.label == "urgent" || health.label == "attention" {
+                        count += 1
+                    }
+                }
+            }
+            let snapshot = count
+            await MainActor.run {
+                urgentFolderCount = snapshot
+            }
         }
     }
 

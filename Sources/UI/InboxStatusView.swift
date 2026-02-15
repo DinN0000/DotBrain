@@ -20,8 +20,8 @@ struct InboxStatusView: View {
 
             Spacer()
 
-            HoverTextLink(label: "폴더 정리", color: .secondary) {
-                appState.currentScreen = .reorganize
+            HoverTextLink(label: "폴더 관리", color: .secondary) {
+                appState.currentScreen = .paraManage
             }
 
             // PKM path info
