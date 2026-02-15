@@ -860,18 +860,65 @@ struct OnboardingView: View {
         }
     }
 
-    // MARK: - Step 4: Trial (placeholder for Task 8)
+    // MARK: - Step 4: Quick Start Guide
 
     private var trialStep: some View {
-        VStack {
+        VStack(spacing: 0) {
             Spacer()
-            Text("준비 완료!")
-                .font(.title3)
-                .fontWeight(.semibold)
-            Text("DotBrain을 시작합니다")
-                .font(.subheadline)
-                .foregroundColor(.secondary)
+
+            if appState.hasAPIKey {
+                Text("·‿·")
+                    .font(.system(size: 36, design: .monospaced))
+                    .padding(.bottom, 12)
+
+                Text("준비 완료!")
+                    .font(.title3)
+                    .fontWeight(.semibold)
+                    .padding(.bottom, 6)
+
+                Text("이제 인박스에 파일을 넣으면\nAI가 자동으로 정리합니다.")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.bottom, 20)
+
+                VStack(alignment: .leading, spacing: 8) {
+                    guideRow(icon: "1.circle.fill", text: "메뉴바에서 DotBrain을 클릭")
+                    guideRow(icon: "2.circle.fill", text: "파일을 드래그하거나 Cmd+V로 붙여넣기")
+                    guideRow(icon: "3.circle.fill", text: "\"정리하기\" 버튼을 누르면 AI가 분류")
+                }
+                .padding(14)
+                .background(Color.secondary.opacity(0.05))
+                .cornerRadius(8)
+                .padding(.horizontal, 32)
+            } else {
+                Text("·_·")
+                    .font(.system(size: 36, design: .monospaced))
+                    .padding(.bottom, 12)
+
+                Text("거의 다 됐어요!")
+                    .font(.title3)
+                    .fontWeight(.semibold)
+                    .padding(.bottom, 6)
+
+                Text("API 키 없이도 폴더 구조를 활용할 수 있습니다.")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.bottom, 20)
+
+                VStack(alignment: .leading, spacing: 8) {
+                    guideRow(icon: "terminal", text: "Claude Code로 폴더에 연결해서 사용")
+                    guideRow(icon: "gearshape", text: "설정에서 언제든 API 키를 추가 가능")
+                }
+                .padding(14)
+                .background(Color.secondary.opacity(0.05))
+                .cornerRadius(8)
+                .padding(.horizontal, 32)
+            }
+
             Spacer()
+
             Button(action: completeOnboarding) {
                 Text("시작하기")
                     .frame(maxWidth: .infinity)
@@ -882,6 +929,18 @@ struct OnboardingView: View {
             .tint(.primary.opacity(0.85))
             .padding(.horizontal, 40)
             .padding(.bottom, 20)
+        }
+        .padding(.horizontal)
+    }
+
+    private func guideRow(icon: String, text: String) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: icon)
+                .font(.subheadline)
+                .foregroundColor(.accentColor)
+                .frame(width: 20)
+            Text(text)
+                .font(.subheadline)
         }
     }
 
