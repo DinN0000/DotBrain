@@ -185,17 +185,11 @@ struct ResultRow: View {
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                         }
-                    case .relocated(let from):
+                    case .relocated:
                         HStack(spacing: 4) {
-                            Text(from)
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                            Image(systemName: "arrow.right")
-                                .font(.caption2)
-                                .foregroundColor(.purple)
                             Image(systemName: result.para.icon)
                                 .font(.caption2)
-                            Text(result.displayTarget)
+                            Text("\(result.displayTarget)로 옮겨짐")
                                 .font(.caption)
                                 .foregroundColor(.purple)
                         }
@@ -296,11 +290,11 @@ struct ConfirmationRow: View {
             // Contextual message
             if confirmation.reason == .unmatchedProject {
                 if let suggested = confirmation.suggestedProjectName, !suggested.isEmpty {
-                    Text("프로젝트 \"\(suggested)\"이(가) 없습니다 — 새로 만들거나 다른 위치를 선택하세요")
+                    Text("등록된 프로젝트에 \"\(suggested)\"이(가) 없습니다. 새로 만들거나 다른 위치를 선택하세요")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 } else {
-                    Text("매칭되는 프로젝트가 없습니다 — 새로 만들거나 다른 위치를 선택하세요")
+                    Text("등록된 프로젝트에 맞는 곳이 없습니다. 새 프로젝트를 만드시겠습니까?")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
@@ -309,11 +303,15 @@ struct ConfirmationRow: View {
                     .font(.caption)
                     .foregroundColor(.secondary)
             } else if confirmation.reason == .nameConflict {
-                Text("같은 이름의 다른 파일이 이미 있습니다 — 다른 위치를 선택하거나 건너뛰세요")
+                Text("같은 이름의 파일이 이미 있습니다 — 다른 위치를 선택하거나 건너뛰세요")
                     .font(.caption)
                     .foregroundColor(.secondary)
             } else if confirmation.reason == .misclassified {
                 Text("AI가 다른 위치를 추천합니다 — 이동하거나 건너뛰세요")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            } else {
+                Text("이 파일이 어디에 들어갈지 모르겠어요. 골라주세요")
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
@@ -455,7 +453,7 @@ struct ResultsSummaryCard: View {
                             Image(systemName: "arrow.right.circle")
                                 .font(.caption2)
                                 .foregroundColor(.purple)
-                            Text("\(relocatedCount) 이동")
+                            Text("\(relocatedCount) 위치 변경")
                                 .font(.caption2)
                                 .foregroundColor(.secondary)
                         }
@@ -492,7 +490,7 @@ struct ResultsSummaryCard: View {
                     }
                 }
 
-                Text("태그, 요약, 관련 노트 링크가 적용되었습니다.")
+                Text("태그와 요약이 자동으로 추가되었습니다.")
                     .font(.caption2)
                     .foregroundColor(.secondary)
             }
@@ -611,11 +609,11 @@ struct AffectedFolderRow: View {
         case .tooManyFiles(let count):
             return "\(count)개 파일 — 세분화 필요"
         case .missingFrontmatter(let count, _):
-            return "\(count)개 파일 메타데이터 누락"
+            return "\(count)개 파일 정보 누락"
         case .lowTagDiversity:
             return "태그 다양성 부족"
         case .noIndexNote:
-            return "인덱스 노트 없음"
+            return "폴더 요약 없음"
         }
     }
 
