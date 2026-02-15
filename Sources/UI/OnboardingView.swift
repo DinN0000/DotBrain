@@ -14,7 +14,7 @@ struct OnboardingView: View {
     @State private var folderError: String?
     @State private var showFolderError = false
 
-    private let totalSteps = 4
+    private let totalSteps = 5
 
     init() {
         let saved = UserDefaults.standard.integer(forKey: "onboardingStep")
@@ -33,7 +33,8 @@ struct OnboardingView: View {
                 case 1: folderStep
                 case 2: projectStep
                 case 3: providerAndKeyStep
-                default: providerAndKeyStep
+                case 4: trialStep
+                default: trialStep
                 }
             }
             .transition(direction > 0
@@ -510,8 +511,8 @@ struct OnboardingView: View {
 
         return VStack(spacing: 0) {
             stepHeader(
-                title: "AI 설정",
-                desc: "파일 분류에 사용할 AI를 선택하고\nAPI 키를 입력하세요."
+                title: "AI 연결",
+                desc: "AI가 파일을 읽고 분류합니다. API 키가 필요합니다."
             )
 
             ScrollView {
@@ -615,24 +616,47 @@ struct OnboardingView: View {
                     .padding(12)
                     .background(Color.secondary.opacity(0.05))
                     .cornerRadius(8)
+
+                    // Claude Code 안내
+                    HStack(alignment: .top, spacing: 8) {
+                        Image(systemName: "terminal")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        Text("API 키 없이도, 만들어진 폴더에 Claude Code를 연결해서 사용할 수 있습니다.")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    .padding(10)
+                    .background(Color.secondary.opacity(0.05))
+                    .cornerRadius(6)
                 }
                 .padding(.horizontal, 24)
             }
 
-            HStack {
-                Button("이전") { goBack() }
-                    .buttonStyle(.bordered)
+            VStack(spacing: 6) {
+                HStack {
+                    Button("이전") { goBack() }
+                        .buttonStyle(.bordered)
+                        .controlSize(.regular)
+
+                    Spacer()
+
+                    Button(action: { goNext() }) {
+                        Text("다음")
+                            .frame(minWidth: 80)
+                    }
+                    .buttonStyle(.borderedProminent)
                     .controlSize(.regular)
-
-                Spacer()
-
-                Button(action: completeOnboarding) {
-                    Text("설정 완료")
-                        .frame(minWidth: 80)
                 }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.regular)
-                .disabled(!appState.hasAPIKey)
+
+                if !appState.hasAPIKey {
+                    Button(action: { goNext() }) {
+                        Text("건너뛰기")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                }
             }
             .padding(.horizontal, 32)
             .padding(.bottom, 20)
@@ -833,6 +857,31 @@ struct OnboardingView: View {
             appState.updateAPIKeyStatus()
         } else {
             keySaveMessage = "\(provider.keyPlaceholder)로 시작하는 키를 입력하세요"
+        }
+    }
+
+    // MARK: - Step 4: Trial (placeholder for Task 8)
+
+    private var trialStep: some View {
+        VStack {
+            Spacer()
+            Text("준비 완료!")
+                .font(.title3)
+                .fontWeight(.semibold)
+            Text("DotBrain을 시작합니다")
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+            Spacer()
+            Button(action: completeOnboarding) {
+                Text("시작하기")
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 4)
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
+            .tint(.primary.opacity(0.85))
+            .padding(.horizontal, 40)
+            .padding(.bottom, 20)
         }
     }
 
