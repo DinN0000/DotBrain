@@ -10,24 +10,15 @@ struct ProjectManageView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Header
-            HStack {
-                Button(action: { appState.currentScreen = .inbox }) {
-                    Image(systemName: "chevron.left")
-                }
-                .buttonStyle(.plain)
-
-                Text("프로젝트 관리")
-                    .font(.headline)
-
-                Spacer()
-
-                Button(action: { showNewProject.toggle() }) {
-                    Image(systemName: showNewProject ? "minus.circle" : "plus.circle")
-                }
-                .buttonStyle(.plain)
-            }
-            .padding()
+            BreadcrumbView(
+                current: .projectManage,
+                trailing: AnyView(
+                    Button(action: { showNewProject.toggle() }) {
+                        Image(systemName: showNewProject ? "minus.circle" : "plus.circle")
+                    }
+                    .buttonStyle(.plain)
+                )
+            )
 
             Divider()
 

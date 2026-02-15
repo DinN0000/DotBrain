@@ -22,25 +22,16 @@ struct VaultReorganizeView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Header
-            HStack {
-                Button(action: goBack) {
-                    Image(systemName: "chevron.left")
-                }
-                .buttonStyle(.plain)
-
-                Text("전체 재정리")
-                    .font(.headline)
-
-                Spacer()
-
-                if phase == .reviewPlan {
-                    Text("\(selectedCount)개 선택")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-            }
-            .padding()
+            BreadcrumbView(
+                current: .vaultReorganize,
+                trailing: phase == .reviewPlan
+                    ? AnyView(
+                        Text("\(selectedCount)개 선택")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    )
+                    : nil
+            )
 
             Divider()
 
@@ -489,7 +480,7 @@ struct VaultReorganizeView: View {
             analyses = []
             results = []
         default:
-            appState.currentScreen = .inbox
+            appState.currentScreen = .vaultManage
         }
     }
 }
