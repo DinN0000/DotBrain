@@ -82,7 +82,7 @@ struct SettingsView: View {
             HStack(spacing: 6) {
                 Image(systemName: "cpu")
                     .font(.caption)
-                    .foregroundColor(.accentColor)
+                    .foregroundColor(.secondary)
                     .frame(width: 16)
                 Text("AI 설정")
                     .font(.subheadline)
@@ -123,7 +123,7 @@ struct SettingsView: View {
                     if otherHasKey {
                         Text("키 등록됨")
                             .font(.caption2)
-                            .foregroundColor(.green)
+                            .foregroundColor(.secondary)
                         Button("전환") {
                             withAnimation(.easeOut(duration: 0.15)) {
                                 appState.selectedProvider = otherProvider
@@ -144,7 +144,6 @@ struct SettingsView: View {
 
     private func providerTab(_ provider: AIProvider) -> some View {
         let isActive = appState.selectedProvider == provider
-        let accent = providerAccentColor(provider)
 
         return Button {
             withAnimation(.easeOut(duration: 0.15)) {
@@ -159,10 +158,10 @@ struct SettingsView: View {
                 if provider == .gemini {
                     Text("무료")
                         .font(.system(size: 8, weight: .semibold))
-                        .foregroundColor(.green)
+                        .foregroundColor(.secondary)
                         .padding(.horizontal, 4)
                         .padding(.vertical, 1)
-                        .background(Color.green.opacity(0.12))
+                        .background(Color.primary.opacity(0.06))
                         .cornerRadius(2)
                 }
             }
@@ -170,9 +169,9 @@ struct SettingsView: View {
             .padding(.vertical, 6)
             .background(
                 RoundedRectangle(cornerRadius: 5)
-                    .fill(isActive ? accent.opacity(0.12) : Color.clear)
+                    .fill(isActive ? Color.primary.opacity(0.08) : Color.clear)
             )
-            .foregroundColor(isActive ? accent : .secondary)
+            .foregroundColor(isActive ? .primary : .secondary)
         }
         .buttonStyle(.plain)
     }
@@ -183,7 +182,7 @@ struct SettingsView: View {
             // Model pipeline
             Text(provider.modelPipeline)
                 .font(.caption2)
-                .foregroundColor(providerAccentColor(provider).opacity(0.8))
+                .foregroundColor(.secondary)
 
             // Key input row
             HStack(spacing: 6) {
@@ -221,7 +220,7 @@ struct SettingsView: View {
                 if let msg = saveMessage {
                     Text(msg)
                         .font(.caption2)
-                        .foregroundColor(msg == "저장 완료" ? .green : .orange)
+                        .foregroundColor(.secondary)
                         .transition(.opacity)
                 }
 
@@ -230,7 +229,7 @@ struct SettingsView: View {
                 if hasKey {
                     Image(systemName: "checkmark.circle.fill")
                         .font(.caption)
-                        .foregroundColor(.green)
+                        .foregroundColor(.secondary)
                 }
             }
         }
@@ -243,7 +242,7 @@ struct SettingsView: View {
             HStack(spacing: 6) {
                 Image(systemName: "folder")
                     .font(.caption)
-                    .foregroundColor(.accentColor)
+                    .foregroundColor(.secondary)
                     .frame(width: 16)
                 Text("PKM 폴더")
                     .font(.subheadline)
@@ -271,7 +270,7 @@ struct SettingsView: View {
             if isStructureReady {
                 Label("PARA 구조 확인됨", systemImage: "checkmark.circle.fill")
                     .font(.caption)
-                    .foregroundColor(.green)
+                    .foregroundColor(.secondary)
             } else {
                 VStack(alignment: .leading, spacing: 6) {
                     Label("PARA 폴더 구조 없음", systemImage: "exclamationmark.triangle.fill")
@@ -311,7 +310,7 @@ struct SettingsView: View {
             HStack(spacing: 6) {
                 Image(systemName: "info.circle")
                     .font(.caption)
-                    .foregroundColor(.accentColor)
+                    .foregroundColor(.secondary)
                     .frame(width: 16)
                 Text("앱 정보")
                     .font(.subheadline)
@@ -334,10 +333,9 @@ struct SettingsView: View {
                     HStack(spacing: 6) {
                         Image(systemName: "arrow.down.circle.fill")
                             .font(.caption)
-                            .foregroundColor(.orange)
+                            .foregroundColor(.primary)
                         Text("v\(latest) 사용 가능")
                             .font(.caption)
-                            .foregroundColor(.orange)
                         Spacer()
                         Button("업데이트") {
                             runUpdate()
@@ -350,10 +348,10 @@ struct SettingsView: View {
                     HStack(spacing: 6) {
                         Image(systemName: "checkmark.circle.fill")
                             .font(.caption)
-                            .foregroundColor(.green)
+                            .foregroundColor(.secondary)
                         Text("최신 버전")
                             .font(.caption)
-                            .foregroundColor(.green)
+                            .foregroundColor(.secondary)
                     }
                 }
             }
@@ -550,10 +548,7 @@ struct SettingsView: View {
     }
 
     private func providerAccentColor(_ provider: AIProvider) -> Color {
-        switch provider {
-        case .claude: return Color(red: 0.85, green: 0.45, blue: 0.25)
-        case .gemini: return Color(red: 0.25, green: 0.52, blue: 0.96)
-        }
+        return .primary
     }
 }
 
@@ -569,7 +564,7 @@ struct SettingsSection<Content: View>: View {
             HStack(spacing: 6) {
                 Image(systemName: icon)
                     .font(.caption)
-                    .foregroundColor(.accentColor)
+                    .foregroundColor(.secondary)
                     .frame(width: 16)
 
                 Text(title)
@@ -595,12 +590,7 @@ struct ProviderSelectCard: View {
     let badgeColor: Color
     let action: () -> Void
 
-    private var accent: Color {
-        switch provider {
-        case .claude: return Color(red: 0.85, green: 0.45, blue: 0.25)
-        case .gemini: return Color(red: 0.25, green: 0.52, blue: 0.96)
-        }
-    }
+    private var accent: Color { .primary }
 
     var body: some View {
         Button(action: action) {
