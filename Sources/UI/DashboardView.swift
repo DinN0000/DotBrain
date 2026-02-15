@@ -74,12 +74,12 @@ struct DashboardView: View {
                     }
 
                     // Group 1: File operations
-                    DashboardCardGroup(label: "파일", tint: .blue) {
+                    DashboardCardGroup(label: "파일", tint: .accentColor) {
                         DashboardHubCard(
                             icon: "folder.badge.gearshape",
                             title: "폴더 관리",
                             subtitle: "이동 · 생성 · 정리",
-                            tint: .blue
+                            tint: .accentColor
                         ) {
                             appState.currentScreen = .paraManage
                         }
@@ -87,19 +87,19 @@ struct DashboardView: View {
                             icon: "magnifyingglass",
                             title: "검색",
                             subtitle: "파일 · 태그 검색",
-                            tint: .blue
+                            tint: .accentColor
                         ) {
                             appState.currentScreen = .search
                         }
                     }
 
                     // Group 2: Vault maintenance
-                    DashboardCardGroup(label: "볼트", tint: .orange) {
+                    DashboardCardGroup(label: "볼트", tint: .accentColor) {
                         DashboardHubCard(
                             icon: "checkmark.shield",
                             title: "볼트 점검",
                             subtitle: "오류 검사 · 메타 보완",
-                            tint: .orange,
+                            tint: .accentColor,
                             isDisabled: isVaultChecking
                         ) {
                             runVaultCheck()
@@ -108,7 +108,7 @@ struct DashboardView: View {
                             icon: "arrow.triangle.2.circlepath",
                             title: "전체 재정리",
                             subtitle: "AI 위치 재분류",
-                            tint: .orange
+                            tint: .accentColor
                         ) {
                             appState.currentScreen = .vaultReorganize
                         }
@@ -237,7 +237,7 @@ struct DashboardView: View {
                 HStack(spacing: 6) {
                     Image(systemName: "text.badge.star")
                         .font(.caption)
-                        .foregroundColor(.blue)
+                        .foregroundColor(.secondary)
                     Text("\(result.enrichCount)개 메타데이터 보완")
                         .font(.caption)
                     Spacer()
@@ -249,7 +249,7 @@ struct DashboardView: View {
                 HStack(spacing: 6) {
                     Image(systemName: "doc.text.magnifyingglass")
                         .font(.caption)
-                        .foregroundColor(.purple)
+                        .foregroundColor(.secondary)
                     Text("폴더 요약 갱신 완료")
                         .font(.caption)
                     Spacer()
@@ -442,10 +442,7 @@ struct DashboardView: View {
     private func activityColor(for action: String) -> Color {
         switch action {
         case "classified", "reorganized", "completed": return .green
-        case "relocated", "vault-reorganized": return .blue
-        case "deduplicated": return .purple
         case "deleted": return .red
-        case "started": return .orange
         case "error": return .red
         default: return .secondary
         }

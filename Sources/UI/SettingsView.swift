@@ -159,10 +159,10 @@ struct SettingsView: View {
                 if provider == .gemini {
                     Text("무료")
                         .font(.system(size: 8, weight: .semibold))
-                        .foregroundColor(.green)
+                        .foregroundColor(.secondary)
                         .padding(.horizontal, 4)
                         .padding(.vertical, 1)
-                        .background(Color.green.opacity(0.12))
+                        .background(Color.secondary.opacity(0.12))
                         .cornerRadius(2)
                 }
             }
@@ -550,10 +550,7 @@ struct SettingsView: View {
     }
 
     private func providerAccentColor(_ provider: AIProvider) -> Color {
-        switch provider {
-        case .claude: return Color(red: 0.85, green: 0.45, blue: 0.25)
-        case .gemini: return Color(red: 0.25, green: 0.52, blue: 0.96)
-        }
+        .accentColor
     }
 }
 
@@ -595,12 +592,7 @@ struct ProviderSelectCard: View {
     let badgeColor: Color
     let action: () -> Void
 
-    private var accent: Color {
-        switch provider {
-        case .claude: return Color(red: 0.85, green: 0.45, blue: 0.25)
-        case .gemini: return Color(red: 0.25, green: 0.52, blue: 0.96)
-        }
-    }
+    private var accent: Color { .accentColor }
 
     var body: some View {
         Button(action: action) {
