@@ -107,36 +107,75 @@ struct OnboardingView: View {
         UserDefaults.standard.set(step, forKey: "onboardingStep")
     }
 
-    // MARK: - Step 0: Welcome
+    // MARK: - Step 0: Welcome (Before/After)
 
     private var welcomeStep: some View {
         VStack(spacing: 0) {
             Spacer()
 
-            Text("·‿·")
-                .font(.system(size: 36, design: .monospaced))
-                .foregroundColor(.primary)
-                .padding(.bottom, 12)
-
             Text("DotBrain에 오신 걸 환영합니다")
                 .font(.title3)
                 .fontWeight(.semibold)
-                .padding(.bottom, 6)
+                .padding(.bottom, 4)
 
-            Text("파일을 추가하면 AI가 PARA 구조로 정리합니다")
+            Text("파일을 던지면, AI가 알아서 정리합니다")
                 .font(.subheadline)
                 .foregroundColor(.secondary)
-                .padding(.bottom, 20)
+                .padding(.bottom, 16)
 
-            VStack(alignment: .leading, spacing: 6) {
-                paraRow(letter: "P", name: "Project", desc: "진행 중인 프로젝트")
-                paraRow(letter: "A", name: "Area", desc: "지속적으로 관리하는 영역")
-                paraRow(letter: "R", name: "Resource", desc: "참고 자료 및 레퍼런스")
-                paraRow(letter: "A", name: "Archive", desc: "완료되거나 보관할 것")
+            // Before box
+            VStack(alignment: .leading, spacing: 0) {
+                Text("지금")
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.secondary)
+                    .padding(.bottom, 6)
+
+                VStack(alignment: .leading, spacing: 3) {
+                    beforeFileRow("회의록_최종_진짜최종.pdf")
+                    beforeFileRow("보고서(2).docx")
+                    beforeFileRow("스크린샷 2026-01-15.png")
+                    beforeFileRow("이름없는문서.txt")
+                    beforeFileRow("메모.md")
+                }
             }
-            .padding(14)
-            .background(Color.secondary.opacity(0.05))
+            .padding(10)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.secondary.opacity(0.08))
             .cornerRadius(8)
+            .padding(.horizontal, 32)
+
+            // Arrow
+            Image(systemName: "arrow.down")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundColor(.secondary)
+                .padding(.vertical, 8)
+
+            // After box
+            VStack(alignment: .leading, spacing: 0) {
+                Text("DotBrain으로 정리하면")
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.green)
+                    .padding(.bottom, 6)
+
+                VStack(alignment: .leading, spacing: 3) {
+                    afterFolderRow("Project/마케팅 캠페인/")
+                    afterFileRow("회의록.pdf", indent: true)
+                    afterFolderRow("Resource/")
+                    afterFileRow("보고서.docx", indent: true)
+                    afterFolderRow("Area/업무 관리/")
+                    afterFileRow("메모.md", indent: true)
+                }
+            }
+            .padding(10)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.green.opacity(0.06))
+            .cornerRadius(8)
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .strokeBorder(Color.green.opacity(0.15), lineWidth: 1)
+            )
             .padding(.horizontal, 32)
 
             Spacer()
@@ -155,21 +194,35 @@ struct OnboardingView: View {
         .padding(.horizontal)
     }
 
-    private func paraRow(letter: String, name: String, desc: String) -> some View {
-        HStack(spacing: 10) {
-            Text(letter)
-                .font(.system(.subheadline, design: .monospaced))
-                .fontWeight(.bold)
-                .frame(width: 18)
-            VStack(alignment: .leading, spacing: 1) {
-                Text(name)
-                    .font(.subheadline)
-                    .fontWeight(.medium)
-                Text(desc)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
+    private func beforeFileRow(_ name: String) -> some View {
+        HStack(spacing: 5) {
+            Text("📄")
+                .font(.caption2)
+            Text(name)
+                .font(.system(.caption, design: .monospaced))
+                .foregroundColor(.secondary)
         }
+    }
+
+    private func afterFolderRow(_ name: String) -> some View {
+        HStack(spacing: 5) {
+            Text("📁")
+                .font(.caption2)
+            Text(name)
+                .font(.system(.caption, design: .monospaced))
+                .fontWeight(.medium)
+        }
+    }
+
+    private func afterFileRow(_ name: String, indent: Bool) -> some View {
+        HStack(spacing: 5) {
+            Text("📄")
+                .font(.caption2)
+            Text(name)
+                .font(.system(.caption, design: .monospaced))
+                .foregroundColor(.secondary)
+        }
+        .padding(.leading, indent ? 20 : 0)
     }
 
     // MARK: - Step 1: Folder Setup
