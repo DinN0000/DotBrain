@@ -5,6 +5,11 @@ struct DashboardView: View {
     @State private var stats = PKMStatistics()
     @State private var urgentFolderCount = 0
 
+    // Vault check state
+    @State private var isVaultChecking = false
+    @State private var vaultCheckPhase = ""
+    @State private var vaultCheckResult: VaultCheckResult?
+
     var body: some View {
         VStack(spacing: 0) {
             BreadcrumbView(current: .dashboard)
@@ -35,7 +40,7 @@ struct DashboardView: View {
                         Text("·").foregroundColor(.secondary)
                         statButton("R", count: r, color: .orange, category: .resource)
                         Text("·").foregroundColor(.secondary)
-                        statButton("AR", count: ar, color: .gray, category: .archive)
+                        statButton("A", count: ar, color: .gray, category: .archive)
                     }
                     .font(.caption)
                     .monospacedDigit()
@@ -67,30 +72,54 @@ struct DashboardView: View {
                         .cornerRadius(6)
                     }
 
-                    // Hub cards: 2 top + 1 full width
-                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
+                    // Group 1: File operations
+                    DashboardCardGroup(label: "파일", tint: .blue) {
                         DashboardHubCard(
                             icon: "folder.badge.gearshape",
                             title: "폴더 관리",
-                            subtitle: "이동 · 생성 · 정리"
+                            subtitle: "이동 · 생성 · 정리",
+                            tint: .blue
                         ) {
                             appState.currentScreen = .paraManage
                         }
                         DashboardHubCard(
                             icon: "magnifyingglass",
                             title: "검색",
-                            subtitle: "파일 · 태그 검색"
+                            subtitle: "파일 · 태그 검색",
+                            tint: .blue
                         ) {
                             appState.currentScreen = .search
                         }
                     }
 
-                    DashboardHubCard(
-                        icon: "wrench.and.screwdriver",
-                        title: "볼트 관리",
-                        subtitle: "오류 검사 · 정리 · 보완"
-                    ) {
-                        appState.currentScreen = .vaultManage
+                    // Group 2: Vault maintenance
+                    DashboardCardGroup(label: "볼트", tint: .orange) {
+                        DashboardHubCard(
+                            icon: "checkmark.shield",
+                            title: "볼트 점검",
+                            subtitle: "오류 검사 · 메타 보완",
+                            tint: .orange,
+                            isDisabled: isVaultChecking
+                        ) {
+                            runVaultCheck()
+                        }
+                        DashboardHubCard(
+                            icon: "arrow.triangle.2.circlepath",
+                            title: "전체 재정리",
+                            subtitle: "AI 위치 재분류",
+                            tint: .orange
+                        ) {
+                            appState.currentScreen = .vaultReorganize
+                        }
+                    }
+
+                    // Vault check inline results
+                    if isVaultChecking {
+                        InlineProgress(message: vaultCheckPhase)
+                    }
+
+                    if let result = vaultCheckResult {
+                        vaultCheckResultView(result)
                     }
 
                     // Recent activity
@@ -143,6 +172,81 @@ struct DashboardView: View {
         }
     }
 
+    // MARK: - Vault Check Result View
+
+    @ViewBuilder
+    private func vaultCheckResultView(_ result: VaultCheckResult) -> some View {
+        VStack(spacing: 6) {
+            // Audit results
+            if result.auditTotal > 0 {
+                HStack(spacing: 6) {
+                    Image(systemName: "exclamationmark.triangle")
+                        .font(.caption)
+                        .foregroundColor(.orange)
+                    Text("\(result.auditTotal)건 발견")
+                        .font(.caption)
+                        .fontWeight(.medium)
+                    Spacer()
+                    if result.repairCount > 0 {
+                        Text("\(result.repairCount)건 자동 복구")
+                            .font(.caption)
+                            .foregroundColor(.green)
+                    }
+                }
+            }
+
+            // Enrich results
+            if result.enrichCount > 0 {
+                HStack(spacing: 6) {
+                    Image(systemName: "text.badge.star")
+                        .font(.caption)
+                        .foregroundColor(.blue)
+                    Text("\(result.enrichCount)개 메타데이터 보완")
+                        .font(.caption)
+                    Spacer()
+                }
+            }
+
+            // MOC update
+            if result.mocUpdated {
+                HStack(spacing: 6) {
+                    Image(systemName: "doc.text.magnifyingglass")
+                        .font(.caption)
+                        .foregroundColor(.purple)
+                    Text("폴더 요약 갱신 완료")
+                        .font(.caption)
+                    Spacer()
+                }
+            }
+
+            // All clean
+            if result.auditTotal == 0 && result.enrichCount == 0 {
+                HStack(spacing: 6) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.caption)
+                        .foregroundColor(.green)
+                    Text("볼트 상태 양호")
+                        .font(.caption)
+                        .foregroundColor(.green)
+                    Spacer()
+                }
+            }
+
+            // Dismiss
+            HStack {
+                Spacer()
+                Button("닫기") { vaultCheckResult = nil }
+                    .font(.caption2)
+                    .buttonStyle(.plain)
+                    .foregroundColor(.secondary)
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(Color.green.opacity(0.06))
+        .cornerRadius(8)
+    }
+
     // MARK: - Interactive Stat Button
 
     private func statButton(_ label: String, count: Int, color: Color, category: PARACategory) -> some View {
@@ -164,7 +268,7 @@ struct DashboardView: View {
             let pathManager = PKMPathManager(root: root)
             let fm = FileManager.default
             var count = 0
-            for cat in PARACategory.allCases {
+            for cat in PARACategory.allCases where cat != .archive {
                 let basePath = pathManager.paraPath(for: cat)
                 guard let entries = try? fm.contentsOfDirectory(atPath: basePath) else { continue }
                 for entry in entries where !entry.hasPrefix(".") && !entry.hasPrefix("_") {
@@ -182,6 +286,67 @@ struct DashboardView: View {
             let snapshot = count
             await MainActor.run {
                 urgentFolderCount = snapshot
+            }
+        }
+    }
+
+    // MARK: - Vault Check (Audit + Repair + Enrich + MOC)
+
+    private func runVaultCheck() {
+        guard !isVaultChecking else { return }
+        isVaultChecking = true
+        vaultCheckResult = nil
+        let root = appState.pkmRootPath
+
+        Task.detached {
+            var auditTotal = 0
+            var repairCount = 0
+            var enrichCount = 0
+
+            // 1. Audit
+            await MainActor.run { vaultCheckPhase = "오류 검사 중..." }
+            let auditor = VaultAuditor(pkmRoot: root)
+            let report = auditor.audit()
+            auditTotal = report.totalIssues
+
+            // 2. Auto-repair
+            if report.totalIssues > 0 {
+                await MainActor.run { vaultCheckPhase = "자동 복구 중..." }
+                let repair = auditor.repair(report: report)
+                repairCount = repair.linksFixed + repair.frontmatterInjected + repair.paraFixed
+            }
+
+            // 3. Enrich metadata
+            await MainActor.run { vaultCheckPhase = "메타데이터 보완 중..." }
+            let enricher = NoteEnricher(pkmRoot: root)
+            let pm = PKMPathManager(root: root)
+            let fm = FileManager.default
+            for basePath in [pm.projectsPath, pm.areaPath, pm.resourcePath] {
+                guard let folders = try? fm.contentsOfDirectory(atPath: basePath) else { continue }
+                for folder in folders where !folder.hasPrefix(".") && !folder.hasPrefix("_") {
+                    let folderPath = (basePath as NSString).appendingPathComponent(folder)
+                    let results = await enricher.enrichFolder(at: folderPath)
+                    enrichCount += results.count
+                }
+            }
+
+            // 4. MOC regenerate
+            await MainActor.run { vaultCheckPhase = "폴더 요약 갱신 중..." }
+            let generator = MOCGenerator(pkmRoot: root)
+            await generator.regenerateAll()
+
+            let snapshot = VaultCheckResult(
+                auditTotal: auditTotal,
+                repairCount: repairCount,
+                enrichCount: enrichCount,
+                mocUpdated: true
+            )
+            await MainActor.run {
+                vaultCheckResult = snapshot
+                isVaultChecking = false
+                // Refresh stats after check
+                let service = StatisticsService(pkmRoot: root)
+                stats = service.collectStatistics()
             }
         }
     }
@@ -211,22 +376,64 @@ struct DashboardView: View {
     }
 }
 
+private struct VaultCheckResult {
+    let auditTotal: Int
+    let repairCount: Int
+    let enrichCount: Int
+    let mocUpdated: Bool
+}
+
+struct DashboardCardGroup<Content: View>: View {
+    let label: String
+    let tint: Color
+    @ViewBuilder let content: () -> Content
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 4) {
+                RoundedRectangle(cornerRadius: 1)
+                    .fill(tint.opacity(0.5))
+                    .frame(width: 2, height: 10)
+                Text(label)
+                    .font(.caption2)
+                    .fontWeight(.semibold)
+                    .foregroundColor(tint.opacity(0.7))
+                    .textCase(.uppercase)
+            }
+            .padding(.leading, 4)
+
+            HStack(spacing: 8) {
+                content()
+            }
+        }
+    }
+}
+
 struct DashboardHubCard: View {
     let icon: String
     let title: String
     let subtitle: String
+    var tint: Color = .accentColor
+    var isDisabled: Bool = false
     let action: () -> Void
+
+    @State private var isHovered = false
 
     var body: some View {
         Button(action: action) {
-            VStack(spacing: 6) {
-                Image(systemName: icon)
-                    .font(.system(size: 20))
-                    .foregroundColor(.accentColor)
+            VStack(spacing: 5) {
+                ZStack {
+                    Circle()
+                        .fill(tint.opacity(isHovered ? 0.15 : 0.08))
+                        .frame(width: 32, height: 32)
+                    Image(systemName: icon)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundColor(tint)
+                }
 
                 Text(title)
-                    .font(.subheadline)
-                    .fontWeight(.medium)
+                    .font(.caption)
+                    .fontWeight(.semibold)
 
                 Text(subtitle)
                     .font(.caption2)
@@ -234,10 +441,21 @@ struct DashboardHubCard: View {
                     .lineLimit(1)
             }
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 14)
+            .padding(.vertical, 10)
+            .background(
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(isHovered ? tint.opacity(0.06) : Color.primary.opacity(0.02))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .strokeBorder(isHovered ? tint.opacity(0.2) : Color.primary.opacity(0.06), lineWidth: 0.5)
+            )
         }
-        .buttonStyle(.bordered)
-        .controlSize(.regular)
+        .buttonStyle(.plain)
+        .disabled(isDisabled)
+        .opacity(isDisabled ? 0.5 : 1)
+        .onHover { isHovered = $0 }
+        .animation(.easeOut(duration: 0.15), value: isHovered)
     }
 }
 

@@ -12,6 +12,17 @@ final class AppState: ObservableObject {
         "m", "mm", "sh", "bash", "vue", "svelte",
     ]
 
+    // MARK: - Processing Phase
+
+    enum ProcessingPhase: String {
+        case preparing = "준비"
+        case extracting = "분석"
+        case classifying = "AI 분류"
+        case linking = "노트 연결"
+        case processing = "정리"
+        case finishing = "마무리"
+    }
+
     // MARK: - Published State
 
     enum Screen {
@@ -23,15 +34,12 @@ final class AppState: ObservableObject {
         case dashboard
         case search
         case paraManage
-        case vaultManage
         case vaultReorganize
 
         var parent: Screen? {
             switch self {
-            case .paraManage, .search, .vaultManage:
+            case .paraManage, .search, .vaultReorganize:
                 return .dashboard
-            case .vaultReorganize:
-                return .vaultManage
             case .results:
                 return nil
             default:
@@ -46,7 +54,6 @@ final class AppState: ObservableObject {
             case .settings: return "설정"
             case .paraManage: return "폴더 관리"
             case .search: return "검색"
-            case .vaultManage: return "볼트 관리"
             case .vaultReorganize: return "전체 재정리"
             case .results: return "정리 결과"
             default: return ""
@@ -66,6 +73,7 @@ final class AppState: ObservableObject {
     @Published var pendingConfirmations: [PendingConfirmation] = []
     @Published var reorganizeCategory: PARACategory?
     @Published var reorganizeSubfolder: String?
+    @Published var processingPhase: ProcessingPhase = .preparing
     @Published var processingOrigin: Screen = .inbox
     @Published var affectedFolders: Set<String> = []
     @Published var navigationId = UUID()
@@ -125,8 +133,6 @@ final class AppState: ObservableObject {
         case .search:
             return "·_·?"
         case .paraManage:
-            return "·_·"
-        case .vaultManage:
             return "·_·"
         case .vaultReorganize:
             return "·_·…"
@@ -204,6 +210,7 @@ final class AppState: ObservableObject {
         processedResults = []
         pendingConfirmations = []
         affectedFolders = []
+        processingPhase = .preparing
         processingOrigin = .inbox
         currentScreen = .processing
 
@@ -221,6 +228,11 @@ final class AppState: ObservableObject {
                         self?.processingCompletedCount = completed
                         self?.processingTotalCount = total
                         self?.processingCurrentFile = fileName
+                    }
+                },
+                onPhaseChange: { [weak self] phase in
+                    Task { @MainActor in
+                        self?.processingPhase = phase
                     }
                 }
             )
@@ -251,6 +263,7 @@ final class AppState: ObservableObject {
         processingCurrentFile = ""
         processingCompletedCount = 0
         processingTotalCount = 0
+        processingPhase = .preparing
         currentScreen = processingOrigin == .paraManage ? .paraManage : .inbox
         Task {
             await refreshInboxCount()
@@ -274,6 +287,7 @@ final class AppState: ObservableObject {
         processedResults = []
         pendingConfirmations = []
         affectedFolders = []
+        processingPhase = .preparing
         processingOrigin = .paraManage
         currentScreen = .processing
 
@@ -293,6 +307,11 @@ final class AppState: ObservableObject {
                         self?.processingCompletedCount = completed
                         self?.processingTotalCount = total
                         self?.processingCurrentFile = fileName
+                    }
+                },
+                onPhaseChange: { [weak self] phase in
+                    Task { @MainActor in
+                        self?.processingPhase = phase
                     }
                 }
             )
@@ -365,6 +384,11 @@ final class AppState: ObservableObject {
                             self?.processingCompletedCount = completed
                             self?.processingTotalCount = total
                             self?.processingCurrentFile = fileName
+                        }
+                    },
+                    onPhaseChange: { [weak self] phase in
+                        Task { @MainActor in
+                            self?.processingPhase = phase
                         }
                     }
                 )
