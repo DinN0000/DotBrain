@@ -30,3 +30,21 @@
 - `StatisticsService` calls (addApiCost, incrementDuplicates, recordActivity) must be wired manually at each call site
 - Wiki-links `[[note]]` in `## Related Notes` sections enable cross-note navigation for both humans and AI
 - MOC files (`folderName.md`) auto-generated as folder-level table of contents
+
+## Release Workflow
+- GitHub: `DinN0000/DotBrain`
+- Release assets: `DotBrain` (universal binary) + `AppIcon.icns` — naming must be exact
+- Use `/release` command for guided release process
+- `AICompanionService.swift` version must be bumped when behavior changes (triggers vault auto-update)
+
+## Branch Rules
+- `main` — stable, release-ready
+- `feature/*` — feature work, merge into main when done
+- Never switch branches on active working repo — use `/tmp/` temporary clones for cross-branch operations
+- Delete feature branches after merge (local + remote)
+
+## Custom Commands
+- `/review` — code review against CLAUDE.md rules
+- `/check` — quick project status (build, git, release)
+- `/release` — guided release workflow
+- `/status` — DotBrain app status
