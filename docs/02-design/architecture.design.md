@@ -81,10 +81,10 @@ enum Screen {
     case processing      // 처리 중
     case results         // 결과 표시
     case settings        // 설정
-    case reorganize      // 폴더 재정리
     case dashboard       // 통계/대시보드
     case search          // 볼트 검색
-    case projectManage   // PARA 관리
+    case paraManage      // PARA 폴더 관리
+    case vaultReorganize // 볼트 전체 재정리
 }
 ```
 
@@ -225,10 +225,10 @@ enum Screen {
 | `ProcessingView` | 진행률 + 상태 업데이트 |
 | `ResultsView` | 처리 결과 목록, 보류 항목 확인 |
 | `SettingsView` | API 키, PKM 경로, Provider 선택 |
-| `ReorganizeView` | 폴더 선택 → 배치 재정리 |
 | `DashboardView` | 통계: 파일 수, API 비용, 활동 이력 |
 | `SearchView` | 볼트 검색 |
-| `ProjectManageView` | PARA 프로젝트 관리 (생성/이동/삭제) |
+| `PARAManageView` | PARA 폴더 관리 (생성/이동/삭제/건강 표시) |
+| `VaultReorganizeView` | 볼트 전체 재정리 (AI 재분류) |
 | `OnboardingView` | 5단계 초기 설정 위자드 |
 
 ---
