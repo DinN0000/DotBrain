@@ -1,0 +1,10 @@
+{
+  "dotbrain-fixes": {
+    "phase": "archived",
+    "matchRate": 100,
+    "iterationCount": 1,
+    "startedAt": "2026-02-15T00:00:00Z",
+    "archivedAt": "2026-02-16T00:00:00Z",
+    "archivedTo": "docs/archive/2026-02/dotbrain-fixes/"
+  }
+}
