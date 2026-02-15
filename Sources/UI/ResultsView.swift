@@ -6,8 +6,7 @@ struct ResultsView: View {
 
     private var navigateBackLabel: String {
         switch appState.processingOrigin {
-        case .reorganize: return "폴더 목록"
-        case .paraManage: return "PARA 관리"
+        case .paraManage: return "폴더 관리"
         default: return "돌아가기"
         }
     }

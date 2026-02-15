@@ -16,15 +16,10 @@ struct MenuBarPopover: View {
                 ResultsView()
             case .settings:
                 SettingsView()
-            case .reorganize:
-                ReorganizeView()
-                    .id(appState.navigationId)
             case .dashboard:
                 DashboardView()
             case .search:
                 SearchView()
-            case .projectManage:
-                ProjectManageView()
             case .paraManage:
                 PARAManageView()
                     .id(appState.navigationId)

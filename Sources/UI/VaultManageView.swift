@@ -149,15 +149,6 @@ struct VaultManageView: View {
                     ) {
                         appState.currentScreen = .vaultReorganize
                     }
-
-                    // MARK: 5. Folder Reorganize (navigate)
-                    DashboardActionButton(
-                        icon: "folder.badge.plus",
-                        title: "폴더별 정리",
-                        subtitle: "특정 폴더를 선택해 자동 정리"
-                    ) {
-                        appState.currentScreen = .reorganize
-                    }
                 }
                 .padding()
             }

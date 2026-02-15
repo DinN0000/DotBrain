@@ -48,6 +48,110 @@ struct PARAMover {
         return updatedCount
     }
 
+    // MARK: - Delete
+
+    /// Move a folder to macOS Trash (recoverable via Finder).
+    func deleteFolder(name: String, category: PARACategory) throws {
+        let fm = FileManager.default
+        let safeName = sanitizeName(name)
+        let basePath = pathManager.paraPath(for: category)
+        let folderPath = (basePath as NSString).appendingPathComponent(safeName)
+
+        guard fm.fileExists(atPath: folderPath) else {
+            throw PARAMoveError.notFound(safeName, category)
+        }
+
+        let folderURL = URL(fileURLWithPath: folderPath)
+        try fm.trashItem(at: folderURL, resultingItemURL: nil)
+    }
+
+    // MARK: - Merge
+
+    /// Merge source folder into target folder within the same category.
+    /// Moves all files from source to target, appending timestamp on conflict.
+    /// Updates frontmatter project fields, then deletes source folder.
+    /// Returns the number of files moved.
+    func mergeFolder(source: String, into target: String, category: PARACategory) throws -> Int {
+        let fm = FileManager.default
+        let safeSource = sanitizeName(source)
+        let safeTarget = sanitizeName(target)
+        let basePath = pathManager.paraPath(for: category)
+        let sourceDir = (basePath as NSString).appendingPathComponent(safeSource)
+        let targetDir = (basePath as NSString).appendingPathComponent(safeTarget)
+
+        guard fm.fileExists(atPath: sourceDir) else {
+            throw PARAMoveError.notFound(safeSource, category)
+        }
+        guard fm.fileExists(atPath: targetDir) else {
+            throw PARAMoveError.notFound(safeTarget, category)
+        }
+
+        guard let entries = try? fm.contentsOfDirectory(atPath: sourceDir) else { return 0 }
+        var movedCount = 0
+
+        for entry in entries {
+            guard !entry.hasPrefix(".") else { continue }
+
+            // Skip source's own index note
+            if entry == "\(safeSource).md" { continue }
+            // Skip _Assets — merge separately
+            if entry == "_Assets" {
+                let sourceAssets = (sourceDir as NSString).appendingPathComponent("_Assets")
+                let targetAssets = (targetDir as NSString).appendingPathComponent("_Assets")
+                try? fm.createDirectory(atPath: targetAssets, withIntermediateDirectories: true)
+                if let assetFiles = try? fm.contentsOfDirectory(atPath: sourceAssets) {
+                    for assetFile in assetFiles where !assetFile.hasPrefix(".") {
+                        let src = (sourceAssets as NSString).appendingPathComponent(assetFile)
+                        var dst = (targetAssets as NSString).appendingPathComponent(assetFile)
+                        if fm.fileExists(atPath: dst) {
+                            let ext = (assetFile as NSString).pathExtension
+                            let base = (assetFile as NSString).deletingPathExtension
+                            let ts = Int(Date().timeIntervalSince1970)
+                            dst = (targetAssets as NSString).appendingPathComponent(
+                                ext.isEmpty ? "\(base)_\(ts)" : "\(base)_\(ts).\(ext)"
+                            )
+                        }
+                        try? fm.moveItem(atPath: src, toPath: dst)
+                    }
+                }
+                continue
+            }
+
+            let srcPath = (sourceDir as NSString).appendingPathComponent(entry)
+            var dstPath = (targetDir as NSString).appendingPathComponent(entry)
+
+            // Resolve name conflicts with timestamp
+            if fm.fileExists(atPath: dstPath) {
+                let ext = (entry as NSString).pathExtension
+                let base = (entry as NSString).deletingPathExtension
+                let ts = Int(Date().timeIntervalSince1970)
+                let newName = ext.isEmpty ? "\(base)_\(ts)" : "\(base)_\(ts).\(ext)"
+                dstPath = (targetDir as NSString).appendingPathComponent(newName)
+            }
+
+            try fm.moveItem(atPath: srcPath, toPath: dstPath)
+            movedCount += 1
+
+            // Update project field in frontmatter for .md files
+            if entry.hasSuffix(".md") {
+                if var content = try? String(contentsOfFile: dstPath, encoding: .utf8) {
+                    let (existing, body) = Frontmatter.parse(markdown: content)
+                    if existing.project == safeSource {
+                        var updated = existing
+                        updated.project = safeTarget
+                        content = updated.stringify() + "\n" + body
+                        try? content.write(toFile: dstPath, atomically: true, encoding: .utf8)
+                    }
+                }
+            }
+        }
+
+        // Remove now-empty source folder
+        try? fm.removeItem(atPath: sourceDir)
+
+        return movedCount
+    }
+
     // MARK: - List
 
     /// List all folders in a given PARA category with file count and summary.

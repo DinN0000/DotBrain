@@ -14,7 +14,7 @@ struct ProcessingView: View {
     }
 
     private var originTitle: String {
-        appState.processingOrigin == .reorganize ? "폴더 정리 중" : "인박스 처리 중"
+        appState.processingOrigin == .paraManage ? "폴더 정리 중" : "인박스 처리 중"
     }
 
     var body: some View {
