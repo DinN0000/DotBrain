@@ -63,6 +63,9 @@ final class AppState: ObservableObject {
     @Published var isProcessing: Bool = false
     @Published var processingProgress: Double = 0
     @Published var processingStatus: String = ""
+    @Published var processingCurrentFile: String = ""
+    @Published var processingCompletedCount: Int = 0
+    @Published var processingTotalCount: Int = 0
     @Published var processedResults: [ProcessedFileResult] = []
     @Published var pendingConfirmations: [PendingConfirmation] = []
     @Published var reorganizeCategory: PARACategory?
@@ -202,6 +205,9 @@ final class AppState: ObservableObject {
         isProcessing = true
         processingProgress = 0
         processingStatus = "시작 중..."
+        processingCurrentFile = ""
+        processingCompletedCount = 0
+        processingTotalCount = 0
         processedResults = []
         pendingConfirmations = []
         affectedFolders = []
@@ -215,6 +221,13 @@ final class AppState: ObservableObject {
                     Task { @MainActor in
                         self?.processingProgress = progress
                         self?.processingStatus = status
+                    }
+                },
+                onFileProgress: { [weak self] completed, total, fileName in
+                    Task { @MainActor in
+                        self?.processingCompletedCount = completed
+                        self?.processingTotalCount = total
+                        self?.processingCurrentFile = fileName
                     }
                 }
             )
@@ -242,6 +255,9 @@ final class AppState: ObservableObject {
         isProcessing = false
         processingProgress = 0
         processingStatus = ""
+        processingCurrentFile = ""
+        processingCompletedCount = 0
+        processingTotalCount = 0
         currentScreen = processingOrigin == .reorganize ? .reorganize
             : processingOrigin == .paraManage ? .paraManage : .inbox
         Task {
@@ -260,6 +276,9 @@ final class AppState: ObservableObject {
         isProcessing = true
         processingProgress = 0
         processingStatus = "시작 중..."
+        processingCurrentFile = ""
+        processingCompletedCount = 0
+        processingTotalCount = 0
         processedResults = []
         pendingConfirmations = []
         affectedFolders = []
@@ -275,6 +294,13 @@ final class AppState: ObservableObject {
                     Task { @MainActor in
                         self?.processingProgress = progress
                         self?.processingStatus = status
+                    }
+                },
+                onFileProgress: { [weak self] completed, total, fileName in
+                    Task { @MainActor in
+                        self?.processingCompletedCount = completed
+                        self?.processingTotalCount = total
+                        self?.processingCurrentFile = fileName
                     }
                 }
             )
@@ -310,6 +336,9 @@ final class AppState: ObservableObject {
         isProcessing = true
         processingProgress = 0
         processingStatus = "시작 중..."
+        processingCurrentFile = ""
+        processingCompletedCount = 0
+        processingTotalCount = 0
         processedResults = []
         pendingConfirmations = []
         affectedFolders = []
@@ -337,6 +366,13 @@ final class AppState: ObservableObject {
                             let scaled = folderProgress + progress / Double(folders.count)
                             self?.processingProgress = scaled
                             self?.processingStatus = "[\(index + 1)/\(folders.count)] \(status)"
+                        }
+                    },
+                    onFileProgress: { [weak self] completed, total, fileName in
+                        Task { @MainActor in
+                            self?.processingCompletedCount = completed
+                            self?.processingTotalCount = total
+                            self?.processingCurrentFile = fileName
                         }
                     }
                 )

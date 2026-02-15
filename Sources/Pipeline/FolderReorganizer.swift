@@ -8,6 +8,7 @@ struct FolderReorganizer {
     let category: PARACategory
     let subfolder: String
     let onProgress: ((Double, String) -> Void)?
+    let onFileProgress: ((Int, Int, String) -> Void)?
 
     private var pathManager: PKMPathManager {
         PKMPathManager(root: pkmRoot)
@@ -39,6 +40,7 @@ struct FolderReorganizer {
         }
 
         onProgress?(0.05, "\(files.count)개 파일 발견")
+        onFileProgress?(0, files.count, "")
 
         // Step 3: Deduplicate
         let (uniqueFiles, dupResults) = deduplicateFiles(files, in: folderPath)
@@ -125,6 +127,7 @@ struct FolderReorganizer {
         for (i, (classification, input)) in zip(enrichedClassifications, inputs).enumerated() {
             let progress = 0.7 + Double(i) / Double(max(enrichedClassifications.count, 1)) * 0.25
             onProgress?(progress, "\(input.fileName) 처리 중...")
+            onFileProgress?(i, inputs.count, input.fileName)
 
             let currentCategory = category
             let currentFolder = subfolder
@@ -190,6 +193,7 @@ struct FolderReorganizer {
             await mocGenerator.updateMOCsForFolders(affectedFolders)
         }
 
+        onFileProgress?(inputs.count, inputs.count, "")
         onProgress?(0.95, "완료 정리 중...")
 
         NotificationService.sendProcessingComplete(
