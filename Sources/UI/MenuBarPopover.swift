@@ -34,57 +34,42 @@ struct MenuBarPopover: View {
                 VaultReorganizeView()
             }
 
-            // Footer (hidden during onboarding, settings, and processing)
-            if appState.currentScreen != .settings && appState.currentScreen != .onboarding {
+            // Footer (hidden during onboarding and processing)
+            if ![.onboarding, .processing].contains(appState.currentScreen) {
                 Divider()
-                HStack {
-                    Button(action: { appState.currentScreen = .settings }) {
-                        Image(systemName: "gear")
-                            .foregroundColor(.secondary)
-                    }
-                    .buttonStyle(.plain)
-
-                    Button(action: { appState.currentScreen = .dashboard }) {
-                        Image(systemName: "chart.bar.fill")
-                            .foregroundColor(.secondary)
-                    }
-                    .buttonStyle(.plain)
-
-                    Button(action: { appState.currentScreen = .search }) {
-                        Image(systemName: "magnifyingglass")
-                            .foregroundColor(.secondary)
-                    }
-                    .buttonStyle(.plain)
-
-                    Button(action: {
-                        if let url = URL(string: "https://github.com/DinN0000/DotBrain#readme") {
-                            NSWorkspace.shared.open(url)
-                        }
-                    }) {
-                        Image(systemName: "questionmark.circle")
-                            .foregroundColor(.secondary)
-                    }
-                    .buttonStyle(.plain)
-                    .help("도움말")
-
-                    Spacer()
-
-                    Text("DotBrain")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-
-                    Spacer()
-
-                    Button(action: { NSApp.terminate(nil) }) {
-                        Image(systemName: "power")
-                            .foregroundColor(.secondary)
-                    }
-                    .buttonStyle(.plain)
+                HStack(spacing: 0) {
+                    footerTab(icon: "tray.and.arrow.down", label: "인박스", screen: .inbox)
+                    footerTab(icon: "square.grid.2x2", label: "대시보드", screen: .dashboard)
+                    footerTab(icon: "gearshape", label: "설정", screen: .settings)
                 }
-                .padding(.horizontal)
-                .padding(.vertical, 8)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 6)
             }
         }
         .frame(width: 360, height: 480)
+    }
+
+    private func footerTab(icon: String, label: String, screen: AppState.Screen) -> some View {
+        Button(action: { appState.currentScreen = screen }) {
+            VStack(spacing: 2) {
+                Image(systemName: icon)
+                    .font(.system(size: 16))
+                Text(label)
+                    .font(.caption2)
+            }
+            .frame(maxWidth: .infinity)
+            .foregroundColor(isActive(screen) ? .accentColor : .secondary)
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func isActive(_ screen: AppState.Screen) -> Bool {
+        if appState.currentScreen == screen { return true }
+        var current = appState.currentScreen.parent
+        while let parent = current {
+            if parent == screen { return true }
+            current = parent.parent
+        }
+        return false
     }
 }
