@@ -94,6 +94,20 @@ struct InboxStatusView: View {
 
     // MARK: - Active State
 
+    private var inboxFiles: [URL] {
+        guard !appState.pkmRootPath.isEmpty else { return [] }
+        let inboxPath = PKMPathManager(root: appState.pkmRootPath).inboxPath
+        let fm = FileManager.default
+        guard let items = try? fm.contentsOfDirectory(
+            at: URL(fileURLWithPath: inboxPath),
+            includingPropertiesForKeys: nil,
+            options: [.skipsHiddenFiles]
+        ) else { return [] }
+        return items
+            .filter { !$0.lastPathComponent.hasPrefix("_") }
+            .sorted { $0.lastPathComponent < $1.lastPathComponent }
+    }
+
     private var activeStateView: some View {
         VStack(spacing: 16) {
             Image(systemName: isDragOver ? "tray.and.arrow.down" : "tray.and.arrow.down.fill")
@@ -112,14 +126,33 @@ struct InboxStatusView: View {
                         .font(.subheadline)
                         .foregroundColor(.green)
                         .transition(.opacity)
-                } else if appState.inboxFileCount > 0 {
-                    Text("\(appState.inboxFileCount)개 파일")
-                        .font(.title3)
-                        .foregroundColor(.secondary)
                 }
             }
 
             if appState.inboxFileCount > 0 {
+                VStack(spacing: 4) {
+                    ForEach(Array(inboxFiles.prefix(5).enumerated()), id: \.offset) { _, url in
+                        HStack(spacing: 8) {
+                            FileThumbnailView(url: url)
+                            Text(url.lastPathComponent)
+                                .font(.caption)
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                            Spacer()
+                        }
+                    }
+                    if inboxFiles.count > 5 {
+                        Text("외 \(inboxFiles.count - 5)개")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
+                .padding(.horizontal, 24)
+
+                Text("\(appState.inboxFileCount)개 파일, 약 \(max(appState.inboxFileCount * 3, 1))초")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+
                 Button(action: {
                     Task {
                         await appState.startProcessing()
@@ -130,7 +163,7 @@ struct InboxStatusView: View {
                         Text("정리하기")
                     }
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 8)
+                    .padding(.vertical, 2)
                 }
                 .buttonStyle(.borderedProminent)
                 .controlSize(.large)
