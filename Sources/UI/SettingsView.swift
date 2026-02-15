@@ -7,19 +7,7 @@ struct SettingsView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Header
-            HStack {
-                Button(action: { appState.currentScreen = .inbox }) {
-                    Image(systemName: "chevron.left")
-                }
-                .buttonStyle(.plain)
-
-                Text("설정")
-                    .font(.headline)
-
-                Spacer()
-            }
-            .padding()
+            BreadcrumbView(current: .settings)
 
             Divider()
 
@@ -157,6 +145,44 @@ struct SettingsView: View {
                             .foregroundColor(.accentColor)
                         }
                     }
+                    // MARK: - Help & Quit
+                    Divider().padding(.vertical, 2)
+
+                    Button(action: {
+                        if let url = URL(string: "https://github.com/DinN0000/DotBrain/issues") {
+                            NSWorkspace.shared.open(url)
+                        }
+                    }) {
+                        HStack {
+                            Image(systemName: "questionmark.circle")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                                .frame(width: 16)
+                            Text("도움말 및 문의")
+                                .font(.caption)
+                            Spacer()
+                            Image(systemName: "arrow.up.right")
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                    .buttonStyle(.plain)
+
+                    Button(action: {
+                        NSApplication.shared.terminate(nil)
+                    }) {
+                        HStack {
+                            Image(systemName: "power")
+                                .font(.caption)
+                                .foregroundColor(.red)
+                                .frame(width: 16)
+                            Text("앱 종료")
+                                .font(.caption)
+                                .foregroundColor(.red)
+                            Spacer()
+                        }
+                    }
+                    .buttonStyle(.plain)
                 }
                 .padding(.horizontal, 14)
                 .padding(.vertical, 10)
