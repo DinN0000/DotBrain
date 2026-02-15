@@ -10,7 +10,8 @@ enum KeychainService {
     private static let claudeKeyAccount = "anthropic-api-key"
     private static let geminiKeyAccount = "gemini-api-key"
 
-    private static let salt = "dotbrain-key-salt-v1"
+    private static let saltV1 = "dotbrain-key-salt-v1"
+    private static let saltV2 = "dotbrain-kdf-salt-v2"
 
     private static var storageURL: URL {
         let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
@@ -57,12 +58,25 @@ enum KeychainService {
 
     // MARK: - Encrypted File Storage
 
+    /// V2 encryption key using HKDF (stronger key derivation)
     private static func encryptionKey() -> SymmetricKey? {
         guard let uuid = hardwareUUID() else {
             print("[SecureStore] 하드웨어 UUID를 가져올 수 없음")
             return nil
         }
-        let material = uuid + salt
+        let inputKey = SymmetricKey(data: Data((uuid + saltV2).utf8))
+        return HKDF<SHA256>.deriveKey(
+            inputKeyMaterial: inputKey,
+            salt: Data(saltV2.utf8),
+            info: Data("dotbrain-encryption".utf8),
+            outputByteCount: 32
+        )
+    }
+
+    /// V1 encryption key (legacy — single SHA256, for migration only)
+    private static func encryptionKeyV1() -> SymmetricKey? {
+        guard let uuid = hardwareUUID() else { return nil }
+        let material = uuid + saltV1
         let hash = SHA256.hash(data: Data(material.utf8))
         return SymmetricKey(data: hash)
     }
@@ -71,16 +85,33 @@ enum KeychainService {
         guard FileManager.default.fileExists(atPath: storageURL.path) else {
             return [:]
         }
-        guard let key = encryptionKey() else { return [:] }
 
+        // Try V2 key first
+        if let key = encryptionKey(), let store = decryptStore(using: key) {
+            return store
+        }
+
+        // Fallback: try V1 key and auto-migrate to V2
+        if let keyV1 = encryptionKeyV1(), let store = decryptStore(using: keyV1) {
+            print("[SecureStore] V1 → V2 키 마이그레이션 중...")
+            if saveStore(store) {
+                print("[SecureStore] V1 → V2 키 마이그레이션 완료")
+            }
+            return store
+        }
+
+        print("[SecureStore] 복호화 실패 (V1, V2 모두)")
+        return [:]
+    }
+
+    private static func decryptStore(using key: SymmetricKey) -> [String: String]? {
         do {
             let data = try Data(contentsOf: storageURL)
             let box = try AES.GCM.SealedBox(combined: data)
             let decrypted = try AES.GCM.open(box, using: key)
-            return (try? JSONDecoder().decode([String: String].self, from: decrypted)) ?? [:]
+            return try? JSONDecoder().decode([String: String].self, from: decrypted)
         } catch {
-            print("[SecureStore] 복호화 실패: \(error.localizedDescription)")
-            return [:]
+            return nil
         }
     }
 

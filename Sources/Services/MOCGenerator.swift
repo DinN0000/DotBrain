@@ -246,9 +246,6 @@ struct MOCGenerator {
     }
 
     private func categoryFromPath(_ path: String) -> PARACategory {
-        if path.contains("/1_Project/") { return .project }
-        if path.contains("/2_Area/") { return .area }
-        if path.contains("/3_Resource/") { return .resource }
-        return .archive
+        PARACategory.fromPath(path) ?? .archive
     }
 }

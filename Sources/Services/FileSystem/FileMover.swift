@@ -201,14 +201,21 @@ struct FileMover {
         let assetsDir = pathManager.assetsDirectory(for: targetDir)
         try fm.createDirectory(atPath: assetsDir, withIntermediateDirectories: true)
 
-        // Duplicate check: skip hash for large files (>500MB) to avoid memory issues
+        // Duplicate check: hash for normal files, metadata for large files (>500MB)
         let fileSize = (try? fm.attributesOfItem(atPath: filePath)[.size] as? Int) ?? 0
         let maxHashSize = 500 * 1024 * 1024  // 500MB
+        var dupPath: String? = nil
+
         if fileSize <= maxHashSize,
-           let sourceHash = streamingHash(at: filePath),
-           let dupPath = findDuplicateByHash(sourceHash, in: assetsDir) {
+           let sourceHash = streamingHash(at: filePath) {
+            dupPath = findDuplicateByHash(sourceHash, in: assetsDir)
+        } else if fileSize > maxHashSize {
+            // Large file: compare by size + modification date
+            dupPath = findDuplicateByMetadata(fileSize: fileSize, filePath: filePath, in: assetsDir)
+        }
+
+        if let dupPath = dupPath {
             StatisticsService.incrementDuplicates()
-            // Merge tags into companion markdown if it exists
             let dupFileName = (dupPath as NSString).lastPathComponent
             let companionPath = (targetDir as NSString).appendingPathComponent("\(dupFileName).md")
             mergeTags(classification.tags, into: companionPath)
@@ -366,6 +373,25 @@ struct FileMover {
 
             if sourceHash == existingHash {
                 return filePath
+            }
+        }
+        return nil
+    }
+
+    /// Find a duplicate large binary file by comparing size + modification date
+    private func findDuplicateByMetadata(fileSize: Int, filePath: String, in dirPath: String) -> String? {
+        let fm = FileManager.default
+        guard let entries = try? fm.contentsOfDirectory(atPath: dirPath) else { return nil }
+        let srcAttr = try? fm.attributesOfItem(atPath: filePath)
+        let srcDate = srcAttr?[.modificationDate] as? Date
+
+        for entry in entries {
+            let existingPath = (dirPath as NSString).appendingPathComponent(entry)
+            guard let attr = try? fm.attributesOfItem(atPath: existingPath) else { continue }
+            let existingSize = attr[.size] as? Int
+            let existingDate = attr[.modificationDate] as? Date
+            if existingSize == fileSize, existingDate == srcDate {
+                return existingPath
             }
         }
         return nil

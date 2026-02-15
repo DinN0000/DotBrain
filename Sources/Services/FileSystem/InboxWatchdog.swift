@@ -62,6 +62,7 @@ final class InboxWatchdog {
     /// Stop watching
     func stop() {
         debounceWorkItem?.cancel()
+        debounceWorkItem = nil
         cancelRetry()
         source?.cancel()
         source = nil

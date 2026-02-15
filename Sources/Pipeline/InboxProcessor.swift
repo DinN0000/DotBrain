@@ -276,20 +276,7 @@ struct InboxProcessor {
         if isDirectory(filePath) {
             return extractFolderContent(from: filePath)
         }
-
-        if BinaryExtractor.isBinaryFile(filePath) {
-            let result = BinaryExtractor.extract(at: filePath)
-            let text = result.text ?? "[바이너리 파일: \(result.file?.name ?? "unknown")]"
-            // 분류용 입력은 5000자로 제한 (AI 요약은 FileMover에서 전체 텍스트로 별도 수행)
-            return String(text.prefix(5000))
-        }
-
-        // Text file
-        if let content = try? String(contentsOfFile: filePath, encoding: .utf8) {
-            return String(content.prefix(5000))
-        }
-
-        return "[읽기 실패: \((filePath as NSString).lastPathComponent)]"
+        return FileContentExtractor.extract(from: filePath)
     }
 
     /// Extract combined content from all files inside a folder

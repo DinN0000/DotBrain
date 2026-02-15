@@ -4,6 +4,9 @@ import Foundation
 class StatisticsService {
     private let pkmRoot: String
 
+    /// Serial queue for atomic read-modify-write on UserDefaults
+    private static let serialQueue = DispatchQueue(label: "com.hwaa.dotbrain.statistics")
+
     init(pkmRoot: String) {
         self.pkmRoot = pkmRoot
     }
@@ -35,33 +38,38 @@ class StatisticsService {
         return stats
     }
 
-    /// Record a classification activity
+    /// Record a classification activity (thread-safe)
     static func recordActivity(fileName: String, category: String, action: String) {
-        var history = loadActivityHistory()
-        let entry: [String: String] = [
-            "fileName": fileName,
-            "category": category,
-            "action": action,
-            "date": ISO8601DateFormatter().string(from: Date()),
-        ]
-        history.insert(entry, at: 0)
-        // Keep last 100 entries
-        if history.count > 100 {
-            history = Array(history.prefix(100))
+        serialQueue.sync {
+            var history = loadActivityHistory()
+            let entry: [String: String] = [
+                "fileName": fileName,
+                "category": category,
+                "action": action,
+                "date": ISO8601DateFormatter().string(from: Date()),
+            ]
+            history.insert(entry, at: 0)
+            if history.count > 100 {
+                history = Array(history.prefix(100))
+            }
+            UserDefaults.standard.set(history, forKey: "pkmActivityHistory")
         }
-        UserDefaults.standard.set(history, forKey: "pkmActivityHistory")
     }
 
-    /// Add to cumulative API cost
+    /// Add to cumulative API cost (thread-safe)
     static func addApiCost(_ cost: Double) {
-        let current = UserDefaults.standard.double(forKey: "pkmApiCost")
-        UserDefaults.standard.set(current + cost, forKey: "pkmApiCost")
+        serialQueue.sync {
+            let current = UserDefaults.standard.double(forKey: "pkmApiCost")
+            UserDefaults.standard.set(current + cost, forKey: "pkmApiCost")
+        }
     }
 
-    /// Increment duplicates found counter
+    /// Increment duplicates found counter (thread-safe)
     static func incrementDuplicates() {
-        let current = UserDefaults.standard.integer(forKey: "pkmDuplicatesFound")
-        UserDefaults.standard.set(current + 1, forKey: "pkmDuplicatesFound")
+        serialQueue.sync {
+            let current = UserDefaults.standard.integer(forKey: "pkmDuplicatesFound")
+            UserDefaults.standard.set(current + 1, forKey: "pkmDuplicatesFound")
+        }
     }
 
     // MARK: - Private

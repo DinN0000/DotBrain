@@ -44,4 +44,13 @@ enum PARACategory: String, Codable, CaseIterable {
         default: return nil
         }
     }
+
+    /// Detect PARA category from a file/folder path containing a PARA folder segment
+    static func fromPath(_ path: String) -> PARACategory? {
+        if path.contains("/1_Project/") || path.contains("/1_Project") { return .project }
+        if path.contains("/2_Area/") || path.contains("/2_Area") { return .area }
+        if path.contains("/3_Resource/") || path.contains("/3_Resource") { return .resource }
+        if path.contains("/4_Archive/") || path.contains("/4_Archive") { return .archive }
+        return nil
+    }
 }

@@ -259,15 +259,6 @@ struct VaultReorganizer {
 
     /// Extract text content from a file, handling binary files via BinaryExtractor.
     private func extractContent(from filePath: String) -> String {
-        if BinaryExtractor.isBinaryFile(filePath) {
-            let result = BinaryExtractor.extract(at: filePath)
-            return result.text ?? "[바이너리 파일: \(result.file?.name ?? "unknown")]"
-        }
-
-        if let content = try? String(contentsOfFile: filePath, encoding: .utf8) {
-            return String(content.prefix(5000))
-        }
-
-        return "[읽기 실패: \((filePath as NSString).lastPathComponent)]"
+        FileContentExtractor.extract(from: filePath)
     }
 }

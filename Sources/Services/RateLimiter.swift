@@ -86,7 +86,8 @@ actor RateLimiter {
         if isRateLimit {
             // 429: aggressive backoff — double interval + exponential cooldown
             ps.minInterval = min(ps.minInterval * 2, .seconds(30))
-            let cooldown = Duration.seconds(min(pow(2.0, Double(ps.consecutiveFailures)), 60))
+            let capped = min(ps.consecutiveFailures, 6)  // max pow(2,6)=64 → clamped to 60
+            let cooldown = Duration.seconds(min(pow(2.0, Double(capped)), 60))
             ps.backoffUntil = now + cooldown
             print("[RateLimiter] \(provider.rawValue) 429 감지 — 간격: \(ps.minInterval), cooldown: \(cooldown)")
         } else {

@@ -275,27 +275,35 @@ struct FolderReorganizer {
         var movedCount = 0
         for file in filesToMove {
             let destPath = (dirPath as NSString).appendingPathComponent(file.fileName)
-            if fm.fileExists(atPath: destPath) {
-                // Name conflict — append suffix
-                let ext = (file.fileName as NSString).pathExtension
-                let base = (file.fileName as NSString).deletingPathExtension
-                var counter = 2
-                var resolved = destPath
-                while fm.fileExists(atPath: resolved) {
-                    let newName = ext.isEmpty ? "\(base)_\(counter)" : "\(base)_\(counter).\(ext)"
-                    resolved = (dirPath as NSString).appendingPathComponent(newName)
-                    counter += 1
+            do {
+                if fm.fileExists(atPath: destPath) {
+                    // Name conflict — append suffix
+                    let ext = (file.fileName as NSString).pathExtension
+                    let base = (file.fileName as NSString).deletingPathExtension
+                    var counter = 2
+                    var resolved = destPath
+                    while fm.fileExists(atPath: resolved) {
+                        let newName = ext.isEmpty ? "\(base)_\(counter)" : "\(base)_\(counter).\(ext)"
+                        resolved = (dirPath as NSString).appendingPathComponent(newName)
+                        counter += 1
+                    }
+                    try fm.moveItem(atPath: file.source, toPath: resolved)
+                } else {
+                    try fm.moveItem(atPath: file.source, toPath: destPath)
                 }
-                try? fm.moveItem(atPath: file.source, toPath: resolved)
-            } else {
-                try? fm.moveItem(atPath: file.source, toPath: destPath)
+                movedCount += 1
+            } catch {
+                print("[FolderReorganizer] 이동 실패: \(file.fileName) — \(error.localizedDescription)")
             }
-            movedCount += 1
         }
 
         // Delete placeholder files
         for placeholder in placeholderFiles {
-            try? fm.removeItem(atPath: placeholder)
+            do {
+                try fm.removeItem(atPath: placeholder)
+            } catch {
+                print("[FolderReorganizer] 플레이스홀더 삭제 실패: \(error.localizedDescription)")
+            }
         }
 
         // Delete empty directories (deepest first by path length)
@@ -304,7 +312,11 @@ struct FolderReorganizer {
             let contents = (try? fm.contentsOfDirectory(atPath: dir)) ?? []
             let nonHidden = contents.filter { !$0.hasPrefix(".") }
             if nonHidden.isEmpty {
-                try? fm.removeItem(atPath: dir)
+                do {
+                    try fm.removeItem(atPath: dir)
+                } catch {
+                    print("[FolderReorganizer] 빈 폴더 삭제 실패: \(error.localizedDescription)")
+                }
             }
         }
 
@@ -475,16 +487,7 @@ struct FolderReorganizer {
     // MARK: - Content Extraction
 
     private func extractContent(from filePath: String) -> String {
-        if BinaryExtractor.isBinaryFile(filePath) {
-            let result = BinaryExtractor.extract(at: filePath)
-            return result.text ?? "[바이너리 파일: \(result.file?.name ?? "unknown")]"
-        }
-
-        if let content = try? String(contentsOfFile: filePath, encoding: .utf8) {
-            return String(content.prefix(5000))
-        }
-
-        return "[읽기 실패: \((filePath as NSString).lastPathComponent)]"
+        FileContentExtractor.extract(from: filePath)
     }
 
 }

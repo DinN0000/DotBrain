@@ -6,7 +6,7 @@ import Foundation
 enum AICompanionService {
 
     /// Bump this when companion file content changes — triggers overwrite on existing vaults
-    static let version = 9
+    static let version = 10
 
     /// Generate all AI companion files in the PKM root (first-time only)
     static func generateAll(pkmRoot: String) throws {

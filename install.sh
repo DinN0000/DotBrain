@@ -42,6 +42,21 @@ trap 'rm -rf "$TMP_DIR"' EXIT
 curl -sL "$DOWNLOAD_URL" -o "$TMP_DIR/$APP_NAME"
 chmod +x "$TMP_DIR/$APP_NAME"
 
+# Verify checksum if available
+TAG=$(curl -sL "https://api.github.com/repos/$REPO/releases/latest" | grep '"tag_name"' | sed -E 's/.*"([^"]+)".*/\1/')
+CHECKSUM_URL="https://github.com/$REPO/releases/download/$TAG/checksums.txt"
+if curl -sLf "$CHECKSUM_URL" -o "$TMP_DIR/checksums.txt" 2>/dev/null; then
+    EXPECTED=$(grep " ${APP_NAME}$" "$TMP_DIR/checksums.txt" | awk '{print $1}')
+    ACTUAL=$(shasum -a 256 "$TMP_DIR/$APP_NAME" | awk '{print $1}')
+    if [ -n "$EXPECTED" ] && [ "$EXPECTED" != "$ACTUAL" ]; then
+        echo "오류: 체크섬 불일치! 다운로드가 손상되었을 수 있습니다."
+        echo "  예상: $EXPECTED"
+        echo "  실제: $ACTUAL"
+        exit 1
+    fi
+    echo "✓ 체크섬 확인 완료"
+fi
+
 # Download icon
 ICON_URL=$(curl -sL "https://api.github.com/repos/$REPO/releases/latest" \
     | grep '"browser_download_url"' \

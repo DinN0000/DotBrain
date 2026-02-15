@@ -283,11 +283,7 @@ struct VaultAuditor {
 
     /// Infer PARA category from a file's path
     private func inferCategory(from path: String) -> PARACategory {
-        if path.contains("/1_Project/") { return .project }
-        if path.contains("/2_Area/") { return .area }
-        if path.contains("/3_Resource/") { return .resource }
-        if path.contains("/4_Archive/") { return .archive }
-        return .resource
+        PARACategory.fromPath(path) ?? .resource
     }
 
     /// Find the closest matching note name for a broken link target

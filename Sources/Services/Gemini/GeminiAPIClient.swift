@@ -82,7 +82,7 @@ actor GeminiAPIClient {
             throw GeminiAPIError.noAPIKey
         }
 
-        let endpoint = "\(baseURL)/\(model):generateContent?key=\(apiKey)"
+        let endpoint = "\(baseURL)/\(model):generateContent"
 
         guard let url = URL(string: endpoint) else {
             throw GeminiAPIError.invalidURL
@@ -104,6 +104,7 @@ actor GeminiAPIClient {
         var urlRequest = URLRequest(url: url)
         urlRequest.httpMethod = "POST"
         urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        urlRequest.setValue(apiKey, forHTTPHeaderField: "x-goog-api-key")
 
         let encoder = JSONEncoder()
         urlRequest.httpBody = try encoder.encode(request)
