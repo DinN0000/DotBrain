@@ -480,7 +480,7 @@ struct VaultReorganizeView: View {
             analyses = []
             results = []
         default:
-            appState.currentScreen = .vaultManage
+            appState.currentScreen = .dashboard
         }
     }
 }

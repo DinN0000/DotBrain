@@ -9,6 +9,7 @@ struct FolderReorganizer {
     let subfolder: String
     let onProgress: ((Double, String) -> Void)?
     let onFileProgress: ((Int, Int, String) -> Void)?
+    let onPhaseChange: ((AppState.ProcessingPhase) -> Void)?
 
     private var pathManager: PKMPathManager {
         PKMPathManager(root: pkmRoot)
@@ -24,6 +25,7 @@ struct FolderReorganizer {
         let folderPath = (pathManager.paraPath(for: category) as NSString)
             .appendingPathComponent(subfolder)
 
+        onPhaseChange?(.preparing)
         onProgress?(0.02, "폴더 구조 정리 중...")
 
         // Step 1: Flatten nested folder hierarchy
@@ -63,6 +65,7 @@ struct FolderReorganizer {
         onProgress?(0.15, "프로젝트 컨텍스트 로드 완료")
 
         // Extract content — parallel using TaskGroup
+        onPhaseChange?(.extracting)
         let inputs: [ClassifyInput] = await withTaskGroup(
             of: ClassifyInput.self,
             returning: [ClassifyInput].self
@@ -93,6 +96,7 @@ struct FolderReorganizer {
         onProgress?(0.3, "\(inputs.count)개 파일 내용 추출 완료")
 
         onProgress?(0.3, "AI 분류 시작...")
+        onPhaseChange?(.classifying)
 
         // Classify with AI
         let classifier = Classifier()
@@ -113,17 +117,36 @@ struct FolderReorganizer {
         StatisticsService.addApiCost(estimatedCost)
 
         // Enrich with related notes — AI-based context linking
+        onPhaseChange?(.linking)
+        onProgress?(0.65, "관련 노트 연결 중...")
         let contextMap = await ContextMapBuilder(pkmRoot: pkmRoot).build()
         let linker = ContextLinker(pkmRoot: pkmRoot)
-        let filePairs = zip(inputs, classifications).map { (input: $0, classification: $1) }
-        let relatedMap = await linker.findRelatedNotes(for: filePairs, contextMap: contextMap)
+
+        // Skip high-confidence files (>= 0.9) for linking
+        let filePairs: [(input: ClassifyInput, classification: ClassifyResult)] = zip(inputs, classifications)
+            .filter { $0.1.confidence < 0.9 }
+            .map { (input: $0.0, classification: $0.1) }
+        let indexMap: [String: Int] = Dictionary(uniqueKeysWithValues: inputs.enumerated().map { ($1.filePath, $0) })
+        let relatedMap = await linker.findRelatedNotes(
+            for: filePairs,
+            contextMap: contextMap,
+            onProgress: { [onProgress] progress, status in
+                let mapped = 0.65 + progress * 0.05
+                onProgress?(mapped, status)
+            }
+        )
 
         var enrichedClassifications = classifications
-        for (index, notes) in relatedMap {
-            enrichedClassifications[index].relatedNotes = notes
+        for (batchIndex, notes) in relatedMap {
+            guard batchIndex < filePairs.count else { continue }
+            let filePath = filePairs[batchIndex].input.filePath
+            if let originalIndex = indexMap[filePath] {
+                enrichedClassifications[originalIndex].relatedNotes = notes
+            }
         }
 
         // Compare and process
+        onPhaseChange?(.processing)
         for (i, (classification, input)) in zip(enrichedClassifications, inputs).enumerated() {
             let progress = 0.7 + Double(i) / Double(max(enrichedClassifications.count, 1)) * 0.25
             onProgress?(progress, "\(input.fileName) 처리 중...")
@@ -182,6 +205,7 @@ struct FolderReorganizer {
         }
 
         // Update MOCs for affected folders (source + all targets)
+        onPhaseChange?(.finishing)
         let mocGenerator = MOCGenerator(pkmRoot: pkmRoot)
         try? await mocGenerator.generateMOC(folderPath: folderPath, folderName: subfolder, para: category)
 

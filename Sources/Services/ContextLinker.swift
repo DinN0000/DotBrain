@@ -10,7 +10,8 @@ struct ContextLinker: Sendable {
     /// Find related notes for a batch of classified files using AI
     func findRelatedNotes(
         for files: [(input: ClassifyInput, classification: ClassifyResult)],
-        contextMap: VaultContextMap
+        contextMap: VaultContextMap,
+        onProgress: ((Double, String) -> Void)? = nil
     ) async -> [Int: [RelatedNote]] {
         guard !files.isEmpty else { return [:] }
 
@@ -25,12 +26,15 @@ struct ContextLinker: Sendable {
             Array(indexedFiles[$0..<min($0 + batchSize, indexedFiles.count)])
         }
 
+        let totalBatches = batches.count
+
         // Process batches concurrently (max 3)
         let results: [Int: [RelatedNote]] = await withTaskGroup(
             of: [(Int, [RelatedNote])].self,
             returning: [Int: [RelatedNote]].self
         ) { group in
             var activeTasks = 0
+            var completedBatches = 0
             var combined: [Int: [RelatedNote]] = [:]
 
             for batch in batches {
@@ -40,6 +44,9 @@ struct ContextLinker: Sendable {
                             combined[idx] = notes
                         }
                         activeTasks -= 1
+                        completedBatches += 1
+                        let progress = Double(completedBatches) / Double(totalBatches)
+                        onProgress?(progress, "노트 연결 \(completedBatches)/\(totalBatches) 배치 완료")
                     }
                 }
 
@@ -53,6 +60,9 @@ struct ContextLinker: Sendable {
                 for (idx, notes) in batchResults {
                     combined[idx] = notes
                 }
+                completedBatches += 1
+                let progress = Double(completedBatches) / Double(totalBatches)
+                onProgress?(progress, "노트 연결 \(completedBatches)/\(totalBatches) 배치 완료")
             }
             return combined
         }

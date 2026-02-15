@@ -6,6 +6,7 @@ struct InboxProcessor {
     let pkmRoot: String
     let onProgress: ((Double, String) -> Void)?
     let onFileProgress: ((Int, Int, String) -> Void)?
+    let onPhaseChange: ((AppState.ProcessingPhase) -> Void)?
 
     struct Result {
         var processed: [ProcessedFileResult]
@@ -16,6 +17,7 @@ struct InboxProcessor {
     }
 
     func process() async throws -> Result {
+        onPhaseChange?(.preparing)
         let scanner = InboxScanner(pkmRoot: pkmRoot)
         let files = scanner.scan()
 
@@ -36,6 +38,7 @@ struct InboxProcessor {
         onProgress?(0.1, "프로젝트 컨텍스트 로드 완료")
 
         // Extract content from all files — parallel using TaskGroup
+        onPhaseChange?(.extracting)
         let inputs: [ClassifyInput] = await withTaskGroup(
             of: ClassifyInput.self,
             returning: [ClassifyInput].self
@@ -68,6 +71,7 @@ struct InboxProcessor {
         onProgress?(0.3, "\(inputs.count)개 파일 내용 추출 완료")
 
         onProgress?(0.3, "AI 분류 시작...")
+        onPhaseChange?(.classifying)
 
         // Classify with 2-stage AI
         let classifier = Classifier()
@@ -89,17 +93,36 @@ struct InboxProcessor {
         StatisticsService.addApiCost(estimatedCost)
 
         // Enrich with related notes — AI-based context linking
+        onPhaseChange?(.linking)
+        onProgress?(0.65, "관련 노트 연결 중...")
         let contextMap = await ContextMapBuilder(pkmRoot: pkmRoot).build()
         let linker = ContextLinker(pkmRoot: pkmRoot)
-        let filePairs = zip(inputs, classifications).map { (input: $0, classification: $1) }
-        let relatedMap = await linker.findRelatedNotes(for: filePairs, contextMap: contextMap)
+
+        // Skip high-confidence files (>= 0.9) for linking
+        let filePairs: [(input: ClassifyInput, classification: ClassifyResult)] = zip(inputs, classifications)
+            .filter { $0.1.confidence < 0.9 }
+            .map { (input: $0.0, classification: $0.1) }
+        let indexMap: [String: Int] = Dictionary(uniqueKeysWithValues: inputs.enumerated().map { ($1.filePath, $0) })
+        let relatedMap = await linker.findRelatedNotes(
+            for: filePairs,
+            contextMap: contextMap,
+            onProgress: { [onProgress] progress, status in
+                let mapped = 0.65 + progress * 0.05
+                onProgress?(mapped, status)
+            }
+        )
 
         var enrichedClassifications = classifications
-        for (index, notes) in relatedMap {
-            enrichedClassifications[index].relatedNotes = notes
+        for (batchIndex, notes) in relatedMap {
+            guard batchIndex < filePairs.count else { continue }
+            let filePath = filePairs[batchIndex].input.filePath
+            if let originalIndex = indexMap[filePath] {
+                enrichedClassifications[originalIndex].relatedNotes = notes
+            }
         }
 
         // Move files
+        onPhaseChange?(.processing)
         let mover = FileMover(pkmRoot: pkmRoot)
         var processed: [ProcessedFileResult] = []
         var needsConfirmation: [PendingConfirmation] = []
@@ -189,6 +212,7 @@ struct InboxProcessor {
         }
 
         // Update MOCs for affected folders
+        onPhaseChange?(.finishing)
         let affectedFolders = Set(processed.filter(\.isSuccess).compactMap { result -> String? in
             let dir = (result.targetPath as NSString).deletingLastPathComponent
             return dir.isEmpty ? nil : dir

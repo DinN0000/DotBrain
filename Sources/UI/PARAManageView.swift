@@ -184,76 +184,144 @@ struct PARAManageView: View {
                 healthLabel: folder.healthLabel,
                 healthIssues: folder.healthIssues
             )
+            .contentShape(Rectangle())
+            .onTapGesture {
+                showFolderMenu(folder: folder, category: category)
+            }
             .contextMenu {
-                // Move to other categories
-                ForEach(PARACategory.allCases.filter { $0 != category }, id: \.self) { target in
-                    Button {
-                        moveFolder(folder.name, from: category, to: target)
-                    } label: {
-                        Label("\(target.displayName)(으)로 이동", systemImage: target.icon)
-                    }
-                }
-
-                Divider()
-
-                // Project complete (project category only)
-                if category == .project {
-                    Button {
-                        completeProject(folder.name)
-                    } label: {
-                        Label("프로젝트 완료", systemImage: "checkmark.circle")
-                    }
-                }
-
-                // Reactivate (archive category only)
-                if category == .archive {
-                    Button {
-                        reactivateProject(folder.name)
-                    } label: {
-                        Label("재활성화", systemImage: "arrow.uturn.left.circle")
-                    }
-                }
-
-                // Auto-reorganize
-                Button {
-                    startReorganize(category: category, subfolder: folder.name)
-                } label: {
-                    Label("자동 정리", systemImage: "sparkles")
-                }
-
-                Divider()
-
-                // Merge into another folder (same category)
-                let siblings = (folderMap[category] ?? []).filter { $0.name != folder.name }
-                if !siblings.isEmpty {
-                    Menu {
-                        ForEach(siblings) { sibling in
-                            Button(sibling.name) {
-                                mergeFolder(source: folder.name, into: sibling.name, category: category)
-                            }
-                        }
-                    } label: {
-                        Label("다른 폴더에 병합", systemImage: "arrow.triangle.merge")
-                    }
-                }
-
-                // Open in Finder
-                Button {
-                    openInFinder(folder.name, category: category)
-                } label: {
-                    Label("Finder에서 열기", systemImage: "folder")
-                }
-
-                Divider()
-
-                // Delete folder
-                Button(role: .destructive) {
-                    deleteTarget = (name: folder.name, category: category)
-                } label: {
-                    Label("폴더 삭제", systemImage: "trash")
-                }
+                folderMenuContent(folder: folder, category: category)
             }
         }
+    }
+
+    @ViewBuilder
+    private func folderMenuContent(folder: FolderEntry, category: PARACategory) -> some View {
+        ForEach(PARACategory.allCases.filter { $0 != category }, id: \.self) { target in
+            Button {
+                moveFolder(folder.name, from: category, to: target)
+            } label: {
+                Label("\(target.displayName)(으)로 이동", systemImage: target.icon)
+            }
+        }
+
+        Divider()
+
+        if category == .project {
+            Button {
+                completeProject(folder.name)
+            } label: {
+                Label("프로젝트 완료", systemImage: "checkmark.circle")
+            }
+        }
+
+        if category == .archive {
+            Button {
+                reactivateProject(folder.name)
+            } label: {
+                Label("재활성화", systemImage: "arrow.uturn.left.circle")
+            }
+        }
+
+        Button {
+            startReorganize(category: category, subfolder: folder.name)
+        } label: {
+            Label("자동 정리", systemImage: "sparkles")
+        }
+
+        Divider()
+
+        let siblings = (folderMap[category] ?? []).filter { $0.name != folder.name }
+        if !siblings.isEmpty {
+            Menu {
+                ForEach(siblings) { sibling in
+                    Button(sibling.name) {
+                        mergeFolder(source: folder.name, into: sibling.name, category: category)
+                    }
+                }
+            } label: {
+                Label("다른 폴더에 병합", systemImage: "arrow.triangle.merge")
+            }
+        }
+
+        Button {
+            openInFinder(folder.name, category: category)
+        } label: {
+            Label("Finder에서 열기", systemImage: "folder")
+        }
+
+        Divider()
+
+        Button(role: .destructive) {
+            deleteTarget = (name: folder.name, category: category)
+        } label: {
+            Label("폴더 삭제", systemImage: "trash")
+        }
+    }
+
+    private func showFolderMenu(folder: FolderEntry, category: PARACategory) {
+        let menu = NSMenu()
+
+        for target in PARACategory.allCases where target != category {
+            addMenuItem(to: menu, title: "\(target.displayName)(으)로 이동", icon: target.icon) {
+                self.moveFolder(folder.name, from: category, to: target)
+            }
+        }
+
+        menu.addItem(.separator())
+
+        if category == .project {
+            addMenuItem(to: menu, title: "프로젝트 완료", icon: "checkmark.circle") {
+                completeProject(folder.name)
+            }
+        }
+        if category == .archive {
+            addMenuItem(to: menu, title: "재활성화", icon: "arrow.uturn.left.circle") {
+                reactivateProject(folder.name)
+            }
+        }
+
+        addMenuItem(to: menu, title: "자동 정리", icon: "sparkles") {
+            startReorganize(category: category, subfolder: folder.name)
+        }
+
+        menu.addItem(.separator())
+
+        let siblings = (folderMap[category] ?? []).filter { $0.name != folder.name }
+        if !siblings.isEmpty {
+            let mergeItem = NSMenuItem(title: "다른 폴더에 병합", action: nil, keyEquivalent: "")
+            mergeItem.image = NSImage(systemSymbolName: "arrow.triangle.merge", accessibilityDescription: nil)
+            let subMenu = NSMenu()
+            for sibling in siblings {
+                addMenuItem(to: subMenu, title: sibling.name, icon: nil) {
+                    self.mergeFolder(source: folder.name, into: sibling.name, category: category)
+                }
+            }
+            mergeItem.submenu = subMenu
+            menu.addItem(mergeItem)
+        }
+
+        addMenuItem(to: menu, title: "Finder에서 열기", icon: "folder") {
+            openInFinder(folder.name, category: category)
+        }
+
+        menu.addItem(.separator())
+
+        addMenuItem(to: menu, title: "폴더 삭제", icon: "trash") {
+            deleteTarget = (name: folder.name, category: category)
+        }
+
+        // Show at mouse location
+        menu.popUp(positioning: nil, at: NSEvent.mouseLocation, in: nil)
+    }
+
+    private func addMenuItem(to menu: NSMenu, title: String, icon: String?, action: @escaping () -> Void) {
+        let item = FolderMenuItem(title: title, action: #selector(FolderMenuItem.invoke), keyEquivalent: "")
+        item.target = item
+        item.callback = action
+        if let icon {
+            item.image = NSImage(systemSymbolName: icon, accessibilityDescription: nil)
+        }
+        menu.addItem(item)
     }
 
     // MARK: - Actions
@@ -488,6 +556,7 @@ private struct PARAFolderRow: View {
                         Capsule()
                             .fill(Color.secondary.opacity(0.12))
                     )
+
             }
 
             // Health issues text (shown on hover)
@@ -497,7 +566,6 @@ private struct PARAFolderRow: View {
                     .foregroundColor(healthColor)
                     .padding(.leading, 24)
                     .padding(.top, 2)
-                    .transition(.opacity)
             }
         }
         .padding(.vertical, 4)
@@ -517,5 +585,15 @@ private struct PARAFolderRow: View {
         case .resource: return .orange
         case .archive: return .gray
         }
+    }
+}
+
+// MARK: - NSMenuItem with Closure
+
+private class FolderMenuItem: NSMenuItem {
+    var callback: (() -> Void)?
+
+    @objc func invoke() {
+        callback?()
     }
 }
