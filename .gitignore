@@ -12,3 +12,6 @@ docs/03-analysis/
 docs/04-report/
 docs/archive/
 run.sh
+.claude/
+Package.resolved
+docs/plans/
