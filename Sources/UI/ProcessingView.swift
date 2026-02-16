@@ -3,6 +3,7 @@ import SwiftUI
 struct ProcessingView: View {
     @EnvironmentObject var appState: AppState
     @State private var pulseScale: CGFloat = 1.0
+    @State private var isAnimating = false
 
     private var originTitle: String {
         appState.processingOrigin == .paraManage ? "폴더 정리 중" : "인박스 처리 중"
@@ -84,11 +85,15 @@ struct ProcessingView: View {
                     )
                     .scaleEffect(pulseScale)
                     .onAppear {
+                        isAnimating = true
                         withAnimation(.easeInOut(duration: 1.0).repeatForever(autoreverses: true)) {
-                            pulseScale = 1.15
+                            if isAnimating { pulseScale = 1.15 }
                         }
                     }
-                    .onDisappear { pulseScale = 1.0 }
+                    .onDisappear {
+                        isAnimating = false
+                        pulseScale = 1.0
+                    }
 
                 Text(appState.processingStatus)
                     .font(.subheadline)
@@ -109,11 +114,15 @@ struct ProcessingView: View {
                     )
                     .scaleEffect(pulseScale)
                     .onAppear {
+                        isAnimating = true
                         withAnimation(.easeInOut(duration: 1.0).repeatForever(autoreverses: true)) {
-                            pulseScale = 1.15
+                            if isAnimating { pulseScale = 1.15 }
                         }
                     }
-                    .onDisappear { pulseScale = 1.0 }
+                    .onDisappear {
+                        isAnimating = false
+                        pulseScale = 1.0
+                    }
 
                 Text("관련 노트 연결 중...")
                     .font(.subheadline)
