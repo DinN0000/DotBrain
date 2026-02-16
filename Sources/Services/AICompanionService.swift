@@ -6,7 +6,7 @@ import Foundation
 enum AICompanionService {
 
     /// Bump this when companion file content changes — triggers overwrite on existing vaults
-    static let version = 10
+    static let version = 11
 
     /// Generate all AI companion files in the PKM root (first-time only)
     static func generateAll(pkmRoot: String) throws {
@@ -80,6 +80,7 @@ enum AICompanionService {
             ("tag-cleanup-agent", tagCleanupAgentContent),
             ("stale-review-agent", staleReviewAgentContent),
             ("para-move-agent", paraMoveAgentContent),
+            ("vault-audit-agent", vaultAuditAgentContent),
         ] {
             let path = (agentsDir as NSString).appendingPathComponent("\(name).md")
             let wrapped = "\(markerStart)\n\(content)\n\(markerEnd)"
@@ -97,6 +98,8 @@ enum AICompanionService {
             ("project-status", projectStatusSkillContent),
             ("weekly-review", weeklyReviewSkillContent),
             ("literature-note", literatureNoteSkillContent),
+            ("frontmatter-validator", frontmatterValidatorSkillContent),
+            ("moc-integrity", mocIntegritySkillContent),
         ]
         for (skillName, skillBody) in allSkills {
             let skillsDir = (pkmRoot as NSString).appendingPathComponent(".claude/skills/\(skillName)")
@@ -458,6 +461,7 @@ enum AICompanionService {
     | "링크 건강 점검해줘" | 링크 건강 | `.claude/agents/link-health-agent.md` |
     | "태그 정리해줘" | 태그 정리 | `.claude/agents/tag-cleanup-agent.md` |
     | "오래된 노트 점검해줘" | 콘텐츠 리뷰 | `.claude/agents/stale-review-agent.md` |
+    | "볼트 점검해줘" | 볼트 건강 점검 | `.claude/agents/vault-audit-agent.md` |
 
     각 에이전트 파일에 상세 워크플로가 정의되어 있습니다.
 
@@ -470,6 +474,8 @@ enum AICompanionService {
     | 프로젝트 현황 | `.claude/skills/project-status/SKILL.md` | 프로젝트 상태 보고서 생성 |
     | 주간 리뷰 | `.claude/skills/weekly-review/SKILL.md` | 주간/월간 리뷰 보고서 |
     | 문헌 노트 | `.claude/skills/literature-note/SKILL.md` | 외부 자료 → 구조화된 문헌 노트 |
+    | 프론트매터 검증 | `.claude/skills/frontmatter-validator/SKILL.md` | 프론트매터 스키마 검증 및 자동 수정 |
+    | MOC 무결성 | `.claude/skills/moc-integrity/SKILL.md` | MOC ↔ 실제 폴더/파일 동기화 검증 |
 
     ---
 
@@ -529,6 +535,7 @@ enum AICompanionService {
     | "링크 건강 점검해줘" | 링크 건강 | `.claude/agents/link-health-agent.md` |
     | "태그 정리해줘" | 태그 정리 | `.claude/agents/tag-cleanup-agent.md` |
     | "오래된 노트 점검해줘" | 콘텐츠 리뷰 | `.claude/agents/stale-review-agent.md` |
+    | "볼트 점검해줘" | 볼트 건강 점검 | `.claude/agents/vault-audit-agent.md` |
 
     ## 프론트매터 병합 정책
 
@@ -603,7 +610,7 @@ enum AICompanionService {
     - **Vault Reorganization**: Cross-category AI scan → compare current vs recommended location → selective execution (Dashboard → 전체 재정리, max 200 files)
     - **Vault Audit**: Detect broken WikiLinks, missing frontmatter/tags/PARA → auto-repair with Levenshtein matching
 
-    ## AI Agents (9 agents in `.claude/agents/`)
+    ## AI Agents (10 agents in `.claude/agents/`)
     - inbox-agent: Inbox classification and processing
     - project-agent: Project lifecycle management
     - search-agent: Vault-wide knowledge search
@@ -613,13 +620,16 @@ enum AICompanionService {
     - link-health-agent: WikiLink health check and orphan detection
     - tag-cleanup-agent: Tag standardization and deduplication
     - stale-review-agent: Stale content review and quality check
+    - vault-audit-agent: Comprehensive vault health check (structure, frontmatter, links, MOC)
 
-    ## AI Skills (5 skills in `.claude/skills/`)
+    ## AI Skills (7 skills in `.claude/skills/`)
     - inbox-processor: Binary file text extraction
     - meeting-note: Meeting content → structured meeting note
     - project-status: Project status report generation
     - weekly-review: Weekly/monthly review report
     - literature-note: External sources → structured literature note
+    - frontmatter-validator: Frontmatter schema validation and auto-fix
+    - moc-integrity: MOC ↔ folder/file synchronization check
 
     ## Navigation Priority
     1. Check **MOC (index notes)**: `FolderName/FolderName.md` — AI-generated folder summary + `[[wikilink]] — summary` list + tag cloud
@@ -695,6 +705,7 @@ enum AICompanionService {
             ("tag-cleanup-agent", tagCleanupAgentContent),
             ("stale-review-agent", staleReviewAgentContent),
             ("para-move-agent", paraMoveAgentContent),
+            ("vault-audit-agent", vaultAuditAgentContent),
         ]
 
         for (name, content) in agents {
@@ -1448,6 +1459,139 @@ enum AICompanionService {
     - 위키링크는 파일명 기반이므로 경로 이동으로는 깨지지 않음
     """
 
+    private static let vaultAuditAgentContent = """
+    # 볼트 건강 점검 에이전트
+
+    ## 트리거
+    - "볼트 점검해줘"
+    - "볼트 건강 확인해줘"
+    - "전체 감사 해줘"
+    - "vault audit"
+
+    ## 개요
+
+    볼트 전체의 구조, 프론트매터, 링크, MOC 무결성을 한번에 검사합니다.
+    3개 검사를 **병렬 에이전트**로 실행한 뒤 종합 보고서를 생성하고, 자동 수정을 제안합니다.
+
+    ## 워크플로
+
+    ### Phase 1: 병렬 검사 (에이전트 3개 동시 실행)
+
+    **에이전트 A: PARA 구조 + 프론트매터**
+    `.claude/skills/frontmatter-validator/SKILL.md` 참조
+
+    검사 항목:
+    1. 4개 PARA 폴더 존재 (1_Project, 2_Area, 3_Resource, 4_Archive)
+    2. 시스템 폴더 존재 (_Inbox, _Assets, .Templates)
+    3. 최상위 orphan 파일 탐지 (PARA 폴더 밖의 .md 파일)
+    4. 전체 프론트매터 스키마 검증
+
+    **에이전트 B: 링크 무결성**
+    `.claude/agents/link-health-agent.md` 워크플로 + 추가 검사:
+    1. 깨진 `[[위키링크]]` 탐지
+    2. Related Notes 형식 검증 (`[[링크]] — 설명` 형식)
+    3. Related Notes 누락 파일 탐지 (콘텐츠 파일 중)
+    4. 고아 노트 탐지
+
+    **에이전트 C: MOC 무결성**
+    `.claude/skills/moc-integrity/SKILL.md` 참조
+
+    ### Phase 2: 종합 보고서 생성
+
+    ```markdown
+    # 볼트 건강 점검 보고서 (YYYY-MM-DD)
+
+    ## 종합 점수: N/100
+
+    | 영역 | 점수 | 상태 | 발견 |
+    |------|------|------|------|
+    | PARA 구조 | /25 | ✅/⚠️/❌ | N건 |
+    | 프론트매터 | /25 | ✅/⚠️/❌ | N건 |
+    | 링크 무결성 | /25 | ✅/⚠️/❌ | N건 |
+    | MOC 무결성 | /25 | ✅/⚠️/❌ | N건 |
+
+    ## 높은 우선순위 (자동 수정 가능)
+    | # | 파일 | 문제 | 수정 내용 |
+    |---|------|------|----------|
+
+    ## 중간 우선순위 (반자동)
+    | # | 파일 | 문제 | 수정 내용 |
+    |---|------|------|----------|
+
+    ## 낮은 우선순위 (수동 확인)
+    | # | 파일 | 문제 | 제안 |
+    |---|------|------|------|
+    ```
+
+    ### 채점 기준
+
+    각 영역 25점 만점:
+
+    **PARA 구조 (25점)**
+    - PARA 4폴더 존재: 10점
+    - 시스템 폴더 존재: 5점
+    - orphan 파일 없음: 5점
+    - 하위 폴더 구조 정상: 5점
+
+    **프론트매터 (25점)**
+    - 필수 필드 존재율 × 10
+    - para ↔ 폴더 일치율 × 5
+    - Enum 값 유효율 × 5
+    - summary 존재율 × 3
+    - tags 규칙 준수율 × 2
+
+    **링크 무결성 (25점)**
+    - 깨진 링크 비율: (1 - 깨진/전체) × 15
+    - Related Notes 커버율 × 5
+    - 고아 노트 비율: (1 - 고아/전체) × 5
+
+    **MOC 무결성 (25점)**
+    - MOC 파일 존재율 × 10
+    - MOC ↔ 폴더 동기화율 × 10
+    - 카테고리 MOC Related Notes 존재: 5점
+
+    ### Phase 3: 자동 수정
+
+    사용자에게 확인 후 우선순위별로 수정 실행:
+
+    **자동 수정 (확인 불필요):**
+    - para ↔ 폴더 불일치 → para 값 변경
+    - Archive 파일 status → completed
+    - MOC 누락 문서 항목 → 추가
+    - 카테고리 MOC Related Notes → 추가
+
+    **반자동 수정 (사용자 확인):**
+    - summary 빈 값 → AI 요약 생성
+    - tags > 5개 → 축소 제안
+    - 깨진 링크 → 유사 파일 제안
+    - orphan 파일 → PARA 분류 제안
+
+    **수정 안함:**
+    - MOC 태그 클라우드 (DotBrain 자동 생성)
+    - _Inbox 내부 (DotBrain 자동 처리)
+
+    ### Phase 4: 변경 보고
+
+    ```markdown
+    ## 수정 완료 요약
+    | # | 파일 | 변경 내용 |
+    |---|------|----------|
+
+    총 N개 파일 수정, N개 생성, N개 삭제
+    ```
+
+    ## 제외 대상
+    - `_Inbox/` (DotBrain 자동 처리)
+    - `.claude/`, `.Templates/`, `.obsidian/` (시스템)
+    - Personal_Images 스텁 (summary 검증에서 제외)
+    - MOC 파일의 tags 개수 (태그 클라우드)
+
+    ## 주의사항
+    - 삭제는 절대 하지 않음 — 이동 또는 수정만
+    - 수정 전 반드시 사용자 확인 (자동 수정 항목 제외)
+    - 보고서는 화면에 출력, 파일로 저장하지 않음
+    """
+
     // MARK: - .claude/skills/
 
     private static func generateClaudeSkills(pkmRoot: String) throws {
@@ -1458,6 +1602,8 @@ enum AICompanionService {
             ("project-status", projectStatusSkillContent),
             ("weekly-review", weeklyReviewSkillContent),
             ("literature-note", literatureNoteSkillContent),
+            ("frontmatter-validator", frontmatterValidatorSkillContent),
+            ("moc-integrity", mocIntegritySkillContent),
         ]
         for (skillName, skillBody) in allSkills {
             let skillsDir = (pkmRoot as NSString).appendingPathComponent(".claude/skills/\(skillName)")
@@ -1798,5 +1944,329 @@ enum AICompanionService {
 
     ## 저장 위치
     `3_Resource/적절한주제폴더/`
+    """
+
+    private static let frontmatterValidatorSkillContent = """
+    # 프론트매터 검증 스킬
+
+    ## 용도
+
+    볼트 전체 또는 특정 폴더의 마크다운 파일 프론트매터가 스키마를 준수하는지 검증하고, 위반 항목을 자동 수정합니다.
+    `vault-audit-agent`의 하위 검사로 호출되거나, 단독으로 "프론트매터 점검해줘"로 실행할 수 있습니다.
+
+    ## 스키마 정의
+
+    ### 필수 필드
+
+    ```yaml
+    para: project | area | resource | archive
+    tags: [태그1, 태그2]       # 최대 5개 (MOC 파일 제외)
+    created: YYYY-MM-DD
+    status: active | draft | completed | on-hold
+    summary: "2-3문장 요약"    # 빈 값 불가
+    source: original | meeting | literature | import
+    ```
+
+    ### 선택 필드
+
+    ```yaml
+    project: "프로젝트명"      # 1_Project/ 하위 폴더명과 일치해야 함
+    file:                       # 바이너리 동반 노트에만
+      name: "원본파일.pdf"
+      format: pdf
+      size_kb: 1234
+    ```
+
+    ## 검증 절차
+
+    ### Step 1: 대상 파일 수집
+
+    ```
+    Glob("**/*.md") 에서 제외:
+    - _Inbox/**
+    - .claude/**
+    - .Templates/**
+    - .obsidian/**
+    ```
+
+    ### Step 2: 필수 필드 존재 확인
+
+    각 파일에 대해 6개 필수 필드 존재 여부 검사:
+
+    ```
+    Grep("^para:", glob: "**/*.md")
+    Grep("^tags:", glob: "**/*.md")
+    Grep("^created:", glob: "**/*.md")
+    Grep("^status:", glob: "**/*.md")
+    Grep("^summary:", glob: "**/*.md")
+    Grep("^source:", glob: "**/*.md")
+    ```
+
+    ### Step 3: Enum 값 유효성
+
+    | 필드 | 허용 값 |
+    |------|--------|
+    | para | project, area, resource, archive |
+    | status | active, draft, completed, on-hold |
+    | source | original, meeting, literature, import |
+
+    유효하지 않은 값 → 위반으로 기록
+
+    ### Step 4: para ↔ 폴더 일치
+
+    | 파일 위치 | 기대 para 값 |
+    |----------|-------------|
+    | 1_Project/** | project |
+    | 2_Area/** | area |
+    | 3_Resource/** | resource |
+    | 4_Archive/** | archive |
+
+    불일치 → **자동 수정** (폴더 기준으로 para 변경)
+
+    ### Step 5: tags 개수
+
+    - **일반 파일**: 최대 5개. 초과 시 위반.
+    - **MOC 파일** (폴더명/폴더명.md): DotBrain 태그 클라우드이므로 **검사 제외**
+
+    MOC 판별법:
+    ```
+    파일명 == 부모폴더명 + ".md"
+    예: Research/Research.md → MOC
+    예: Research/paper.md → 일반 파일
+    ```
+
+    ### Step 6: summary 비어있는지
+
+    ```
+    Grep("^summary: ?$|^summary: \\"\\"$", glob: "**/*.md")
+    ```
+
+    비어있는 파일 중 제외:
+    - .Templates/ 파일
+    - Personal_Images 스텁 (*.png.md, *.jpg.md 등)
+    - 본문이 프론트매터만 있는 빈 파일
+
+    비어있는 콘텐츠 파일 → 본문을 읽고 AI가 1-2문장 한글 요약 생성
+
+    ### Step 7: project 필드 참조 유효성
+
+    `project` 값이 있으면 `1_Project/` 하위에 해당 폴더가 존재하는지 확인:
+    ```
+    Glob("1_Project/{project값}/")
+    ```
+
+    존재하지 않으면 → 위반 기록 (자동 수정 안함, 사용자 확인)
+
+    ### Step 8: Archive 파일 status
+
+    `4_Archive/**` 내 파일은 `status: completed` 또는 `status: on-hold`여야 함.
+    `status: active`이면 → `completed`로 **자동 수정**
+
+    ## 자동 수정 규칙
+
+    | 위반 유형 | 수정 방법 | 사용자 확인 |
+    |----------|----------|-----------
+    | para ↔ 폴더 불일치 | para를 폴더에 맞게 변경 | 불필요 |
+    | Archive status: active | → completed | 불필요 |
+    | summary 비어있음 | AI 요약 생성 | 필요 |
+    | tags > 5개 (비-MOC) | 상위 5개 유지 제안 | 필요 |
+    | Enum 값 오류 | 유사 값 제안 | 필요 |
+    | project 참조 없음 | 보고만 (수정 안함) | - |
+
+    ## 보고서 형식
+
+    ```markdown
+    # 프론트매터 검증 보고서
+
+    ## 요약
+    - 검사 파일: N개
+    - 정상: N개 (N%)
+    - 위반: N개 (N%)
+
+    ## 위반 상세
+
+    ### 자동 수정 완료
+    | 파일 | 위반 | 변경 전 | 변경 후 |
+    |------|------|--------|--------|
+
+    ### 사용자 확인 필요
+    | 파일 | 위반 | 현재 값 | 제안 |
+    |------|------|--------|------|
+
+    ### 참고 (수정 불필요)
+    | 파일 | 항목 | 비고 |
+    |------|------|------|
+    ```
+
+    ## 주의사항
+    - 기존 프론트매터 값은 최대한 보존
+    - created 필드는 절대 변경하지 않음
+    - tags는 기존 태그에서 선택하여 축소 (임의 태그 추가 금지)
+    - 프론트매터가 아예 없는 파일은 생성하지 않고 보고만
+    """
+
+    private static let mocIntegritySkillContent = """
+    # MOC 무결성 점검 스킬
+
+    ## 용도
+
+    MOC(Map of Content) 파일이 실제 폴더 내용과 동기화되어 있는지 검증하고, 불일치를 수정합니다.
+    `vault-audit-agent`의 하위 검사로 호출되거나, 단독으로 "MOC 점검해줘"로 실행할 수 있습니다.
+
+    ## MOC 파일 유형
+
+    ### 카테고리 MOC (4개)
+
+    | 파일 | 역할 |
+    |------|------|
+    | `1_Project/1_Project.md` | Project 하위 폴더 목록 |
+    | `2_Area/2_Area.md` | Area 하위 폴더 목록 |
+    | `3_Resource/3_Resource.md` | Resource 하위 폴더 목록 |
+    | `4_Archive/4_Archive.md` | Archive 하위 폴더 목록 |
+
+    ### 폴더 MOC
+
+    `폴더명/폴더명.md` 형식 (예: `Research/Research.md`)
+
+    역할: 해당 폴더의 문서 목록, 태그 클라우드, 폴더 요약
+
+    ## 검증 절차
+
+    ### Step 1: MOC 파일 존재 확인
+
+    각 하위 폴더에 MOC 파일이 있는지 확인:
+
+    ```
+    # 각 PARA 카테고리의 하위 폴더 목록
+    Bash: ls -d 1_Project/*/
+    # 각 폴더에 대해:
+    Glob("1_Project/{폴더명}/{폴더명}.md")
+    ```
+
+    **누락 시**: 새 MOC 생성 제안 (사용자 확인 후)
+
+    ### Step 2: 카테고리 MOC ↔ 실제 폴더 동기화
+
+    각 카테고리 MOC를 읽고:
+    1. MOC에 `[[폴더명]]`으로 나열된 폴더 목록 추출
+    2. 실제 하위 폴더 목록과 비교
+    3. 차이 기록:
+       - MOC에 있지만 실제 없음 → **삭제된 폴더** (MOC에서 제거)
+       - 실제 있지만 MOC에 없음 → **누락 폴더** (MOC에 추가)
+
+    ### Step 3: 폴더 MOC ↔ 실제 파일 동기화
+
+    각 폴더 MOC를 읽고:
+    1. MOC에 `[[문서명]]`으로 나열된 파일 목록 추출
+    2. 실제 폴더 내 .md 파일 목록과 비교 (MOC 자신, _Assets 제외)
+    3. 차이 기록:
+       - MOC에 있지만 실제 없음 → **삭제된 문서** (MOC에서 제거)
+       - 실제 있지만 MOC에 없음 → **누락 문서** (MOC에 추가)
+
+    ### Step 4: 문서/폴더 수 정확성
+
+    카테고리 MOC의 summary 필드:
+    ```yaml
+    summary: "Project 카테고리 인덱스 — N개 폴더"
+    ```
+
+    폴더 MOC의 summary 필드:
+    ```yaml
+    summary: "폴더명 폴더 요약 텍스트"
+    ```
+
+    MOC 본문의 개수 표기:
+    ```
+    - [[폴더명]] — 설명 (N개)
+    ```
+
+    실제 개수와 불일치하면 → **자동 수정**
+
+    ### Step 5: 카테고리 MOC Related Notes
+
+    4개 카테고리 MOC에 `## Related Notes` 섹션이 있는지 확인.
+    다른 3개 카테고리로의 상호 참조가 있어야 함:
+
+    ```markdown
+    ## Related Notes
+
+    - [[다른_카테고리]] — 맥락 설명
+    ```
+
+    누락 시 → **자동 추가**
+
+    ### Step 6: 위키링크 형식
+
+    MOC 내 모든 항목이 올바른 형식인지 확인:
+    - ✅ `[[링크]] — 설명 텍스트`
+    - ❌ `[[링크]]` (설명 없음)
+    - ❌ `- 링크` (위키링크 형식 아님)
+
+    설명 없는 항목 → 위반 기록 (AI가 설명 생성 제안)
+
+    ## 자동 수정 규칙
+
+    | 위반 유형 | 수정 방법 | 사용자 확인 |
+    |----------|----------|-----------
+    | MOC 파일 누락 | 폴더 스캔하여 새 MOC 생성 | 필요 |
+    | 누락 문서/폴더 항목 | MOC에 `[[링크]] — 설명` 추가 | 불필요 |
+    | 삭제된 문서/폴더 항목 | MOC에서 해당 줄 제거 | 불필요 |
+    | 개수 불일치 | summary 및 본문 개수 갱신 | 불필요 |
+    | Related Notes 누락 (카테고리) | 상호 참조 섹션 추가 | 불필요 |
+    | 위키링크 설명 누락 | AI 설명 생성 제안 | 필요 |
+
+    ### 새 MOC 생성 템플릿
+
+    ```yaml
+    ---
+    para: {카테고리}
+    created: {오늘날짜}
+    status: active
+    summary: "{폴더명} 폴더 요약"
+    source: original
+    ---
+
+    # {폴더명}
+
+    ## 문서 목록
+
+    - [[문서1]] — 설명
+    - [[문서2]] — 설명
+    ```
+
+    ## 보고서 형식
+
+    ```markdown
+    # MOC 무결성 보고서
+
+    ## 요약
+    - 전체 MOC: N개
+    - 정상 동기화: N개
+    - 불일치: N개
+
+    ## 불일치 상세
+
+    ### 누락 항목 (실제 존재 → MOC 미등록)
+    | MOC 파일 | 누락 문서 |
+    |---------|----------|
+
+    ### 잔여 항목 (MOC 등록 → 실제 삭제됨)
+    | MOC 파일 | 잔여 문서 |
+    |---------|----------|
+
+    ### 개수 불일치
+    | MOC 파일 | 표기 | 실제 |
+    |---------|------|------|
+
+    ### Related Notes 누락
+    | MOC 파일 | 상태 |
+    |---------|------|
+    ```
+
+    ## 주의사항
+    - MOC의 태그 클라우드(tags 필드)는 DotBrain이 자동 갱신하므로 수정하지 않음
+    - MOC의 기존 설명 텍스트는 보존 (새로 추가하는 항목만 AI가 작성)
+    - 폴더 MOC의 Related Notes는 필수 아님 (카테고리 MOC만 필수)
+    - _Assets 폴더는 MOC 항목에 포함하지 않음
     """
 }
