@@ -1,7 +1,7 @@
-# DotBrain Security Review Report
+# DotBrain Security Review
 
 > 2026-02-15 | Security Architect Review
-> Scope: Full codebase security audit (v1.4.0)
+> Scope: Full codebase security audit (v1.5.7 기준, 주요 이슈 수정 완료)
 
 ---
 

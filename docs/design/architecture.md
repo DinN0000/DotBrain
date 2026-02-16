@@ -1,6 +1,6 @@
-# DotBrain Architecture Design
+# DotBrain Architecture
 
-> v1.5.0 기준 — 2026-02-15 작성
+> v1.7.7 기준 — 2026-02-15 작성
 
 ---
 
