@@ -7,6 +7,8 @@ struct InboxStatusView: View {
     @State private var dropFeedback: String?
     @State private var bounceAnimation = false
     @State private var isButtonHovered = false
+    @State private var isBounceAnimating = false
+    @State private var cachedInboxFiles: [URL] = []
 
     var body: some View {
         VStack(spacing: 16) {
@@ -50,12 +52,21 @@ struct InboxStatusView: View {
             handlePaste()
         })
         .onAppear {
+            loadInboxFiles()
             Task {
                 await appState.refreshInboxCount()
             }
+            isBounceAnimating = true
             withAnimation(.easeInOut(duration: 2.0).repeatForever(autoreverses: true)) {
-                bounceAnimation = true
+                if isBounceAnimating { bounceAnimation = true }
             }
+        }
+        .onDisappear {
+            isBounceAnimating = false
+            bounceAnimation = false
+        }
+        .onChange(of: appState.pkmRootPath) { _ in
+            loadInboxFiles()
         }
     }
 
@@ -94,16 +105,22 @@ struct InboxStatusView: View {
 
     // MARK: - Active State
 
-    private var inboxFiles: [URL] {
-        guard !appState.pkmRootPath.isEmpty else { return [] }
+    private func loadInboxFiles() {
+        guard !appState.pkmRootPath.isEmpty else {
+            cachedInboxFiles = []
+            return
+        }
         let inboxPath = PKMPathManager(root: appState.pkmRootPath).inboxPath
         let fm = FileManager.default
         guard let items = try? fm.contentsOfDirectory(
             at: URL(fileURLWithPath: inboxPath),
             includingPropertiesForKeys: nil,
             options: [.skipsHiddenFiles]
-        ) else { return [] }
-        return items
+        ) else {
+            cachedInboxFiles = []
+            return
+        }
+        cachedInboxFiles = items
             .filter { !$0.lastPathComponent.hasPrefix("_") }
             .sorted { $0.lastPathComponent < $1.lastPathComponent }
     }
@@ -131,7 +148,7 @@ struct InboxStatusView: View {
 
             if appState.inboxFileCount > 0 {
                 VStack(spacing: 4) {
-                    ForEach(Array(inboxFiles.prefix(5).enumerated()), id: \.offset) { _, url in
+                    ForEach(Array(cachedInboxFiles.prefix(5).enumerated()), id: \.offset) { _, url in
                         HStack(spacing: 8) {
                             FileThumbnailView(url: url)
                             Text(url.lastPathComponent)
@@ -141,8 +158,8 @@ struct InboxStatusView: View {
                             Spacer()
                         }
                     }
-                    if inboxFiles.count > 5 {
-                        Text("외 \(inboxFiles.count - 5)개")
+                    if cachedInboxFiles.count > 5 {
+                        Text("외 \(cachedInboxFiles.count - 5)개")
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }

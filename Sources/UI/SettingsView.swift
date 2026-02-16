@@ -17,6 +17,7 @@ struct SettingsView: View {
     @State private var updateError: String?
     @State private var updateIconRotation: Double = 0
     @State private var updateCheckHovered = false
+    @State private var isUpdateAnimating = false
 
     private var activeProvider: AIProvider { appState.selectedProvider }
     private var otherProvider: AIProvider { activeProvider == .claude ? .gemini : .claude }
@@ -416,9 +417,10 @@ struct SettingsView: View {
         isCheckingUpdate = true
         updateError = nil
         latestVersion = nil
+        isUpdateAnimating = true
 
         withAnimation(.linear(duration: 0.6).repeatForever(autoreverses: false)) {
-            updateIconRotation = 360
+            if isUpdateAnimating { updateIconRotation = 360 }
         }
 
         Task {
@@ -429,12 +431,14 @@ struct SettingsView: View {
                    let tag = json["tag_name"] as? String {
                     let version = tag.hasPrefix("v") ? String(tag.dropFirst()) : tag
                     await MainActor.run {
+                        isUpdateAnimating = false
                         withAnimation { updateIconRotation = 0 }
                         latestVersion = version
                         isCheckingUpdate = false
                     }
                 } else {
                     await MainActor.run {
+                        isUpdateAnimating = false
                         withAnimation { updateIconRotation = 0 }
                         updateError = "릴리즈 정보를 읽을 수 없습니다"
                         isCheckingUpdate = false
@@ -442,6 +446,7 @@ struct SettingsView: View {
                 }
             } catch {
                 await MainActor.run {
+                    isUpdateAnimating = false
                     withAnimation { updateIconRotation = 0 }
                     updateError = "확인 실패: \(error.localizedDescription)"
                     isCheckingUpdate = false

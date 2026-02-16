@@ -11,6 +11,12 @@ struct DashboardView: View {
     @State private var vaultCheckResult: VaultCheckResult?
     @State private var selectedActivity: ActivityEntry?
 
+    // Cached PARA counts to avoid recalculation on every render
+    private var projectCount: Int { stats.byCategory["project"] ?? 0 }
+    private var areaCount: Int { stats.byCategory["area"] ?? 0 }
+    private var resourceCount: Int { stats.byCategory["resource"] ?? 0 }
+    private var archiveCount: Int { stats.byCategory["archive"] ?? 0 }
+
     var body: some View {
         VStack(spacing: 0) {
             BreadcrumbView(current: .dashboard)
@@ -30,18 +36,13 @@ struct DashboardView: View {
 
                         Spacer()
 
-                        let p = stats.byCategory["project"] ?? 0
-                        let a = stats.byCategory["area"] ?? 0
-                        let r = stats.byCategory["resource"] ?? 0
-                        let ar = stats.byCategory["archive"] ?? 0
-
-                        statButton("P", count: p, color: .blue, category: .project)
+                        statButton("P", count: projectCount, color: .blue, category: .project)
                         Text("·").foregroundColor(.secondary)
-                        statButton("A", count: a, color: .green, category: .area)
+                        statButton("A", count: areaCount, color: .green, category: .area)
                         Text("·").foregroundColor(.secondary)
-                        statButton("R", count: r, color: .orange, category: .resource)
+                        statButton("R", count: resourceCount, color: .orange, category: .resource)
                         Text("·").foregroundColor(.secondary)
-                        statButton("A", count: ar, color: .gray, category: .archive)
+                        statButton("A", count: archiveCount, color: .gray, category: .archive)
                     }
                     .font(.caption)
                     .monospacedDigit()
