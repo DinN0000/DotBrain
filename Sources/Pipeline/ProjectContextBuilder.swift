@@ -25,6 +25,7 @@ struct ProjectContextBuilder {
             let projectDir = (projectsPath as NSString).appendingPathComponent(entry)
             var isDir: ObjCBool = false
             guard fm.fileExists(atPath: projectDir, isDirectory: &isDir), isDir.boolValue else { continue }
+            guard pathManager.isPathSafe(projectDir) else { continue }
 
             let indexPath = (projectDir as NSString).appendingPathComponent("\(entry).md")
 
@@ -122,6 +123,7 @@ struct ProjectContextBuilder {
             let projectDir = (projectsPath as NSString).appendingPathComponent(project)
             var isDir: ObjCBool = false
             guard fm.fileExists(atPath: projectDir, isDirectory: &isDir), isDir.boolValue else { continue }
+            guard pathManager.isPathSafe(projectDir) else { continue }
 
             // Read index note for project summary
             let indexPath = (projectDir as NSString).appendingPathComponent("\(project).md")
@@ -172,6 +174,7 @@ struct ProjectContextBuilder {
             let folderPath = (basePath as NSString).appendingPathComponent(folder)
             var isDir: ObjCBool = false
             guard fm.fileExists(atPath: folderPath, isDirectory: &isDir), isDir.boolValue else { continue }
+            guard pathManager.isPathSafe(folderPath) else { continue }
 
             // Count files and aggregate tags
             guard let files = try? fm.contentsOfDirectory(atPath: folderPath) else { continue }

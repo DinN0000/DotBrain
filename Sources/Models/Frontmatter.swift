@@ -103,8 +103,8 @@ struct Frontmatter {
                 currentObj = nil
             }
 
-            // Top-level key: value
-            guard let colonIdx = trimmed.firstIndex(of: ":") else { continue }
+            // Top-level key: value — find first colon outside quotes
+            guard let colonIdx = findFirstUnquotedColon(in: trimmed) else { continue }
             let key = String(trimmed[..<colonIdx]).trimmingCharacters(in: .whitespaces)
             let rawValue = String(trimmed[trimmed.index(after: colonIdx)...]).trimmingCharacters(in: .whitespaces)
 
@@ -143,6 +143,22 @@ struct Frontmatter {
         }
 
         return fm
+    }
+
+    /// Find first colon that is not inside single or double quotes
+    private static func findFirstUnquotedColon(in text: String) -> String.Index? {
+        var inDouble = false
+        var inSingle = false
+        var prev: Character = "\0"
+
+        for idx in text.indices {
+            let ch = text[idx]
+            if ch == "\"" && !inSingle && prev != "\\" { inDouble.toggle() }
+            else if ch == "'" && !inDouble && prev != "\\" { inSingle.toggle() }
+            else if ch == ":" && !inDouble && !inSingle { return idx }
+            prev = ch
+        }
+        return nil
     }
 
     private static func applyScalar(to fm: inout Frontmatter, key: String, value: String) {

@@ -41,10 +41,15 @@ enum FrontmatterWriter {
         // Build ## Related Notes section with context descriptions
         var lines: [String] = []
         if let project = project, !project.isEmpty, !result.contains("[[\(project)]]") {
-            lines.append("- [[\(project)]] — 소속 프로젝트")
+            let safeProject = sanitizeWikilink(project)
+            lines.append("- [[\(safeProject)]] — 소속 프로젝트")
         }
         for note in relatedNotes where !result.contains("[[\(note.name)]]") {
-            lines.append("- [[\(note.name)]] — \(note.context)")
+            let safeName = sanitizeWikilink(note.name)
+            let safeContext = note.context
+                .replacingOccurrences(of: "[[", with: "")
+                .replacingOccurrences(of: "]]", with: "")
+            lines.append("- [[\(safeName)]] — \(safeContext)")
         }
 
         if !lines.isEmpty {
@@ -93,16 +98,31 @@ enum FrontmatterWriter {
         // Related Notes
         var lines: [String] = []
         if let project = classification.project, !project.isEmpty {
-            lines.append("- [[\(project)]] — 소속 프로젝트")
+            let safeProject = sanitizeWikilink(project)
+            lines.append("- [[\(safeProject)]] — 소속 프로젝트")
         }
         for note in relatedNotes where !result.contains("[[\(note.name)]]") {
-            lines.append("- [[\(note.name)]] — \(note.context)")
+            let safeName = sanitizeWikilink(note.name)
+            let safeContext = note.context
+                .replacingOccurrences(of: "[[", with: "")
+                .replacingOccurrences(of: "]]", with: "")
+            lines.append("- [[\(safeName)]] — \(safeContext)")
         }
         if !lines.isEmpty {
             result += "\n## Related Notes\n\n" + lines.joined(separator: "\n") + "\n"
         }
 
         return result
+    }
+
+    /// Sanitize a string for use inside [[wikilink]] — remove brackets and path traversal
+    private static func sanitizeWikilink(_ name: String) -> String {
+        name.replacingOccurrences(of: "[[", with: "")
+            .replacingOccurrences(of: "]]", with: "")
+            .replacingOccurrences(of: "/", with: "-")
+            .replacingOccurrences(of: "\\", with: "-")
+            .replacingOccurrences(of: "..", with: "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     /// Create index note for a new subfolder
