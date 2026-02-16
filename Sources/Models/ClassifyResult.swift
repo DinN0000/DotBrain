@@ -23,6 +23,7 @@ struct ClassifyResult: Codable {
         let fileName: String
         let para: PARACategory
         let tags: [String]
+        let summary: String
         let confidence: Double
         var project: String?
         var targetFolder: String?

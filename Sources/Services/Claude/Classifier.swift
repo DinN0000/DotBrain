@@ -6,7 +6,7 @@ actor Classifier {
     private let aiService = AIService.shared
     private let batchSize = 10
     private let confidenceThreshold = 0.8
-    private let previewLength = 200
+    private let previewLength = 800
 
     // MARK: - Main Classification
 
@@ -85,8 +85,8 @@ actor Classifier {
         var stage2Results: [String: ClassifyResult.Stage2Item] = [:]
 
         if !uncertainFiles.isEmpty {
-            // Stage 2: Process uncertain files concurrently (max 5)
-            let maxConcurrentStage2 = 5
+            // Stage 2: Process uncertain files concurrently (max 3)
+            let maxConcurrentStage2 = 3
 
             stage2Results = try await withThrowingTaskGroup(
                 of: (String, ClassifyResult.Stage2Item).self,
@@ -146,7 +146,7 @@ actor Classifier {
                 result = ClassifyResult(
                     para: s1.para,
                     tags: s1.tags,
-                    summary: "",
+                    summary: s1.summary,
                     targetFolder: stripParaPrefix(s1.targetFolder ?? ""),
                     project: rawProject.flatMap { fuzzyMatchProject($0, projectNames: projectNames) },
                     confidence: s1.confidence
@@ -181,7 +181,12 @@ actor Classifier {
         weightedContext: String
     ) async throws -> [String: ClassifyResult.Stage1Item] {
         let previews = files.map { file in
-            (fileName: file.fileName, preview: String(file.content.prefix(previewLength)))
+            let preview = FileContentExtractor.extractPreview(
+                from: file.filePath,
+                content: file.content,
+                maxLength: previewLength
+            )
+            return (fileName: file.fileName, preview: preview)
         }
 
         let prompt = buildStage1Prompt(previews, projectContext: projectContext, subfolderContext: subfolderContext, weightedContext: weightedContext)
@@ -196,6 +201,7 @@ actor Classifier {
                     fileName: item.fileName,
                     para: para,
                     tags: Array((item.tags ?? []).prefix(5)),
+                    summary: item.summary ?? "",
                     confidence: max(0, min(1, item.confidence ?? 0)),
                     project: item.project,
                     targetFolder: item.targetFolder.map { stripParaPrefix($0) }
@@ -209,6 +215,7 @@ actor Classifier {
                 fileName: file.fileName,
                 para: .resource,
                 tags: [],
+                summary: "",
                 confidence: 0,
                 project: nil,
                 targetFolder: nil
@@ -313,6 +320,7 @@ actor Classifier {
             "fileName": "파일명",
             "para": "project" | "area" | "resource" | "archive",
             "tags": ["태그1", "태그2"],
+            "summary": "핵심 내용 한 줄 요약 (15자 이상)",
             "confidence": 0.0~1.0,
             "project": "관련 프로젝트명 (관련 있을 때만, 없으면 생략)",
             "targetFolder": "하위 폴더명 (예: DevOps, 회의록). PARA 접두사 포함하지 말 것"
@@ -321,6 +329,7 @@ actor Classifier {
 
         각 파일에 대해 정확히 하나의 객체를 반환하세요. tags는 최대 5개, 한국어 또는 영어 혼용 가능합니다.
         confidence는 분류 확신도입니다 (0.0=모름, 1.0=확실).
+        summary는 이 문서가 무엇에 관한 것인지 구체적으로 한 줄로 요약하세요 (후속 노트 연결에 사용됩니다).
         ⚠️ 같은 주제의 기존 폴더가 있으면 반드시 그 폴더명을 그대로 사용하세요.
         """
     }
@@ -395,6 +404,7 @@ actor Classifier {
         let fileName: String
         let para: String
         var tags: [String]?
+        var summary: String?
         var confidence: Double?
         var project: String?
         var targetFolder: String?

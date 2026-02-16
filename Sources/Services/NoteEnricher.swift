@@ -8,11 +8,18 @@ struct NoteEnricher: Sendable {
 
     /// Enrich a single note's frontmatter by filling empty fields with AI analysis
     func enrichNote(at filePath: String) async throws -> EnrichResult {
-        guard let content = try? String(contentsOfFile: filePath, encoding: .utf8) else {
+        // Use smart extraction — reads structure, not just prefix
+        let smartContent = FileContentExtractor.extract(from: filePath, maxLength: maxContentLength)
+        guard !smartContent.hasPrefix("[읽기 실패") else {
             throw EnrichError.cannotRead(filePath)
         }
 
-        let (existing, body) = Frontmatter.parse(markdown: content)
+        // Still need full content for frontmatter parsing and write-back
+        guard let fullContent = try? String(contentsOfFile: filePath, encoding: .utf8) else {
+            throw EnrichError.cannotRead(filePath)
+        }
+
+        let (existing, body) = Frontmatter.parse(markdown: fullContent)
 
         // Determine which fields need filling
         let needsPara = existing.para == nil
@@ -25,8 +32,8 @@ struct NoteEnricher: Sendable {
             return EnrichResult(filePath: filePath, fieldsUpdated: 0)
         }
 
-        // Ask AI to analyze the content
-        let preview = String(body.prefix(maxContentLength))
+        // Use smart-extracted content for AI analysis (includes headings + tail)
+        let preview = smartContent
         let fileName = (filePath as NSString).lastPathComponent
 
         let prompt = """
@@ -48,6 +55,9 @@ struct NoteEnricher: Sendable {
         """
 
         let response = try await aiService.sendFast(maxTokens: 512, message: prompt)
+
+        // Track API cost for note enrichment
+        StatisticsService.addApiCost(0.0005)  // ~$0.0005 per file for fast model
 
         // Parse AI response
         guard let data = extractJSON(from: response),

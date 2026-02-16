@@ -78,11 +78,23 @@ struct ContextLinker: Sendable {
         let noteDescriptions = batch.enumerated().map { (i, item) in
             let c = item.file.classification
             let tags = c.tags.joined(separator: ", ")
+            // Use summary if available; otherwise extract a short content preview
+            let description: String
+            if !c.summary.isEmpty {
+                description = c.summary
+            } else {
+                let preview = FileContentExtractor.extractPreview(
+                    from: item.file.input.filePath,
+                    content: item.file.input.content,
+                    maxLength: 300
+                )
+                description = preview
+            }
             return """
             [\(i)] 파일명: \(item.file.input.fileName)
             분류: \(c.para.rawValue)/\(c.targetFolder)
             태그: \(tags)
-            요약: \(c.summary)
+            내용: \(description)
             """
         }.joined(separator: "\n\n")
 
@@ -118,6 +130,11 @@ struct ContextLinker: Sendable {
 
         do {
             let response = try await aiService.sendFast(maxTokens: 2048, message: prompt)
+
+            // Track API cost for context linking batch
+            let estimatedCost = Double(batch.count) * 0.0005  // ~$0.0005 per file for fast model
+            StatisticsService.addApiCost(estimatedCost)
+
             let parsed = parseResponse(response)
 
             return batch.enumerated().map { (i, item) in
