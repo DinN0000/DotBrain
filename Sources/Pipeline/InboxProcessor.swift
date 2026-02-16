@@ -53,7 +53,7 @@ struct InboxProcessor {
             var collected: [ClassifyInput] = []
             collected.reserveCapacity(files.count)
             var activeTasks = 0
-            let maxConcurrent = 10
+            let maxConcurrent = 5
 
             for filePath in files {
                 if activeTasks >= maxConcurrent {
@@ -345,19 +345,23 @@ struct InboxProcessor {
     }
 
     /// Extract combined content from all files inside a folder
+    /// Uses smart extraction per file instead of raw prefix truncation
     private func extractFolderContent(from dirPath: String) -> String {
         let folderName = (dirPath as NSString).lastPathComponent
         let scanner = InboxScanner(pkmRoot: pkmRoot)
         let files = scanner.filesInDirectory(at: dirPath)
 
+        let perFileBudget = max(500, 5000 / max(files.count, 1))
+
         var content = "[폴더: \(folderName)] 포함 파일 \(files.count)개\n\n"
         for file in files {
             let name = (file as NSString).lastPathComponent
-            if let text = try? String(contentsOfFile: file, encoding: .utf8) {
-                content += "--- \(name) ---\n"
-                content += String(text.prefix(1500)) + "\n\n"
-            } else {
+            let extracted = FileContentExtractor.extract(from: file, maxLength: perFileBudget)
+            if extracted.hasPrefix("[읽기 실패") || extracted.hasPrefix("[바이너리") {
                 content += "--- \(name) [바이너리] ---\n\n"
+            } else {
+                content += "--- \(name) ---\n"
+                content += extracted + "\n\n"
             }
         }
         return String(content.prefix(5000))
