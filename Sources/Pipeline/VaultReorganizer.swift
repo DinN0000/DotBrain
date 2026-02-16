@@ -86,7 +86,7 @@ struct VaultReorganizer {
             var collected: [ClassifyInput] = []
             collected.reserveCapacity(filesToProcess.count)
             var activeTasks = 0
-            let maxConcurrent = 10
+            let maxConcurrent = 5
 
             for entry in filesToProcess {
                 if activeTasks >= maxConcurrent {
