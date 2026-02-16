@@ -70,7 +70,7 @@ if [ -n "$ICON_URL" ]; then
 fi
 
 # Stop running instance if any
-pkill -f "$APP_NAME" 2>/dev/null || true
+pkill -x "$APP_NAME" 2>/dev/null || true
 sleep 1
 
 # --- .app 번들 생성 ---
