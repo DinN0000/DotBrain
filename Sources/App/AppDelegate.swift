@@ -22,7 +22,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Auto-open popover on first launch
         if !UserDefaults.standard.bool(forKey: "onboardingCompleted") {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            Task { @MainActor [weak self] in
+                try? await Task.sleep(for: .milliseconds(500))
                 self?.openPopover()
             }
         }

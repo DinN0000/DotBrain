@@ -5,6 +5,10 @@ import ZIPFoundation
 enum DOCXExtractor {
     static let maxTextLength = 50_000
 
+    // MARK: - Cached Regex Patterns
+    private static let paraRegex = try! NSRegularExpression(pattern: #"<(?:[^:]+:)?p[\s>][\s\S]*?</(?:[^:]+:)?p>"#)
+    private static let textRegex = try! NSRegularExpression(pattern: #"<(?:[^:]+:)?t[^>]*>([^<]*)</(?:[^:]+:)?t>"#)
+
     static func extract(at path: String) -> ExtractResult {
         let url = URL(fileURLWithPath: path)
         let fileName = url.lastPathComponent
@@ -49,16 +53,8 @@ enum DOCXExtractor {
     private static func extractWordParagraphs(from xml: String) -> [String] {
         var paragraphs: [String] = []
 
-        // Match paragraph blocks: <w:p ...>...</w:p>
-        let paraPattern = #"<(?:[^:]+:)?p[\s>][\s\S]*?</(?:[^:]+:)?p>"#
-        guard let paraRegex = try? NSRegularExpression(pattern: paraPattern) else { return paragraphs }
-
         let nsRange = NSRange(xml.startIndex..., in: xml)
         let paraMatches = paraRegex.matches(in: xml, range: nsRange)
-
-        // Pattern for text runs: <w:t>text</w:t> or namespace variants
-        let textPattern = #"<(?:[^:]+:)?t[^>]*>([^<]*)</(?:[^:]+:)?t>"#
-        guard let textRegex = try? NSRegularExpression(pattern: textPattern) else { return paragraphs }
 
         for paraMatch in paraMatches {
             guard let paraRange = Range(paraMatch.range, in: xml) else { continue }

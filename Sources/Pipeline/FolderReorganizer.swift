@@ -80,7 +80,7 @@ struct FolderReorganizer {
             var collected: [ClassifyInput] = []
             collected.reserveCapacity(uniqueFiles.count)
             var activeTasks = 0
-            let maxConcurrent = 10
+            let maxConcurrent = 5
 
             for filePath in uniqueFiles {
                 if activeTasks >= maxConcurrent {

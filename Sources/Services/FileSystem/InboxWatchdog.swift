@@ -1,20 +1,24 @@
 import Foundation
 
-/// Monitors _Inbox folder for changes using DispatchSource file system events
+/// Monitors _Inbox folder for changes using DispatchSource file system events.
+/// Note: DispatchSource.makeFileSystemObjectSource is a kernel-level API with no
+/// Swift Concurrency equivalent, so we keep it for the FS monitoring itself.
+/// Debounce and retry logic use Task-based patterns to minimize GCD surface.
+@MainActor
 final class InboxWatchdog {
     private var source: DispatchSourceFileSystemObject?
     private let folderPath: String
-    private let onChange: () -> Void
-    private var debounceWorkItem: DispatchWorkItem?
+    private let onChange: @MainActor () -> Void
+    private var debounceTask: Task<Void, Never>?
+    private var retryTask: Task<Void, Never>?
     private var retryCount = 0
-    private var retryTimer: DispatchSourceTimer?
     private static let maxRetries = 3
     private static let retryInterval: TimeInterval = 10.0
 
     /// Debounce interval in seconds (avoid rapid-fire refreshes)
     private let debounceInterval: TimeInterval = 2.0
 
-    init(folderPath: String, onChange: @escaping () -> Void) {
+    init(folderPath: String, onChange: @MainActor @escaping () -> Void) {
         self.folderPath = folderPath
         self.onChange = onChange
     }
@@ -35,10 +39,11 @@ final class InboxWatchdog {
 
         let fd = open(folderPath, O_EVTONLY)
         guard fd >= 0 else {
-            print("[InboxWatchdog] 폴더 열기 실패: \(folderPath)")
+            print("[InboxWatchdog] Failed to open folder: \(folderPath)")
             return
         }
 
+        // DispatchSource requires a GCD queue — use utility QoS, minimal surface
         let source = DispatchSource.makeFileSystemObjectSource(
             fileDescriptor: fd,
             eventMask: [.write, .rename, .delete],
@@ -46,7 +51,10 @@ final class InboxWatchdog {
         )
 
         source.setEventHandler { [weak self] in
-            self?.handleChange()
+            // Bridge from GCD to MainActor
+            Task { @MainActor [weak self] in
+                self?.handleChange()
+            }
         }
 
         source.setCancelHandler {
@@ -56,48 +64,45 @@ final class InboxWatchdog {
         self.source = source
         source.resume()
 
-        print("[InboxWatchdog] 감시 시작: \(folderPath)")
+        print("[InboxWatchdog] Watching: \(folderPath)")
     }
 
     /// Stop watching
     func stop() {
-        debounceWorkItem?.cancel()
-        debounceWorkItem = nil
+        debounceTask?.cancel()
+        debounceTask = nil
         cancelRetry()
         source?.cancel()
         source = nil
-        print("[InboxWatchdog] 감시 중지")
     }
 
     private func scheduleRetry() {
         guard retryCount < Self.maxRetries else {
-            print("[InboxWatchdog] 폴더 대기 포기 (\(Self.maxRetries)회 시도): \(folderPath)")
+            print("[InboxWatchdog] Gave up waiting for folder (\(Self.maxRetries) attempts): \(folderPath)")
             return
         }
         retryCount += 1
-        print("[InboxWatchdog] 폴더 없음, \(Self.retryInterval)초 후 재시도 (\(retryCount)/\(Self.maxRetries))")
+        print("[InboxWatchdog] Folder missing, retry in \(Self.retryInterval)s (\(retryCount)/\(Self.maxRetries))")
 
-        let timer = DispatchSource.makeTimerSource(queue: DispatchQueue.global(qos: .utility))
-        timer.schedule(deadline: .now() + Self.retryInterval)
-        timer.setEventHandler { [weak self] in
+        retryTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(Self.retryInterval))
+            guard !Task.isCancelled else { return }
             self?.start()
         }
-        retryTimer = timer
-        timer.resume()
     }
 
     private func cancelRetry() {
-        retryTimer?.cancel()
-        retryTimer = nil
+        retryTask?.cancel()
+        retryTask = nil
     }
 
     private func handleChange() {
         // Debounce: cancel any pending callback and schedule a new one
-        debounceWorkItem?.cancel()
-        let workItem = DispatchWorkItem { [weak self] in
+        debounceTask?.cancel()
+        debounceTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(self?.debounceInterval ?? 2.0))
+            guard !Task.isCancelled else { return }
             self?.onChange()
         }
-        debounceWorkItem = workItem
-        DispatchQueue.main.asyncAfter(deadline: .now() + debounceInterval, execute: workItem)
     }
 }

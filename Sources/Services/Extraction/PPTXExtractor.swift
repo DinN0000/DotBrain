@@ -5,6 +5,9 @@ import ZIPFoundation
 enum PPTXExtractor {
     static let maxTextLength = 50_000
 
+    // MARK: - Cached Regex Patterns
+    private static let drawingMLTextRegex = try! NSRegularExpression(pattern: #"<(?:[^:]+:)?t[^>]*>([^<]*)</(?:[^:]+:)?t>"#)
+
     static func extract(at path: String) -> ExtractResult {
         let url = URL(fileURLWithPath: path)
         let fileName = url.lastPathComponent
@@ -65,12 +68,8 @@ enum PPTXExtractor {
     private static func extractDrawingMLTexts(from xml: String) -> [String] {
         var texts: [String] = []
 
-        // Match <a:t>text</a:t> or namespace variants
-        let pattern = #"<(?:[^:]+:)?t[^>]*>([^<]*)</(?:[^:]+:)?t>"#
-        guard let regex = try? NSRegularExpression(pattern: pattern) else { return texts }
-
         let nsRange = NSRange(xml.startIndex..., in: xml)
-        let matches = regex.matches(in: xml, range: nsRange)
+        let matches = drawingMLTextRegex.matches(in: xml, range: nsRange)
 
         for match in matches {
             if let textRange = Range(match.range(at: 1), in: xml) {
@@ -86,6 +85,8 @@ enum PPTXExtractor {
 }
 
 // MARK: - Shared OOXML utilities
+
+private var _metadataRegexCache: [String: NSRegularExpression] = [:]
 
 func readEntry(_ entry: Entry, from archive: Archive) -> String? {
     var data = Data()
@@ -110,8 +111,18 @@ func extractOOXMLMetadata(from archive: Archive) -> [String: Any] {
     let fields = ["title", "creator", "subject", "description", "created", "modified"]
     for field in fields {
         let pattern = "<[^>]*:?\(field)[^>]*>([^<]+)<"
-        if let regex = try? NSRegularExpression(pattern: pattern),
-           let match = regex.firstMatch(in: content, range: NSRange(content.startIndex..., in: content)),
+
+        let regex: NSRegularExpression
+        if let cached = _metadataRegexCache[pattern] {
+            regex = cached
+        } else if let newRegex = try? NSRegularExpression(pattern: pattern) {
+            _metadataRegexCache[pattern] = newRegex
+            regex = newRegex
+        } else {
+            continue
+        }
+
+        if let match = regex.firstMatch(in: content, range: NSRange(content.startIndex..., in: content)),
            let range = Range(match.range(at: 1), in: content) {
             let value = String(content[range]).trimmingCharacters(in: .whitespacesAndNewlines)
             if !value.isEmpty {

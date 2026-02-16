@@ -6,6 +6,15 @@ enum XLSXExtractor {
     static let maxTextLength = 50_000
     static let maxRowsPerSheet = 100
 
+    // MARK: - Cached Regex Patterns
+    private static let siRegex = try! NSRegularExpression(pattern: #"<si[^>]*>([\s\S]*?)</si>"#)
+    private static let tRegex = try! NSRegularExpression(pattern: #"<t[^>]*>([^<]*)</t>"#)
+    private static let sheetsRegex = try! NSRegularExpression(pattern: #"<sheets>([\s\S]*?)</sheets>"#)
+    private static let nameRegex = try! NSRegularExpression(pattern: #"name="([^"]+)""#)
+    private static let rowRegex = try! NSRegularExpression(pattern: #"<row[^>]*>([\s\S]*?)</row>"#)
+    private static let cellRegex = try! NSRegularExpression(pattern: #"<c[^>]*?(t="([^"]*)")?[^>]*>([\s\S]*?)</c>"#)
+    private static let valueRegex = try! NSRegularExpression(pattern: #"<v>([^<]*)</v>"#)
+
     static func extract(at path: String) -> ExtractResult {
         let url = URL(fileURLWithPath: path)
         let fileName = url.lastPathComponent
@@ -80,15 +89,8 @@ enum XLSXExtractor {
 
         var strings: [String] = []
 
-        // Parse <si>...<t>text</t>...</si> blocks
-        let siPattern = #"<si[^>]*>([\s\S]*?)</si>"#
-        guard let siRegex = try? NSRegularExpression(pattern: siPattern) else { return strings }
-
         let nsRange = NSRange(content.startIndex..., in: content)
         let siMatches = siRegex.matches(in: content, range: nsRange)
-
-        let tPattern = #"<t[^>]*>([^<]*)</t>"#
-        guard let tRegex = try? NSRegularExpression(pattern: tPattern) else { return strings }
 
         for siMatch in siMatches {
             guard let siRange = Range(siMatch.range(at: 1), in: content) else { continue }
@@ -116,18 +118,12 @@ enum XLSXExtractor {
 
         var names: [String] = []
 
-        // Find <sheets>...</sheets> section
-        let sheetsPattern = #"<sheets>([\s\S]*?)</sheets>"#
-        guard let sheetsRegex = try? NSRegularExpression(pattern: sheetsPattern),
-              let sheetsMatch = sheetsRegex.firstMatch(in: content, range: NSRange(content.startIndex..., in: content)),
+        guard let sheetsMatch = sheetsRegex.firstMatch(in: content, range: NSRange(content.startIndex..., in: content)),
               let sheetsRange = Range(sheetsMatch.range(at: 1), in: content) else {
             return names
         }
 
         let sheetsContent = String(content[sheetsRange])
-        let namePattern = #"name="([^"]+)""#
-        guard let nameRegex = try? NSRegularExpression(pattern: namePattern) else { return names }
-
         let nsRange = NSRange(sheetsContent.startIndex..., in: sheetsContent)
         let matches = nameRegex.matches(in: sheetsContent, range: nsRange)
         for match in matches {
@@ -142,16 +138,8 @@ enum XLSXExtractor {
     private static func extractRows(from xml: String, sharedStrings: [String]) -> [String] {
         var rows: [String] = []
 
-        let rowPattern = #"<row[^>]*>([\s\S]*?)</row>"#
-        guard let rowRegex = try? NSRegularExpression(pattern: rowPattern) else { return rows }
-
         let nsRange = NSRange(xml.startIndex..., in: xml)
         let rowMatches = rowRegex.matches(in: xml, range: nsRange)
-
-        let cellPattern = #"<c[^>]*?(t="([^"]*)")?[^>]*>([\s\S]*?)</c>"#
-        let valuePattern = #"<v>([^<]*)</v>"#
-        guard let cellRegex = try? NSRegularExpression(pattern: cellPattern),
-              let valueRegex = try? NSRegularExpression(pattern: valuePattern) else { return rows }
 
         for rowMatch in rowMatches {
             guard let rowRange = Range(rowMatch.range(at: 0), in: xml) else { continue }
