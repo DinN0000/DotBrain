@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.8.0 — 품질 개선 + 보안 강화 + 성능 최적화 (2026-02-16)
+- 스마트 콘텐츠 추출로 AI 분류 품질 향상 (FileContentExtractor 전면 개선)
+- 경로 탐색 방지 강화 (canonicalize + hasPrefix), YAML 인젝션 방어
+- 정규식 캐싱, actor 마이그레이션, 동시성 튜닝 (DOCXExtractor, XLSXExtractor, PPTXExtractor 등)
+- SwiftUI 불필요 리렌더 방지, 애니메이션 메모리 릭 수정
+- InboxWatchdog deinit actor isolation 에러 수정
+
 ## v1.7.8 — 문서 정비 + vault-audit 에이전트 (2026-02-16)
 - 볼트 감사 에이전트 (vault-audit-agent) 추가
 - 프론트매터 검증, MOC 무결성 검사 스킬 추가
