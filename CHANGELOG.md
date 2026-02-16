@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.7.8 — 문서 정비 + vault-audit 에이전트 (2026-02-16)
+- 볼트 감사 에이전트 (vault-audit-agent) 추가
+- 프론트매터 검증, MOC 무결성 검사 스킬 추가
+- MIT 라이선스, CONTRIBUTING, SECURITY, Issue/PR 템플릿 추가
+- README 배지, GitHub 설명/토픽 설정
+- 아키텍처 문서 v1.7.7 기준 갱신, docs 구조 정리
+- README API 키 저장 방식 설명 수정 (Keychain → AES-GCM)
+
 ## v1.7.7 — 성능 최적화 + UX 피드백 개선 (2026-02-15)
 - 파일 추출 TaskGroup 동시성 최대 10개 제한 (메모리 폭증 방지)
 - AI 재시도 120초 타임아웃 추가 (무한 대기 방지)
