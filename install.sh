@@ -20,9 +20,13 @@ echo "시스템: macOS $(sw_vers -productVersion) ($ARCH)"
 
 # Get latest release download URL
 echo "최신 릴리즈 확인 중..."
-DOWNLOAD_URL=$(curl -sL "https://api.github.com/repos/$REPO/releases/latest" \
+RELEASE_JSON=$(curl -sL "https://api.github.com/repos/$REPO/releases/latest")
+# Match DotBrain or DotBrain-binary, exclude .icns/.txt
+DOWNLOAD_URL=$(echo "$RELEASE_JSON" \
     | grep '"browser_download_url"' \
-    | grep "/${APP_NAME}\"" \
+    | grep -v '\.icns' \
+    | grep -v '\.txt' \
+    | grep "/${APP_NAME}" \
     | head -1 \
     | sed -E 's/.*"(https[^"]+)".*/\1/')
 
