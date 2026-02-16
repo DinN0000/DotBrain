@@ -87,6 +87,14 @@ struct PKMPathManager {
         return (targetDir as NSString).appendingPathComponent("_Assets")
     }
 
+    /// Validate that a path is safely within the PKM root (prevents symlink traversal)
+    /// Call this before any file read/write to untrusted paths
+    func isPathSafe(_ path: String) -> Bool {
+        let resolvedRoot = URL(fileURLWithPath: root).standardizedFileURL.resolvingSymlinksInPath().path
+        let resolvedPath = URL(fileURLWithPath: path).standardizedFileURL.resolvingSymlinksInPath().path
+        return resolvedPath.hasPrefix(resolvedRoot)
+    }
+
     /// Check if PKM folder structure exists
     func isInitialized() -> Bool {
         let fm = FileManager.default
