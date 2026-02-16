@@ -6,3 +6,9 @@ xcuserdata/
 DerivedData/
 .env
 .worktrees/
+.pdca-status.json
+docs/01-plan/
+docs/03-analysis/
+docs/04-report/
+docs/archive/
+run.sh

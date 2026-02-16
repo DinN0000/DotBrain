@@ -2,9 +2,18 @@
   <img src="Resources/app-icon.png" width="128" alt="DotBrain Icon">
 </p>
 
-# DotBrain
+<h1 align="center">DotBrain</h1>
 
-### Built for Humans. Optimized for AI.
+<p align="center">
+  <strong>Built for Humans. Optimized for AI.</strong>
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/Swift-5.9-F05138?logo=swift&logoColor=white" alt="Swift 5.9">
+  <img src="https://img.shields.io/badge/macOS-13%2B-000000?logo=apple&logoColor=white" alt="macOS 13+">
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/DinN0000/DotBrain" alt="License"></a>
+  <a href="https://github.com/DinN0000/DotBrain/releases/latest"><img src="https://img.shields.io/github/v/release/DinN0000/DotBrain" alt="Latest Release"></a>
+</p>
 
 DotBrain은 로컬 문서를 PARA 방법론에 따라 체계적으로 정리합니다.
 이 구조는 사람에게는 직관적인 지식 체계가 되고,
