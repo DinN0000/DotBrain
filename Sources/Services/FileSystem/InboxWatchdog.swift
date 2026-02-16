@@ -24,7 +24,9 @@ final class InboxWatchdog {
     }
 
     deinit {
-        stop()
+        debounceTask?.cancel()
+        retryTask?.cancel()
+        source?.cancel()
     }
 
     /// Start watching the inbox folder
