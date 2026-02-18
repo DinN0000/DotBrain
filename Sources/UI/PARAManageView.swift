@@ -316,18 +316,18 @@ struct PARAManageView: View {
     // MARK: - Actions
 
     private func loadFolders() {
-        isLoading = true
+        let showLoading = folderMap.values.allSatisfy({ $0.isEmpty })
+        if showLoading { isLoading = true }
         let root = appState.pkmRootPath
-        Task.detached(priority: .utility) {
+        Task {
             var result: [PARACategory: [FolderEntry]] = [:]
             for cat in PARACategory.allCases {
-                result[cat] = Self.scanCategory(cat, pkmRoot: root)
+                result[cat] = await Task.detached(priority: .utility) {
+                    Self.scanCategory(cat, pkmRoot: root)
+                }.value
             }
-            let snapshot = result
-            await MainActor.run {
-                folderMap = snapshot
-                isLoading = false
-            }
+            folderMap = result
+            isLoading = false
         }
     }
 
