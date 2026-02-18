@@ -1,5 +1,20 @@
 # Changelog
 
+## v1.8.7 — 폴더 관리 안정성 + 보안 강화 (2026-02-18)
+- 폴더 관리 화면 멈춤 근본 수정: Task.detached + TaskGroup 병렬 스캔 + 취소 지원
+- 폴더 이름 변경 기능 추가 (프론트매터 + WikiLink 일괄 갱신)
+- MOC 갱신을 백그라운드 스레드로 이동 (메인 스레드 차단 제거)
+- 이름 변경/병합 후 카테고리 루트 MOC 자동 갱신
+- WikiLink 완료 표시(markInVault) 노트 손상 버그 수정
+- 병합 시 소스 폴더 완전 삭제 (인덱스 노트 잔존 해결)
+- 이름 변경 시 인덱스 노트 처리 순서 수정 (enumerator 안정성)
+- 재활성화 시 충돌 검사를 프론트매터 수정 전으로 이동
+- 폴더 생성 입력값 검증 강화 (경로 탐색 방지)
+- PARAMover/ProjectManager 전체 함수에 isPathSafe 검증 추가
+- Finder 열기 시 resolvingSymlinksInPath 적용
+- clearStatusAfterDelay 타이머 경쟁 조건 수정
+- Frontmatter file.format YAML 인젝션 방어
+
 ## v1.8.6 — UX 개선 + Project Folder Protection (2026-02-18)
 - 대시보드 섹션 라벨: "수제 도구" / "AI 관리" + 역할 설명 추가
 - "전체 재정리" → "AI 재분류"로 기능명 변경

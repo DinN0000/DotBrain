@@ -246,7 +246,7 @@ struct Frontmatter {
         if let file = file {
             lines.append("file:")
             lines.append("  name: \(Frontmatter.escapeYAML(file.name))")
-            lines.append("  format: \(file.format)")
+            lines.append("  format: \(Frontmatter.escapeYAML(file.format))")
             lines.append("  size_kb: \(file.sizeKB)")
         }
 

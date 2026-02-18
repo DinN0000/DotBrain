@@ -15,6 +15,9 @@ struct ProjectManager {
         let safeName = sanitizeName(name)
         let projectDir = (pathManager.projectsPath as NSString).appendingPathComponent(safeName)
 
+        guard pathManager.isPathSafe(projectDir) else {
+            throw ProjectError.alreadyExists(safeName)
+        }
         guard !fm.fileExists(atPath: projectDir) else {
             throw ProjectError.alreadyExists(safeName)
         }
@@ -48,6 +51,9 @@ struct ProjectManager {
         let safeName = sanitizeName(name)
         let projectDir = (pathManager.projectsPath as NSString).appendingPathComponent(safeName)
 
+        guard pathManager.isPathSafe(projectDir) else {
+            throw ProjectError.notFound(safeName)
+        }
         guard fm.fileExists(atPath: projectDir) else {
             throw ProjectError.notFound(safeName)
         }
@@ -80,16 +86,20 @@ struct ProjectManager {
         let safeName = sanitizeName(name)
         let archiveDir = (pathManager.archivePath as NSString).appendingPathComponent(safeName)
 
+        guard pathManager.isPathSafe(archiveDir) else {
+            throw ProjectError.notFound(safeName)
+        }
         guard fm.fileExists(atPath: archiveDir) else {
             throw ProjectError.notFound(safeName)
         }
 
-        let updatedCount = try updateAllNotes(in: archiveDir, status: .active, para: .project)
-
+        // Check for conflict BEFORE modifying frontmatter
         let projectDir = (pathManager.projectsPath as NSString).appendingPathComponent(safeName)
         guard !fm.fileExists(atPath: projectDir) else {
             throw ProjectError.alreadyExists(safeName)
         }
+
+        let updatedCount = try updateAllNotes(in: archiveDir, status: .active, para: .project)
         try fm.moveItem(atPath: archiveDir, toPath: projectDir)
 
         unmarkReferencesCompleted(projectName: safeName)
@@ -106,6 +116,9 @@ struct ProjectManager {
         let safeNew = sanitizeName(newName)
         let oldDir = (pathManager.projectsPath as NSString).appendingPathComponent(safeOld)
 
+        guard pathManager.isPathSafe(oldDir) else {
+            throw ProjectError.notFound(safeOld)
+        }
         guard fm.fileExists(atPath: oldDir) else {
             throw ProjectError.notFound(safeOld)
         }
@@ -207,6 +220,11 @@ struct ProjectManager {
     }
 
     private func markReferencesCompleted(projectName: String) {
+        // Two-pass: strip existing marks first to prevent double-marking
+        markInVault(
+            pattern: "[[\(projectName)]] (완료됨)",
+            replacement: "[[\(projectName)]]"
+        )
         markInVault(
             pattern: "[[\(projectName)]]",
             replacement: "[[\(projectName)]] (완료됨)"
@@ -249,7 +267,7 @@ struct ProjectManager {
         return files
     }
 
-    /// Replace with normalization — prevents double-marking for mark/unmark operations
+    /// Simple find-and-replace across vault markdown files
     @discardableResult
     private func markInVault(pattern: String, replacement: String) -> Int {
         let files = collectVaultMarkdownFiles()
@@ -257,8 +275,8 @@ struct ProjectManager {
 
         for filePath in files {
             guard let content = try? String(contentsOfFile: filePath, encoding: .utf8) else { continue }
-            let normalized = content.replacingOccurrences(of: replacement, with: pattern)
-            let updated = normalized.replacingOccurrences(of: pattern, with: replacement)
+            guard content.contains(pattern) else { continue }
+            let updated = content.replacingOccurrences(of: pattern, with: replacement)
             if updated != content {
                 try? updated.write(toFile: filePath, atomically: true, encoding: .utf8)
                 count += 1
