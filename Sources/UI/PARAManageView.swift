@@ -407,6 +407,8 @@ struct PARAManageView: View {
             statusMessage = "'\(name)' -> \(target.displayName) (\(count)개 노트 갱신)"
             loadFolders()
             clearStatusAfterDelay()
+            refreshMOC(folderName: name, category: target)
+            refreshCategoryMOC(source)
         } catch {
             statusMessage = error.localizedDescription
             clearStatusAfterDelay()
@@ -442,6 +444,7 @@ struct PARAManageView: View {
             newFolderCategory = nil
             loadFolders()
             clearStatusAfterDelay()
+            refreshCategoryMOC(category)
         } catch {
             statusMessage = error.localizedDescription
             clearStatusAfterDelay()
@@ -455,6 +458,8 @@ struct PARAManageView: View {
             statusMessage = "'\(name)' 완료 -> 아카이브 (\(count)개 노트 갱신)"
             loadFolders()
             clearStatusAfterDelay()
+            refreshCategoryMOC(.project)
+            refreshMOC(folderName: name, category: .archive)
         } catch {
             statusMessage = error.localizedDescription
             clearStatusAfterDelay()
@@ -468,6 +473,8 @@ struct PARAManageView: View {
             statusMessage = "'\(name)' 재활성화됨 (\(count)개 노트 갱신)"
             loadFolders()
             clearStatusAfterDelay()
+            refreshCategoryMOC(.archive)
+            refreshMOC(folderName: name, category: .project)
         } catch {
             statusMessage = error.localizedDescription
             clearStatusAfterDelay()
@@ -483,6 +490,7 @@ struct PARAManageView: View {
             statusMessage = "'\(oldName)' -> '\(trimmed)' (\(count)개 노트 갱신)"
             loadFolders()
             clearStatusAfterDelay()
+            refreshMOC(folderName: trimmed, category: category)
         } catch {
             statusMessage = error.localizedDescription
             clearStatusAfterDelay()
@@ -496,6 +504,7 @@ struct PARAManageView: View {
             statusMessage = "'\(name)' 삭제됨 (휴지통)"
             loadFolders()
             clearStatusAfterDelay()
+            refreshCategoryMOC(category)
         } catch {
             statusMessage = error.localizedDescription
             clearStatusAfterDelay()
@@ -509,6 +518,7 @@ struct PARAManageView: View {
             statusMessage = "'\(source)' -> '\(target)' 병합 (\(count)개 파일)"
             loadFolders()
             clearStatusAfterDelay()
+            refreshMOC(folderName: target, category: category)
         } catch {
             statusMessage = error.localizedDescription
             clearStatusAfterDelay()
@@ -527,6 +537,27 @@ struct PARAManageView: View {
         let basePath = PKMPathManager(root: appState.pkmRootPath).paraPath(for: category)
         let folderPath = (basePath as NSString).appendingPathComponent(name)
         NSWorkspace.shared.open(URL(fileURLWithPath: folderPath))
+    }
+
+    private func refreshMOC(folderName: String, category: PARACategory) {
+        let root = appState.pkmRootPath
+        Task {
+            let moc = MOCGenerator(pkmRoot: root)
+            let pathManager = PKMPathManager(root: root)
+            let basePath = pathManager.paraPath(for: category)
+            let folderPath = (basePath as NSString).appendingPathComponent(folderName)
+            try? await moc.generateMOC(folderPath: folderPath, folderName: folderName, para: category)
+            try? await moc.generateCategoryRootMOC(basePath: basePath, para: category)
+        }
+    }
+
+    private func refreshCategoryMOC(_ category: PARACategory) {
+        let root = appState.pkmRootPath
+        Task {
+            let moc = MOCGenerator(pkmRoot: root)
+            let basePath = PKMPathManager(root: root).paraPath(for: category)
+            try? await moc.generateCategoryRootMOC(basePath: basePath, para: category)
+        }
     }
 
     private func clearStatusAfterDelay() {
