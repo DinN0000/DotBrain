@@ -69,6 +69,9 @@ if [ -n "$ICON_URL" ]; then
     curl -sL "$ICON_URL" -o "$TMP_DIR/AppIcon.icns"
 fi
 
+# Unload LaunchAgent first (prevents KeepAlive restart on pkill)
+launchctl bootout "gui/$(id -u)/$PLIST_NAME" 2>/dev/null || true
+
 # Stop running instance if any
 pkill -x "$APP_NAME" 2>/dev/null || true
 sleep 1
