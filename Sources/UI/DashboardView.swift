@@ -76,7 +76,7 @@ struct DashboardView: View {
 
                     // Group 1: File operations
                     DashboardCardGroup(
-                        label: "정리 도구",
+                        label: "수제 도구",
                         description: "폴더와 파일을 직접 관리",
                         tint: .accentColor
                     ) {
@@ -100,7 +100,7 @@ struct DashboardView: View {
 
                     // Group 2: Vault maintenance
                     DashboardCardGroup(
-                        label: "자동 관리",
+                        label: "AI 관리",
                         description: "AI가 볼트 전체를 점검하고 분류",
                         tint: .accentColor
                     ) {
