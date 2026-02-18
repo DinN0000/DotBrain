@@ -363,18 +363,9 @@ struct SettingsView: View {
             }
 
             HStack(spacing: 12) {
-                Button(action: {
-                    openExternal("https://github.com/DinN0000/DotBrain")
-                }) {
-                    HStack(spacing: 4) {
-                        Image(systemName: "arrow.up.right.square")
-                            .font(.caption2)
-                        Text("GitHub")
-                            .font(.caption)
-                    }
-                }
-                .buttonStyle(.plain)
-                .foregroundColor(.accentColor)
+                Text("DotBrain v\(currentVersion)")
+                    .font(.system(.caption, design: .monospaced))
+                    .foregroundColor(.secondary)
 
                 Spacer()
 
@@ -491,6 +482,19 @@ struct SettingsView: View {
             .popover(isPresented: $showHelp) {
                 helpPopover
             }
+
+            Button(action: {
+                openExternal("https://github.com/DinN0000/DotBrain")
+            }) {
+                HStack(spacing: 3) {
+                    Image(systemName: "arrow.up.right.square")
+                        .font(.caption2)
+                    Text("GitHub")
+                        .font(.caption2)
+                }
+            }
+            .buttonStyle(.plain)
+            .foregroundColor(.secondary)
 
             Spacer()
 
