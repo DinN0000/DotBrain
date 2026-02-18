@@ -14,8 +14,9 @@ struct AuditReport {
         let suggestion: String?
     }
 
+    /// Actionable issues that repair can fix (excludes untagged — handled by NoteEnricher)
     var totalIssues: Int {
-        brokenLinks.count + missingFrontmatter.count + untaggedFiles.count + missingPARA.count
+        brokenLinks.count + missingFrontmatter.count + missingPARA.count
     }
 }
 
@@ -172,6 +173,54 @@ struct VaultAuditor {
                 if content.contains(oldPipePrefix) {
                     content = content.replacingOccurrences(of: oldPipePrefix, with: newPipePrefix)
                     // Already counted above if both exist; only count if not yet counted
+                }
+            }
+            if modified {
+                try? content.write(toFile: filePath, atomically: true, encoding: .utf8)
+            }
+        }
+
+        // Unwrap unfixable broken links: [[target]] -> target (remove wiki-link syntax)
+        var unfixableByFile: [String: [String]] = [:]
+        for brokenLink in report.brokenLinks {
+            // Skip links that were already fixed above
+            if let suggestion = brokenLink.suggestion {
+                let targetForComparison: String
+                if brokenLink.linkTarget.contains("/") {
+                    targetForComparison = (brokenLink.linkTarget as NSString).lastPathComponent
+                } else {
+                    targetForComparison = brokenLink.linkTarget
+                }
+                let dist = levenshteinDistance(targetForComparison.lowercased(), suggestion.lowercased())
+                let maxDist = max(3, targetForComparison.count / 3)
+                if dist <= maxDist { continue }
+            }
+            unfixableByFile[brokenLink.filePath, default: []].append(brokenLink.linkTarget)
+        }
+
+        for (filePath, targets) in unfixableByFile {
+            guard var content = try? String(contentsOfFile: filePath, encoding: .utf8) else {
+                continue
+            }
+            var modified = false
+            for target in targets {
+                let oldLink = "[[\(target)]]"
+                if content.contains(oldLink) {
+                    content = content.replacingOccurrences(of: oldLink, with: target)
+                    modified = true
+                    linksFixed += 1
+                }
+                // Handle pipe alias: [[target|display]] -> display
+                let pipePattern = "[[\(target)|"
+                if let start = content.range(of: pipePattern) {
+                    let afterPipe = content[start.upperBound...]
+                    if let end = afterPipe.range(of: "]]") {
+                        let display = String(afterPipe[..<end.lowerBound])
+                        let fullLink = String(content[start.lowerBound..<end.upperBound])
+                        content = content.replacingOccurrences(of: fullLink, with: display)
+                        modified = true
+                        linksFixed += 1
+                    }
                 }
             }
             if modified {
