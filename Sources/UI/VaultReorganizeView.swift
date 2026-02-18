@@ -11,6 +11,8 @@ struct VaultReorganizeView: View {
     @State private var isExecuting = false
     @State private var progress: Double = 0
     @State private var progressStatus: String = ""
+    @State private var scanTask: Task<Void, Never>?
+    @State private var executeTask: Task<Void, Never>?
 
     enum Phase {
         case selectScope
@@ -47,6 +49,12 @@ struct VaultReorganizeView: View {
             case .done:
                 resultsView
             }
+        }
+        .onDisappear {
+            scanTask?.cancel()
+            executeTask?.cancel()
+            scanTask = nil
+            executeTask = nil
         }
     }
 
@@ -389,7 +397,8 @@ struct VaultReorganizeView: View {
         let root = appState.pkmRootPath
         let currentScope = scope
 
-        Task {
+        scanTask?.cancel()
+        scanTask = Task {
             let reorganizer = VaultReorganizer(
                 pkmRoot: root,
                 scope: currentScope,
@@ -403,6 +412,7 @@ struct VaultReorganizeView: View {
 
             do {
                 let result = try await reorganizer.scan()
+                if Task.isCancelled { return }
 
                 await MainActor.run {
                     scanResult = result
@@ -415,12 +425,14 @@ struct VaultReorganizeView: View {
                         results = []
                         phase = .done
                     }
+                    scanTask = nil
                 }
             } catch {
                 await MainActor.run {
                     isScanning = false
                     progressStatus = "오류: \(error.localizedDescription)"
                     phase = .selectScope
+                    scanTask = nil
                 }
             }
         }
@@ -437,7 +449,8 @@ struct VaultReorganizeView: View {
 
         let root = appState.pkmRootPath
 
-        Task {
+        executeTask?.cancel()
+        executeTask = Task {
             let reorganizer = VaultReorganizer(
                 pkmRoot: root,
                 scope: scope,
@@ -451,17 +464,20 @@ struct VaultReorganizeView: View {
 
             do {
                 let executionResults = try await reorganizer.execute(plan: selected)
+                if Task.isCancelled { return }
 
                 await MainActor.run {
                     results = executionResults
                     isExecuting = false
                     phase = .done
+                    executeTask = nil
                 }
             } catch {
                 await MainActor.run {
                     isExecuting = false
                     progressStatus = "오류: \(error.localizedDescription)"
                     phase = .done
+                    executeTask = nil
                 }
             }
         }
@@ -474,6 +490,10 @@ struct VaultReorganizeView: View {
     }
 
     private func goBack() {
+        scanTask?.cancel()
+        executeTask?.cancel()
+        scanTask = nil
+        executeTask = nil
         switch phase {
         case .reviewPlan:
             phase = .selectScope

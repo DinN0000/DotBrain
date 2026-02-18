@@ -665,11 +665,11 @@ private struct PARAFolderRow: View {
 
             }
 
-            // Health issues text (shown on hover)
-            if healthLabel != "good" && isHovered && !healthIssues.isEmpty {
+            if healthLabel != "good" && !healthIssues.isEmpty {
                 Text(healthIssues)
                     .font(.caption2)
                     .foregroundColor(healthColor)
+                    .opacity(isHovered ? 1.0 : 0.8)
                     .padding(.leading, 24)
                     .padding(.top, 2)
             }

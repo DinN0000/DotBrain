@@ -6,6 +6,7 @@ struct SearchView: View {
     @State private var results: [SearchResult] = []
     @State private var hasSearched: Bool = false
     @State private var isSearching: Bool = false
+    @State private var searchTask: Task<Void, Never>?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -23,14 +24,18 @@ struct SearchView: View {
 
                 if !query.isEmpty {
                     Button(action: {
+                        searchTask?.cancel()
+                        searchTask = nil
                         query = ""
                         results = []
                         hasSearched = false
+                        isSearching = false
                     }) {
                         Image(systemName: "xmark.circle.fill")
                             .foregroundColor(.secondary)
                     }
                     .buttonStyle(.plain)
+                    .accessibilityLabel("검색어 지우기")
                 }
             }
             .padding(8)
@@ -108,6 +113,10 @@ struct SearchView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
+        .onDisappear {
+            searchTask?.cancel()
+            searchTask = nil
+        }
     }
 
     private func paraLegend(_ label: String, icon: String, color: Color) -> some View {
@@ -126,13 +135,21 @@ struct SearchView: View {
         guard !trimmed.isEmpty, !isSearching else { return }
         isSearching = true
         let pkmRoot = appState.pkmRootPath
-        Task.detached(priority: .userInitiated) {
+        searchTask?.cancel()
+        searchTask = Task.detached(priority: .userInitiated) {
             let searcher = VaultSearcher(pkmRoot: pkmRoot)
             let searchResults = searcher.search(query: trimmed)
+            if Task.isCancelled { return }
             await MainActor.run {
+                if query.trimmingCharacters(in: .whitespaces) != trimmed {
+                    isSearching = false
+                    searchTask = nil
+                    return
+                }
                 results = searchResults
                 hasSearched = true
                 isSearching = false
+                searchTask = nil
             }
         }
     }

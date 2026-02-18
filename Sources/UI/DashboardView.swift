@@ -10,6 +10,8 @@ struct DashboardView: View {
     @State private var vaultCheckPhase = ""
     @State private var vaultCheckResult: VaultCheckResult?
     @State private var selectedActivity: ActivityEntry?
+    @State private var healthScanTask: Task<Void, Never>?
+    @State private var vaultCheckTask: Task<Void, Never>?
 
     // Cached PARA counts to avoid recalculation on every render
     private var projectCount: Int { stats.byCategory["project"] ?? 0 }
@@ -36,13 +38,13 @@ struct DashboardView: View {
 
                         Spacer()
 
-                        statButton("P", count: projectCount, color: .blue, category: .project)
+                        statButton("Project", count: projectCount, color: .blue, category: .project)
                         Text("·").foregroundColor(.secondary)
-                        statButton("A", count: areaCount, color: .green, category: .area)
+                        statButton("Area", count: areaCount, color: .green, category: .area)
                         Text("·").foregroundColor(.secondary)
-                        statButton("R", count: resourceCount, color: .orange, category: .resource)
+                        statButton("Resource", count: resourceCount, color: .orange, category: .resource)
                         Text("·").foregroundColor(.secondary)
-                        statButton("A", count: archiveCount, color: .gray, category: .archive)
+                        statButton("Archive", count: archiveCount, color: .gray, category: .archive)
                     }
                     .font(.caption)
                     .monospacedDigit()
@@ -205,6 +207,12 @@ struct DashboardView: View {
         .onAppear {
             refreshStats()
         }
+        .onDisappear {
+            healthScanTask?.cancel()
+            healthScanTask = nil
+            vaultCheckTask?.cancel()
+            vaultCheckTask = nil
+        }
         .onChange(of: appState.currentScreen) { newScreen in
             if newScreen == .dashboard {
                 refreshStats()
@@ -350,14 +358,17 @@ struct DashboardView: View {
 
     private func scanHealthSummary() {
         let root = appState.pkmRootPath
-        Task.detached(priority: .utility) {
+        healthScanTask?.cancel()
+        healthScanTask = Task.detached(priority: .utility) {
             let pathManager = PKMPathManager(root: root)
             let fm = FileManager.default
             var count = 0
             for cat in PARACategory.allCases where cat != .archive {
+                if Task.isCancelled { return }
                 let basePath = pathManager.paraPath(for: cat)
                 guard let entries = try? fm.contentsOfDirectory(atPath: basePath) else { continue }
                 for entry in entries where !entry.hasPrefix(".") && !entry.hasPrefix("_") {
+                    if Task.isCancelled { return }
                     let fullPath = (basePath as NSString).appendingPathComponent(entry)
                     var isDir: ObjCBool = false
                     guard fm.fileExists(atPath: fullPath, isDirectory: &isDir), isDir.boolValue else { continue }
@@ -370,8 +381,10 @@ struct DashboardView: View {
                 }
             }
             let snapshot = count
+            if Task.isCancelled { return }
             await MainActor.run {
                 urgentFolderCount = snapshot
+                healthScanTask = nil
             }
         }
     }
@@ -384,7 +397,16 @@ struct DashboardView: View {
         vaultCheckResult = nil
         let root = appState.pkmRootPath
 
-        Task.detached {
+        vaultCheckTask?.cancel()
+        vaultCheckTask = Task.detached {
+            defer {
+                if Task.isCancelled {
+                    Task { @MainActor in
+                        isVaultChecking = false
+                        vaultCheckTask = nil
+                    }
+                }
+            }
             var repairCount = 0
             var enrichCount = 0
 
@@ -399,6 +421,7 @@ struct DashboardView: View {
             await MainActor.run { vaultCheckPhase = "오류 검사 중..." }
             let auditor = VaultAuditor(pkmRoot: root)
             let report = auditor.audit()
+            if Task.isCancelled { return }
 
             // 2. Auto-repair
             if report.totalIssues > 0 {
@@ -406,6 +429,7 @@ struct DashboardView: View {
                 let repair = auditor.repair(report: report)
                 repairCount = repair.linksFixed + repair.frontmatterInjected + repair.paraFixed
             }
+            if Task.isCancelled { return }
 
             // 3. Enrich metadata
             await MainActor.run { vaultCheckPhase = "메타데이터 보완 중..." }
@@ -413,8 +437,10 @@ struct DashboardView: View {
             let pm = PKMPathManager(root: root)
             let fm = FileManager.default
             for basePath in [pm.projectsPath, pm.areaPath, pm.resourcePath] {
+                if Task.isCancelled { return }
                 guard let folders = try? fm.contentsOfDirectory(atPath: basePath) else { continue }
                 for folder in folders where !folder.hasPrefix(".") && !folder.hasPrefix("_") {
+                    if Task.isCancelled { return }
                     let folderPath = (basePath as NSString).appendingPathComponent(folder)
                     let results = await enricher.enrichFolder(at: folderPath)
                     enrichCount += results.filter { $0.fieldsUpdated > 0 }.count
@@ -424,6 +450,7 @@ struct DashboardView: View {
             // 4. MOC regenerate — count PARA folders for progress visibility
             var folderCount = 0
             for basePath in [pm.projectsPath, pm.areaPath, pm.resourcePath] {
+                if Task.isCancelled { return }
                 if let entries = try? fm.contentsOfDirectory(atPath: basePath) {
                     for entry in entries where !entry.hasPrefix(".") && !entry.hasPrefix("_") {
                         let fullPath = (basePath as NSString).appendingPathComponent(entry)
@@ -438,6 +465,7 @@ struct DashboardView: View {
             await MainActor.run { vaultCheckPhase = "\(folderCountSnapshot)개 폴더 요약 갱신 중..." }
             let generator = MOCGenerator(pkmRoot: root)
             await generator.regenerateAll()
+            if Task.isCancelled { return }
 
             StatisticsService.recordActivity(
                 fileName: "볼트 점검",
@@ -459,6 +487,7 @@ struct DashboardView: View {
                 vaultCheckResult = snapshot
                 isVaultChecking = false
                 refreshStats()
+                vaultCheckTask = nil
             }
         }
     }

@@ -451,6 +451,7 @@ struct OnboardingView: View {
                     .buttonStyle(.bordered)
                     .controlSize(.regular)
                     .disabled(newProjectName.trimmingCharacters(in: .whitespaces).isEmpty)
+                    .accessibilityLabel("프로젝트 추가")
                 }
 
                 if !projects.isEmpty {
@@ -472,6 +473,7 @@ struct OnboardingView: View {
                                             .foregroundColor(.secondary)
                                     }
                                     .buttonStyle(.plain)
+                                    .accessibilityLabel("\(name) 삭제")
                                 }
                                 .padding(.horizontal, 10)
                                 .padding(.vertical, 6)

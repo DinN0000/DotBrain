@@ -13,7 +13,9 @@ struct FileMover {
     func wouldConflictWithIndexNote(fileName: String, classification: ClassifyResult) -> Bool {
         guard classification.para != .project else { return false }
         guard !classification.targetFolder.isEmpty else { return false }
-        let indexNoteName = "\(classification.targetFolder).md"
+        let targetDir = pathManager.targetDirectory(for: classification)
+        let indexBaseName = (targetDir as NSString).lastPathComponent
+        let indexNoteName = "\(indexBaseName).md"
         return fileName == indexNoteName
     }
 
@@ -37,7 +39,8 @@ struct FileMover {
 
         // Create index note FIRST — index note is the authoritative management document
         if classification.para != .project {
-            try ensureIndexNote(at: targetDir, para: classification.para, folderName: classification.targetFolder)
+            let indexFolderName = (targetDir as NSString).lastPathComponent
+            try ensureIndexNote(at: targetDir, para: classification.para, folderName: indexFolderName)
         }
 
         let isBinary = BinaryExtractor.isBinaryFile(filePath)
@@ -252,6 +255,7 @@ struct FileMover {
             """
             do {
                 aiSummary = try await AIService.shared.sendFast(maxTokens: 1024, message: prompt)
+                StatisticsService.addApiCost(0.0005)
             } catch {
                 // AI 요약 실패 시 원본 텍스트 앞부분 사용
                 aiSummary = nil

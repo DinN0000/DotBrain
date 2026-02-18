@@ -59,6 +59,7 @@ struct InboxScanner {
     /// Skips code files and code project folders automatically.
     func scan() -> [String] {
         let inboxPath = PKMPathManager(root: pkmRoot).inboxPath
+        let pathManager = PKMPathManager(root: pkmRoot)
         let fm = FileManager.default
 
         guard let entries = try? fm.contentsOfDirectory(atPath: inboxPath) else {
@@ -72,8 +73,8 @@ struct InboxScanner {
 
             // Skip symbolic links that point outside pkmRoot
             if isSymbolicLink(fullPath, fileManager: fm) {
-                guard let resolved = try? fm.destinationOfSymbolicLink(atPath: fullPath),
-                      resolved.hasPrefix(pkmRoot) else {
+                guard let resolved = resolveSymlinkTarget(at: fullPath, fileManager: fm),
+                      pathManager.isPathSafe(resolved) else {
                     return nil
                 }
             }
@@ -139,5 +140,22 @@ struct InboxScanner {
         guard let attrs = try? fm.attributesOfItem(atPath: path),
               let type = attrs[.type] as? FileAttributeType else { return false }
         return type == .typeSymbolicLink
+    }
+
+    private func resolveSymlinkTarget(at path: String, fileManager fm: FileManager) -> String? {
+        guard let destination = try? fm.destinationOfSymbolicLink(atPath: path) else { return nil }
+        if destination.hasPrefix("/") {
+            return URL(fileURLWithPath: destination)
+                .standardizedFileURL
+                .resolvingSymlinksInPath()
+                .path
+        }
+
+        let parentPath = (path as NSString).deletingLastPathComponent
+        let combined = URL(fileURLWithPath: parentPath).appendingPathComponent(destination).path
+        return URL(fileURLWithPath: combined)
+            .standardizedFileURL
+            .resolvingSymlinksInPath()
+            .path
     }
 }
