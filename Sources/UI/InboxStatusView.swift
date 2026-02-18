@@ -13,16 +13,12 @@ struct InboxStatusView: View {
     @State private var showClearConfirmation = false
 
     var body: some View {
-        VStack(spacing: 16) {
-            Spacer()
-
+        VStack(spacing: 0) {
             if appState.inboxFileCount == 0 && !isDragOver {
                 emptyStateView
             } else {
                 activeStateView
             }
-
-            Spacer()
 
             // PKM path — click to change
             Button(action: pickNewPKMRoot) {
@@ -94,12 +90,13 @@ struct InboxStatusView: View {
     // MARK: - Empty State
 
     private var emptyStateView: some View {
-        VStack(spacing: 20) {
-            Text("\u{00B7}_\u{00B7}")
-                .font(.system(size: 40, design: .monospaced))
-                .foregroundColor(.secondary)
-                .offset(x: mouseOffset.width, y: mouseOffset.height + (bounceAnimation ? -3 : 3))
-                .animation(.interactiveSpring(response: 0.3, dampingFraction: 0.6), value: mouseOffset)
+        VStack(spacing: 0) {
+            Spacer()
+
+            faceView(mouth: "_")
+                .offset(y: bounceAnimation ? -3 : 3)
+
+            Spacer()
 
             VStack(spacing: 8) {
                 Text("인박스가 비어 있음")
@@ -119,7 +116,22 @@ struct InboxStatusView: View {
                 .buttonStyle(.bordered)
                 .controlSize(.small)
             }
+            .padding(.bottom, 8)
         }
+    }
+
+    /// Face with eyes that follow the mouse, mouth stays fixed
+    private func faceView(mouth: String) -> some View {
+        HStack(spacing: 0) {
+            Text("\u{00B7}")
+                .offset(x: mouseOffset.width * 0.5, y: mouseOffset.height * 0.5)
+            Text(mouth)
+            Text("\u{00B7}")
+                .offset(x: mouseOffset.width * 0.5, y: mouseOffset.height * 0.5)
+        }
+        .font(.system(size: 48, design: .monospaced))
+        .foregroundColor(.secondary)
+        .animation(.interactiveSpring(response: 0.25, dampingFraction: 0.6), value: mouseOffset)
     }
 
     // MARK: - Active State
@@ -145,14 +157,14 @@ struct InboxStatusView: View {
     }
 
     private var activeStateView: some View {
-        VStack(spacing: 20) {
-            Text(isDragOver ? "\u{00B7}o\u{00B7}" : "\u{00B7}\u{203F}\u{00B7}")
-                .font(.system(size: 40, design: .monospaced))
-                .offset(x: mouseOffset.width, y: mouseOffset.height)
-                .animation(.interactiveSpring(response: 0.3, dampingFraction: 0.6), value: mouseOffset)
+        VStack(spacing: 0) {
+            Spacer()
+
+            faceView(mouth: isDragOver ? "o" : "\u{203F}")
                 .scaleEffect(isDragOver ? 1.15 : 1.0)
                 .animation(.easeInOut(duration: 0.2), value: isDragOver)
-                .padding(.bottom, 4)
+
+            Spacer()
 
             if let feedback = dropFeedback {
                 Text(feedback)
