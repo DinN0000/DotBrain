@@ -1,5 +1,12 @@
 # Changelog
 
+## v2.1.1 — 11-Agent Code Review Fixes (2026-02-19)
+- 11개 병렬 에이전트 코드 리뷰 후 의도 기반 재검토, 15건 실제 버그 수정
+- Data Safety: OnboardingView 프로젝트 삭제 시 trashItem 사용, AICompanionService marker 검색 범위 제한, PARAMover 에셋 이동 에러 핸들링
+- Logic: RateLimiter backoff 초기화, Classifier Stage2 confidence fallback 0.0, AIService fallback 에러 로깅, ProjectManager isPathSafe 에러 타입 수정, FolderReorganizer 실패 카운트 전달, VaultReorganizer source MOC 갱신
+- Security: PPTXExtractor ZIP 압축 해제 4MB 제한, KeychainService migrationDone NSLock 보호
+- Convention: 코드 내 이모지 제거 (SF Symbols 전환), ContextLinker progress 이중 카운트 수정, flattenFolder _Assets/ 스킵
+
 ## v2.1.0 — 스마트 에셋 관리 (2026-02-19)
 - 중앙 집중형 `_Assets/{documents,images}/` 구조로 전환
 - 이미지 파일은 companion .md 생성 생략 (EXIF 데이터만으로는 노트 가치 없음)
