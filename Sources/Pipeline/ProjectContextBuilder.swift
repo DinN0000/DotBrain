@@ -74,38 +74,55 @@ struct ProjectContextBuilder {
 
     // MARK: - Weighted Context
 
-    /// Build weighted document context for classification accuracy.
-    /// - Project docs: full detail (tags, summaries, file list) — highest weight
-    /// - Area/Resource docs: folder + key tags + file count — medium weight
-    /// - Archive: folder names only — low weight
+    /// Build weighted context from root MOC files (optimized: max 4 file reads)
+    /// Per-category hybrid fallback: uses root MOC when available, legacy for missing categories
     func buildWeightedContext() -> String {
+        let categories: [(path: String, label: String, emoji: String, weight: String)] = [
+            (pathManager.projectsPath, "Project", "🔴", "높은 연결 가중치"),
+            (pathManager.areaPath, "Area", "🟡", "중간 연결 가중치"),
+            (pathManager.resourcePath, "Resource", "🟡", "중간 연결 가중치"),
+            (pathManager.archivePath, "Archive", "⚪", "낮은 연결 가중치"),
+        ]
+
         var sections: [String] = []
 
-        // HIGH weight: Project documents (full detail)
-        let projectSection = buildProjectDocuments()
-        if !projectSection.isEmpty {
-            sections.append("### 🔴 Project (높은 연결 가중치)\n\(projectSection)")
-        }
+        for (basePath, label, emoji, weight) in categories {
+            let categoryName = (basePath as NSString).lastPathComponent
+            let mocPath = (basePath as NSString).appendingPathComponent("\(categoryName).md")
 
-        // MEDIUM weight: Area documents (folder + tags + count)
-        let areaSection = buildFolderSummaries(at: pathManager.areaPath, label: "Area")
-        if !areaSection.isEmpty {
-            sections.append("### 🟡 Area (중간 연결 가중치)\n\(areaSection)")
-        }
+            // Try root MOC first
+            if let content = try? String(contentsOfFile: mocPath, encoding: .utf8) {
+                let (_, body) = Frontmatter.parse(markdown: content)
+                let trimmed = body.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !trimmed.isEmpty {
+                    sections.append("### \(emoji) \(label) (\(weight))\n\(trimmed)")
+                    continue
+                }
+            }
 
-        // MEDIUM weight: Resource documents (folder + tags + count)
-        let resourceSection = buildFolderSummaries(at: pathManager.resourcePath, label: "Resource")
-        if !resourceSection.isEmpty {
-            sections.append("### 🟡 Resource (중간 연결 가중치)\n\(resourceSection)")
-        }
-
-        // LOW weight: Archive (folder names only)
-        let archiveSection = buildArchiveSummary()
-        if !archiveSection.isEmpty {
-            sections.append("### ⚪ Archive (낮은 연결 가중치)\n\(archiveSection)")
+            // Per-category fallback: no root MOC or empty body
+            let fallback = buildCategoryFallback(basePath: basePath, label: label, emoji: emoji, weight: weight)
+            if !fallback.isEmpty {
+                sections.append(fallback)
+            }
         }
 
         return sections.isEmpty ? "기존 문서 없음" : sections.joined(separator: "\n\n")
+    }
+
+    /// Per-category legacy fallback when root MOC is missing or empty
+    private func buildCategoryFallback(basePath: String, label: String, emoji: String, weight: String) -> String {
+        let section: String
+        switch label {
+        case "Project":
+            section = buildProjectDocuments()
+        case "Archive":
+            section = buildArchiveSummary()
+        default:
+            section = buildFolderSummaries(at: basePath, label: label)
+        }
+        guard !section.isEmpty else { return "" }
+        return "### \(emoji) \(label) (\(weight))\n\(section)"
     }
 
     // MARK: - Private Helpers

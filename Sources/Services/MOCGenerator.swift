@@ -132,13 +132,14 @@ struct MOCGenerator {
     }
 
     /// Generate a root-level index note for a PARA category (e.g., 2_Area.md listing all subfolders)
+    /// Enriched with tag aggregation and per-project document listings
     func generateCategoryRootMOC(basePath: String, para: PARACategory) async throws {
         let fm = FileManager.default
         let categoryName = (basePath as NSString).lastPathComponent
         guard let entries = try? fm.contentsOfDirectory(atPath: basePath) else { return }
 
-        // Collect subfolders with their MOC summaries
-        var subfolders: [(name: String, summary: String, fileCount: Int)] = []
+        // Collect subfolders with summaries, tags, and document listings
+        var subfolders: [(name: String, summary: String, fileCount: Int, tags: [String], docs: [(name: String, tags: String, summary: String)])] = []
 
         for entry in entries.sorted() {
             guard !entry.hasPrefix("."), !entry.hasPrefix("_") else { continue }
@@ -146,29 +147,56 @@ struct MOCGenerator {
             var isDir: ObjCBool = false
             guard fm.fileExists(atPath: entryPath, isDirectory: &isDir), isDir.boolValue else { continue }
 
-            // Try to read summary from the subfolder's own MOC
+            // Read subfolder MOC for summary and tags
             let subMOCPath = (entryPath as NSString).appendingPathComponent("\(entry).md")
             var summary = ""
+            var folderTags: [String] = []
             if let content = try? String(contentsOfFile: subMOCPath, encoding: .utf8) {
                 let (frontmatter, _) = Frontmatter.parse(markdown: content)
                 summary = frontmatter.summary ?? ""
+                folderTags = frontmatter.tags
             }
 
             // Count files in subfolder
             let subEntries = (try? fm.contentsOfDirectory(atPath: entryPath)) ?? []
-            let fileCount = subEntries.filter {
+            let mdFiles = subEntries.filter {
                 !$0.hasPrefix(".") && !$0.hasPrefix("_") && $0.hasSuffix(".md") && $0 != "\(entry).md"
-            }.count
+            }
+            let fileCount = mdFiles.count
 
-            subfolders.append((name: entry, summary: summary, fileCount: fileCount))
+            // For Project category: collect per-document info (max 10)
+            var docs: [(name: String, tags: String, summary: String)] = []
+            if para == .project {
+                for file in mdFiles.sorted().prefix(10) {
+                    let filePath = (entryPath as NSString).appendingPathComponent(file)
+                    let baseName = (file as NSString).deletingPathExtension
+                    if let fileContent = try? String(contentsOfFile: filePath, encoding: .utf8) {
+                        let (fileFM, _) = Frontmatter.parse(markdown: fileContent)
+                        let tagStr = fileFM.tags.prefix(3).joined(separator: ", ")
+                        docs.append((name: baseName, tags: tagStr, summary: fileFM.summary ?? ""))
+                    }
+                }
+            }
+
+            subfolders.append((name: entry, summary: summary, fileCount: fileCount, tags: folderTags, docs: docs))
         }
 
         guard !subfolders.isEmpty else { return }
 
+        // Aggregate tags from all subfolders
+        var categoryTags: [String: Int] = [:]
+        for subfolder in subfolders {
+            for tag in subfolder.tags {
+                categoryTags[tag, default: 0] += 1
+            }
+        }
+        let topTags = categoryTags.sorted { $0.value > $1.value }
+            .prefix(10).map { $0.key }
+
         // Build root MOC content
         let frontmatter = Frontmatter.createDefault(
             para: para,
-            tags: [],
+            tags: topTags,
             summary: "\(para.displayName) 카테고리 인덱스 — \(subfolders.count)개 폴더",
             source: .original
         )
@@ -179,10 +207,22 @@ struct MOCGenerator {
 
         for folder in subfolders {
             let countLabel = folder.fileCount > 0 ? " (\(folder.fileCount)개)" : ""
+            let tagLabel = folder.tags.isEmpty ? "" : " [\(folder.tags.prefix(5).joined(separator: ", "))]"
+
             if folder.summary.isEmpty {
-                content += "- [[\(folder.name)]]\(countLabel)\n"
+                content += "- [[\(folder.name)]]\(tagLabel)\(countLabel)\n"
             } else {
-                content += "- [[\(folder.name)]] — \(folder.summary)\(countLabel)\n"
+                content += "- [[\(folder.name)]] — \(folder.summary)\(tagLabel)\(countLabel)\n"
+            }
+
+            // Project: include per-document listings
+            for doc in folder.docs {
+                let detail = [doc.tags, doc.summary].filter { !$0.isEmpty }.joined(separator: " — ")
+                if detail.isEmpty {
+                    content += "  - [[\(doc.name)]]\n"
+                } else {
+                    content += "  - [[\(doc.name)]]: \(detail)\n"
+                }
             }
         }
 

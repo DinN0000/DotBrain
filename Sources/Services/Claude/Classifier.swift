@@ -4,9 +4,8 @@ import Foundation
 /// Supports Claude (Haiku/Sonnet) and Gemini (Flash/Pro)
 actor Classifier {
     private let aiService = AIService.shared
-    private let batchSize = 10
+    private let batchSize = 5
     private let confidenceThreshold = 0.8
-    private let previewLength = 800
 
     // MARK: - Main Classification
 
@@ -180,16 +179,11 @@ actor Classifier {
         subfolderContext: String,
         weightedContext: String
     ) async throws -> [String: ClassifyResult.Stage1Item] {
-        let previews = files.map { file in
-            let preview = FileContentExtractor.extractPreview(
-                from: file.filePath,
-                content: file.content,
-                maxLength: previewLength
-            )
-            return (fileName: file.fileName, preview: preview)
+        let fileContents = files.map { file in
+            (fileName: file.fileName, content: file.content)
         }
 
-        let prompt = buildStage1Prompt(previews, projectContext: projectContext, subfolderContext: subfolderContext, weightedContext: weightedContext)
+        let prompt = buildStage1Prompt(fileContents, projectContext: projectContext, subfolderContext: subfolderContext, weightedContext: weightedContext)
 
         let response = try await aiService.sendFast(maxTokens: 4096, message: prompt)
 
@@ -268,13 +262,14 @@ actor Classifier {
     // MARK: - Prompt Builders (Korean)
 
     private func buildStage1Prompt(
-        _ files: [(fileName: String, preview: String)],
+        _ files: [(fileName: String, content: String)],
         projectContext: String,
         subfolderContext: String,
         weightedContext: String
     ) -> String {
         let fileList = files.enumerated().map { (i, f) in
-            "[\(i)] 파일명: \(f.fileName)\n미리보기: \(f.preview)"
+            let truncated = String(f.content.prefix(5000))
+            return "[\(i)] 파일명: \(f.fileName)\n내용: \(truncated)"
         }.joined(separator: "\n\n")
 
         let weightedSection = weightedContext.isEmpty ? "" : """

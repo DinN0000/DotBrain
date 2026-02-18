@@ -510,7 +510,8 @@ final class AppState: ObservableObject {
                 summary: base.summary,
                 targetFolder: "",
                 project: projectName,
-                confidence: 1.0
+                confidence: 1.0,
+                relatedNotes: base.relatedNotes
             )
 
             let mover = FileMover(pkmRoot: pkmRootPath)
