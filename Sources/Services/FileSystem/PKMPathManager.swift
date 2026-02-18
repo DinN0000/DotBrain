@@ -37,9 +37,7 @@ struct PKMPathManager {
         if result.para == .project, let project = result.project {
             let safeProject = sanitizeFolderName(project)
             let targetPath = (projectsPath as NSString).appendingPathComponent(safeProject)
-            let resolvedBase = URL(fileURLWithPath: projectsPath).standardizedFileURL.resolvingSymlinksInPath().path
-            let resolvedTarget = URL(fileURLWithPath: targetPath).standardizedFileURL.resolvingSymlinksInPath().path
-            guard resolvedTarget.hasPrefix(resolvedBase) else { return projectsPath }
+            guard isPathInsideRoot(targetPath, base: projectsPath) else { return projectsPath }
             return targetPath
         }
 
@@ -50,9 +48,7 @@ struct PKMPathManager {
         }
         let safeFolder = sanitizeFolderName(sanitized)
         let targetPath = (base as NSString).appendingPathComponent(safeFolder)
-        let resolvedBase = URL(fileURLWithPath: base).standardizedFileURL.resolvingSymlinksInPath().path
-        let resolvedTarget = URL(fileURLWithPath: targetPath).standardizedFileURL.resolvingSymlinksInPath().path
-        guard resolvedTarget.hasPrefix(resolvedBase) else { return base }
+        guard isPathInsideRoot(targetPath, base: base) else { return base }
         return targetPath
     }
 
@@ -92,7 +88,19 @@ struct PKMPathManager {
     func isPathSafe(_ path: String) -> Bool {
         let resolvedRoot = URL(fileURLWithPath: root).standardizedFileURL.resolvingSymlinksInPath().path
         let resolvedPath = URL(fileURLWithPath: path).standardizedFileURL.resolvingSymlinksInPath().path
-        return resolvedPath.hasPrefix(resolvedRoot)
+        return isPathInsideResolvedRoot(resolvedPath, resolvedRoot: resolvedRoot)
+    }
+
+    private func isPathInsideRoot(_ path: String, base: String) -> Bool {
+        let resolvedBase = URL(fileURLWithPath: base).standardizedFileURL.resolvingSymlinksInPath().path
+        let resolvedPath = URL(fileURLWithPath: path).standardizedFileURL.resolvingSymlinksInPath().path
+        return isPathInsideResolvedRoot(resolvedPath, resolvedRoot: resolvedBase)
+    }
+
+    private func isPathInsideResolvedRoot(_ path: String, resolvedRoot: String) -> Bool {
+        if path == resolvedRoot { return true }
+        let normalizedRoot = resolvedRoot.hasSuffix("/") ? resolvedRoot : resolvedRoot + "/"
+        return path.hasPrefix(normalizedRoot)
     }
 
     /// Check if PKM folder structure exists

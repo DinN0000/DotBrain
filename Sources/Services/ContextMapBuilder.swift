@@ -36,7 +36,11 @@ struct ContextMapBuilder: Sendable {
             of: [ContextMapEntry].self,
             returning: [ContextMapEntry].self
         ) { group in
-            for task in folderTasks {
+            var nextIndex = 0
+            let maxConcurrent = 3
+
+            while nextIndex < min(maxConcurrent, folderTasks.count) {
+                let task = folderTasks[nextIndex]
                 group.addTask {
                     return self.parseMOC(
                         folderPath: task.folderPath,
@@ -44,11 +48,23 @@ struct ContextMapBuilder: Sendable {
                         para: task.para
                     )
                 }
+                nextIndex += 1
             }
 
             var collected: [ContextMapEntry] = []
             for await entries in group {
                 collected.append(contentsOf: entries)
+                if nextIndex < folderTasks.count {
+                    let task = folderTasks[nextIndex]
+                    group.addTask {
+                        return self.parseMOC(
+                            folderPath: task.folderPath,
+                            folderName: task.folderName,
+                            para: task.para
+                        )
+                    }
+                    nextIndex += 1
+                }
             }
             return collected
         }

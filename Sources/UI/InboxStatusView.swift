@@ -166,6 +166,7 @@ struct InboxStatusView: View {
                     }
                     .buttonStyle(.plain)
                     .foregroundColor(.accentColor)
+                    .accessibilityLabel("인박스 파일 추가")
 
                     Button(action: clearInbox) {
                         Image(systemName: "trash")
@@ -173,6 +174,7 @@ struct InboxStatusView: View {
                     }
                     .buttonStyle(.plain)
                     .foregroundColor(.secondary)
+                    .accessibilityLabel("인박스 비우기")
                 }
 
                 Button(action: {

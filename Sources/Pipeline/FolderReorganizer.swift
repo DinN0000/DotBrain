@@ -9,7 +9,7 @@ struct FolderReorganizer {
     let subfolder: String
     let onProgress: ((Double, String) -> Void)?
     let onFileProgress: ((Int, Int, String) -> Void)?
-    let onPhaseChange: ((AppState.ProcessingPhase) -> Void)?
+    let onPhaseChange: ((ProcessingPhase) -> Void)?
 
     private var pathManager: PKMPathManager {
         PKMPathManager(root: pkmRoot)
@@ -59,6 +59,12 @@ struct FolderReorganizer {
 
         guard !uniqueFiles.isEmpty else {
             onProgress?(1.0, "완료!")
+            StatisticsService.recordActivity(
+                fileName: "폴더 정리",
+                category: "system",
+                action: "completed",
+                detail: "\(subfolder) — 중복 제거로 종료"
+            )
             return Result(processed: processed, needsConfirmation: [], total: files.count)
         }
 
@@ -170,6 +176,7 @@ struct FolderReorganizer {
         // Compare and process
         onPhaseChange?(.processing)
         for (i, (classification, input)) in zip(enrichedClassifications, inputs).enumerated() {
+            if Task.isCancelled { throw CancellationError() }
             let progress = 0.7 + Double(i) / Double(max(enrichedClassifications.count, 1)) * 0.25
             onProgress?(progress, "\(input.fileName) 처리 중...")
             onFileProgress?(i, inputs.count, input.fileName)
@@ -449,11 +456,24 @@ struct FolderReorganizer {
             let hash = SHA256.hash(data: Data(body.utf8))
             return hash.map { String(format: "%02x", $0) }.joined()
         }
-        if let data = FileManager.default.contents(atPath: filePath) {
-            let hash = SHA256.hash(data: data)
-            return hash.map { String(format: "%02x", $0) }.joined()
+        if let hash = streamingHash(at: filePath) {
+            return hash
         }
         return UUID().uuidString // fallback: treat as unique
+    }
+
+    private func streamingHash(at path: String) -> String? {
+        guard let handle = FileHandle(forReadingAtPath: path) else { return nil }
+        defer { try? handle.close() }
+
+        var hasher = SHA256()
+        while true {
+            let chunk = handle.readData(ofLength: 1024 * 1024)
+            guard !chunk.isEmpty else { break }
+            hasher.update(data: chunk)
+        }
+        let digest = hasher.finalize()
+        return digest.map { String(format: "%02x", $0) }.joined()
     }
 
     private func stripFrontmatter(_ text: String) -> String {

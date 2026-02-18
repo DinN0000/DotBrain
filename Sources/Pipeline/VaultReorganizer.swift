@@ -66,6 +66,12 @@ struct VaultReorganizer {
 
         guard !collected.isEmpty else {
             onProgress?(1.0, "완료!")
+            StatisticsService.recordActivity(
+                fileName: "전체 재정리",
+                category: "system",
+                action: "completed",
+                detail: "0개 스캔"
+            )
             return ScanResult(files: [], totalScanned: 0, skippedCount: 0, estimatedCost: 0)
         }
 
@@ -152,6 +158,7 @@ struct VaultReorganizer {
         var analyses: [FileAnalysis] = []
 
         for (index, classification) in classifications.enumerated() {
+            if Task.isCancelled { throw CancellationError() }
             let entry = filesToProcess[index]
 
             // Never create new project folders — only allow moves to existing projects
@@ -207,6 +214,7 @@ struct VaultReorganizer {
         var results: [ProcessedFileResult] = []
 
         for (i, analysis) in selected.enumerated() {
+            if Task.isCancelled { throw CancellationError() }
             let progress = Double(i) / Double(selected.count)
             onProgress?(progress, "\(analysis.fileName) 이동 중...")
 
@@ -226,10 +234,16 @@ struct VaultReorganizer {
                     tags: result.tags,
                     status: .relocated(from: fromDisplay)
                 ))
+                let action: String
+                if case .deduplicated = result.status {
+                    action = "deduplicated"
+                } else {
+                    action = "vault-reorganized"
+                }
                 StatisticsService.recordActivity(
                     fileName: analysis.fileName,
                     category: analysis.recommended.para.rawValue,
-                    action: "vault-reorganized",
+                    action: action,
                     detail: "\(fromDisplay) → \(analysis.recommended.para.rawValue)/\(analysis.recommended.targetFolder)"
                 )
             } catch {

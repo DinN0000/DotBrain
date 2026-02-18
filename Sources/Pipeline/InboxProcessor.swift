@@ -6,7 +6,7 @@ struct InboxProcessor {
     let pkmRoot: String
     let onProgress: ((Double, String) -> Void)?
     let onFileProgress: ((Int, Int, String) -> Void)?
-    let onPhaseChange: ((AppState.ProcessingPhase) -> Void)?
+    let onPhaseChange: ((ProcessingPhase) -> Void)?
 
     struct Result {
         var processed: [ProcessedFileResult]
@@ -151,6 +151,7 @@ struct InboxProcessor {
         var failed = 0
 
         for (i, (classification, input)) in zip(enrichedClassifications, inputs).enumerated() {
+            if Task.isCancelled { throw CancellationError() }
             let progress = 0.7 + Double(i) / Double(max(enrichedClassifications.count, 1)) * 0.25
             onProgress?(progress, "\(input.fileName) 이동 중...")
             onFileProgress?(i, inputs.count, input.fileName)
@@ -216,10 +217,16 @@ struct InboxProcessor {
                     result = try await mover.moveFile(at: input.filePath, with: classification)
                 }
                 processed.append(result)
+                let action: String
+                if case .deduplicated = result.status {
+                    action = "deduplicated"
+                } else {
+                    action = "classified"
+                }
                 StatisticsService.recordActivity(
                     fileName: input.fileName,
                     category: classification.para.rawValue,
-                    action: "classified",
+                    action: action,
                     detail: "→ \(classification.targetFolder)"
                 )
             } catch {

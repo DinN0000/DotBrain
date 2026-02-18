@@ -10,6 +10,7 @@ EXECUTABLE="$APP_PATH/Contents/MacOS/$APP_NAME"
 LAUNCHAGENT_DIR="$HOME/Library/LaunchAgents"
 PLIST_NAME="com.dotbrain.app"
 PLIST_PATH="$LAUNCHAGENT_DIR/$PLIST_NAME.plist"
+CURL_OPTS=(--fail --location --silent --show-error --retry 3 --retry-delay 1 --retry-connrefused)
 
 echo "=== DotBrain 설치 ==="
 echo ""
@@ -27,7 +28,11 @@ if [ -n "${1:-}" ]; then
 else
     # Get latest release (single API call)
     echo "최신 릴리즈 확인 중..."
-    RELEASE_JSON=$(curl -sL "https://api.github.com/repos/$REPO/releases/latest")
+    if ! RELEASE_JSON=$(curl "${CURL_OPTS[@]}" "https://api.github.com/repos/$REPO/releases/latest"); then
+        echo "오류: 최신 릴리즈 정보를 가져오지 못했습니다. 네트워크 상태를 확인한 뒤 다시 시도해주세요."
+        echo "문제가 계속되면 https://github.com/$REPO/releases 에서 직접 다운로드하세요."
+        exit 1
+    fi
 
     TAG=$(echo "$RELEASE_JSON" | grep '"tag_name"' | head -1 | sed -E 's/.*"([^"]+)".*/\1/') || true
     if [ -z "$TAG" ]; then
@@ -62,15 +67,19 @@ TMP_DIR=$(mktemp -d)
 trap 'rm -rf "$TMP_DIR"' EXIT
 
 # Download binary
-curl -sL "$DOWNLOAD_URL" -o "$TMP_DIR/$APP_NAME"
+curl "${CURL_OPTS[@]}" "$DOWNLOAD_URL" -o "$TMP_DIR/$APP_NAME"
 chmod +x "$TMP_DIR/$APP_NAME"
 
 # Verify checksum if available
 CHECKSUM_URL="https://github.com/$REPO/releases/download/$TAG/checksums.txt"
-if curl -sLf "$CHECKSUM_URL" -o "$TMP_DIR/checksums.txt" 2>/dev/null; then
+if curl "${CURL_OPTS[@]}" "$CHECKSUM_URL" -o "$TMP_DIR/checksums.txt" 2>/dev/null; then
     EXPECTED=$(grep " ${APP_NAME}$" "$TMP_DIR/checksums.txt" | awk '{print $1}')
     ACTUAL=$(shasum -a 256 "$TMP_DIR/$APP_NAME" | awk '{print $1}')
-    if [ -n "$EXPECTED" ] && [ "$EXPECTED" != "$ACTUAL" ]; then
+    if [ -z "$EXPECTED" ]; then
+        echo "오류: checksums.txt에서 $APP_NAME 항목을 찾지 못했습니다."
+        exit 1
+    fi
+    if [ "$EXPECTED" != "$ACTUAL" ]; then
         echo "오류: 체크섬 불일치! 다운로드가 손상되었을 수 있습니다."
         echo "  예상: $EXPECTED"
         echo "  실제: $ACTUAL"
@@ -81,7 +90,9 @@ fi
 
 # Download icon
 if [ -n "${ICON_URL:-}" ]; then
-    curl -sL "$ICON_URL" -o "$TMP_DIR/AppIcon.icns"
+    if ! curl "${CURL_OPTS[@]}" "$ICON_URL" -o "$TMP_DIR/AppIcon.icns"; then
+        echo "경고: 아이콘 다운로드 실패, 기본 아이콘으로 계속 진행합니다."
+    fi
 fi
 
 # Unload LaunchAgent first (prevents KeepAlive restart on pkill)
@@ -200,7 +211,10 @@ echo "✓ 자동 시작 등록 완료"
 # --- 바로 실행 ---
 echo ""
 echo "앱을 시작합니다..."
-launchctl kickstart "gui/$(id -u)/$PLIST_NAME" 2>/dev/null || open "$APP_PATH"
+if ! launchctl kickstart "gui/$(id -u)/$PLIST_NAME" 2>/dev/null; then
+    echo "경고: LaunchAgent 시작 실패, 앱을 직접 실행합니다."
+    open "$APP_PATH"
+fi
 
 echo ""
 echo "================================================"
