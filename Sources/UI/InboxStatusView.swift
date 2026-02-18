@@ -11,13 +11,43 @@ struct InboxStatusView: View {
     @State private var cachedInboxFiles: [URL] = []
     @State private var showClearConfirmation = false
 
+    private var hasFiles: Bool { appState.inboxFileCount > 0 }
+
     var body: some View {
         VStack(spacing: 0) {
-            if appState.inboxFileCount == 0 && !isDragOver {
-                emptyStateView
-            } else {
-                activeStateView
+            // --- Zone 1: Face (fixed position) ---
+            Spacer()
+
+            faceView(mouth: currentMouth)
+                .offset(y: (!hasFiles && !isDragOver) ? (bounceAnimation ? -3 : 3) : 0)
+                .scaleEffect(isDragOver ? 1.1 : 1.0)
+                .animation(.easeInOut(duration: 0.2), value: isDragOver)
+                .overlay(alignment: .topTrailing) {
+                    if hasFiles && !isDragOver {
+                        Text("\(appState.inboxFileCount)")
+                            .font(.system(size: 11, weight: .medium, design: .rounded))
+                            .foregroundColor(.secondary)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Capsule().fill(Color.secondary.opacity(0.1)))
+                            .offset(x: 20, y: -4)
+                    }
+                }
+
+            // --- Zone 2: Content (fixed position between face and footer) ---
+            Spacer()
+
+            Group {
+                if isDragOver {
+                    dragContent
+                } else if hasFiles {
+                    fileContent
+                } else {
+                    emptyContent
+                }
             }
+
+            Spacer()
 
             // PKM path — click to change
             Button(action: pickNewPKMRoot) {
@@ -41,8 +71,16 @@ struct InboxStatusView: View {
         .padding()
         .background(
             RoundedRectangle(cornerRadius: 8)
-                .strokeBorder(isDragOver ? Color.primary.opacity(0.4) : Color.clear, lineWidth: 2)
+                .strokeBorder(
+                    isDragOver ? Color.accentColor.opacity(0.4) : Color.clear,
+                    style: StrokeStyle(lineWidth: 1.5, dash: isDragOver ? [6, 4] : [])
+                )
+                .background(
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(isDragOver ? Color.accentColor.opacity(0.03) : Color.clear)
+                )
                 .padding(4)
+                .animation(.easeInOut(duration: 0.2), value: isDragOver)
         )
         .onDrop(of: [.fileURL], isTargeted: $isDragOver) { providers in
             handleDrop(providers)
@@ -70,38 +108,12 @@ struct InboxStatusView: View {
         }
     }
 
-    // MARK: - Empty State
+    // MARK: - Shared
 
-    private var emptyStateView: some View {
-        VStack(spacing: 0) {
-            Spacer()
-
-            faceView(mouth: "_")
-                .offset(y: bounceAnimation ? -3 : 3)
-
-            Spacer()
-
-            VStack(spacing: 8) {
-                Text("인박스가 비어 있음")
-                    .font(.title3)
-                    .foregroundColor(.secondary)
-
-                Text("파일을 여기에 끌어다 놓거나")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-
-                Button(action: pickFilesForInbox) {
-                    HStack(spacing: 4) {
-                        Image(systemName: "plus.circle")
-                        Text("파일 선택")
-                    }
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-            }
-
-            Spacer()
-        }
+    private var currentMouth: String {
+        if isDragOver { return "o" }
+        if hasFiles { return "\u{203F}" }
+        return "_"
     }
 
     private func faceView(mouth: String) -> some View {
@@ -109,8 +121,6 @@ struct InboxStatusView: View {
             .font(.system(size: 48, design: .monospaced))
             .foregroundColor(.secondary)
     }
-
-    // MARK: - Active State
 
     private func loadInboxFiles() {
         guard !appState.pkmRootPath.isEmpty else {
@@ -132,105 +142,154 @@ struct InboxStatusView: View {
             .sorted { $0.lastPathComponent < $1.lastPathComponent }
     }
 
-    private var activeStateView: some View {
-        VStack(spacing: 0) {
-            Spacer()
+    // MARK: - Content per state (Zone 2 only — face is in Zone 1)
 
-            faceView(mouth: isDragOver ? "o" : "\u{203F}")
-                .scaleEffect(isDragOver ? 1.15 : 1.0)
-                .animation(.easeInOut(duration: 0.2), value: isDragOver)
+    private var emptyContent: some View {
+        VStack(spacing: 8) {
+            Text("인박스가 비어 있음")
+                .font(.title3)
+                .foregroundColor(.secondary)
 
-            Spacer()
+            Text("파일을 여기에 끌어다 놓거나")
+                .font(.caption)
+                .foregroundColor(.secondary)
 
+            Button(action: pickFilesForInbox) {
+                HStack(spacing: 4) {
+                    Image(systemName: "plus.circle")
+                    Text("파일 선택")
+                }
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+        }
+    }
+
+    private var dragContent: some View {
+        Text("놓으면 인박스에 추가됩니다")
+            .font(.subheadline)
+            .fontWeight(.medium)
+            .foregroundColor(.primary.opacity(0.7))
+    }
+
+    private var fileContent: some View {
+        VStack(spacing: 8) {
+            // Feedback pill
             if let feedback = dropFeedback {
                 Text(feedback)
-                    .font(.subheadline)
-                    .foregroundColor(.green)
-                    .transition(.opacity)
-            }
-
-            if appState.inboxFileCount > 0 {
-                VStack(spacing: 4) {
-                    ForEach(Array(cachedInboxFiles.prefix(5).enumerated()), id: \.offset) { _, url in
-                        HStack(spacing: 8) {
-                            FileThumbnailView(url: url)
-                            Text(url.lastPathComponent)
-                                .font(.caption)
-                                .lineLimit(1)
-                                .truncationMode(.middle)
-                            Spacer()
-                        }
-                    }
-                    if cachedInboxFiles.count > 5 {
-                        Text("외 \(cachedInboxFiles.count - 5)개")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                }
-                .padding(.horizontal, 24)
-
-                HStack(spacing: 8) {
-                    Text("\(appState.inboxFileCount)개 파일, 약 \(max(appState.inboxFileCount * 3, 1))초")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-
-                    Button(action: pickFilesForInbox) {
-                        Image(systemName: "plus.circle")
-                            .font(.caption)
-                    }
-                    .buttonStyle(.plain)
-                    .foregroundColor(.accentColor)
-                    .accessibilityLabel("인박스 파일 추가")
-
-                    Button(action: { showClearConfirmation = true }) {
-                        Image(systemName: "trash")
-                            .font(.caption)
-                    }
-                    .buttonStyle(.plain)
-                    .foregroundColor(.secondary)
-                    .accessibilityLabel("인박스 비우기")
-                    .alert("인박스 비우기", isPresented: $showClearConfirmation) {
-                        Button("비우기", role: .destructive) { clearInbox() }
-                        Button("취소", role: .cancel) {}
-                    } message: {
-                        Text("\(appState.inboxFileCount)개 파일을 휴지통으로 보냅니다.")
-                    }
-                }
-
-                Button(action: {
-                    Task {
-                        await appState.startProcessing()
-                    }
-                }) {
-                    HStack {
-                        Image(systemName: "sparkles")
-                        Text("정리하기")
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 2)
-                }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.large)
-                .padding(.horizontal, 40)
-                .scaleEffect(isButtonHovered ? 1.03 : 1.0)
-                .animation(.easeOut(duration: 0.12), value: isButtonHovered)
-                .onHover { isButtonHovered = $0 }
-                .disabled(!appState.hasAPIKey)
-
-                if !appState.hasAPIKey {
-                    Text("API 키를 먼저 설정하세요")
-                        .font(.caption)
-                        .foregroundColor(.orange)
-                }
-            }
-
-            if isDragOver {
-                Text("놓으면 인박스에 추가됩니다")
                     .font(.caption)
-                    .foregroundColor(.primary.opacity(0.6))
                     .fontWeight(.medium)
+                    .foregroundColor(.green)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 4)
+                    .background(Capsule().fill(Color.green.opacity(0.1)))
+                    .transition(.opacity.combined(with: .scale(scale: 0.9)))
+            }
+
+            // File rows
+            ScrollView {
+                VStack(spacing: 2) {
+                    ForEach(Array(cachedInboxFiles.prefix(6).enumerated()), id: \.offset) { _, url in
+                        fileRow(url: url)
+                    }
+                    if cachedInboxFiles.count > 6 {
+                        Text("외 \(cachedInboxFiles.count - 6)개")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 4)
+                    }
+                }
+            }
+            .frame(maxHeight: 160)
+            .padding(.horizontal, 12)
+
+            // Action bar
+            HStack(spacing: 12) {
+                Text("약 \(max(appState.inboxFileCount * 3, 1))초")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+
+                Spacer()
+
+                Button(action: pickFilesForInbox) {
+                    Image(systemName: "plus.circle")
+                        .font(.system(size: 13))
+                }
+                .buttonStyle(.plain)
+                .foregroundColor(.accentColor)
+                .accessibilityLabel("인박스 파일 추가")
+
+                Button(action: { showClearConfirmation = true }) {
+                    Image(systemName: "trash")
+                        .font(.system(size: 12))
+                }
+                .buttonStyle(.plain)
+                .foregroundColor(.secondary)
+                .accessibilityLabel("인박스 비우기")
+                .alert("인박스 비우기", isPresented: $showClearConfirmation) {
+                    Button("비우기", role: .destructive) { clearInbox() }
+                    Button("취소", role: .cancel) {}
+                } message: {
+                    Text("\(appState.inboxFileCount)개 파일을 휴지통으로 보냅니다.")
+                }
+            }
+            .padding(.horizontal, 20)
+
+            Button(action: {
+                Task { await appState.startProcessing() }
+            }) {
+                HStack(spacing: 6) {
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 12))
+                    Text("정리하기")
+                        .fontWeight(.medium)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 6)
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.regular)
+            .padding(.horizontal, 24)
+            .scaleEffect(isButtonHovered ? 1.02 : 1.0)
+            .animation(.easeOut(duration: 0.1), value: isButtonHovered)
+            .onHover { isButtonHovered = $0 }
+            .disabled(!appState.hasAPIKey)
+
+            if !appState.hasAPIKey {
+                Text("API 키를 먼저 설정하세요")
+                    .font(.caption2)
+                    .foregroundColor(.orange)
             }
         }
+    }
+
+    private func fileRow(url: URL) -> some View {
+        HStack(spacing: 8) {
+            FileThumbnailView(url: url)
+            Text(url.lastPathComponent)
+                .font(.system(size: 12))
+                .lineLimit(1)
+                .truncationMode(.middle)
+            Spacer()
+            Text(fileSizeString(url))
+                .font(.caption2)
+                .foregroundColor(.secondary.opacity(0.6))
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 5)
+        .background(
+            RoundedRectangle(cornerRadius: 6)
+                .fill(Color.primary.opacity(0.03))
+        )
+    }
+
+    private func fileSizeString(_ url: URL) -> String {
+        guard let attrs = try? FileManager.default.attributesOfItem(atPath: url.path),
+              let size = attrs[.size] as? Int64 else { return "" }
+        if size < 1024 { return "\(size)B" }
+        if size < 1024 * 1024 { return "\(size / 1024)KB" }
+        return String(format: "%.1fMB", Double(size) / 1_048_576)
     }
 
     // MARK: - PKM Root Picker
