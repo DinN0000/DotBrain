@@ -106,7 +106,7 @@ struct InboxProcessor {
         )
 
         // Record estimated API cost
-        let estimatedCost = Double(inputs.count) * 0.001  // ~$0.001 per file (rough estimate)
+        let estimatedCost = Double(inputs.count) * 0.005  // ~$0.005 per file (Stage 1 full content + Stage 2 fallback)
         StatisticsService.addApiCost(estimatedCost)
 
         // Enrich with related notes — AI-based context linking
@@ -381,30 +381,31 @@ struct InboxProcessor {
             summary: base.summary,
             targetFolder: base.targetFolder,
             project: nil,
-            confidence: 0.7
+            confidence: 0.7,
+            relatedNotes: base.relatedNotes
         ))
 
-        // Option 2: Archive (completed project)
+        // Option 2: Area (ongoing responsibility)
+        options.append(ClassifyResult(
+            para: .area,
+            tags: base.tags,
+            summary: base.summary,
+            targetFolder: base.targetFolder,
+            project: nil,
+            confidence: 0.6,
+            relatedNotes: base.relatedNotes
+        ))
+
+        // Option 3: Archive (completed/inactive)
         options.append(ClassifyResult(
             para: .archive,
             tags: base.tags,
             summary: base.summary,
             targetFolder: base.suggestedProject ?? "",
             project: nil,
-            confidence: 0.5
+            confidence: 0.5,
+            relatedNotes: base.relatedNotes
         ))
-
-        // Option 3: Existing projects (top 3, in case fuzzy match was too strict)
-        for projectName in projectNames.prefix(3) {
-            options.append(ClassifyResult(
-                para: .project,
-                tags: base.tags,
-                summary: base.summary,
-                targetFolder: "",
-                project: projectName,
-                confidence: 0.5
-            ))
-        }
 
         return options
     }
@@ -415,15 +416,14 @@ struct InboxProcessor {
 
         // Add alternative PARA categories
         for category in PARACategory.allCases where category != base.para {
-            var alt = base
-            alt.confidence = 0.5
             options.append(ClassifyResult(
                 para: category,
                 tags: base.tags,
                 summary: base.summary,
                 targetFolder: base.targetFolder,
                 project: category == .project ? projectNames.first : nil,
-                confidence: 0.5
+                confidence: 0.5,
+                relatedNotes: base.relatedNotes
             ))
         }
 
