@@ -79,7 +79,7 @@ struct InboxStatusView: View {
             faceView(mouth: "_")
                 .offset(y: bounceAnimation ? -3 : 3)
 
-            Spacer()
+            Spacer().frame(height: 24)
 
             VStack(spacing: 8) {
                 Text("인박스가 비어 있음")
@@ -99,7 +99,8 @@ struct InboxStatusView: View {
                 .buttonStyle(.bordered)
                 .controlSize(.small)
             }
-            .padding(.bottom, 8)
+
+            Spacer()
         }
     }
 
