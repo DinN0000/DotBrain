@@ -464,18 +464,19 @@ struct SettingsView: View {
     }
 
     private func runUpdate() {
-        Task {
-            do {
-                let script = "curl -sL https://raw.githubusercontent.com/DinN0000/DotBrain/main/install.sh | bash"
-                let process = Process()
-                process.executableURL = URL(fileURLWithPath: "/bin/bash")
-                process.arguments = ["-c", script]
-                try process.run()
-            } catch {
-                await MainActor.run {
-                    updateError = "업데이트 실패: \(error.localizedDescription)"
-                }
+        // Run install script detached so it survives app termination
+        let script = "nohup bash -c 'sleep 1; curl -sL https://raw.githubusercontent.com/DinN0000/DotBrain/main/install.sh | bash' &>/dev/null &"
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/bin/bash")
+        process.arguments = ["-c", script]
+        do {
+            try process.run()
+            // Give the detached process time to start, then quit
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                NSApplication.shared.terminate(nil)
             }
+        } catch {
+            updateError = "업데이트 실패: \(error.localizedDescription)"
         }
     }
 
