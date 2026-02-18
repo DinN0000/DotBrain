@@ -166,6 +166,13 @@ struct InboxStatusView: View {
                     }
                     .buttonStyle(.plain)
                     .foregroundColor(.accentColor)
+
+                    Button(action: clearInbox) {
+                        Image(systemName: "trash")
+                            .font(.caption)
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundColor(.secondary)
                 }
 
                 Button(action: {
@@ -235,6 +242,25 @@ struct InboxStatusView: View {
 
     private func abbreviatePath(_ path: String) -> String {
         path.replacingOccurrences(of: NSHomeDirectory(), with: "~")
+    }
+
+    // MARK: - Inbox Actions
+
+    private func clearInbox() {
+        let inboxPath = PKMPathManager(root: appState.pkmRootPath).inboxPath
+        let fm = FileManager.default
+        guard let items = try? fm.contentsOfDirectory(
+            at: URL(fileURLWithPath: inboxPath),
+            includingPropertiesForKeys: nil,
+            options: [.skipsHiddenFiles]
+        ) else { return }
+
+        for url in items where !url.lastPathComponent.hasPrefix("_") {
+            try? fm.trashItem(at: url, resultingItemURL: nil)
+        }
+        loadInboxFiles()
+        Task { await appState.refreshInboxCount() }
+        showFeedback("인박스 비움 (휴지통으로 이동)")
     }
 
     // MARK: - File Picker
