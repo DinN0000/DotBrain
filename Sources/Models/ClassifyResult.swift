@@ -11,7 +11,7 @@ struct ClassifyResult: Codable {
     var para: PARACategory
     let tags: [String]
     let summary: String
-    let targetFolder: String
+    var targetFolder: String
     var project: String?
     var confidence: Double
     var relatedNotes: [RelatedNote] = []
