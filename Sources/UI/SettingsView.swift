@@ -70,7 +70,15 @@ struct SettingsView: View {
         }
         .fileImporter(isPresented: $showFolderPicker, allowedContentTypes: [.folder]) { result in
             if case .success(let url) = result {
-                appState.pkmRootPath = url.path
+                let newPath = url.path
+                appState.pkmRootPath = newPath
+
+                // If folder lacks PARA structure, trigger re-onboarding (skip welcome)
+                let pm = PKMPathManager(root: newPath)
+                if !pm.isInitialized() {
+                    UserDefaults.standard.set(1, forKey: "onboardingStep")
+                    appState.currentScreen = .onboarding
+                }
             }
         }
     }

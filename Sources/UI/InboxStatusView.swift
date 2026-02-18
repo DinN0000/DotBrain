@@ -74,16 +74,12 @@ struct InboxStatusView: View {
 
     private var emptyStateView: some View {
         VStack(spacing: 12) {
-            Image(systemName: "tray.and.arrow.down.fill")
-                .font(.system(size: 48))
-                .foregroundColor(.secondary.opacity(0.5))
+            Text("\u{00B7}_\u{00B7}")
+                .font(.system(size: 32, design: .monospaced))
+                .foregroundColor(.secondary)
                 .offset(y: bounceAnimation ? -3 : 3)
 
-            Text("인박스")
-                .font(.title2)
-                .fontWeight(.semibold)
-
-            Text("비어 있음")
+            Text("인박스가 비어 있음")
                 .font(.title3)
                 .foregroundColor(.secondary)
 
@@ -118,23 +114,16 @@ struct InboxStatusView: View {
 
     private var activeStateView: some View {
         VStack(spacing: 16) {
-            Image(systemName: isDragOver ? "tray.and.arrow.down" : "tray.and.arrow.down.fill")
-                .font(.system(size: 48))
-                .foregroundColor(isDragOver ? .primary : .accentColor)
-                .scaleEffect(isDragOver ? 1.2 : 1.0)
+            Text(isDragOver ? "\u{00B7}o\u{00B7}" : "\u{00B7}\u{203F}\u{00B7}")
+                .font(.system(size: 32, design: .monospaced))
+                .scaleEffect(isDragOver ? 1.15 : 1.0)
                 .animation(.easeInOut(duration: 0.2), value: isDragOver)
 
-            VStack(spacing: 4) {
-                Text("인박스")
-                    .font(.title2)
-                    .fontWeight(.semibold)
-
-                if let feedback = dropFeedback {
-                    Text(feedback)
-                        .font(.subheadline)
-                        .foregroundColor(.green)
-                        .transition(.opacity)
-                }
+            if let feedback = dropFeedback {
+                Text(feedback)
+                    .font(.subheadline)
+                    .foregroundColor(.green)
+                    .transition(.opacity)
             }
 
             if appState.inboxFileCount > 0 {
@@ -210,17 +199,16 @@ struct InboxStatusView: View {
         guard panel.runModal() == .OK, let url = panel.url else { return }
         let newPath = url.path
 
-        // Validate: must have PARA structure or be empty
+        appState.pkmRootPath = newPath
+
+        // If folder lacks PARA structure, trigger re-onboarding (skip welcome)
         let pm = PKMPathManager(root: newPath)
         if !pm.isInitialized() {
-            do {
-                try pm.initializeStructure()
-            } catch {
-                return
-            }
+            UserDefaults.standard.set(1, forKey: "onboardingStep")
+            appState.currentScreen = .onboarding
+            return
         }
 
-        appState.pkmRootPath = newPath
         loadInboxFiles()
         Task {
             await appState.refreshInboxCount()
