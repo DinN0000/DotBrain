@@ -1,5 +1,10 @@
 # Changelog
 
+## v2.0.5 — 인앱 업데이트 API 호출 제거 (2026-02-19)
+- install.sh에 TAG 인자 전달 모드 추가 (API 호출 완전 생략)
+- 앱에서 이미 알고 있는 버전 정보를 install.sh에 직접 전달
+- 터미널 설치 시에만 API 호출 (기존 동작 유지)
+
 ## v2.0.4 — 인앱 업데이트 안정화 (2026-02-19)
 - install.sh GitHub API 호출 3회 → 1회로 축소 (rate limit 방지)
 - grep 파이프라인 pipefail 내성 강화

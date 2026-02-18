@@ -454,12 +454,13 @@ struct SettingsView: View {
     }
 
     private func runUpdate() {
-        // Write update script to temp file and run detached
+        // Pass tag so install.sh skips GitHub API entirely
+        let tag = latestVersion.map { "v\($0)" } ?? ""
         let updateScript = """
         #!/bin/bash
         sleep 2
         curl -sL https://raw.githubusercontent.com/DinN0000/DotBrain/main/install.sh -o /tmp/dotbrain_install.sh
-        bash /tmp/dotbrain_install.sh
+        bash /tmp/dotbrain_install.sh \(tag)
         rm -f /tmp/dotbrain_install.sh /tmp/dotbrain_update.sh
         """
         let scriptPath = "/tmp/dotbrain_update.sh"
