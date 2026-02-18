@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.8.4 — Activity Log Fix (2026-02-18)
+- 볼트 점검 완료 후 "최근 활동"에 기록되지 않던 버그 수정
+- 전체 재정리 스캔 단계 활동 기록 추가
+- MOCGenerator 디버그 로그 print() -> NSLog() 전환
+
 ## v1.8.3 — MOC Lifecycle (2026-02-18)
 - VaultReorganizer 파일 이동 후 MOC 자동 갱신 추가
 - 루트 MOC 태그 누락 진단 로그 추가 (generateCategoryRootMOC)
