@@ -258,6 +258,16 @@ struct SettingsView: View {
                 Text("PKM 폴더")
                     .font(.subheadline)
                     .fontWeight(.medium)
+                Spacer()
+                if isStructureReady {
+                    Label("PARA 확인됨", systemImage: "checkmark.circle.fill")
+                        .font(.caption2)
+                        .foregroundColor(.green)
+                } else {
+                    Label("PARA 없음", systemImage: "exclamationmark.triangle.fill")
+                        .font(.caption2)
+                        .foregroundColor(.orange)
+                }
             }
 
             HStack(spacing: 8) {
@@ -278,30 +288,20 @@ struct SettingsView: View {
                     .controlSize(.mini)
             }
 
-            if isStructureReady {
-                Label("PARA 구조 확인됨", systemImage: "checkmark.circle.fill")
-                    .font(.caption)
-                    .foregroundColor(.green)
-            } else {
-                VStack(alignment: .leading, spacing: 6) {
-                    Label("PARA 폴더 구조 없음", systemImage: "exclamationmark.triangle.fill")
-                        .font(.caption)
-                        .foregroundColor(.orange)
-
-                    Button(action: {
-                        let pathManager = PKMPathManager(root: appState.pkmRootPath)
-                        try? pathManager.initializeStructure()
-                        isStructureReady = pathManager.isInitialized()
-                    }) {
-                        HStack(spacing: 4) {
-                            Image(systemName: "folder.badge.plus")
-                            Text("폴더 구조 만들기")
-                        }
-                        .frame(maxWidth: .infinity)
+            if !isStructureReady {
+                Button(action: {
+                    let pathManager = PKMPathManager(root: appState.pkmRootPath)
+                    try? pathManager.initializeStructure()
+                    isStructureReady = pathManager.isInitialized()
+                }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "folder.badge.plus")
+                        Text("폴더 구조 만들기")
                     }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
+                    .frame(maxWidth: .infinity)
                 }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
             }
         }
         .padding(12)
@@ -326,46 +326,34 @@ struct SettingsView: View {
                 Text("앱 정보")
                     .font(.subheadline)
                     .fontWeight(.medium)
-            }
-
-            HStack {
-                Text("DotBrain")
-                    .font(.caption)
-                    .fontWeight(.medium)
                 Spacer()
                 Text("v\(currentVersion)")
-                    .font(.system(.caption, design: .monospaced))
+                    .font(.system(.caption2, design: .monospaced))
                     .foregroundColor(.secondary)
-            }
-
-            // Update check
-            if let latest = latestVersion {
-                if latest != currentVersion {
-                    HStack(spacing: 6) {
-                        Image(systemName: "arrow.down.circle.fill")
-                            .font(.caption)
+                if let latest = latestVersion {
+                    if latest != currentVersion {
+                        Label("v\(latest) 사용 가능", systemImage: "arrow.down.circle.fill")
+                            .font(.caption2)
                             .foregroundColor(.orange)
-                        Text("v\(latest) 사용 가능")
-                            .font(.caption)
-                            .foregroundColor(.orange)
-                        Spacer()
-                        Button("업데이트") {
-                            runUpdate()
-                        }
-                        .font(.caption)
-                        .buttonStyle(.borderedProminent)
-                        .controlSize(.mini)
-                    }
-                } else {
-                    HStack(spacing: 6) {
-                        Image(systemName: "checkmark.circle.fill")
-                            .font(.caption)
-                            .foregroundColor(.green)
-                        Text("최신 버전")
-                            .font(.caption)
+                    } else {
+                        Label("최신", systemImage: "checkmark.circle.fill")
+                            .font(.caption2)
                             .foregroundColor(.green)
                     }
                 }
+            }
+
+            // Update button
+            if let latest = latestVersion, latest != currentVersion {
+                Button(action: { runUpdate() }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "arrow.down.circle")
+                        Text("업데이트")
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.small)
             }
 
             if let error = updateError {
