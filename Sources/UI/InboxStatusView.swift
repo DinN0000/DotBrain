@@ -51,9 +51,6 @@ struct InboxStatusView: View {
             handleDrop(providers)
             return true
         }
-        .background(PasteCommandView {
-            handlePaste()
-        })
         .onAppear {
             loadInboxFiles()
             Task {
@@ -90,19 +87,10 @@ struct InboxStatusView: View {
                 .font(.title3)
                 .foregroundColor(.secondary)
 
-            VStack(spacing: 4) {
-                Text("파일을 여기에 끌어다 놓거나")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                HStack(spacing: 2) {
-                    Image(systemName: "command")
-                        .font(.caption2)
-                    Text("V 로 붙여넣기")
-                        .font(.caption)
-                }
+            Text("파일을 여기에 끌어다 놓으세요")
+                .font(.caption)
                 .foregroundColor(.secondary)
-            }
-            .padding(.top, 4)
+                .padding(.top, 4)
         }
     }
 
@@ -270,26 +258,6 @@ struct InboxStatusView: View {
         }
     }
 
-    // MARK: - Paste (Cmd+V)
-
-    private func handlePaste() {
-        let pasteboard = NSPasteboard.general
-        var urls: [URL] = []
-
-        if let fileURLs = pasteboard.readObjects(forClasses: [NSURL.self], options: [
-            .urlReadingFileURLsOnly: true
-        ]) as? [URL] {
-            urls.append(contentsOf: fileURLs)
-        }
-
-        guard !urls.isEmpty else { return }
-
-        Task {
-            let result = await appState.addFilesToInboxDetailed(urls: urls)
-            showDropFeedback(result)
-        }
-    }
-
     private func showDropFeedback(_ result: AppState.AddFilesResult) {
         var parts: [String] = []
 
@@ -318,43 +286,6 @@ struct InboxStatusView: View {
             withAnimation {
                 dropFeedback = nil
             }
-        }
-    }
-}
-
-// MARK: - Paste Command Helper
-
-struct PasteCommandView: NSViewRepresentable {
-    let onPaste: () -> Void
-
-    func makeNSView(context: Context) -> PasteCapturingView {
-        let view = PasteCapturingView()
-        view.onPaste = onPaste
-        return view
-    }
-
-    func updateNSView(_ nsView: PasteCapturingView, context: Context) {
-        nsView.onPaste = onPaste
-    }
-}
-
-class PasteCapturingView: NSView {
-    var onPaste: (() -> Void)?
-
-    override var acceptsFirstResponder: Bool { true }
-
-    override func viewDidMoveToWindow() {
-        super.viewDidMoveToWindow()
-        DispatchQueue.main.async { [weak self] in
-            self?.window?.makeFirstResponder(self)
-        }
-    }
-
-    override func keyDown(with event: NSEvent) {
-        if event.modifierFlags.contains(.command) && event.charactersIgnoringModifiers == "v" {
-            onPaste?()
-        } else {
-            super.keyDown(with: event)
         }
     }
 }
