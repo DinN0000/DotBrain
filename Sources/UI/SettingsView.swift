@@ -84,6 +84,8 @@ struct SettingsView: View {
         }
     }
 
+    @State private var isEditingKey = false
+
     // MARK: - AI Settings Section
 
     private var aiSettingsSection: some View {
@@ -97,6 +99,12 @@ struct SettingsView: View {
                 Text("AI 설정")
                     .font(.subheadline)
                     .fontWeight(.medium)
+                Spacer()
+                if activeHasKey {
+                    Label("키 등록됨", systemImage: "checkmark.circle.fill")
+                        .font(.caption2)
+                        .foregroundColor(.green)
+                }
             }
 
             // Provider picker — segmented style
@@ -108,41 +116,62 @@ struct SettingsView: View {
             .background(Color.primary.opacity(0.04))
             .cornerRadius(6)
 
-            // Active provider key input
-            providerKeySection(activeProvider, hasKey: activeHasKey)
+            // Model pipeline + cost
+            HStack {
+                Text(activeProvider.modelPipeline)
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+                Spacer()
+                Text(activeProvider.costInfo)
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+            }
 
-            // Cost info inline
-            Text(activeProvider.costInfo)
-                .font(.caption2)
-                .foregroundColor(.secondary)
-                .padding(.leading, 2)
+            // Key section: collapsed when key exists, expanded when editing or no key
+            if activeHasKey && !isEditingKey {
+                HStack {
+                    Button("API 키 변경") {
+                        isEditingKey = true
+                        loadKeyForProvider(activeProvider)
+                    }
+                    .font(.caption)
+                    .buttonStyle(.bordered)
+                    .controlSize(.mini)
 
-            // Other provider (collapsed)
-            if otherHasKey || showOtherProvider {
+                    Button("삭제") { deleteKey() }
+                        .font(.caption)
+                        .buttonStyle(.bordered)
+                        .controlSize(.mini)
+
+                    if let msg = saveMessage {
+                        Text(msg)
+                            .font(.caption2)
+                            .foregroundColor(msg == "삭제됨" ? .orange : .green)
+                    }
+                }
+            } else {
+                providerKeyInput(activeProvider)
+            }
+
+            // Other provider
+            if otherHasKey {
                 Divider()
                     .padding(.vertical, 2)
 
                 HStack(spacing: 6) {
-                    Circle()
-                        .fill(Color.secondary.opacity(0.3))
-                        .frame(width: 6, height: 6)
                     Text(otherProvider.displayName)
                         .font(.caption)
                         .foregroundColor(.secondary)
                     Spacer()
-                    if otherHasKey {
-                        Text("키 등록됨")
-                            .font(.caption2)
-                            .foregroundColor(.green)
-                        Button("전환") {
-                            withAnimation(.easeOut(duration: 0.15)) {
-                                appState.selectedProvider = otherProvider
-                            }
+                    Button("전환") {
+                        isEditingKey = false
+                        withAnimation(.easeOut(duration: 0.15)) {
+                            appState.selectedProvider = otherProvider
                         }
-                        .font(.caption2)
-                        .buttonStyle(.bordered)
-                        .controlSize(.mini)
                     }
+                    .font(.caption2)
+                    .buttonStyle(.bordered)
+                    .controlSize(.mini)
                 }
             }
         }
@@ -157,6 +186,7 @@ struct SettingsView: View {
         let accent = providerAccentColor(provider)
 
         return Button {
+            isEditingKey = false
             withAnimation(.easeOut(duration: 0.15)) {
                 appState.selectedProvider = provider
             }
@@ -188,14 +218,8 @@ struct SettingsView: View {
     }
 
     @ViewBuilder
-    private func providerKeySection(_ provider: AIProvider, hasKey: Bool) -> some View {
+    private func providerKeyInput(_ provider: AIProvider) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            // Model pipeline
-            Text(provider.modelPipeline)
-                .font(.caption2)
-                .foregroundColor(providerAccentColor(provider).opacity(0.8))
-
-            // Key input row
             HStack(spacing: 6) {
                 if showingKey {
                     TextField(provider.keyPlaceholder, text: $keyInput)
@@ -215,32 +239,27 @@ struct SettingsView: View {
                 .foregroundColor(.secondary)
             }
 
-            // Action row
             HStack(spacing: 6) {
-                Button("저장") { saveKey() }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.mini)
-                    .disabled(keyInput.isEmpty || keyInput == "••••••••")
+                Button("저장") {
+                    saveKey()
+                    if activeHasKey { isEditingKey = false }
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.mini)
+                .disabled(keyInput.isEmpty || keyInput == "••••••••")
 
-                if hasKey {
-                    Button("삭제") { deleteKey() }
-                        .buttonStyle(.bordered)
-                        .controlSize(.mini)
+                if isEditingKey {
+                    Button("취소") {
+                        isEditingKey = false
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.mini)
                 }
 
                 if let msg = saveMessage {
                     Text(msg)
                         .font(.caption2)
                         .foregroundColor(msg == "저장 완료" ? .green : .orange)
-                        .transition(.opacity)
-                }
-
-                Spacer()
-
-                if hasKey {
-                    Image(systemName: "checkmark.circle.fill")
-                        .font(.caption)
-                        .foregroundColor(.green)
                 }
             }
         }
