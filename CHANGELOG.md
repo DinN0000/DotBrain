@@ -1,5 +1,15 @@
 # Changelog
 
+## v1.8.3 — MOC Lifecycle (2026-02-18)
+- VaultReorganizer 파일 이동 후 MOC 자동 갱신 추가
+- 루트 MOC 태그 누락 진단 로그 추가 (generateCategoryRootMOC)
+- 비용 추정 $0.005/파일로 전 파이프라인 통일
+
+## v1.8.2 — Pipeline Optimization (2026-02-18)
+- Area 옵션 분류 추가 (Project/Resource/Archive 외)
+- Stage 1 전체 콘텐츠 기반 분류로 정확도 향상
+- MOC 기반 컨텍스트 빌드 최적화
+
 ## v1.8.1 — 레포 루트 정리 (2026-02-18)
 - CODE_REVIEW 파일 루트에서 제거
 - docs/ 디렉토리 gitignore 처리 (GitHub 레포 페이지 정리)
