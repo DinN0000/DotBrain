@@ -106,6 +106,7 @@ struct PARAMover {
             // Skip _Assets — move files to centralized _Assets/{documents,images}/
             if entry == "_Assets" {
                 let sourceAssets = (sourceDir as NSString).appendingPathComponent("_Assets")
+                var assetMoveFailed = false
                 if let assetFiles = try? fm.contentsOfDirectory(atPath: sourceAssets) {
                     for assetFile in assetFiles where !assetFile.hasPrefix(".") {
                         let src = (sourceAssets as NSString).appendingPathComponent(assetFile)
@@ -120,13 +121,20 @@ struct PARAMover {
                                 ext.isEmpty ? "\(base)_\(ts)" : "\(base)_\(ts).\(ext)"
                             )
                         }
-                        try? fm.moveItem(atPath: src, toPath: dst)
+                        do {
+                            try fm.moveItem(atPath: src, toPath: dst)
+                        } catch {
+                            assetMoveFailed = true
+                            NSLog("[PARAMover] 에셋 이동 실패 %@: %@", src, error.localizedDescription)
+                        }
                     }
                 }
-                // Remove the now-empty local _Assets/ directory
-                let remaining = (try? fm.contentsOfDirectory(atPath: sourceAssets))?.filter { !$0.hasPrefix(".") } ?? []
-                if remaining.isEmpty {
-                    try? fm.removeItem(atPath: sourceAssets)
+                // Remove the now-empty local _Assets/ directory only if all moves succeeded
+                if !assetMoveFailed {
+                    let remaining = (try? fm.contentsOfDirectory(atPath: sourceAssets))?.filter { !$0.hasPrefix(".") } ?? []
+                    if remaining.isEmpty {
+                        try? fm.removeItem(atPath: sourceAssets)
+                    }
                 }
                 continue
             }

@@ -197,7 +197,7 @@ struct OnboardingView: View {
 
     private func beforeFileRow(_ name: String) -> some View {
         HStack(spacing: 5) {
-            Text("📄")
+            Image(systemName: "doc")
                 .font(.caption2)
             Text(name)
                 .font(.system(.caption, design: .monospaced))
@@ -207,7 +207,7 @@ struct OnboardingView: View {
 
     private func afterFolderRow(_ name: String) -> some View {
         HStack(spacing: 5) {
-            Text("📁")
+            Image(systemName: "folder")
                 .font(.caption2)
             Text(name)
                 .font(.system(.caption, design: .monospaced))
@@ -217,7 +217,7 @@ struct OnboardingView: View {
 
     private func afterFileRow(_ name: String, indent: Bool) -> some View {
         HStack(spacing: 5) {
-            Text("📄")
+            Image(systemName: "doc")
                 .font(.caption2)
             Text(name)
                 .font(.system(.caption, design: .monospaced))
@@ -866,7 +866,7 @@ struct OnboardingView: View {
     private func removeProject(_ name: String) {
         let pathManager = PKMPathManager(root: appState.pkmRootPath)
         let projectDir = (pathManager.projectsPath as NSString).appendingPathComponent(name)
-        try? FileManager.default.removeItem(atPath: projectDir)
+        try? FileManager.default.trashItem(at: URL(fileURLWithPath: projectDir), resultingItemURL: nil)
         projects.removeAll { $0 == name }
     }
 

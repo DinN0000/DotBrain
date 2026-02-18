@@ -118,8 +118,11 @@ enum AICompanionService {
     private static func replaceMarkerSection(at path: String, with newSection: String) throws {
         let existing = try String(contentsOfFile: path, encoding: .utf8)
 
+        let searchAfterStart = { (start: Range<String.Index>) -> Range<String.Index>? in
+            existing.range(of: markerEnd, range: start.upperBound..<existing.endIndex)
+        }
         if let startRange = existing.range(of: markerStart),
-           let endRange = existing.range(of: markerEnd),
+           let endRange = searchAfterStart(startRange),
            startRange.lowerBound < endRange.lowerBound {
             // Markers found — replace only between them (inclusive)
             var updated = existing

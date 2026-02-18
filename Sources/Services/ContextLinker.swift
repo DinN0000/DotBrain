@@ -44,9 +44,6 @@ struct ContextLinker: Sendable {
                             combined[idx] = notes
                         }
                         activeTasks -= 1
-                        completedBatches += 1
-                        let progress = Double(completedBatches) / Double(totalBatches)
-                        onProgress?(progress, "노트 연결 \(completedBatches)/\(totalBatches) 배치 완료")
                     }
                 }
 

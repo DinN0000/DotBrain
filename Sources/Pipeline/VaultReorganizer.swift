@@ -258,11 +258,17 @@ struct VaultReorganizer {
             }
         }
 
-        // Update MOCs for affected folders after file moves
-        let affectedFolders = Set(results.filter(\.isSuccess).compactMap { result -> String? in
+        // Update MOCs for affected folders (both source and target) after file moves
+        var affectedFolders = Set(results.filter(\.isSuccess).compactMap { result -> String? in
             let dir = (result.targetPath as NSString).deletingLastPathComponent
             return dir.isEmpty ? nil : dir
         })
+        // Include source folders so their MOCs drop moved-out files
+        for analysis in selected {
+            let sourceDir = (pathManager.paraPath(for: analysis.currentCategory) as NSString)
+                .appendingPathComponent(analysis.currentFolder)
+            affectedFolders.insert(sourceDir)
+        }
 
         if !affectedFolders.isEmpty {
             onProgress?(0.95, "MOC 갱신 중...")

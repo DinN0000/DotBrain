@@ -171,9 +171,12 @@ enum KeychainService {
 
     // MARK: - Keychain Migration
 
+    private static let migrationLock = NSLock()
     private static var migrationDone = false
 
     private static func migrateFromKeychainIfNeeded() {
+        migrationLock.lock()
+        defer { migrationLock.unlock() }
         guard !migrationDone else { return }
         migrationDone = true
 

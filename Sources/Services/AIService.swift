@@ -124,8 +124,8 @@ actor AIService {
                 )
                 await rateLimiter.recordSuccess(for: fallback, duration: ContinuousClock.now - start)
                 return result
-            } catch {
-                // Fallback also failed, throw original error
+            } catch let fallbackError {
+                NSLog("[AIService] 폴백 제공자(%@) 실패: %@", fallback.rawValue, fallbackError.localizedDescription)
             }
         }
 
