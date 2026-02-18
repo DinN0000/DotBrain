@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.8.1 — 레포 루트 정리 (2026-02-18)
+- CODE_REVIEW 파일 루트에서 제거
+- docs/ 디렉토리 gitignore 처리 (GitHub 레포 페이지 정리)
+
 ## v1.8.0 — 품질 개선 + 보안 강화 + 성능 최적화 (2026-02-16)
 - 스마트 콘텐츠 추출로 AI 분류 품질 향상 (FileContentExtractor 전면 개선)
 - 경로 탐색 방지 강화 (canonicalize + hasPrefix), YAML 인젝션 방어
