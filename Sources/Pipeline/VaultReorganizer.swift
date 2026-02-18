@@ -154,6 +154,11 @@ struct VaultReorganizer {
         for (index, classification) in classifications.enumerated() {
             let entry = filesToProcess[index]
 
+            // Skip unmatched project files — project folders are user-defined only
+            if classification.para == .project && classification.project == nil {
+                continue
+            }
+
             let analysis = FileAnalysis(
                 filePath: entry.filePath,
                 fileName: inputs[index].fileName,
@@ -197,6 +202,11 @@ struct VaultReorganizer {
         for (i, analysis) in selected.enumerated() {
             let progress = Double(i) / Double(selected.count)
             onProgress?(progress, "\(analysis.fileName) 이동 중...")
+
+            // Double-check: skip unmatched project files (should be filtered in scan already)
+            if analysis.recommended.para == .project && analysis.recommended.project == nil {
+                continue
+            }
 
             let fromDisplay = "\(analysis.currentCategory.folderName)/\(analysis.currentFolder)"
 
