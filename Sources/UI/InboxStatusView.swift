@@ -8,6 +8,7 @@ struct InboxStatusView: View {
     @State private var bounceAnimation = false
     @State private var isButtonHovered = false
     @State private var isBounceAnimating = false
+    @State private var mouseOffset: CGSize = .zero
     @State private var cachedInboxFiles: [URL] = []
     @State private var showClearConfirmation = false
 
@@ -48,6 +49,22 @@ struct InboxStatusView: View {
                 .strokeBorder(isDragOver ? Color.primary.opacity(0.4) : Color.clear, lineWidth: 2)
                 .padding(4)
         )
+        .onContinuousHover { phase in
+            switch phase {
+            case .active(let location):
+                let centerX: CGFloat = 180
+                let centerY: CGFloat = 240
+                let dx = (location.x - centerX) / centerX * 8
+                let dy = (location.y - centerY) / centerY * 6
+                mouseOffset = CGSize(width: dx, height: dy)
+            case .ended:
+                withAnimation(.easeOut(duration: 0.4)) {
+                    mouseOffset = .zero
+                }
+            @unknown default:
+                break
+            }
+        }
         .onDrop(of: [.fileURL], isTargeted: $isDragOver) { providers in
             handleDrop(providers)
             return true
@@ -77,29 +94,31 @@ struct InboxStatusView: View {
     // MARK: - Empty State
 
     private var emptyStateView: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: 20) {
             Text("\u{00B7}_\u{00B7}")
-                .font(.system(size: 32, design: .monospaced))
+                .font(.system(size: 40, design: .monospaced))
                 .foregroundColor(.secondary)
-                .offset(y: bounceAnimation ? -3 : 3)
+                .offset(x: mouseOffset.width, y: mouseOffset.height + (bounceAnimation ? -3 : 3))
+                .animation(.interactiveSpring(response: 0.3, dampingFraction: 0.6), value: mouseOffset)
 
-            Text("인박스가 비어 있음")
-                .font(.title3)
-                .foregroundColor(.secondary)
+            VStack(spacing: 8) {
+                Text("인박스가 비어 있음")
+                    .font(.title3)
+                    .foregroundColor(.secondary)
 
-            Text("파일을 여기에 끌어다 놓거나")
-                .font(.caption)
-                .foregroundColor(.secondary)
-                .padding(.top, 4)
+                Text("파일을 여기에 끌어다 놓거나")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
 
-            Button(action: pickFilesForInbox) {
-                HStack(spacing: 4) {
-                    Image(systemName: "plus.circle")
-                    Text("파일 선택")
+                Button(action: pickFilesForInbox) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "plus.circle")
+                        Text("파일 선택")
+                    }
                 }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
             }
-            .buttonStyle(.bordered)
-            .controlSize(.small)
         }
     }
 
@@ -126,11 +145,14 @@ struct InboxStatusView: View {
     }
 
     private var activeStateView: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: 20) {
             Text(isDragOver ? "\u{00B7}o\u{00B7}" : "\u{00B7}\u{203F}\u{00B7}")
-                .font(.system(size: 32, design: .monospaced))
+                .font(.system(size: 40, design: .monospaced))
+                .offset(x: mouseOffset.width, y: mouseOffset.height)
+                .animation(.interactiveSpring(response: 0.3, dampingFraction: 0.6), value: mouseOffset)
                 .scaleEffect(isDragOver ? 1.15 : 1.0)
                 .animation(.easeInOut(duration: 0.2), value: isDragOver)
+                .padding(.bottom, 4)
 
             if let feedback = dropFeedback {
                 Text(feedback)
