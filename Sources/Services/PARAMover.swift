@@ -20,6 +20,9 @@ struct PARAMover {
         let targetPath = pathManager.paraPath(for: target)
         let sourceDir = (sourcePath as NSString).appendingPathComponent(safeName)
 
+        guard pathManager.isPathSafe(sourceDir) else {
+            throw PARAMoveError.notFound(safeName, source)
+        }
         guard fm.fileExists(atPath: sourceDir) else {
             throw PARAMoveError.notFound(safeName, source)
         }
@@ -57,6 +60,9 @@ struct PARAMover {
         let basePath = pathManager.paraPath(for: category)
         let folderPath = (basePath as NSString).appendingPathComponent(safeName)
 
+        guard pathManager.isPathSafe(folderPath) else {
+            throw PARAMoveError.notFound(safeName, category)
+        }
         guard fm.fileExists(atPath: folderPath) else {
             throw PARAMoveError.notFound(safeName, category)
         }
@@ -79,6 +85,9 @@ struct PARAMover {
         let sourceDir = (basePath as NSString).appendingPathComponent(safeSource)
         let targetDir = (basePath as NSString).appendingPathComponent(safeTarget)
 
+        guard pathManager.isPathSafe(sourceDir), pathManager.isPathSafe(targetDir) else {
+            throw PARAMoveError.notFound(safeSource, category)
+        }
         guard fm.fileExists(atPath: sourceDir) else {
             throw PARAMoveError.notFound(safeSource, category)
         }
@@ -146,6 +155,10 @@ struct PARAMover {
             }
         }
 
+        // Delete source index note that was skipped during merge
+        let sourceIndex = (sourceDir as NSString).appendingPathComponent("\(safeSource).md")
+        try? fm.removeItem(atPath: sourceIndex)
+
         // Remove now-empty source folder
         try? fm.removeItem(atPath: sourceDir)
 
@@ -167,6 +180,9 @@ struct PARAMover {
         let oldDir = (basePath as NSString).appendingPathComponent(safeOld)
         let newDir = (basePath as NSString).appendingPathComponent(safeNew)
 
+        guard pathManager.isPathSafe(oldDir) else {
+            throw PARAMoveError.notFound(safeOld, category)
+        }
         guard fm.fileExists(atPath: oldDir) else {
             throw PARAMoveError.notFound(safeOld, category)
         }
@@ -174,14 +190,7 @@ struct PARAMover {
             throw PARAMoveError.alreadyExists(safeNew, category)
         }
 
-        // Rename index note (oldName.md -> newName.md) before moving folder
-        let oldIndex = (oldDir as NSString).appendingPathComponent("\(safeOld).md")
-        let newIndex = (oldDir as NSString).appendingPathComponent("\(safeNew).md")
-        if fm.fileExists(atPath: oldIndex) {
-            try fm.moveItem(atPath: oldIndex, toPath: newIndex)
-        }
-
-        // Update frontmatter project fields in all .md files
+        // Update frontmatter project fields in all .md files (while oldName.md still exists)
         var count = 0
         if let enumerator = fm.enumerator(atPath: oldDir) {
             while let relativePath = enumerator.nextObject() as? String {
@@ -197,6 +206,13 @@ struct PARAMover {
                     count += 1
                 }
             }
+        }
+
+        // Rename index note after enumerator is done (avoids stale path in live enumeration)
+        let oldIndex = (oldDir as NSString).appendingPathComponent("\(safeOld).md")
+        let newIndex = (oldDir as NSString).appendingPathComponent("\(safeNew).md")
+        if fm.fileExists(atPath: oldIndex) {
+            try fm.moveItem(atPath: oldIndex, toPath: newIndex)
         }
 
         // Move (rename) the folder
@@ -292,6 +308,11 @@ struct PARAMover {
     }
 
     private func markReferencesCompleted(folderName: String) {
+        // Two-pass: strip existing marks first to prevent double-marking
+        markInVault(
+            pattern: "[[\(folderName)]] (완료됨)",
+            replacement: "[[\(folderName)]]"
+        )
         markInVault(
             pattern: "[[\(folderName)]]",
             replacement: "[[\(folderName)]] (완료됨)"
@@ -329,7 +350,7 @@ struct PARAMover {
         return files
     }
 
-    /// Replace with normalization to prevent double-marking
+    /// Simple find-and-replace across vault markdown files
     @discardableResult
     private func markInVault(pattern: String, replacement: String) -> Int {
         let files = collectVaultMarkdownFiles()
@@ -337,8 +358,8 @@ struct PARAMover {
 
         for filePath in files {
             guard let content = try? String(contentsOfFile: filePath, encoding: .utf8) else { continue }
-            let normalized = content.replacingOccurrences(of: replacement, with: pattern)
-            let updated = normalized.replacingOccurrences(of: pattern, with: replacement)
+            guard content.contains(pattern) else { continue }
+            let updated = content.replacingOccurrences(of: pattern, with: replacement)
             if updated != content {
                 try? updated.write(toFile: filePath, atomically: true, encoding: .utf8)
                 count += 1

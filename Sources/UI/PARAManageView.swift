@@ -10,6 +10,8 @@ struct PARAManageView: View {
     @State private var deleteTarget: (name: String, category: PARACategory)?
     @State private var renameTarget: (name: String, category: PARACategory)?
     @State private var renameNewName = ""
+    @State private var loadTask: Task<Void, Never>?
+    @State private var statusClearTask: Task<Void, Never>?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -346,18 +348,26 @@ struct PARAManageView: View {
     // MARK: - Actions
 
     private func loadFolders() {
+        loadTask?.cancel()
         let showLoading = folderMap.values.allSatisfy({ $0.isEmpty })
         if showLoading { isLoading = true }
         let root = appState.pkmRootPath
-        Task {
+        loadTask = Task.detached(priority: .utility) {
             var result: [PARACategory: [FolderEntry]] = [:]
-            for cat in PARACategory.allCases {
-                result[cat] = await Task.detached(priority: .utility) {
-                    Self.scanCategory(cat, pkmRoot: root)
-                }.value
+            await withTaskGroup(of: (PARACategory, [FolderEntry]).self) { group in
+                for cat in PARACategory.allCases {
+                    group.addTask { (cat, Self.scanCategory(cat, pkmRoot: root)) }
+                }
+                for await (cat, entries) in group {
+                    result[cat] = entries
+                }
             }
-            folderMap = result
-            isLoading = false
+            guard !Task.isCancelled else { return }
+            let snapshot = result
+            await MainActor.run {
+                folderMap = snapshot
+                isLoading = false
+            }
         }
     }
 
@@ -416,13 +426,23 @@ struct PARAManageView: View {
     }
 
     private func createFolder(in category: PARACategory) {
-        let name = newFolderName.trimmingCharacters(in: .whitespaces)
+        let raw = newFolderName.trimmingCharacters(in: .whitespaces)
+        // Sanitize: strip path separators, .., null bytes, enforce 255-char limit
+        let name = raw.components(separatedBy: "/")
+            .filter { $0 != ".." && $0 != "." && !$0.isEmpty }
+            .first.map { String($0.replacingOccurrences(of: "\0", with: "").prefix(255)) } ?? ""
         guard !name.isEmpty else { return }
 
         let fm = FileManager.default
         let pathManager = PKMPathManager(root: appState.pkmRootPath)
         let basePath = pathManager.paraPath(for: category)
         let folderPath = (basePath as NSString).appendingPathComponent(name)
+
+        guard pathManager.isPathSafe(folderPath) else {
+            statusMessage = "잘못된 폴더 이름입니다"
+            clearStatusAfterDelay()
+            return
+        }
 
         guard !fm.fileExists(atPath: folderPath) else {
             statusMessage = "'\(name)' 이미 존재합니다"
@@ -491,6 +511,7 @@ struct PARAManageView: View {
             loadFolders()
             clearStatusAfterDelay()
             refreshMOC(folderName: trimmed, category: category)
+            refreshCategoryMOC(category)
         } catch {
             statusMessage = error.localizedDescription
             clearStatusAfterDelay()
@@ -519,6 +540,7 @@ struct PARAManageView: View {
             loadFolders()
             clearStatusAfterDelay()
             refreshMOC(folderName: target, category: category)
+            refreshCategoryMOC(category)
         } catch {
             statusMessage = error.localizedDescription
             clearStatusAfterDelay()
@@ -536,12 +558,13 @@ struct PARAManageView: View {
     private func openInFinder(_ name: String, category: PARACategory) {
         let basePath = PKMPathManager(root: appState.pkmRootPath).paraPath(for: category)
         let folderPath = (basePath as NSString).appendingPathComponent(name)
-        NSWorkspace.shared.open(URL(fileURLWithPath: folderPath))
+        let safeURL = URL(fileURLWithPath: folderPath).resolvingSymlinksInPath()
+        NSWorkspace.shared.open(safeURL)
     }
 
     private func refreshMOC(folderName: String, category: PARACategory) {
         let root = appState.pkmRootPath
-        Task {
+        Task.detached(priority: .utility) {
             let moc = MOCGenerator(pkmRoot: root)
             let pathManager = PKMPathManager(root: root)
             let basePath = pathManager.paraPath(for: category)
@@ -553,7 +576,7 @@ struct PARAManageView: View {
 
     private func refreshCategoryMOC(_ category: PARACategory) {
         let root = appState.pkmRootPath
-        Task {
+        Task.detached(priority: .utility) {
             let moc = MOCGenerator(pkmRoot: root)
             let basePath = PKMPathManager(root: root).paraPath(for: category)
             try? await moc.generateCategoryRootMOC(basePath: basePath, para: category)
@@ -561,9 +584,11 @@ struct PARAManageView: View {
     }
 
     private func clearStatusAfterDelay() {
-        Task {
+        statusClearTask?.cancel()
+        statusClearTask = Task {
             try? await Task.sleep(nanoseconds: 3_000_000_000)
-            await MainActor.run { statusMessage = "" }
+            guard !Task.isCancelled else { return }
+            statusMessage = ""
         }
     }
 }
