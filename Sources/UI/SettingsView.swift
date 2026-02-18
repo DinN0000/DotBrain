@@ -332,28 +332,18 @@ struct SettingsView: View {
                     .foregroundColor(.secondary)
                 if let latest = latestVersion {
                     if latest != currentVersion {
-                        Label("v\(latest) 사용 가능", systemImage: "arrow.down.circle.fill")
-                            .font(.caption2)
-                            .foregroundColor(.orange)
+                        Button(action: { runUpdate() }) {
+                            Label("v\(latest) 업데이트", systemImage: "arrow.down.circle.fill")
+                                .font(.caption2)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.mini)
                     } else {
                         Label("최신", systemImage: "checkmark.circle.fill")
                             .font(.caption2)
                             .foregroundColor(.green)
                     }
                 }
-            }
-
-            // Update button
-            if let latest = latestVersion, latest != currentVersion {
-                Button(action: { runUpdate() }) {
-                    HStack(spacing: 4) {
-                        Image(systemName: "arrow.down.circle")
-                        Text("업데이트")
-                    }
-                    .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.small)
             }
 
             if let error = updateError {
@@ -443,11 +433,13 @@ struct SettingsView: View {
 
     private func runUpdate() {
         // Write update script to temp file and run detached
+        let appPath = NSHomeDirectory() + "/Applications/DotBrain.app"
         let updateScript = """
         #!/bin/bash
         sleep 2
         curl -sL https://raw.githubusercontent.com/DinN0000/DotBrain/main/install.sh -o /tmp/dotbrain_install.sh
-        bash /tmp/dotbrain_install.sh
+        bash /tmp/dotbrain_install.sh || true
+        open "\(appPath)" 2>/dev/null || true
         rm -f /tmp/dotbrain_install.sh /tmp/dotbrain_update.sh
         """
         let scriptPath = "/tmp/dotbrain_update.sh"
