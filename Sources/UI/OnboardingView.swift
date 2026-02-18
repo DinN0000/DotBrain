@@ -440,7 +440,7 @@ struct OnboardingView: View {
                 .cornerRadius(6)
 
                 HStack(spacing: 8) {
-                    TextField("예: 2026 마케팅 캠페인, 신규 서비스 런칭", text: $newProjectName)
+                    TextField("프로젝트 이름 입력 후 + 버튼", text: $newProjectName)
                         .textFieldStyle(.roundedBorder)
                         .font(.subheadline)
                         .onSubmit { addProject() }
