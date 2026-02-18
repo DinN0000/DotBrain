@@ -93,7 +93,7 @@ struct SettingsView: View {
 
     private var aiSettingsSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            // Section header
+            // Section header (mirrors App Info pattern: status or action on right)
             HStack(spacing: 6) {
                 Image(systemName: "cpu")
                     .font(.caption)
@@ -103,10 +103,27 @@ struct SettingsView: View {
                     .font(.subheadline)
                     .fontWeight(.medium)
                 Spacer()
-                if activeHasKey {
-                    Label("\(activeProvider.displayName) 사용 중", systemImage: "checkmark.circle.fill")
+                if viewingProvider == activeProvider {
+                    if activeHasKey {
+                        Label("\(activeProvider.displayName) 사용 중", systemImage: "checkmark.circle.fill")
+                            .font(.caption2)
+                            .foregroundColor(.green)
+                    }
+                } else if viewingHasKey {
+                    Button(action: {
+                        withAnimation(.easeOut(duration: 0.15)) {
+                            appState.selectedProvider = viewingProvider
+                        }
+                    }) {
+                        Text("\(viewingProvider.displayName)(으)로 전환")
+                            .font(.caption2)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.mini)
+                } else {
+                    Label("키 필요", systemImage: "key")
                         .font(.caption2)
-                        .foregroundColor(.green)
+                        .foregroundColor(.secondary)
                 }
             }
 
@@ -150,19 +167,6 @@ struct SettingsView: View {
                         Text(msg)
                             .font(.caption2)
                             .foregroundColor(msg == "삭제됨" ? .orange : .green)
-                    }
-
-                    Spacer()
-
-                    if viewingProvider != activeProvider {
-                        Button("\(viewingProvider.displayName)(으)로 전환") {
-                            withAnimation(.easeOut(duration: 0.15)) {
-                                appState.selectedProvider = viewingProvider
-                            }
-                        }
-                        .font(.caption)
-                        .buttonStyle(.borderedProminent)
-                        .controlSize(.mini)
                     }
                 }
             } else {
