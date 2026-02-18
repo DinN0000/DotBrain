@@ -93,7 +93,7 @@ struct SettingsView: View {
 
     private var aiSettingsSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            // Section header (mirrors App Info pattern: status or action on right)
+            // Section header — status only
             HStack(spacing: 6) {
                 Image(systemName: "cpu")
                     .font(.caption)
@@ -103,27 +103,10 @@ struct SettingsView: View {
                     .font(.subheadline)
                     .fontWeight(.medium)
                 Spacer()
-                if viewingProvider == activeProvider {
-                    if activeHasKey {
-                        Label("\(activeProvider.displayName) 사용 중", systemImage: "checkmark.circle.fill")
-                            .font(.caption2)
-                            .foregroundColor(.green)
-                    }
-                } else if viewingHasKey {
-                    Button(action: {
-                        withAnimation(.easeOut(duration: 0.15)) {
-                            appState.selectedProvider = viewingProvider
-                        }
-                    }) {
-                        Text("\(viewingProvider.displayName)(으)로 전환")
-                            .font(.caption2)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.mini)
-                } else {
-                    Label("키 필요", systemImage: "key")
+                if activeHasKey {
+                    Label("\(activeProvider.displayName) 사용 중", systemImage: "checkmark.circle.fill")
                         .font(.caption2)
-                        .foregroundColor(.secondary)
+                        .foregroundColor(.green)
                 }
             }
 
@@ -171,6 +154,21 @@ struct SettingsView: View {
                 }
             } else {
                 providerKeyInput(viewingProvider)
+            }
+
+            // Switch provider (below key management)
+            if viewingProvider != activeProvider && viewingHasKey {
+                Button(action: {
+                    withAnimation(.easeOut(duration: 0.15)) {
+                        appState.selectedProvider = viewingProvider
+                    }
+                }) {
+                    Text("\(viewingProvider.displayName)(으)로 전환")
+                        .font(.caption)
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.small)
             }
 
         }
@@ -353,19 +351,10 @@ struct SettingsView: View {
                     .font(.subheadline)
                     .fontWeight(.medium)
                 Spacer()
-                if let latest = latestVersion {
-                    if latest != currentVersion {
-                        Button(action: { runUpdate() }) {
-                            Text("업데이트")
-                                .font(.caption2)
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .controlSize(.mini)
-                    } else {
-                        Label("최신", systemImage: "checkmark.circle.fill")
-                            .font(.caption2)
-                            .foregroundColor(.green)
-                    }
+                if let latest = latestVersion, latest == currentVersion {
+                    Label("최신", systemImage: "checkmark.circle.fill")
+                        .font(.caption2)
+                        .foregroundColor(.green)
                 }
             }
 
@@ -402,6 +391,16 @@ struct SettingsView: View {
                 .disabled(isCheckingUpdate)
                 .onHover { updateCheckHovered = $0 }
                 .animation(.easeInOut(duration: 0.15), value: updateCheckHovered)
+            }
+
+            if let latest = latestVersion, latest != currentVersion {
+                Button(action: { runUpdate() }) {
+                    Text("v\(latest) 업데이트")
+                        .font(.caption)
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.small)
             }
         }
         .padding(12)
