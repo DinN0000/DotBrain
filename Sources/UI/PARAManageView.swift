@@ -3,25 +3,15 @@ import SwiftUI
 struct PARAManageView: View {
     @EnvironmentObject var appState: AppState
     @State private var folderMap: [PARACategory: [FolderEntry]] = [:]
-    @State private var showNewProject = false
-    @State private var newProjectName = ""
-    @State private var newProjectSummary = ""
+    @State private var newFolderCategory: PARACategory?
+    @State private var newFolderName = ""
     @State private var statusMessage = ""
     @State private var isLoading = true
     @State private var deleteTarget: (name: String, category: PARACategory)?
 
     var body: some View {
         VStack(spacing: 0) {
-            BreadcrumbView(
-                current: .paraManage,
-                trailing: AnyView(
-                    Button(action: { showNewProject.toggle() }) {
-                        Image(systemName: showNewProject ? "minus.circle" : "plus.circle")
-                    }
-                    .buttonStyle(.plain)
-                    .help("새 프로젝트")
-                )
-            )
+            BreadcrumbView(current: .paraManage)
 
             Divider()
 
@@ -38,30 +28,6 @@ struct PARAManageView: View {
                 ScrollViewReader { proxy in
                     ScrollView {
                         LazyVStack(spacing: 0) {
-                            // New project form
-                            if showNewProject {
-                                VStack(spacing: 8) {
-                                    TextField("프로젝트 이름", text: $newProjectName)
-                                        .textFieldStyle(.roundedBorder)
-                                    TextField("설명 (선택)", text: $newProjectSummary)
-                                        .textFieldStyle(.roundedBorder)
-                                    Button(action: createProject) {
-                                        HStack {
-                                            Image(systemName: "plus")
-                                            Text("프로젝트 생성")
-                                        }
-                                        .frame(maxWidth: .infinity)
-                                    }
-                                    .buttonStyle(.borderedProminent)
-                                    .controlSize(.small)
-                                    .disabled(newProjectName.trimmingCharacters(in: .whitespaces).isEmpty)
-                                }
-                                .padding()
-                                .background(Color.primary.opacity(0.03))
-                                .cornerRadius(8)
-                                .padding(.bottom, 8)
-                            }
-
                             // Status message
                             if !statusMessage.isEmpty {
                                 Text(statusMessage)
@@ -82,7 +48,7 @@ struct PARAManageView: View {
                                     Text("폴더가 없습니다")
                                         .font(.subheadline)
                                         .foregroundColor(.secondary)
-                                    Text("+ 버튼으로 프로젝트를 생성하세요")
+                                    Text("+ 버튼으로 폴더를 생성하세요")
                                         .font(.caption)
                                         .foregroundColor(.secondary)
                                 }
@@ -138,10 +104,9 @@ struct PARAManageView: View {
     private func categorySection(_ category: PARACategory) -> some View {
         let folders = folderMap[category] ?? []
 
-        if folders.isEmpty {
-            EmptyView()
-        } else if category == .archive {
+        if category == .archive && !folders.isEmpty {
             DisclosureGroup {
+                newFolderForm(category: category)
                 folderList(folders, category: category)
             } label: {
                 categoryHeader(category, count: folders.count)
@@ -151,6 +116,7 @@ struct PARAManageView: View {
             VStack(alignment: .leading, spacing: 0) {
                 categoryHeader(category, count: folders.count)
                     .padding(.vertical, 6)
+                newFolderForm(category: category)
                 folderList(folders, category: category)
             }
             .padding(.top, 8)
@@ -167,9 +133,52 @@ struct PARAManageView: View {
                 .font(.caption)
                 .fontWeight(.semibold)
                 .foregroundColor(.secondary)
-            Text("(\(count))")
-                .font(.caption2)
-                .foregroundColor(.secondary.opacity(0.7))
+            if count > 0 {
+                Text("(\(count))")
+                    .font(.caption2)
+                    .foregroundColor(.secondary.opacity(0.7))
+            }
+
+            Spacer()
+
+            Button(action: {
+                withAnimation(.easeOut(duration: 0.15)) {
+                    if newFolderCategory == category {
+                        newFolderCategory = nil
+                        newFolderName = ""
+                    } else {
+                        newFolderCategory = category
+                        newFolderName = ""
+                    }
+                }
+            }) {
+                Image(systemName: newFolderCategory == category ? "minus.circle" : "plus.circle")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            .buttonStyle(.plain)
+            .help("\(category.displayName)에 폴더 생성")
+        }
+    }
+
+    @ViewBuilder
+    private func newFolderForm(category: PARACategory) -> some View {
+        if newFolderCategory == category {
+            HStack(spacing: 6) {
+                TextField("폴더 이름", text: $newFolderName)
+                    .textFieldStyle(.roundedBorder)
+                    .font(.caption)
+                    .onSubmit { createFolder(in: category) }
+                Button(action: { createFolder(in: category) }) {
+                    Image(systemName: "plus.circle.fill")
+                        .foregroundColor(.accentColor)
+                }
+                .buttonStyle(.plain)
+                .disabled(newFolderName.trimmingCharacters(in: .whitespaces).isEmpty)
+            }
+            .padding(.vertical, 4)
+            .padding(.horizontal, 8)
+            .transition(.opacity.combined(with: .move(edge: .top)))
         }
     }
 
@@ -394,17 +403,33 @@ struct PARAManageView: View {
         }
     }
 
-    private func createProject() {
-        let name = newProjectName.trimmingCharacters(in: .whitespaces)
+    private func createFolder(in category: PARACategory) {
+        let name = newFolderName.trimmingCharacters(in: .whitespaces)
         guard !name.isEmpty else { return }
 
-        let manager = ProjectManager(pkmRoot: appState.pkmRootPath)
+        let fm = FileManager.default
+        let pathManager = PKMPathManager(root: appState.pkmRootPath)
+        let basePath = pathManager.paraPath(for: category)
+        let folderPath = (basePath as NSString).appendingPathComponent(name)
+
+        guard !fm.fileExists(atPath: folderPath) else {
+            statusMessage = "'\(name)' 이미 존재합니다"
+            clearStatusAfterDelay()
+            return
+        }
+
         do {
-            _ = try manager.createProject(name: name, summary: newProjectSummary)
-            statusMessage = "'\(name)' 프로젝트 생성됨"
-            newProjectName = ""
-            newProjectSummary = ""
-            showNewProject = false
+            try fm.createDirectory(atPath: folderPath, withIntermediateDirectories: true)
+            // Create index note
+            let indexContent = FrontmatterWriter.createIndexNote(
+                folderName: name, para: category
+            )
+            let indexPath = (folderPath as NSString).appendingPathComponent("\(name).md")
+            try indexContent.write(toFile: indexPath, atomically: true, encoding: .utf8)
+
+            statusMessage = "'\(name)' 폴더 생성됨"
+            newFolderName = ""
+            newFolderCategory = nil
             loadFolders()
             clearStatusAfterDelay()
         } catch {
