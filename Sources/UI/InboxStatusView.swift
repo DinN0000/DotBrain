@@ -9,6 +9,7 @@ struct InboxStatusView: View {
     @State private var isButtonHovered = false
     @State private var isBounceAnimating = false
     @State private var cachedInboxFiles: [URL] = []
+    @State private var showClearConfirmation = false
 
     var body: some View {
         VStack(spacing: 16) {
@@ -66,6 +67,9 @@ struct InboxStatusView: View {
             bounceAnimation = false
         }
         .onChange(of: appState.pkmRootPath) { _ in
+            loadInboxFiles()
+        }
+        .onChange(of: appState.inboxFileCount) { _ in
             loadInboxFiles()
         }
     }
@@ -168,13 +172,19 @@ struct InboxStatusView: View {
                     .foregroundColor(.accentColor)
                     .accessibilityLabel("인박스 파일 추가")
 
-                    Button(action: clearInbox) {
+                    Button(action: { showClearConfirmation = true }) {
                         Image(systemName: "trash")
                             .font(.caption)
                     }
                     .buttonStyle(.plain)
                     .foregroundColor(.secondary)
                     .accessibilityLabel("인박스 비우기")
+                    .alert("인박스 비우기", isPresented: $showClearConfirmation) {
+                        Button("비우기", role: .destructive) { clearInbox() }
+                        Button("취소", role: .cancel) {}
+                    } message: {
+                        Text("\(appState.inboxFileCount)개 파일을 휴지통으로 보냅니다.")
+                    }
                 }
 
                 Button(action: {
@@ -224,7 +234,7 @@ struct InboxStatusView: View {
         panel.canCreateDirectories = true
 
         guard panel.runModal() == .OK, let url = panel.url else { return }
-        let newPath = url.path
+        let newPath = url.resolvingSymlinksInPath().path
 
         appState.pkmRootPath = newPath
 
@@ -257,12 +267,20 @@ struct InboxStatusView: View {
             options: [.skipsHiddenFiles]
         ) else { return }
 
+        var failed = 0
         for url in items where !url.lastPathComponent.hasPrefix("_") {
-            try? fm.trashItem(at: url, resultingItemURL: nil)
+            do {
+                try fm.trashItem(at: url, resultingItemURL: nil)
+            } catch {
+                failed += 1
+            }
         }
         loadInboxFiles()
         Task { await appState.refreshInboxCount() }
-        showFeedback("인박스 비움 (휴지통으로 이동)")
+        let message = failed > 0
+            ? "인박스 비움 (\(failed)개 실패 — 파일이 사용 중일 수 있습니다)"
+            : "인박스 비움 (휴지통으로 이동)"
+        showFeedback(message)
     }
 
     // MARK: - File Picker

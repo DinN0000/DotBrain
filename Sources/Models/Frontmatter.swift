@@ -229,7 +229,7 @@ struct Frontmatter {
             lines.append("tags: [\(escapedTags.joined(separator: ", "))]")
         }
         if let created = created {
-            lines.append("created: \(created)")
+            lines.append("created: \(Frontmatter.escapeYAML(created))")
         }
         if let status = status {
             lines.append("status: \(status.rawValue)")

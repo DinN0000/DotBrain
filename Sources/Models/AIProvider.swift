@@ -14,13 +14,6 @@ enum AIProvider: String, CaseIterable, Identifiable {
         }
     }
 
-    var companyName: String {
-        switch self {
-        case .claude: return "Anthropic"
-        case .gemini: return "Google"
-        }
-    }
-
     var modelPipeline: String {
         switch self {
         case .claude: return "Haiku 4.5 → Sonnet 4.5"

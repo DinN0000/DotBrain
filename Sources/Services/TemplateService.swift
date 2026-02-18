@@ -2,13 +2,6 @@ import Foundation
 
 /// Loads note templates from .Templates/ folder, with built-in fallbacks
 enum TemplateService {
-    /// Load a template by name from .Templates/ folder
-    static func loadTemplate(name: String, pkmRoot: String) -> String? {
-        let templatesDir = (pkmRoot as NSString).appendingPathComponent(".Templates")
-        let templatePath = (templatesDir as NSString).appendingPathComponent("\(name).md")
-        return try? String(contentsOfFile: templatePath, encoding: .utf8)
-    }
-
     /// Create default .Templates/ folder with Note.md, Project.md, Asset.md
     static func initializeTemplates(pkmRoot: String) throws {
         let fm = FileManager.default
@@ -91,14 +84,4 @@ enum TemplateService {
 
     """
 
-    /// Apply template variables
-    static func apply(template: String, variables: [String: String]) -> String {
-        var result = template
-        for (key, value) in variables {
-            result = result.replacingOccurrences(of: "{{\(key)}}", with: value)
-        }
-        // Replace date placeholder with today
-        result = result.replacingOccurrences(of: "{{date}}", with: Frontmatter.today())
-        return result
-    }
 }

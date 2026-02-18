@@ -97,7 +97,7 @@ actor GeminiAPIClient {
             ],
             generationConfig: .init(
                 maxOutputTokens: maxTokens,
-                temperature: 0.7
+                temperature: 0.1
             )
         )
 
@@ -127,7 +127,7 @@ actor GeminiAPIClient {
             // Fallback: try to read raw error text
             let rawBody = String(data: data, encoding: .utf8) ?? ""
             let preview = String(rawBody.prefix(200))
-            print("[GeminiAPI] HTTP \(httpResponse.statusCode): \(preview)")
+            NSLog("[GeminiAPI] HTTP %d: %@", httpResponse.statusCode, preview)
             throw GeminiAPIError.httpError(status: httpResponse.statusCode)
         }
 
@@ -136,7 +136,7 @@ actor GeminiAPIClient {
             geminiResponse = try JSONDecoder().decode(GenerateContentResponse.self, from: data)
         } catch {
             let rawBody = String(data: data, encoding: .utf8) ?? ""
-            print("[GeminiAPI] JSON 파싱 실패: \(String(rawBody.prefix(300)))")
+            NSLog("[GeminiAPI] JSON 파싱 실패: %@", String(rawBody.prefix(300)))
             throw GeminiAPIError.invalidResponse
         }
 

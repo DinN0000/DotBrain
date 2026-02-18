@@ -28,13 +28,7 @@ struct VaultContextMap: Sendable {
         for para in order {
             guard let paraEntries = grouped[para], !paraEntries.isEmpty else { continue }
 
-            let label: String
-            switch para {
-            case .project: label = "Project"
-            case .area: label = "Area"
-            case .resource: label = "Resource"
-            case .archive: label = "Archive"
-            }
+            let label = para.displayName
 
             var lines: [String] = ["### \(label)"]
 

@@ -188,6 +188,7 @@ struct ProjectManager {
         return safe.prefix(3).map { component in
             let cleaned = component
                 .replacingOccurrences(of: "\0", with: "")
+                .replacingOccurrences(of: "\\", with: "")
                 .trimmingCharacters(in: .whitespacesAndNewlines)
             return String(cleaned.prefix(255))
         }.joined(separator: "/")

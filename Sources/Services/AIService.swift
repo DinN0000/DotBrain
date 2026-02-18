@@ -30,23 +30,8 @@ actor AIService {
 
     // MARK: - Model Names
 
-    var fastModel: String {
-        switch currentProvider {
-        case .claude:
-            return ClaudeAPIClient.haikuModel
-        case .gemini:
-            return GeminiAPIClient.flashModel
-        }
-    }
-
-    var preciseModel: String {
-        switch currentProvider {
-        case .claude:
-            return ClaudeAPIClient.sonnetModel
-        case .gemini:
-            return GeminiAPIClient.proModel
-        }
-    }
+    var fastModel: String { fastModel(for: currentProvider) }
+    var preciseModel: String { preciseModel(for: currentProvider) }
 
     private func fastModel(for provider: AIProvider) -> String {
         switch provider {
@@ -128,7 +113,7 @@ actor AIService {
                 : preciseModel(for: fallback)
 
             do {
-                print("[AIService] 주 제공자 실패, \(fallback.rawValue)로 폴백 시도")
+                NSLog("[AIService] 주 제공자 실패, %@로 폴백 시도", fallback.rawValue)
                 await rateLimiter.acquire(for: fallback)
                 let start = ContinuousClock.now
                 let result = try await sendDirect(

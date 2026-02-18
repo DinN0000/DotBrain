@@ -1,5 +1,17 @@
 # Changelog
 
+## v2.0.6 — 코드 품질 대폭 개선 (2026-02-19)
+- 26개 파일 전면 리뷰 및 수정 (Critical 8, Important 14, Security 3, Bloat 6)
+- print() → NSLog() 전환 (27개소), 사용자 에러 메시지 한국어 통일
+- YAML injection 방지 (Frontmatter created 필드 이스케이프)
+- sanitizeName 백슬래시 제거, 폴더 선택 심링크 해결
+- RateLimiter actor 경합 조건 수정 (suspension 전 시간 기록)
+- PARAManageView 에러/성공 색상 구분, InboxStatusView 캐시 갱신
+- Gemini 온도 0.1로 조정 (JSON 출력 안정성)
+- NoteEnricher 에러 로깅 추가, 데드 코드 정리
+- removeItem → trashItem 전환 (데이터 안전)
+- Classifier 이모지 → 텍스트 가중치 표기
+
 ## v2.0.5 — 인앱 업데이트 API 호출 제거 (2026-02-19)
 - install.sh에 TAG 인자 전달 모드 추가 (API 호출 완전 생략)
 - 앱에서 이미 알고 있는 버전 정보를 install.sh에 직접 전달

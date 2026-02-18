@@ -85,7 +85,7 @@ struct InboxScanner {
             var isDir: ObjCBool = false
             if fm.fileExists(atPath: fullPath, isDirectory: &isDir), isDir.boolValue {
                 if Self.isCodeProject(at: fullPath, fm: fm) {
-                    print("[InboxScanner] 코드 프로젝트 건너뜀: \(name)")
+                    NSLog("[InboxScanner] 코드 프로젝트 건너뜀: %@", name)
                     return nil
                 }
             }
@@ -94,7 +94,7 @@ struct InboxScanner {
             if let attrs = try? fm.attributesOfItem(atPath: fullPath),
                let size = attrs[.size] as? Int,
                size > Self.largeFileThreshold {
-                print("[InboxScanner] 대용량 파일 경고: \(name) (\(size / 1024 / 1024)MB)")
+                NSLog("[InboxScanner] 대용량 파일 경고: %@ (%dMB)", name, size / 1024 / 1024)
             }
 
             return fullPath

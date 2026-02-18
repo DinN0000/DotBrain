@@ -46,7 +46,6 @@ struct VaultReorganizer {
         let files: [FileAnalysis]
         let totalScanned: Int
         let skippedCount: Int
-        let estimatedCost: Double
     }
 
     // MARK: - Phase 1: Scan
@@ -72,7 +71,7 @@ struct VaultReorganizer {
                 action: "completed",
                 detail: "0개 스캔"
             )
-            return ScanResult(files: [], totalScanned: 0, skippedCount: 0, estimatedCost: 0)
+            return ScanResult(files: [], totalScanned: 0, skippedCount: 0)
         }
 
         let skippedCount = max(0, collected.count - Self.maxFilesPerScan)
@@ -150,9 +149,6 @@ struct VaultReorganizer {
             }
         )
 
-        let estimatedCost = Double(inputs.count) * 0.005
-        StatisticsService.addApiCost(estimatedCost)
-
         // 0.9-1.0: Compare current vs recommended
         onProgress?(0.9, "분류 결과 비교 중...")
         var analyses: [FileAnalysis] = []
@@ -198,8 +194,7 @@ struct VaultReorganizer {
         return ScanResult(
             files: analyses,
             totalScanned: filesToProcess.count,
-            skippedCount: skippedCount,
-            estimatedCost: estimatedCost
+            skippedCount: skippedCount
         )
     }
 
@@ -252,13 +247,13 @@ struct VaultReorganizer {
                     para: analysis.recommended.para,
                     targetPath: "",
                     tags: analysis.recommended.tags,
-                    status: .error("이동 실패: \(error.localizedDescription)")
+                    status: .error(InboxProcessor.friendlyErrorMessage(error))
                 ))
                 StatisticsService.recordActivity(
                     fileName: analysis.fileName,
                     category: analysis.recommended.para.rawValue,
                     action: "error",
-                    detail: "이동 실패: \(error.localizedDescription)"
+                    detail: InboxProcessor.friendlyErrorMessage(error)
                 )
             }
         }

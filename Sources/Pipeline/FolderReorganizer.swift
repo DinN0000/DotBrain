@@ -135,10 +135,6 @@ struct FolderReorganizer {
             }
         )
 
-        // Record estimated API cost
-        let estimatedCost = Double(inputs.count) * 0.005  // ~$0.005 per file
-        StatisticsService.addApiCost(estimatedCost)
-
         // Enrich with related notes — AI-based context linking
         onPhaseChange?(.linking)
         var enrichedClassifications = classifications
@@ -229,13 +225,13 @@ struct FolderReorganizer {
                         para: classification.para,
                         targetPath: "",
                         tags: classification.tags,
-                        status: .error("이동 실패: \(error.localizedDescription)")
+                        status: .error(InboxProcessor.friendlyErrorMessage(error))
                     ))
                     StatisticsService.recordActivity(
                         fileName: input.fileName,
                         category: classification.para.rawValue,
                         action: "error",
-                        detail: "이동 실패: \(error.localizedDescription)"
+                        detail: InboxProcessor.friendlyErrorMessage(error)
                     )
                 }
             }
@@ -366,16 +362,16 @@ struct FolderReorganizer {
                 }
                 movedCount += 1
             } catch {
-                print("[FolderReorganizer] 이동 실패: \(file.fileName) — \(error.localizedDescription)")
+                NSLog("[FolderReorganizer] 이동 실패: %@ — %@", file.fileName, error.localizedDescription)
             }
         }
 
-        // Delete placeholder files
+        // Move placeholder files to trash (recoverable)
         for placeholder in placeholderFiles {
             do {
-                try fm.removeItem(atPath: placeholder)
+                try fm.trashItem(at: URL(fileURLWithPath: placeholder), resultingItemURL: nil)
             } catch {
-                print("[FolderReorganizer] 플레이스홀더 삭제 실패: \(error.localizedDescription)")
+                NSLog("[FolderReorganizer] 플레이스홀더 삭제 실패: %@", error.localizedDescription)
             }
         }
 
@@ -388,7 +384,7 @@ struct FolderReorganizer {
                 do {
                     try fm.removeItem(atPath: dir)
                 } catch {
-                    print("[FolderReorganizer] 빈 폴더 삭제 실패: \(error.localizedDescription)")
+                    NSLog("[FolderReorganizer] 빈 폴더 삭제 실패: %@", error.localizedDescription)
                 }
             }
         }

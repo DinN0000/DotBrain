@@ -164,7 +164,7 @@ PKM Root/
         └── quarterly-report.md
 ```
 
-## 🛠 Techinical Details
+## 🛠 Technical Details
 
 ### 지원 파일 형식
 

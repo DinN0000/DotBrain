@@ -711,7 +711,8 @@ enum AICompanionService {
         for (name, content) in agents {
             let path = (agentsDir as NSString).appendingPathComponent("\(name).md")
             if !fm.fileExists(atPath: path) {
-                try content.write(toFile: path, atomically: true, encoding: .utf8)
+                let wrapped = "\(markerStart)\n\(content)\n\(markerEnd)"
+                try wrapped.write(toFile: path, atomically: true, encoding: .utf8)
             }
         }
     }
@@ -1610,7 +1611,8 @@ enum AICompanionService {
             try fm.createDirectory(atPath: skillsDir, withIntermediateDirectories: true)
             let path = (skillsDir as NSString).appendingPathComponent("SKILL.md")
             if !fm.fileExists(atPath: path) {
-                try skillBody.write(toFile: path, atomically: true, encoding: .utf8)
+                let wrapped = "\(markerStart)\n\(skillBody)\n\(markerEnd)"
+                try wrapped.write(toFile: path, atomically: true, encoding: .utf8)
             }
         }
     }
