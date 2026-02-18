@@ -335,6 +335,28 @@ struct FileMover {
         let targetPath = (targetDir as NSString).appendingPathComponent(fileName)
         let resolvedPath = resolveConflict(targetPath)
 
+        // Guard: source == destination means file is already in place
+        let resolvedSource = URL(fileURLWithPath: filePath).resolvingSymlinksInPath().path
+        let resolvedDest = URL(fileURLWithPath: resolvedPath).resolvingSymlinksInPath().path
+        if resolvedSource == resolvedDest {
+            // Just update frontmatter in-place, no move needed
+            let taggedContent = FrontmatterWriter.injectFrontmatter(
+                into: content,
+                para: classification.para,
+                tags: classification.tags,
+                summary: classification.summary,
+                project: classification.project,
+                relatedNotes: classification.relatedNotes
+            )
+            try taggedContent.write(toFile: filePath, atomically: true, encoding: .utf8)
+            return ProcessedFileResult(
+                fileName: fileName,
+                para: classification.para,
+                targetPath: filePath,
+                tags: classification.tags
+            )
+        }
+
         let taggedContent = FrontmatterWriter.injectFrontmatter(
             into: content,
             para: classification.para,

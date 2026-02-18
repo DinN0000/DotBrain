@@ -153,9 +153,8 @@ struct VaultReorganizer {
         onProgress?(0.9, "분류 결과 비교 중...")
         var analyses: [FileAnalysis] = []
 
-        for (index, classification) in classifications.enumerated() {
+        for (index, (classification, entry)) in zip(classifications, filesToProcess).enumerated() {
             if Task.isCancelled { throw CancellationError() }
-            let entry = filesToProcess[index]
 
             // Never create new project folders — only allow moves to existing projects
             if classification.para == .project && classification.project == nil {
