@@ -67,7 +67,7 @@ struct FolderHealthAnalyzer {
         var issues: [Issue] = []
 
         // Issue: Too many files in a single folder
-        if fileCount > 20 {
+        if fileCount > 40 {
             issues.append(.tooManyFiles(count: fileCount))
         }
 
@@ -166,8 +166,8 @@ struct FolderHealthAnalyzer {
         for issue in issues {
             switch issue {
             case .tooManyFiles(let count):
-                // Deduct up to 0.3 as file count exceeds 20, scaling over 40 extra files
-                score -= min(Double(count - 20) / 40.0, 0.3)
+                // Deduct up to 0.3 as file count exceeds 40, scaling over 60 extra files
+                score -= min(Double(count - 40) / 60.0, 0.3)
             case .missingFrontmatter(let count, let total):
                 // Deduct proportionally, up to 0.3 when all files lack frontmatter
                 let ratio = Double(count) / Double(max(total, 1))
