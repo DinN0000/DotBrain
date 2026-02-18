@@ -154,9 +154,16 @@ struct VaultReorganizer {
         for (index, classification) in classifications.enumerated() {
             let entry = filesToProcess[index]
 
-            // Project folders are user-managed — never reorganize
-            if entry.category == .project || (classification.para == .project && classification.project == nil) {
+            // Never create new project folders — only allow moves to existing projects
+            if classification.para == .project && classification.project == nil {
                 continue
+            }
+
+            // For matched project files, use project name as targetFolder
+            // so needsMove correctly reflects actual destination
+            var adjusted = classification
+            if classification.para == .project, let project = classification.project {
+                adjusted.targetFolder = project
             }
 
             let analysis = FileAnalysis(
@@ -164,7 +171,7 @@ struct VaultReorganizer {
                 fileName: inputs[index].fileName,
                 currentCategory: entry.category,
                 currentFolder: entry.folder,
-                recommended: classification
+                recommended: adjusted
             )
 
             if analysis.needsMove {
@@ -203,8 +210,8 @@ struct VaultReorganizer {
             let progress = Double(i) / Double(selected.count)
             onProgress?(progress, "\(analysis.fileName) 이동 중...")
 
-            // Double-check: project folders are user-managed (should be filtered in scan already)
-            if analysis.currentCategory == .project || (analysis.recommended.para == .project && analysis.recommended.project == nil) {
+            // Double-check: never create new project folders (should be filtered in scan already)
+            if analysis.recommended.para == .project && analysis.recommended.project == nil {
                 continue
             }
 
@@ -273,10 +280,7 @@ struct VaultReorganizer {
         let fm = FileManager.default
         var results: [CollectedFile] = []
 
-        // Project folders are user-managed — exclude from reorganization
-        let categoriesToScan = scope.categories.filter { $0 != .project }
-
-        for category in categoriesToScan {
+        for category in scope.categories {
             let basePath = pathManager.paraPath(for: category)
             guard let folders = try? fm.contentsOfDirectory(atPath: basePath) else { continue }
 
