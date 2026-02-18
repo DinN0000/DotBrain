@@ -22,20 +22,23 @@ struct InboxStatusView: View {
 
             Spacer()
 
-            HoverTextLink(label: "폴더 관리", color: .secondary) {
-                appState.currentScreen = .paraManage
+            // PKM path — click to change
+            Button(action: pickNewPKMRoot) {
+                HStack(spacing: 4) {
+                    Image(systemName: "folder")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                    Text(abbreviatePath(appState.pkmRootPath))
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 8))
+                        .foregroundColor(.secondary.opacity(0.5))
+                }
             }
-
-            // PKM path info
-            HStack {
-                Image(systemName: "folder")
-                    .foregroundColor(.secondary)
-                Text(appState.pkmRootPath)
-                    .font(.caption2)
-                    .foregroundColor(.secondary)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-            }
+            .buttonStyle(.plain)
             .padding(.horizontal)
         }
         .padding()
@@ -204,6 +207,40 @@ struct InboxStatusView: View {
                     .fontWeight(.medium)
             }
         }
+    }
+
+    // MARK: - PKM Root Picker
+
+    private func pickNewPKMRoot() {
+        let panel = NSOpenPanel()
+        panel.title = "PKM 볼트 폴더 선택"
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.allowsMultipleSelection = false
+        panel.canCreateDirectories = true
+
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        let newPath = url.path
+
+        // Validate: must have PARA structure or be empty
+        let pm = PKMPathManager(root: newPath)
+        if !pm.isInitialized() {
+            do {
+                try pm.initializeStructure()
+            } catch {
+                return
+            }
+        }
+
+        appState.pkmRootPath = newPath
+        loadInboxFiles()
+        Task {
+            await appState.refreshInboxCount()
+        }
+    }
+
+    private func abbreviatePath(_ path: String) -> String {
+        path.replacingOccurrences(of: NSHomeDirectory(), with: "~")
     }
 
     // MARK: - Drag & Drop
