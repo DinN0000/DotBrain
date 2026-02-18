@@ -130,7 +130,7 @@ struct FolderReorganizer {
         )
 
         // Record estimated API cost
-        let estimatedCost = Double(inputs.count) * 0.001  // ~$0.001 per file (rough estimate)
+        let estimatedCost = Double(inputs.count) * 0.005  // ~$0.005 per file
         StatisticsService.addApiCost(estimatedCost)
 
         // Enrich with related notes — AI-based context linking

@@ -137,7 +137,7 @@ struct VaultReorganizer {
             }
         )
 
-        let estimatedCost = Double(inputs.count) * 0.001
+        let estimatedCost = Double(inputs.count) * 0.005
         StatisticsService.addApiCost(estimatedCost)
 
         // 0.9-1.0: Compare current vs recommended
@@ -216,6 +216,18 @@ struct VaultReorganizer {
                     detail: "이동 실패: \(error.localizedDescription)"
                 )
             }
+        }
+
+        // Update MOCs for affected folders after file moves
+        let affectedFolders = Set(results.filter(\.isSuccess).compactMap { result -> String? in
+            let dir = (result.targetPath as NSString).deletingLastPathComponent
+            return dir.isEmpty ? nil : dir
+        })
+
+        if !affectedFolders.isEmpty {
+            onProgress?(0.95, "MOC 갱신 중...")
+            let mocGenerator = MOCGenerator(pkmRoot: pkmRoot)
+            await mocGenerator.updateMOCsForFolders(affectedFolders)
         }
 
         onProgress?(1.0, "완료!")

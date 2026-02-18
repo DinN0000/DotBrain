@@ -155,6 +155,11 @@ struct MOCGenerator {
                 let (frontmatter, _) = Frontmatter.parse(markdown: content)
                 summary = frontmatter.summary ?? ""
                 folderTags = frontmatter.tags
+                if folderTags.isEmpty {
+                    print("[MOCGenerator] ROOT-MOC \(entry): tags empty (summary=\(summary.prefix(40))...)")
+                }
+            } else {
+                print("[MOCGenerator] ROOT-MOC \(entry): failed to read \(subMOCPath)")
             }
 
             // Count files in subfolder
@@ -174,7 +179,12 @@ struct MOCGenerator {
                         let (fileFM, _) = Frontmatter.parse(markdown: fileContent)
                         let tagStr = fileFM.tags.prefix(3).joined(separator: ", ")
                         docs.append((name: baseName, tags: tagStr, summary: fileFM.summary ?? ""))
+                    } else {
+                        print("[MOCGenerator] ROOT-MOC doc read failed: \(file)")
                     }
+                }
+                if docs.isEmpty && !mdFiles.isEmpty {
+                    print("[MOCGenerator] ROOT-MOC \(entry): \(mdFiles.count) md files but 0 docs parsed")
                 }
             }
 
@@ -192,6 +202,11 @@ struct MOCGenerator {
         }
         let topTags = categoryTags.sorted { $0.value > $1.value }
             .prefix(10).map { $0.key }
+
+        if topTags.isEmpty && !subfolders.isEmpty {
+            let tagStatus = subfolders.map { "\($0.name):\($0.tags.count)" }.joined(separator: ", ")
+            print("[MOCGenerator] WARNING: root MOC \(categoryName) has 0 tags — subfolder tags: \(tagStatus)")
+        }
 
         // Build root MOC content
         let frontmatter = Frontmatter.createDefault(
