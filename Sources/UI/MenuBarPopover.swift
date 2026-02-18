@@ -31,9 +31,9 @@ struct MenuBarPopover: View {
             if ![.onboarding, .processing].contains(appState.currentScreen) {
                 Divider()
                 HStack(spacing: 0) {
-                    footerTab(icon: "tray.and.arrow.down", label: "인박스", screen: .inbox)
-                    footerTab(icon: "square.grid.2x2", label: "대시보드", screen: .dashboard)
-                    footerTab(icon: "gearshape", label: "설정", screen: .settings)
+                    footerTab(icon: "tray.and.arrow.down", screen: .inbox)
+                    footerTab(icon: "square.grid.2x2", screen: .dashboard)
+                    footerTab(icon: "gearshape", screen: .settings)
                 }
                 .padding(.horizontal, 8)
                 .padding(.vertical, 6)
@@ -42,16 +42,12 @@ struct MenuBarPopover: View {
         .frame(width: 360, height: 480)
     }
 
-    private func footerTab(icon: String, label: String, screen: AppState.Screen) -> some View {
+    private func footerTab(icon: String, screen: AppState.Screen) -> some View {
         Button(action: { appState.currentScreen = screen }) {
-            VStack(spacing: 2) {
-                Image(systemName: icon)
-                    .font(.system(size: 16))
-                Text(label)
-                    .font(.caption2)
-            }
-            .frame(maxWidth: .infinity)
-            .foregroundColor(isActive(screen) ? .accentColor : .secondary)
+            Image(systemName: icon)
+                .font(.system(size: 18))
+                .frame(maxWidth: .infinity)
+                .foregroundColor(isActive(screen) ? .accentColor : .secondary)
         }
         .buttonStyle(.plain)
     }
