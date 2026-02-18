@@ -214,22 +214,46 @@ struct DashboardView: View {
 
     @ViewBuilder
     private func vaultCheckResultView(_ result: VaultCheckResult) -> some View {
+        let hasIssues = result.auditTotal > 0 || result.untaggedFiles > 0
+        let allClean = !hasIssues && result.enrichCount == 0
+
         VStack(spacing: 6) {
-            // Audit results
-            if result.auditTotal > 0 {
+            // Audit detail rows
+            if result.brokenLinks > 0 {
+                auditResultRow(
+                    icon: "link",
+                    label: "깨진 링크",
+                    count: result.brokenLinks,
+                    color: .orange
+                )
+            }
+            if result.missingFrontmatter > 0 {
+                auditResultRow(
+                    icon: "doc.badge.plus",
+                    label: "프론트매터 누락",
+                    count: result.missingFrontmatter,
+                    color: .orange
+                )
+            }
+            if result.missingPARA > 0 {
+                auditResultRow(
+                    icon: "folder.badge.questionmark",
+                    label: "PARA 미분류",
+                    count: result.missingPARA,
+                    color: .orange
+                )
+            }
+
+            // Repair summary
+            if result.repairCount > 0 {
                 HStack(spacing: 6) {
-                    Image(systemName: "exclamationmark.triangle")
+                    Image(systemName: "wrench.and.screwdriver")
                         .font(.caption)
-                        .foregroundColor(.orange)
-                    Text("\(result.auditTotal)건 발견")
+                        .foregroundColor(.green)
+                    Text("\(result.repairCount)건 자동 복구")
                         .font(.caption)
-                        .fontWeight(.medium)
+                        .foregroundColor(.green)
                     Spacer()
-                    if result.repairCount > 0 {
-                        Text("\(result.repairCount)건 자동 복구")
-                            .font(.caption)
-                            .foregroundColor(.green)
-                    }
                 }
             }
 
@@ -258,7 +282,7 @@ struct DashboardView: View {
             }
 
             // All clean
-            if result.auditTotal == 0 && result.enrichCount == 0 {
+            if allClean {
                 HStack(spacing: 6) {
                     Image(systemName: "checkmark.circle.fill")
                         .font(.caption)
@@ -281,8 +305,24 @@ struct DashboardView: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
-        .background(Color.green.opacity(0.06))
+        .background(allClean ? Color.green.opacity(0.06) : Color.orange.opacity(0.06))
         .cornerRadius(8)
+    }
+
+    private func auditResultRow(icon: String, label: String, count: Int, color: Color) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: icon)
+                .font(.caption)
+                .foregroundColor(color)
+                .frame(width: 16)
+            Text(label)
+                .font(.caption)
+            Spacer()
+            Text("\(count)건")
+                .font(.caption)
+                .monospacedDigit()
+                .foregroundColor(.secondary)
+        }
     }
 
     // MARK: - Interactive Stat Button
@@ -337,7 +377,6 @@ struct DashboardView: View {
         let root = appState.pkmRootPath
 
         Task.detached {
-            var auditTotal = 0
             var repairCount = 0
             var enrichCount = 0
 
@@ -352,7 +391,6 @@ struct DashboardView: View {
             await MainActor.run { vaultCheckPhase = "오류 검사 중..." }
             let auditor = VaultAuditor(pkmRoot: root)
             let report = auditor.audit()
-            auditTotal = report.totalIssues
 
             // 2. Auto-repair
             if report.totalIssues > 0 {
@@ -371,7 +409,7 @@ struct DashboardView: View {
                 for folder in folders where !folder.hasPrefix(".") && !folder.hasPrefix("_") {
                     let folderPath = (basePath as NSString).appendingPathComponent(folder)
                     let results = await enricher.enrichFolder(at: folderPath)
-                    enrichCount += results.count
+                    enrichCount += results.filter { $0.fieldsUpdated > 0 }.count
                 }
             }
 
@@ -397,11 +435,14 @@ struct DashboardView: View {
                 fileName: "볼트 점검",
                 category: "system",
                 action: "completed",
-                detail: "\(auditTotal)건 발견, \(repairCount)건 복구, \(enrichCount)개 보완"
+                detail: "\(report.totalIssues)건 발견, \(repairCount)건 복구, \(enrichCount)개 보완"
             )
 
             let snapshot = VaultCheckResult(
-                auditTotal: auditTotal,
+                brokenLinks: report.brokenLinks.count,
+                missingFrontmatter: report.missingFrontmatter.count,
+                missingPARA: report.missingPARA.count,
+                untaggedFiles: report.untaggedFiles.count,
                 repairCount: repairCount,
                 enrichCount: enrichCount,
                 mocUpdated: true
@@ -516,10 +557,17 @@ struct DashboardView: View {
 }
 
 private struct VaultCheckResult {
-    let auditTotal: Int
+    let brokenLinks: Int
+    let missingFrontmatter: Int
+    let missingPARA: Int
+    let untaggedFiles: Int
     let repairCount: Int
     let enrichCount: Int
     let mocUpdated: Bool
+
+    var auditTotal: Int {
+        brokenLinks + missingFrontmatter + missingPARA
+    }
 }
 
 struct DashboardCardGroup<Content: View>: View {
