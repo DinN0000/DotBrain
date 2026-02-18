@@ -1,5 +1,15 @@
 # Changelog
 
+## v2.1.9 — 10-Agent Defensive Fixes (2026-02-19)
+- 10개 병렬 에이전트 코드 리뷰 후 7건 방어적 수정 (비즈니스 로직 무변경)
+- FileMover: source==dest 가드 추가 (재분류 시 데이터 손실 방지)
+- DashboardView: Task.detached priority: .utility 추가
+- PPTXExtractor: _metadataRegexCache var→let (data race 수정)
+- FileContentExtractor: force-unwrap → guard let (크래시 방지)
+- AppState: 배치 재정리 취소 가드 추가
+- XLSXExtractor: 음수 인덱스 가드 추가
+- VaultReorganizer: zip() 패턴으로 배열 범위 안전성 강화
+
 ## v2.1.8 — UI 폴리싱 (2026-02-19)
 - 하단 탭바: 텍스트 라벨 제거, 아이콘만 표시 (18pt)
 - 인박스 텍스트 이모티콘: 48pt로 확대, 중앙 플로팅 배치
