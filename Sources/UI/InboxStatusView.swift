@@ -83,10 +83,19 @@ struct InboxStatusView: View {
                 .font(.title3)
                 .foregroundColor(.secondary)
 
-            Text("파일을 여기에 끌어다 놓으세요")
+            Text("파일을 여기에 끌어다 놓거나")
                 .font(.caption)
                 .foregroundColor(.secondary)
                 .padding(.top, 4)
+
+            Button(action: pickFilesForInbox) {
+                HStack(spacing: 4) {
+                    Image(systemName: "plus.circle")
+                    Text("파일 선택")
+                }
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
         }
     }
 
@@ -146,9 +155,18 @@ struct InboxStatusView: View {
                 }
                 .padding(.horizontal, 24)
 
-                Text("\(appState.inboxFileCount)개 파일, 약 \(max(appState.inboxFileCount * 3, 1))초")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                HStack(spacing: 8) {
+                    Text("\(appState.inboxFileCount)개 파일, 약 \(max(appState.inboxFileCount * 3, 1))초")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+
+                    Button(action: pickFilesForInbox) {
+                        Image(systemName: "plus.circle")
+                            .font(.caption)
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundColor(.accentColor)
+                }
 
                 Button(action: {
                     Task {
@@ -217,6 +235,22 @@ struct InboxStatusView: View {
 
     private func abbreviatePath(_ path: String) -> String {
         path.replacingOccurrences(of: NSHomeDirectory(), with: "~")
+    }
+
+    // MARK: - File Picker
+
+    private func pickFilesForInbox() {
+        let panel = NSOpenPanel()
+        panel.title = "인박스에 추가할 파일 선택"
+        panel.canChooseDirectories = false
+        panel.canChooseFiles = true
+        panel.allowsMultipleSelection = true
+
+        guard panel.runModal() == .OK, !panel.urls.isEmpty else { return }
+        Task {
+            let result = await appState.addFilesToInboxDetailed(urls: panel.urls)
+            showDropFeedback(result)
+        }
     }
 
     // MARK: - Drag & Drop
