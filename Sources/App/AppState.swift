@@ -235,7 +235,14 @@ final class AppState: ObservableObject {
                 currentScreen = .results
             } catch {
                 if !Task.isCancelled {
-                    processingStatus = "오류: \(InboxProcessor.friendlyErrorMessage(error))"
+                    processedResults = [ProcessedFileResult(
+                        fileName: "처리 오류",
+                        para: .archive,
+                        targetPath: "",
+                        tags: [],
+                        status: .error(InboxProcessor.friendlyErrorMessage(error))
+                    )]
+                    currentScreen = .results
                 }
             }
 
@@ -317,7 +324,14 @@ final class AppState: ObservableObject {
                 currentScreen = .results
             } catch {
                 if !Task.isCancelled {
-                    processingStatus = "오류: \(InboxProcessor.friendlyErrorMessage(error))"
+                    processedResults = [ProcessedFileResult(
+                        fileName: "정리 오류",
+                        para: reorganizeCategory ?? .archive,
+                        targetPath: "",
+                        tags: [],
+                        status: .error(InboxProcessor.friendlyErrorMessage(error))
+                    )]
+                    currentScreen = .results
                 }
             }
 
@@ -406,6 +420,7 @@ final class AppState: ObservableObject {
 
             guard !Task.isCancelled else {
                 isProcessing = false
+                currentScreen = processingOrigin == .paraManage ? .paraManage : .inbox
                 return
             }
 
@@ -452,7 +467,7 @@ final class AppState: ObservableObject {
                 para: .archive,
                 targetPath: "",
                 tags: [],
-                status: .error("삭제 실패: \(error.localizedDescription)")
+                status: .error(InboxProcessor.friendlyErrorMessage(error))
             ))
         }
         checkConfirmationsComplete()
@@ -512,7 +527,7 @@ final class AppState: ObservableObject {
                 para: .project,
                 targetPath: "",
                 tags: [],
-                status: .error("프로젝트 생성 실패: \(error.localizedDescription)")
+                status: .error(InboxProcessor.friendlyErrorMessage(error))
             ))
         }
         checkConfirmationsComplete()
@@ -523,11 +538,6 @@ final class AppState: ObservableObject {
         let added: Int
         let failedFiles: [String]
         let skippedCode: [String]
-    }
-
-    func addFilesToInbox(urls: [URL]) async -> Int {
-        let result = await addFilesToInboxDetailed(urls: urls)
-        return result.added
     }
 
     func addFilesToInboxDetailed(urls: [URL]) async -> AddFilesResult {
@@ -581,6 +591,7 @@ final class AppState: ObservableObject {
                 added += 1
             } catch {
                 failedFiles.append(fileName)
+                NSLog("[AppState] 파일 복사 실패 %@: %@", fileName, error.localizedDescription)
             }
         }
 

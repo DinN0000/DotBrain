@@ -41,7 +41,7 @@ final class InboxWatchdog {
 
         let fd = open(folderPath, O_EVTONLY)
         guard fd >= 0 else {
-            print("[InboxWatchdog] Failed to open folder: \(folderPath)")
+            NSLog("[InboxWatchdog] Failed to open folder: %@", folderPath)
             return
         }
 
@@ -66,7 +66,7 @@ final class InboxWatchdog {
         self.source = source
         source.resume()
 
-        print("[InboxWatchdog] Watching: \(folderPath)")
+        NSLog("[InboxWatchdog] Watching: %@", folderPath)
     }
 
     /// Stop watching
@@ -80,11 +80,11 @@ final class InboxWatchdog {
 
     private func scheduleRetry() {
         guard retryCount < Self.maxRetries else {
-            print("[InboxWatchdog] Gave up waiting for folder (\(Self.maxRetries) attempts): \(folderPath)")
+            NSLog("[InboxWatchdog] Gave up waiting for folder (%d attempts): %@", Self.maxRetries, folderPath)
             return
         }
         retryCount += 1
-        print("[InboxWatchdog] Folder missing, retry in \(Self.retryInterval)s (\(retryCount)/\(Self.maxRetries))")
+        NSLog("[InboxWatchdog] Folder missing, retry in %.0fs (%d/%d)", Self.retryInterval, retryCount, Self.maxRetries)
 
         retryTask = Task { [weak self] in
             try? await Task.sleep(for: .seconds(Self.retryInterval))

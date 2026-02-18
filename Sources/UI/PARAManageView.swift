@@ -6,6 +6,7 @@ struct PARAManageView: View {
     @State private var newFolderCategory: PARACategory?
     @State private var newFolderName = ""
     @State private var statusMessage = ""
+    @State private var isStatusError = false
     @State private var isLoading = true
     @State private var deleteTarget: (name: String, category: PARACategory)?
     @State private var renameTarget: (name: String, category: PARACategory)?
@@ -36,7 +37,7 @@ struct PARAManageView: View {
                             if !statusMessage.isEmpty {
                                 Text(statusMessage)
                                     .font(.caption)
-                                    .foregroundColor(.green)
+                                    .foregroundColor(isStatusError ? .red : .green)
                                     .padding(.vertical, 4)
                             }
 
@@ -414,12 +415,14 @@ struct PARAManageView: View {
         let mover = PARAMover(pkmRoot: appState.pkmRootPath)
         do {
             let count = try mover.moveFolder(name: name, from: source, to: target)
+            isStatusError = false
             statusMessage = "'\(name)' -> \(target.displayName) (\(count)개 노트 갱신)"
             loadFolders()
             clearStatusAfterDelay()
             refreshMOC(folderName: name, category: target)
             refreshCategoryMOC(source)
         } catch {
+            isStatusError = true
             statusMessage = error.localizedDescription
             clearStatusAfterDelay()
         }
@@ -439,12 +442,14 @@ struct PARAManageView: View {
         let folderPath = (basePath as NSString).appendingPathComponent(name)
 
         guard pathManager.isPathSafe(folderPath) else {
+            isStatusError = true
             statusMessage = "잘못된 폴더 이름입니다"
             clearStatusAfterDelay()
             return
         }
 
         guard !fm.fileExists(atPath: folderPath) else {
+            isStatusError = true
             statusMessage = "'\(name)' 이미 존재합니다"
             clearStatusAfterDelay()
             return
@@ -459,6 +464,7 @@ struct PARAManageView: View {
             let indexPath = (folderPath as NSString).appendingPathComponent("\(name).md")
             try indexContent.write(toFile: indexPath, atomically: true, encoding: .utf8)
 
+            isStatusError = false
             statusMessage = "'\(name)' 폴더 생성됨"
             newFolderName = ""
             newFolderCategory = nil
@@ -466,6 +472,7 @@ struct PARAManageView: View {
             clearStatusAfterDelay()
             refreshCategoryMOC(category)
         } catch {
+            isStatusError = true
             statusMessage = error.localizedDescription
             clearStatusAfterDelay()
         }
@@ -475,12 +482,14 @@ struct PARAManageView: View {
         let manager = ProjectManager(pkmRoot: appState.pkmRootPath)
         do {
             let count = try manager.completeProject(name: name)
+            isStatusError = false
             statusMessage = "'\(name)' 완료 -> 아카이브 (\(count)개 노트 갱신)"
             loadFolders()
             clearStatusAfterDelay()
             refreshCategoryMOC(.project)
             refreshMOC(folderName: name, category: .archive)
         } catch {
+            isStatusError = true
             statusMessage = error.localizedDescription
             clearStatusAfterDelay()
         }
@@ -490,12 +499,14 @@ struct PARAManageView: View {
         let manager = ProjectManager(pkmRoot: appState.pkmRootPath)
         do {
             let count = try manager.reactivateProject(name: name)
+            isStatusError = false
             statusMessage = "'\(name)' 재활성화됨 (\(count)개 노트 갱신)"
             loadFolders()
             clearStatusAfterDelay()
             refreshCategoryMOC(.archive)
             refreshMOC(folderName: name, category: .project)
         } catch {
+            isStatusError = true
             statusMessage = error.localizedDescription
             clearStatusAfterDelay()
         }
@@ -507,12 +518,14 @@ struct PARAManageView: View {
         let mover = PARAMover(pkmRoot: appState.pkmRootPath)
         do {
             let count = try mover.renameFolder(oldName: oldName, newName: trimmed, category: category)
+            isStatusError = false
             statusMessage = "'\(oldName)' -> '\(trimmed)' (\(count)개 노트 갱신)"
             loadFolders()
             clearStatusAfterDelay()
             refreshMOC(folderName: trimmed, category: category)
             refreshCategoryMOC(category)
         } catch {
+            isStatusError = true
             statusMessage = error.localizedDescription
             clearStatusAfterDelay()
         }
@@ -522,11 +535,13 @@ struct PARAManageView: View {
         let mover = PARAMover(pkmRoot: appState.pkmRootPath)
         do {
             try mover.deleteFolder(name: name, category: category)
+            isStatusError = false
             statusMessage = "'\(name)' 삭제됨 (휴지통)"
             loadFolders()
             clearStatusAfterDelay()
             refreshCategoryMOC(category)
         } catch {
+            isStatusError = true
             statusMessage = error.localizedDescription
             clearStatusAfterDelay()
         }
@@ -536,12 +551,14 @@ struct PARAManageView: View {
         let mover = PARAMover(pkmRoot: appState.pkmRootPath)
         do {
             let count = try mover.mergeFolder(source: source, into: target, category: category)
+            isStatusError = false
             statusMessage = "'\(source)' -> '\(target)' 병합 (\(count)개 파일)"
             loadFolders()
             clearStatusAfterDelay()
             refreshMOC(folderName: target, category: category)
             refreshCategoryMOC(category)
         } catch {
+            isStatusError = true
             statusMessage = error.localizedDescription
             clearStatusAfterDelay()
         }

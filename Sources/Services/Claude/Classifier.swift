@@ -186,6 +186,7 @@ actor Classifier {
         let prompt = buildStage1Prompt(fileContents, projectContext: projectContext, subfolderContext: subfolderContext, weightedContext: weightedContext)
 
         let response = try await aiService.sendFast(maxTokens: 4096, message: prompt)
+        StatisticsService.addApiCost(Double(files.count) * 0.001)
 
         var results: [String: ClassifyResult.Stage1Item] = [:]
         if let items = parseJSONSafe([Stage1RawItem].self, from: response) {
@@ -236,6 +237,7 @@ actor Classifier {
         )
 
         let response = try await aiService.sendPrecise(maxTokens: 2048, message: prompt)
+        StatisticsService.addApiCost(0.003)
 
         if let item = parseJSONSafe(Stage2RawItem.self, from: response),
            let para = PARACategory(rawValue: item.para) {
@@ -276,9 +278,9 @@ actor Classifier {
 
         ## 기존 문서 맥락 (가중치 기반)
         아래 기존 문서 정보를 참고하여, 새 문서가 기존 문서와 태그나 주제가 겹치면 같은 카테고리/폴더로 분류하세요.
-        🔴 Project 문서와 겹치면 → 해당 프로젝트 연결 가중치 높음
-        🟡 Area/Resource 문서와 겹치면 → 해당 폴더 연결 가중치 중간
-        ⚪ Archive는 참고만 (낮은 가중치)
+        (높음) Project 문서와 겹치면 → 해당 프로젝트 연결 가중치 높음
+        (중간) Area/Resource 문서와 겹치면 → 해당 폴더 연결 가중치 중간
+        (낮음) Archive는 참고만 (낮은 가중치)
 
         \(weightedContext)
 
@@ -340,9 +342,9 @@ actor Classifier {
 
         ## 기존 문서 맥락 (가중치 기반)
         아래 기존 문서 정보를 참고하여, 이 문서가 기존 문서와 태그나 주제가 겹치면 같은 카테고리/폴더로 분류하세요.
-        🔴 Project 문서와 겹치면 → 해당 프로젝트 연결 가중치 높음
-        🟡 Area/Resource 문서와 겹치면 → 해당 폴더 연결 가중치 중간
-        ⚪ Archive는 참고만 (낮은 가중치)
+        (높음) Project 문서와 겹치면 → 해당 프로젝트 연결 가중치 높음
+        (중간) Area/Resource 문서와 겹치면 → 해당 폴더 연결 가중치 중간
+        (낮음) Archive는 참고만 (낮은 가중치)
 
         \(weightedContext)
 
@@ -439,13 +441,13 @@ actor Classifier {
                 do {
                     return try JSONDecoder().decode(T.self, from: data)
                 } catch {
-                    print("[Classifier] JSON 파싱 실패: \(error.localizedDescription)")
-                    print("[Classifier] 원본 응답 (처음 200자): \(String(cleaned.prefix(200)))")
+                    NSLog("[Classifier] JSON 파싱 실패: %@", error.localizedDescription)
+                    NSLog("[Classifier] 원본 응답 (처음 200자): %@", String(cleaned.prefix(200)))
                 }
             }
         }
 
-        print("[Classifier] JSON 추출 실패 — 응답에서 JSON을 찾을 수 없습니다")
+        NSLog("[Classifier] JSON 추출 실패 — 응답에서 JSON을 찾을 수 없습니다")
         return nil
     }
 

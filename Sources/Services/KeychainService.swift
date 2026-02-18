@@ -61,7 +61,7 @@ enum KeychainService {
     /// V2 encryption key using HKDF (stronger key derivation)
     private static func encryptionKey() -> SymmetricKey? {
         guard let uuid = hardwareUUID() else {
-            print("[SecureStore] 하드웨어 UUID를 가져올 수 없음")
+            NSLog("[SecureStore] 하드웨어 UUID를 가져올 수 없음")
             return nil
         }
         let inputKey = SymmetricKey(data: Data((uuid + saltV2).utf8))
@@ -93,14 +93,14 @@ enum KeychainService {
 
         // Fallback: try V1 key and auto-migrate to V2
         if let keyV1 = encryptionKeyV1(), let store = decryptStore(using: keyV1) {
-            print("[SecureStore] V1 → V2 키 마이그레이션 중...")
+            NSLog("[SecureStore] V1 → V2 키 마이그레이션 중...")
             if saveStore(store) {
-                print("[SecureStore] V1 → V2 키 마이그레이션 완료")
+                NSLog("[SecureStore] V1 → V2 키 마이그레이션 완료")
             }
             return store
         }
 
-        print("[SecureStore] 복호화 실패 (V1, V2 모두)")
+        NSLog("[SecureStore] 복호화 실패 (V1, V2 모두)")
         return [:]
     }
 
@@ -130,7 +130,7 @@ enum KeychainService {
             )
             return true
         } catch {
-            print("[SecureStore] 저장 실패: \(error.localizedDescription)")
+            NSLog("[SecureStore] 저장 실패: %@", error.localizedDescription)
             return false
         }
     }
@@ -191,7 +191,7 @@ enum KeychainService {
         if let k = geminiKey { store[geminiKeyAccount] = k }
 
         if saveStore(store) {
-            print("[SecureStore] 키체인 → 암호화 파일 마이그레이션 완료")
+            NSLog("[SecureStore] 키체인 → 암호화 파일 마이그레이션 완료")
             // Clean up legacy keychain entries
             legacyKeychainDelete(account: claudeKeyAccount)
             legacyKeychainDelete(account: geminiKeyAccount)

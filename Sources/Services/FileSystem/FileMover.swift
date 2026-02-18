@@ -31,6 +31,12 @@ struct FileMover {
         let fm = FileManager.default
         let fileName = (filePath as NSString).lastPathComponent
 
+        // Validate source path is inside PKM root
+        guard pathManager.isPathSafe(filePath) else {
+            throw NSError(domain: "FileMover", code: 1,
+                userInfo: [NSLocalizedDescriptionKey: "안전하지 않은 경로: \(fileName)"])
+        }
+
         // Determine target directory
         let targetDir = pathManager.targetDirectory(for: classification)
 
@@ -59,6 +65,11 @@ struct FileMover {
     func moveFolder(at folderPath: String, with classification: ClassifyResult) throws -> ProcessedFileResult {
         let fm = FileManager.default
         let folderName = (folderPath as NSString).lastPathComponent
+
+        guard pathManager.isPathSafe(folderPath) else {
+            throw NSError(domain: "FileMover", code: 1,
+                userInfo: [NSLocalizedDescriptionKey: "안전하지 않은 경로: \(folderName)"])
+        }
 
         // Target: PARA category directory
         let targetDir = pathManager.targetDirectory(for: classification)
@@ -222,7 +233,7 @@ struct FileMover {
             let dupFileName = (dupPath as NSString).lastPathComponent
             let companionPath = (targetDir as NSString).appendingPathComponent("\(dupFileName).md")
             mergeTags(classification.tags, into: companionPath)
-            try fm.removeItem(atPath: filePath)
+            try fm.trashItem(at: URL(fileURLWithPath: filePath), resultingItemURL: nil)
             return ProcessedFileResult(
                 fileName: fileName,
                 para: classification.para,
@@ -298,7 +309,7 @@ struct FileMover {
             // Merge tags into existing file
             let dupFileName = (dupPath as NSString).lastPathComponent
             mergeTags(classification.tags, into: dupPath)
-            try fm.removeItem(atPath: filePath)
+            try fm.trashItem(at: URL(fileURLWithPath: filePath), resultingItemURL: nil)
             return ProcessedFileResult(
                 fileName: fileName,
                 para: classification.para,

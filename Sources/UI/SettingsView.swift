@@ -74,7 +74,7 @@ struct SettingsView: View {
         }
         .fileImporter(isPresented: $showFolderPicker, allowedContentTypes: [.folder]) { result in
             if case .success(let url) = result {
-                let newPath = url.path
+                let newPath = url.resolvingSymlinksInPath().path
                 appState.pkmRootPath = newPath
 
                 // If folder lacks PARA structure, trigger re-onboarding (skip welcome)
@@ -454,13 +454,18 @@ struct SettingsView: View {
     }
 
     private func runUpdate() {
-        // Pass tag so install.sh skips GitHub API entirely
-        let tag = latestVersion.map { "v\($0)" } ?? ""
+        // Validate version string to prevent shell injection
+        guard let version = latestVersion,
+              version.range(of: #"^[0-9]+\.[0-9]+\.[0-9]+$"#, options: .regularExpression) != nil else {
+            updateError = "잘못된 버전 형식"
+            return
+        }
+        let safeTag = "v\(version)"
         let updateScript = """
         #!/bin/bash
         sleep 2
         curl -sL https://raw.githubusercontent.com/DinN0000/DotBrain/main/install.sh -o /tmp/dotbrain_install.sh
-        bash /tmp/dotbrain_install.sh \(tag)
+        bash /tmp/dotbrain_install.sh "\(safeTag)"
         rm -f /tmp/dotbrain_install.sh /tmp/dotbrain_update.sh
         """
         let scriptPath = "/tmp/dotbrain_update.sh"
@@ -470,7 +475,8 @@ struct SettingsView: View {
             process.executableURL = URL(fileURLWithPath: "/bin/bash")
             process.arguments = ["-c", "nohup bash \(scriptPath) > /tmp/dotbrain_update.log 2>&1 &"]
             try process.run()
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            Task { @MainActor in
+                try? await Task.sleep(nanoseconds: 500_000_000)
                 NSApplication.shared.terminate(nil)
             }
         } catch {

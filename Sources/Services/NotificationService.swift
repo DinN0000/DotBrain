@@ -18,6 +18,6 @@ enum NotificationService {
         // Try UserNotifications if available, otherwise silently skip
         // SPM executables without a proper .app bundle can't use UNUserNotificationCenter
         // so we just log to stdout as fallback
-        print("[\(title)] \(body)")
+        NSLog("[%@] %@", title, body)
     }
 }

@@ -105,10 +105,6 @@ struct InboxProcessor {
             }
         )
 
-        // Record estimated API cost
-        let estimatedCost = Double(inputs.count) * 0.005  // ~$0.005 per file (Stage 1 full content + Stage 2 fallback)
-        StatisticsService.addApiCost(estimatedCost)
-
         // Enrich with related notes — AI-based context linking
         onPhaseChange?(.linking)
         var enrichedClassifications = classifications
@@ -332,7 +328,11 @@ struct InboxProcessor {
             }
         }
 
-        return desc
+        if error is CancellationError {
+            return "작업이 취소되었습니다."
+        }
+
+        return "알 수 없는 오류가 발생했습니다. 앱을 재시작하거나 설정을 확인해주세요."
     }
 
     // MARK: - Private

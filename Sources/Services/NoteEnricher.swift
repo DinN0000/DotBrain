@@ -124,7 +124,12 @@ struct NoteEnricher: Sendable {
                     index += 1
                     active += 1
                     group.addTask {
-                        try? await self.enrichNote(at: filePath)
+                        do {
+                            return try await self.enrichNote(at: filePath)
+                        } catch {
+                            NSLog("[NoteEnricher] enrichNote 실패 %@: %@", (filePath as NSString).lastPathComponent, error.localizedDescription)
+                            return nil
+                        }
                     }
                 }
 

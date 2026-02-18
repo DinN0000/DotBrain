@@ -39,7 +39,7 @@ actor RateLimiter {
         // Wait for backoff period if active
         if let backoffUntil = ps.backoffUntil, now < backoffUntil {
             let waitTime = backoffUntil - now
-            print("[RateLimiter] \(provider.rawValue) backoff 대기: \(waitTime)")
+            NSLog("[RateLimiter] %@ backoff 대기: %@", provider.rawValue, "\(waitTime)")
             try? await Task.sleep(for: waitTime)
         }
 
@@ -48,7 +48,12 @@ actor RateLimiter {
             let elapsed = ContinuousClock.now - lastTime
             if elapsed < ps.minInterval {
                 let waitTime = ps.minInterval - elapsed
+                // Record expected wake time BEFORE sleep to prevent concurrent
+                // tasks from reading stale lastRequestTime during suspension
+                ps.lastRequestTime = ContinuousClock.now + waitTime
+                state[provider] = ps
                 try? await Task.sleep(for: waitTime)
+                return
             }
         }
 
@@ -89,12 +94,12 @@ actor RateLimiter {
             let capped = min(ps.consecutiveFailures, 6)  // max pow(2,6)=64 → clamped to 60
             let cooldown = Duration.seconds(min(pow(2.0, Double(capped)), 60))
             ps.backoffUntil = now + cooldown
-            print("[RateLimiter] \(provider.rawValue) 429 감지 — 간격: \(ps.minInterval), cooldown: \(cooldown)")
+            NSLog("[RateLimiter] %@ 429 감지 — 간격: %@, cooldown: %@", provider.rawValue, "\(ps.minInterval)", "\(cooldown)")
         } else {
             // 5xx/529: moderate backoff — 1.5x interval + 5s cooldown
             ps.minInterval = min(ps.minInterval * 3 / 2, .seconds(15))
             ps.backoffUntil = now + .seconds(5)
-            print("[RateLimiter] \(provider.rawValue) 서버 에러 — 간격: \(ps.minInterval), cooldown: 5s")
+            NSLog("[RateLimiter] %@ 서버 에러 — 간격: %@, cooldown: 5s", provider.rawValue, "\(ps.minInterval)")
         }
 
         state[provider] = ps

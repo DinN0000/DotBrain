@@ -112,7 +112,7 @@ struct MOCGenerator {
             do {
                 try await generateMOC(folderPath: folderPath, folderName: folderName, para: para)
             } catch {
-                print("[MOCGenerator] MOC 갱신 실패: \(folderName) — \(error.localizedDescription)")
+                NSLog("[MOCGenerator] MOC 갱신 실패: %@ — %@", folderName, error.localizedDescription)
             }
             // Track parent category paths for root MOC update
             let parentPath = (folderPath as NSString).deletingLastPathComponent
@@ -126,7 +126,7 @@ struct MOCGenerator {
                 try await generateCategoryRootMOC(basePath: parentPath, para: para)
             } catch {
                 let name = (parentPath as NSString).lastPathComponent
-                print("[MOCGenerator] 카테고리 루트 MOC 갱신 실패: \(name) — \(error.localizedDescription)")
+                NSLog("[MOCGenerator] 카테고리 루트 MOC 갱신 실패: %@ — %@", name, error.localizedDescription)
             }
         }
     }
@@ -285,7 +285,7 @@ struct MOCGenerator {
                             para: task.para
                         )
                     } catch {
-                        print("[MOCGenerator] MOC 갱신 실패: \(task.folderName) — \(error.localizedDescription)")
+                        NSLog("[MOCGenerator] MOC 갱신 실패: %@ — %@", task.folderName, error.localizedDescription)
                     }
                 }
                 activeTasks += 1
@@ -298,7 +298,7 @@ struct MOCGenerator {
                 try await generateCategoryRootMOC(basePath: basePath, para: para)
             } catch {
                 let name = (basePath as NSString).lastPathComponent
-                print("[MOCGenerator] 카테고리 루트 MOC 갱신 실패: \(name) — \(error.localizedDescription)")
+                NSLog("[MOCGenerator] 카테고리 루트 MOC 갱신 실패: %@ — %@", name, error.localizedDescription)
             }
         }
     }
