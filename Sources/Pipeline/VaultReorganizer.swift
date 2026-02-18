@@ -154,8 +154,8 @@ struct VaultReorganizer {
         for (index, classification) in classifications.enumerated() {
             let entry = filesToProcess[index]
 
-            // Skip unmatched project files — project folders are user-defined only
-            if classification.para == .project && classification.project == nil {
+            // Project folders are user-managed — never reorganize
+            if entry.category == .project || (classification.para == .project && classification.project == nil) {
                 continue
             }
 
@@ -203,8 +203,8 @@ struct VaultReorganizer {
             let progress = Double(i) / Double(selected.count)
             onProgress?(progress, "\(analysis.fileName) 이동 중...")
 
-            // Double-check: skip unmatched project files (should be filtered in scan already)
-            if analysis.recommended.para == .project && analysis.recommended.project == nil {
+            // Double-check: project folders are user-managed (should be filtered in scan already)
+            if analysis.currentCategory == .project || (analysis.recommended.para == .project && analysis.recommended.project == nil) {
                 continue
             }
 
@@ -273,7 +273,10 @@ struct VaultReorganizer {
         let fm = FileManager.default
         var results: [CollectedFile] = []
 
-        for category in scope.categories {
+        // Project folders are user-managed — exclude from reorganization
+        let categoriesToScan = scope.categories.filter { $0 != .project }
+
+        for category in categoriesToScan {
             let basePath = pathManager.paraPath(for: category)
             guard let folders = try? fm.contentsOfDirectory(atPath: basePath) else { continue }
 
