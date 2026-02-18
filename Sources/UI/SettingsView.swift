@@ -327,13 +327,10 @@ struct SettingsView: View {
                     .font(.subheadline)
                     .fontWeight(.medium)
                 Spacer()
-                Text("v\(currentVersion)")
-                    .font(.system(.caption2, design: .monospaced))
-                    .foregroundColor(.secondary)
                 if let latest = latestVersion {
                     if latest != currentVersion {
                         Button(action: { runUpdate() }) {
-                            Label("v\(latest) 업데이트", systemImage: "arrow.down.circle.fill")
+                            Text("업데이트")
                                 .font(.caption2)
                         }
                         .buttonStyle(.borderedProminent)
