@@ -123,25 +123,11 @@ struct PARAManageView: View {
         }
     }
 
-    @ViewBuilder
     private func categoryHeader(_ category: PARACategory, count: Int) -> some View {
-        HStack(spacing: 4) {
-            Image(systemName: category.icon)
-                .font(.caption)
-                .foregroundColor(.secondary)
-            Text(category.displayName)
-                .font(.caption)
-                .fontWeight(.semibold)
-                .foregroundColor(.secondary)
-            if count > 0 {
-                Text("(\(count))")
-                    .font(.caption2)
-                    .foregroundColor(.secondary.opacity(0.7))
-            }
-
-            Spacer()
-
-            Button(action: {
+        CategoryHeaderView(
+            category: category,
+            count: count,
+            onTap: {
                 withAnimation(.easeOut(duration: 0.15)) {
                     if newFolderCategory == category {
                         newFolderCategory = nil
@@ -151,14 +137,8 @@ struct PARAManageView: View {
                         newFolderName = ""
                     }
                 }
-            }) {
-                Image(systemName: newFolderCategory == category ? "minus.circle" : "plus.circle")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
             }
-            .buttonStyle(.plain)
-            .help("\(category.displayName)에 폴더 생성")
-        }
+        )
     }
 
     @ViewBuilder
@@ -610,6 +590,42 @@ private struct PARAFolderRow: View {
         case .resource: return .orange
         case .archive: return .gray
         }
+    }
+}
+
+// MARK: - Category Header
+
+private struct CategoryHeaderView: View {
+    let category: PARACategory
+    let count: Int
+    let onTap: () -> Void
+    @State private var isHovered = false
+
+    var body: some View {
+        HStack(spacing: 4) {
+            Image(systemName: category.icon)
+                .font(.caption)
+                .foregroundColor(isHovered ? .primary : .secondary)
+            Text(category.displayName)
+                .font(.caption)
+                .fontWeight(.semibold)
+                .foregroundColor(isHovered ? .primary : .secondary)
+            if count > 0 {
+                Text("(\(count))")
+                    .font(.caption2)
+                    .foregroundColor(.secondary.opacity(0.7))
+            }
+        }
+        .padding(.vertical, 2)
+        .padding(.horizontal, 4)
+        .background(
+            RoundedRectangle(cornerRadius: 4)
+                .fill(isHovered ? Color.primary.opacity(0.06) : Color.clear)
+        )
+        .contentShape(Rectangle())
+        .onTapGesture { onTap() }
+        .onHover { isHovered = $0 }
+        .animation(.easeOut(duration: 0.12), value: isHovered)
     }
 }
 
