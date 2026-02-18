@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.8.5 — Vault Check Accuracy (2026-02-18)
+- 볼트 점검 결과 상세 표시 (깨진 링크/프론트매터 누락/PARA 미분류 구분)
+- enrichCount 실제 보완 건수만 집계 (전체 파일 수 → 변경된 파일만)
+- 깨진 링크 자동 복구: suggestion 없는 링크는 일반 텍스트로 변환
+- auditTotal에서 태그 누락 제외 (NoteEnricher가 처리하는 영역)
+
 ## v1.8.4 — Activity Log Fix (2026-02-18)
 - 볼트 점검 완료 후 "최근 활동"에 기록되지 않던 버그 수정
 - 전체 재정리 스캔 단계 활동 기록 추가
