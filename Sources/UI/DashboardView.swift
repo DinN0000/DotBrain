@@ -395,7 +395,7 @@ struct DashboardView: View {
         let root = appState.pkmRootPath
 
         vaultCheckTask?.cancel()
-        vaultCheckTask = Task.detached {
+        vaultCheckTask = Task.detached(priority: .utility) {
             defer {
                 if Task.isCancelled {
                     Task { @MainActor in

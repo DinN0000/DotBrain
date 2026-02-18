@@ -86,7 +86,15 @@ enum PPTXExtractor {
 
 // MARK: - Shared OOXML utilities
 
-private var _metadataRegexCache: [String: NSRegularExpression] = [:]
+private let _metadataRegexCache: [String: NSRegularExpression] = {
+    let fields = ["title", "creator", "subject", "description", "created", "modified"]
+    var cache: [String: NSRegularExpression] = [:]
+    for field in fields {
+        let pattern = "<[^>]*:?\(field)[^>]*>([^<]+)<"
+        cache[pattern] = try? NSRegularExpression(pattern: pattern)
+    }
+    return cache
+}()
 
 func readEntry(_ entry: Entry, from archive: Archive, maxBytes: Int = 4_000_000) -> String? {
     var data = Data()
@@ -118,15 +126,7 @@ func extractOOXMLMetadata(from archive: Archive) -> [String: Any] {
     for field in fields {
         let pattern = "<[^>]*:?\(field)[^>]*>([^<]+)<"
 
-        let regex: NSRegularExpression
-        if let cached = _metadataRegexCache[pattern] {
-            regex = cached
-        } else if let newRegex = try? NSRegularExpression(pattern: pattern) {
-            _metadataRegexCache[pattern] = newRegex
-            regex = newRegex
-        } else {
-            continue
-        }
+        guard let regex = _metadataRegexCache[pattern] else { continue }
 
         if let match = regex.firstMatch(in: content, range: NSRange(content.startIndex..., in: content)),
            let range = Range(match.range(at: 1), in: content) {

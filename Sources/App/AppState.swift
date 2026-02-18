@@ -444,6 +444,9 @@ final class AppState: ObservableObject {
                 return
             }
 
+            // Double-check cancellation before writing final state
+            guard !Task.isCancelled else { return }
+
             processedResults = allProcessed
             pendingConfirmations = allConfirmations
             affectedFolders = allAffected

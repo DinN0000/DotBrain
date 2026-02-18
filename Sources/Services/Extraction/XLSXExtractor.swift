@@ -167,7 +167,7 @@ enum XLSXExtractor {
                 if let vMatch = valueRegex.firstMatch(in: cellContent, range: cellNSRange),
                    let vRange = Range(vMatch.range(at: 1), in: cellContent) {
                     let value = String(cellContent[vRange])
-                    if cellType == "s", let idx = Int(value), idx < sharedStrings.count {
+                    if cellType == "s", let idx = Int(value), idx >= 0, idx < sharedStrings.count {
                         cells.append(sharedStrings[idx])
                     } else {
                         cells.append(value)

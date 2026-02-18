@@ -201,14 +201,16 @@ enum FileContentExtractor {
             return ("", text.startIndex)
         }
 
-        let searchText = text.prefix(4096)  // Frontmatter is always near the top
-        let range = NSRange(searchText.startIndex..., in: searchText)
+        let searchString = String(text.prefix(4096))  // Frontmatter is always near the top
+        let range = NSRange(searchString.startIndex..., in: searchString)
 
-        if let match = Frontmatter.frontmatterRegex.firstMatch(in: String(searchText), range: range) {
-            let fullMatchRange = Range(match.range, in: searchText)!
-            let fmRange = Range(match.range(at: 1), in: searchText)!
-            let frontmatterContent = "---\n" + String(searchText[fmRange]) + "\n---"
-            return (frontmatterContent, fullMatchRange.upperBound)
+        if let match = Frontmatter.frontmatterRegex.firstMatch(in: searchString, range: range),
+           let fullMatchRange = Range(match.range, in: searchString),
+           let fmRange = Range(match.range(at: 1), in: searchString) {
+            let frontmatterContent = "---\n" + String(searchString[fmRange]) + "\n---"
+            // Convert index back to the original text
+            let offset = text.distance(from: text.startIndex, to: text.index(text.startIndex, offsetBy: searchString.distance(from: searchString.startIndex, to: fullMatchRange.upperBound)))
+            return (frontmatterContent, text.index(text.startIndex, offsetBy: offset))
         }
 
         return ("", text.startIndex)
