@@ -18,18 +18,27 @@ echo ""
 ARCH=$(uname -m)
 echo "시스템: macOS $(sw_vers -productVersion) ($ARCH)"
 
-# Get latest release download URL
+# Get latest release (single API call)
 echo "최신 릴리즈 확인 중..."
 RELEASE_JSON=$(curl -sL "https://api.github.com/repos/$REPO/releases/latest")
+
+# Extract tag name from the same JSON
+TAG=$(echo "$RELEASE_JSON" | grep '"tag_name"' | head -1 | sed -E 's/.*"([^"]+)".*/\1/') || true
+if [ -z "$TAG" ]; then
+    echo "오류: 릴리즈 정보를 읽을 수 없습니다. (GitHub API 제한일 수 있음)"
+    echo "https://github.com/$REPO/releases 에서 직접 다운로드하세요."
+    exit 1
+fi
+
 # Find binary asset: exclude all known non-binary extensions
 DOWNLOAD_URL=$(echo "$RELEASE_JSON" \
     | grep '"browser_download_url"' \
     | grep -v -E '\.(icns|txt|md|json|zip|tar|gz|sha256)' \
     | head -1 \
-    | sed -E 's/.*"(https[^"]+)".*/\1/')
+    | sed -E 's/.*"(https[^"]+)".*/\1/') || true
 
 if [ -z "$DOWNLOAD_URL" ]; then
-    echo "오류: 릴리즈를 찾을 수 없습니다."
+    echo "오류: 바이너리를 찾을 수 없습니다."
     echo "https://github.com/$REPO/releases 에서 직접 다운로드하세요."
     exit 1
 fi
@@ -45,7 +54,6 @@ curl -sL "$DOWNLOAD_URL" -o "$TMP_DIR/$APP_NAME"
 chmod +x "$TMP_DIR/$APP_NAME"
 
 # Verify checksum if available
-TAG=$(curl -sL "https://api.github.com/repos/$REPO/releases/latest" | grep '"tag_name"' | sed -E 's/.*"([^"]+)".*/\1/')
 CHECKSUM_URL="https://github.com/$REPO/releases/download/$TAG/checksums.txt"
 if curl -sLf "$CHECKSUM_URL" -o "$TMP_DIR/checksums.txt" 2>/dev/null; then
     EXPECTED=$(grep " ${APP_NAME}$" "$TMP_DIR/checksums.txt" | awk '{print $1}')
@@ -59,12 +67,12 @@ if curl -sLf "$CHECKSUM_URL" -o "$TMP_DIR/checksums.txt" 2>/dev/null; then
     echo "✓ 체크섬 확인 완료"
 fi
 
-# Download icon
-ICON_URL=$(curl -sL "https://api.github.com/repos/$REPO/releases/latest" \
+# Download icon (reuse same JSON)
+ICON_URL=$(echo "$RELEASE_JSON" \
     | grep '"browser_download_url"' \
     | grep "AppIcon.icns" \
     | head -1 \
-    | sed -E 's/.*"(https[^"]+)".*/\1/')
+    | sed -E 's/.*"(https[^"]+)".*/\1/') || true
 if [ -n "$ICON_URL" ]; then
     curl -sL "$ICON_URL" -o "$TMP_DIR/AppIcon.icns"
 fi
