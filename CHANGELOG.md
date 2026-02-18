@@ -1,5 +1,15 @@
 # Changelog
 
+## v2.1.0 — 스마트 에셋 관리 (2026-02-19)
+- 중앙 집중형 `_Assets/{documents,images}/` 구조로 전환
+- 이미지 파일은 companion .md 생성 생략 (EXIF 데이터만으로는 노트 가치 없음)
+- PKMPathManager: 확장자 기반 에셋 라우팅 (`assetsDirectory(for:)`)
+- FileMover: 이미지는 `_Assets/images/`로, 문서는 `_Assets/documents/`로 분리
+- FrontmatterWriter: 위키링크 `![[_Assets/documents/파일]]` 형식으로 변경
+- AssetMigrator: 기존 볼트 자동 마이그레이션 (산재된 _Assets/ 통합, 이미지 companion 정리, 인덱스 노트 정리)
+- PARAMover: 폴더 병합 시 에셋을 중앙으로 라우팅
+- ProjectManager: 프로젝트별 _Assets/ 생성 제거
+
 ## v2.0.7 — PARA 색상 통일 (2026-02-19)
 - PARACategory.color 중앙 프로퍼티 추가 (전체 앱 색상 한 곳에서 관리)
 - Area 색상 불일치 수정 (PARAManageView .purple → .green 통일)
