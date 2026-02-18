@@ -16,7 +16,7 @@ struct ProjectManager {
         let projectDir = (pathManager.projectsPath as NSString).appendingPathComponent(safeName)
 
         guard pathManager.isPathSafe(projectDir) else {
-            throw ProjectError.alreadyExists(safeName)
+            throw ProjectError.notFound(safeName) // path traversal — invalid path
         }
         guard !fm.fileExists(atPath: projectDir) else {
             throw ProjectError.alreadyExists(safeName)

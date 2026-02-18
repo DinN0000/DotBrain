@@ -88,17 +88,23 @@ enum PPTXExtractor {
 
 private var _metadataRegexCache: [String: NSRegularExpression] = [:]
 
-func readEntry(_ entry: Entry, from archive: Archive) -> String? {
+func readEntry(_ entry: Entry, from archive: Archive, maxBytes: Int = 4_000_000) -> String? {
     var data = Data()
     do {
         _ = try archive.extract(entry) { chunk in
             data.append(chunk)
+            guard data.count <= maxBytes else { throw OOXMLError.tooLarge }
         }
         return String(data: data, encoding: .utf8)
+    } catch is OOXMLError {
+        // Hit size limit — return what we have
+        return data.isEmpty ? nil : String(data: data, encoding: .utf8)
     } catch {
         return nil
     }
 }
+
+private enum OOXMLError: Error { case tooLarge }
 
 func extractOOXMLMetadata(from archive: Archive) -> [String: Any] {
     var metadata: [String: Any] = [:]

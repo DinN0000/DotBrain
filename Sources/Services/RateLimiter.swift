@@ -36,11 +36,13 @@ actor RateLimiter {
         let now = ContinuousClock.now
         var ps = getState(for: provider)
 
-        // Wait for backoff period if active
+        // Wait for backoff period if active, then clear it
         if let backoffUntil = ps.backoffUntil, now < backoffUntil {
             let waitTime = backoffUntil - now
             NSLog("[RateLimiter] %@ backoff 대기: %@", provider.rawValue, "\(waitTime)")
             try? await Task.sleep(for: waitTime)
+            ps.backoffUntil = nil
+            state[provider] = ps
         }
 
         // Enforce minimum interval between requests

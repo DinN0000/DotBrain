@@ -139,7 +139,7 @@ actor Classifier {
                     summary: s2.summary,
                     targetFolder: s2.targetFolder,
                     project: rawProject.flatMap { fuzzyMatchProject($0, projectNames: projectNames) },
-                    confidence: s2.confidence ?? 0.9
+                    confidence: s2.confidence ?? 0.0
                 )
             } else if let s1 = s1 {
                 result = ClassifyResult(

@@ -77,16 +77,16 @@ struct ProjectContextBuilder {
     /// Build weighted context from root MOC files (optimized: max 4 file reads)
     /// Per-category hybrid fallback: uses root MOC when available, legacy for missing categories
     func buildWeightedContext() -> String {
-        let categories: [(path: String, label: String, emoji: String, weight: String)] = [
-            (pathManager.projectsPath, "Project", "🔴", "높은 연결 가중치"),
-            (pathManager.areaPath, "Area", "🟡", "중간 연결 가중치"),
-            (pathManager.resourcePath, "Resource", "🟡", "중간 연결 가중치"),
-            (pathManager.archivePath, "Archive", "⚪", "낮은 연결 가중치"),
+        let categories: [(path: String, label: String, weight: String)] = [
+            (pathManager.projectsPath, "Project", "높은 연결 가중치"),
+            (pathManager.areaPath, "Area", "중간 연결 가중치"),
+            (pathManager.resourcePath, "Resource", "중간 연결 가중치"),
+            (pathManager.archivePath, "Archive", "낮은 연결 가중치"),
         ]
 
         var sections: [String] = []
 
-        for (basePath, label, emoji, weight) in categories {
+        for (basePath, label, weight) in categories {
             let categoryName = (basePath as NSString).lastPathComponent
             let mocPath = (basePath as NSString).appendingPathComponent("\(categoryName).md")
 
@@ -95,13 +95,13 @@ struct ProjectContextBuilder {
                 let (_, body) = Frontmatter.parse(markdown: content)
                 let trimmed = body.trimmingCharacters(in: .whitespacesAndNewlines)
                 if !trimmed.isEmpty {
-                    sections.append("### \(emoji) \(label) (\(weight))\n\(trimmed)")
+                    sections.append("### \(label) (\(weight))\n\(trimmed)")
                     continue
                 }
             }
 
             // Per-category fallback: no root MOC or empty body
-            let fallback = buildCategoryFallback(basePath: basePath, label: label, emoji: emoji, weight: weight)
+            let fallback = buildCategoryFallback(basePath: basePath, label: label, weight: weight)
             if !fallback.isEmpty {
                 sections.append(fallback)
             }
@@ -111,7 +111,7 @@ struct ProjectContextBuilder {
     }
 
     /// Per-category legacy fallback when root MOC is missing or empty
-    private func buildCategoryFallback(basePath: String, label: String, emoji: String, weight: String) -> String {
+    private func buildCategoryFallback(basePath: String, label: String, weight: String) -> String {
         let section: String
         switch label {
         case "Project":
@@ -122,7 +122,7 @@ struct ProjectContextBuilder {
             section = buildFolderSummaries(at: basePath, label: label)
         }
         guard !section.isEmpty else { return "" }
-        return "### \(emoji) \(label) (\(weight))\n\(section)"
+        return "### \(label) (\(weight))\n\(section)"
     }
 
     // MARK: - Private Helpers

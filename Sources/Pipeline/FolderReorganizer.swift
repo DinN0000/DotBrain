@@ -253,10 +253,11 @@ struct FolderReorganizer {
         onFileProgress?(inputs.count, inputs.count, "")
         onProgress?(0.95, "완료 정리 중...")
 
+        let failedCount = processed.filter { if case .error = $0.status { return true }; return false }.count
         NotificationService.sendProcessingComplete(
             classified: processed.filter(\.isSuccess).count,
             total: files.count,
-            failed: 0
+            failed: failedCount
         )
 
         onProgress?(1.0, "완료!")
@@ -298,7 +299,12 @@ struct FolderReorganizer {
             guard fm.fileExists(atPath: fullPath, isDirectory: &isDir) else { continue }
 
             if isDir.boolValue {
-                directories.append(fullPath)
+                // Skip _Assets/ subtree — centralized assets should not be flattened
+                if (fullPath as NSString).lastPathComponent == "_Assets" {
+                    enumerator.skipDescendants()
+                } else {
+                    directories.append(fullPath)
+                }
                 continue
             }
 
