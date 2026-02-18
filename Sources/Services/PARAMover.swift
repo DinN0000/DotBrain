@@ -152,6 +152,62 @@ struct PARAMover {
         return movedCount
     }
 
+    // MARK: - Rename
+
+    /// Rename a folder within the same PARA category.
+    /// Updates frontmatter project fields, renames index note, and updates WikiLink references.
+    /// Returns the number of notes updated.
+    func renameFolder(oldName: String, newName: String, category: PARACategory) throws -> Int {
+        let fm = FileManager.default
+        let safeOld = sanitizeName(oldName)
+        let safeNew = sanitizeName(newName)
+        guard !safeNew.isEmpty else { throw PARAMoveError.notFound(safeNew, category) }
+
+        let basePath = pathManager.paraPath(for: category)
+        let oldDir = (basePath as NSString).appendingPathComponent(safeOld)
+        let newDir = (basePath as NSString).appendingPathComponent(safeNew)
+
+        guard fm.fileExists(atPath: oldDir) else {
+            throw PARAMoveError.notFound(safeOld, category)
+        }
+        guard !fm.fileExists(atPath: newDir) else {
+            throw PARAMoveError.alreadyExists(safeNew, category)
+        }
+
+        // Rename index note (oldName.md -> newName.md) before moving folder
+        let oldIndex = (oldDir as NSString).appendingPathComponent("\(safeOld).md")
+        let newIndex = (oldDir as NSString).appendingPathComponent("\(safeNew).md")
+        if fm.fileExists(atPath: oldIndex) {
+            try fm.moveItem(atPath: oldIndex, toPath: newIndex)
+        }
+
+        // Update frontmatter project fields in all .md files
+        var count = 0
+        if let enumerator = fm.enumerator(atPath: oldDir) {
+            while let relativePath = enumerator.nextObject() as? String {
+                guard relativePath.hasSuffix(".md") else { continue }
+                let filePath = (oldDir as NSString).appendingPathComponent(relativePath)
+                guard var content = try? String(contentsOfFile: filePath, encoding: .utf8) else { continue }
+                let (existing, body) = Frontmatter.parse(markdown: content)
+                if existing.project == safeOld {
+                    var updated = existing
+                    updated.project = safeNew
+                    content = updated.stringify() + "\n" + body
+                    try content.write(toFile: filePath, atomically: true, encoding: .utf8)
+                    count += 1
+                }
+            }
+        }
+
+        // Move (rename) the folder
+        try fm.moveItem(atPath: oldDir, toPath: newDir)
+
+        // Update WikiLink references across the vault
+        markInVault(pattern: "[[\(safeOld)]]", replacement: "[[\(safeNew)]]")
+
+        return count
+    }
+
     // MARK: - List
 
     /// List all folders in a given PARA category with file count and summary.

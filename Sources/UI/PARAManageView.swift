@@ -8,6 +8,8 @@ struct PARAManageView: View {
     @State private var statusMessage = ""
     @State private var isLoading = true
     @State private var deleteTarget: (name: String, category: PARACategory)?
+    @State private var renameTarget: (name: String, category: PARACategory)?
+    @State private var renameNewName = ""
 
     var body: some View {
         VStack(spacing: 0) {
@@ -94,6 +96,22 @@ struct PARAManageView: View {
         } message: {
             if let target = deleteTarget {
                 Text("'\(target.name)' 폴더를 휴지통으로 보냅니다. Finder에서 복구할 수 있습니다.")
+            }
+        }
+        .alert("이름 변경", isPresented: .init(
+            get: { renameTarget != nil },
+            set: { if !$0 { renameTarget = nil } }
+        )) {
+            TextField("새 이름", text: $renameNewName)
+            Button("변경") {
+                if let target = renameTarget {
+                    performRename(oldName: target.name, newName: renameNewName, category: target.category)
+                }
+            }
+            Button("취소", role: .cancel) {}
+        } message: {
+            if let target = renameTarget {
+                Text("'\(target.name)' 폴더의 새 이름을 입력하세요.")
             }
         }
     }
@@ -233,6 +251,13 @@ struct PARAManageView: View {
         }
 
         Button {
+            renameTarget = (name: folder.name, category: category)
+            renameNewName = folder.name
+        } label: {
+            Label("이름 변경", systemImage: "pencil")
+        }
+
+        Button {
             openInFinder(folder.name, category: category)
         } label: {
             Label("Finder에서 열기", systemImage: "folder")
@@ -287,6 +312,11 @@ struct PARAManageView: View {
             }
             mergeItem.submenu = subMenu
             menu.addItem(mergeItem)
+        }
+
+        addMenuItem(to: menu, title: "이름 변경", icon: "pencil") {
+            renameTarget = (name: folder.name, category: category)
+            renameNewName = folder.name
         }
 
         addMenuItem(to: menu, title: "Finder에서 열기", icon: "folder") {
@@ -436,6 +466,21 @@ struct PARAManageView: View {
         do {
             let count = try manager.reactivateProject(name: name)
             statusMessage = "'\(name)' 재활성화됨 (\(count)개 노트 갱신)"
+            loadFolders()
+            clearStatusAfterDelay()
+        } catch {
+            statusMessage = error.localizedDescription
+            clearStatusAfterDelay()
+        }
+    }
+
+    private func performRename(oldName: String, newName: String, category: PARACategory) {
+        let trimmed = newName.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty, trimmed != oldName else { return }
+        let mover = PARAMover(pkmRoot: appState.pkmRootPath)
+        do {
+            let count = try mover.renameFolder(oldName: oldName, newName: trimmed, category: category)
+            statusMessage = "'\(oldName)' -> '\(trimmed)' (\(count)개 노트 갱신)"
             loadFolders()
             clearStatusAfterDelay()
         } catch {
