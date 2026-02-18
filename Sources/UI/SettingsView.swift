@@ -151,29 +151,22 @@ struct SettingsView: View {
                             .font(.caption2)
                             .foregroundColor(msg == "삭제됨" ? .orange : .green)
                     }
+
+                    Spacer()
+
+                    if viewingProvider != activeProvider {
+                        Button("\(viewingProvider.displayName)(으)로 전환") {
+                            withAnimation(.easeOut(duration: 0.15)) {
+                                appState.selectedProvider = viewingProvider
+                            }
+                        }
+                        .font(.caption)
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.mini)
+                    }
                 }
             } else {
                 providerKeyInput(viewingProvider)
-            }
-
-            // Switch provider button (only when viewing a different provider with a key)
-            if viewingProvider != activeProvider && viewingHasKey {
-                Button(action: {
-                    withAnimation(.easeOut(duration: 0.15)) {
-                        appState.selectedProvider = viewingProvider
-                    }
-                }) {
-                    HStack(spacing: 4) {
-                        Image(systemName: "arrow.right.arrow.left")
-                            .font(.caption2)
-                        Text("\(viewingProvider.displayName)(으)로 전환")
-                            .font(.caption)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 4)
-                }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.small)
             }
 
         }
