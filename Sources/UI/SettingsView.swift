@@ -463,15 +463,22 @@ struct SettingsView: View {
     }
 
     private func runUpdate() {
-        // Run install script detached so it survives app termination
-        let script = "nohup bash -c 'sleep 1; curl -sL https://raw.githubusercontent.com/DinN0000/DotBrain/main/install.sh | bash' &>/dev/null &"
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/bin/bash")
-        process.arguments = ["-c", script]
+        // Write update script to temp file and run detached
+        let updateScript = """
+        #!/bin/bash
+        sleep 2
+        curl -sL https://raw.githubusercontent.com/DinN0000/DotBrain/main/install.sh -o /tmp/dotbrain_install.sh
+        bash /tmp/dotbrain_install.sh
+        rm -f /tmp/dotbrain_install.sh /tmp/dotbrain_update.sh
+        """
+        let scriptPath = "/tmp/dotbrain_update.sh"
         do {
+            try updateScript.write(toFile: scriptPath, atomically: true, encoding: .utf8)
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: "/bin/bash")
+            process.arguments = ["-c", "nohup bash \(scriptPath) > /tmp/dotbrain_update.log 2>&1 &"]
             try process.run()
-            // Give the detached process time to start, then quit
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                 NSApplication.shared.terminate(nil)
             }
         } catch {
