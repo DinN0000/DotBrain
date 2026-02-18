@@ -701,14 +701,7 @@ private struct PARAFolderRow: View {
         .onHover { isHovered = $0 }
     }
 
-    private var categoryColor: Color {
-        switch category {
-        case .project: return .blue
-        case .area: return .purple
-        case .resource: return .orange
-        case .archive: return .gray
-        }
-    }
+    private var categoryColor: Color { category.color }
 }
 
 // MARK: - Category Header

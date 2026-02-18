@@ -38,13 +38,10 @@ struct DashboardView: View {
 
                         Spacer()
 
-                        statButton("Project", count: projectCount, color: .blue, category: .project)
-                        Text("·").foregroundColor(.secondary)
-                        statButton("Area", count: areaCount, color: .green, category: .area)
-                        Text("·").foregroundColor(.secondary)
-                        statButton("Resource", count: resourceCount, color: .orange, category: .resource)
-                        Text("·").foregroundColor(.secondary)
-                        statButton("Archive", count: archiveCount, color: .gray, category: .archive)
+                        statButton("P", count: projectCount, color: PARACategory.project.color, category: .project)
+                        statButton("A", count: areaCount, color: PARACategory.area.color, category: .area)
+                        statButton("R", count: resourceCount, color: PARACategory.resource.color, category: .resource)
+                        statButton("A", count: archiveCount, color: PARACategory.archive.color, category: .archive)
                     }
                     .font(.caption)
                     .monospacedDigit()
