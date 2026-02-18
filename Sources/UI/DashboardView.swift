@@ -75,7 +75,11 @@ struct DashboardView: View {
                     }
 
                     // Group 1: File operations
-                    DashboardCardGroup(label: "파일", tint: .accentColor) {
+                    DashboardCardGroup(
+                        label: "정리 도구",
+                        description: "폴더와 파일을 직접 관리",
+                        tint: .accentColor
+                    ) {
                         DashboardHubCard(
                             icon: "folder.badge.gearshape",
                             title: "폴더 관리",
@@ -95,11 +99,15 @@ struct DashboardView: View {
                     }
 
                     // Group 2: Vault maintenance
-                    DashboardCardGroup(label: "볼트", tint: .accentColor) {
+                    DashboardCardGroup(
+                        label: "자동 관리",
+                        description: "AI가 볼트 전체를 점검하고 분류",
+                        tint: .accentColor
+                    ) {
                         DashboardHubCard(
                             icon: "checkmark.shield",
                             title: "볼트 점검",
-                            subtitle: "오류 검사 · 메타 보완",
+                            subtitle: "오류 수정 · 메타 보완",
                             tint: .accentColor,
                             isDisabled: isVaultChecking
                         ) {
@@ -107,8 +115,8 @@ struct DashboardView: View {
                         }
                         DashboardHubCard(
                             icon: "arrow.triangle.2.circlepath",
-                            title: "전체 재정리",
-                            subtitle: "AI 위치 재분류",
+                            title: "AI 재분류",
+                            subtitle: "파일 위치 재배치",
                             tint: .accentColor
                         ) {
                             appState.currentScreen = .vaultReorganize
@@ -572,8 +580,21 @@ private struct VaultCheckResult {
 
 struct DashboardCardGroup<Content: View>: View {
     let label: String
+    let description: String?
     let tint: Color
-    @ViewBuilder let content: () -> Content
+    let content: () -> Content
+
+    init(
+        label: String,
+        description: String? = nil,
+        tint: Color,
+        @ViewBuilder content: @escaping () -> Content
+    ) {
+        self.label = label
+        self.description = description
+        self.tint = tint
+        self.content = content
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -586,6 +607,11 @@ struct DashboardCardGroup<Content: View>: View {
                     .fontWeight(.semibold)
                     .foregroundColor(tint.opacity(0.7))
                     .textCase(.uppercase)
+                if let description {
+                    Text(description)
+                        .font(.caption2)
+                        .foregroundColor(.secondary.opacity(0.7))
+                }
             }
             .padding(.leading, 4)
 
@@ -608,13 +634,13 @@ struct DashboardHubCard: View {
 
     var body: some View {
         Button(action: action) {
-            VStack(spacing: 5) {
+            VStack(spacing: 4) {
                 ZStack {
                     Circle()
                         .fill(tint.opacity(isHovered ? 0.15 : 0.08))
-                        .frame(width: 32, height: 32)
+                        .frame(width: 28, height: 28)
                     Image(systemName: icon)
-                        .font(.system(size: 13, weight: .medium))
+                        .font(.system(size: 12, weight: .medium))
                         .foregroundColor(tint)
                 }
 
@@ -628,7 +654,7 @@ struct DashboardHubCard: View {
                     .lineLimit(1)
             }
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 10)
+            .padding(.vertical, 8)
             .background(
                 RoundedRectangle(cornerRadius: 8)
                     .fill(isHovered ? tint.opacity(0.06) : Color.primary.opacity(0.02))
