@@ -333,9 +333,18 @@ struct OnboardingView: View {
             }
 
             HStack {
-                Button("이전") { goBack() }
+                if isReOnboarding {
+                    Button("취소") {
+                        UserDefaults.standard.removeObject(forKey: "onboardingStep")
+                        appState.currentScreen = .inbox
+                    }
                     .buttonStyle(.bordered)
                     .controlSize(.regular)
+                } else {
+                    Button("이전") { goBack() }
+                        .buttonStyle(.bordered)
+                        .controlSize(.regular)
+                }
 
                 Spacer()
 
@@ -490,7 +499,16 @@ struct OnboardingView: View {
 
                 Spacer()
 
-                Button(action: { goNext() }) {
+                Button(action: {
+                    if appState.hasAPIKey {
+                        // Skip API key step, go to final
+                        direction = 1
+                        step = 4
+                        UserDefaults.standard.set(step, forKey: "onboardingStep")
+                    } else {
+                        goNext()
+                    }
+                }) {
                     Text("다음")
                         .frame(minWidth: 80)
                 }
@@ -862,6 +880,10 @@ struct OnboardingView: View {
 
     // MARK: - Step 4: Quick Start Guide
 
+    private var isReOnboarding: Bool {
+        UserDefaults.standard.bool(forKey: "onboardingCompleted")
+    }
+
     private var trialStep: some View {
         VStack(spacing: 0) {
             Spacer()
@@ -871,12 +893,14 @@ struct OnboardingView: View {
                     .font(.system(size: 36, design: .monospaced))
                     .padding(.bottom, 12)
 
-                Text("준비 완료!")
+                Text(isReOnboarding ? "볼트 설정 완료!" : "준비 완료!")
                     .font(.title3)
                     .fontWeight(.semibold)
                     .padding(.bottom, 6)
 
-                Text("이제 인박스에 파일을 넣으면\nAI가 자동으로 정리합니다.")
+                Text(isReOnboarding
+                    ? "새 볼트가 준비되었습니다.\n인박스에 파일을 넣어 정리를 시작하세요."
+                    : "이제 인박스에 파일을 넣으면\nAI가 자동으로 정리합니다.")
                     .font(.subheadline)
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
