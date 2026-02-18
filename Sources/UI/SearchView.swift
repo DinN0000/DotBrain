@@ -64,11 +64,21 @@ struct SearchView: View {
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
-                    HStack {
-                        Text("\(results.count)개 결과")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                        Spacer()
+                    VStack(spacing: 4) {
+                        HStack(spacing: 10) {
+                            paraLegend("Project", icon: "folder.fill", color: .blue)
+                            paraLegend("Area", icon: "tray.fill", color: .green)
+                            paraLegend("Resource", icon: "book.fill", color: .orange)
+                            paraLegend("Archive", icon: "archivebox.fill", color: .gray)
+                            Spacer()
+                        }
+
+                        HStack {
+                            Text("\(results.count)개 결과")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            Spacer()
+                        }
                     }
                     .padding(.horizontal)
                     .padding(.top, 8)
@@ -97,6 +107,17 @@ struct SearchView: View {
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
+        }
+    }
+
+    private func paraLegend(_ label: String, icon: String, color: Color) -> some View {
+        HStack(spacing: 3) {
+            Image(systemName: icon)
+                .font(.system(size: 8))
+                .foregroundColor(color)
+            Text(label)
+                .font(.system(size: 9))
+                .foregroundColor(.secondary)
         }
     }
 
