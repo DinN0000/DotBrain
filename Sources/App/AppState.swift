@@ -54,7 +54,7 @@ final class AppState: ObservableObject {
             case .settings: return "설정"
             case .paraManage: return "폴더 관리"
             case .search: return "검색"
-            case .vaultReorganize: return "전체 재정리"
+            case .vaultReorganize: return "AI 재분류"
             case .results: return "정리 결과"
             default: return ""
             }

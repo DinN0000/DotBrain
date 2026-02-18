@@ -173,12 +173,12 @@ struct VaultReorganizeView: View {
 
             Divider()
 
-            // File list grouped by current category
+            // File list grouped by destination category
             ScrollView {
                 LazyVStack(spacing: 0) {
                     ForEach(PARACategory.allCases, id: \.self) { category in
                         let categoryFiles = analyses.filter {
-                            $0.needsMove && $0.currentCategory == category
+                            $0.needsMove && $0.recommended.para == category
                         }
                         if !categoryFiles.isEmpty {
                             planCategorySection(category: category, files: categoryFiles)
@@ -241,20 +241,25 @@ struct VaultReorganizeView: View {
         files: [VaultReorganizer.FileAnalysis]
     ) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Category header
-            HStack(spacing: 4) {
+            // Destination category header
+            HStack(spacing: 6) {
+                Image(systemName: "arrow.right.circle.fill")
+                    .font(.caption)
+                    .foregroundColor(.accentColor)
                 Image(systemName: category.icon)
                     .font(.caption)
                     .foregroundColor(.secondary)
                 Text(category.displayName)
                     .font(.caption)
                     .fontWeight(.semibold)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(.primary)
                 Text("(\(files.count))")
                     .font(.caption2)
                     .foregroundColor(.secondary)
+                Spacer()
             }
-            .padding(.vertical, 6)
+            .padding(.vertical, 8)
+            .padding(.horizontal, 4)
 
             ForEach(files.indices, id: \.self) { idx in
                 if let analysisIndex = analyses.firstIndex(where: {
@@ -499,31 +504,52 @@ private struct PlanFileRow: View {
             .toggleStyle(.checkbox)
             .labelsHidden()
 
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 3) {
                 Text(analysis.fileName)
                     .font(.system(.body, design: .monospaced))
                     .lineLimit(1)
 
-                HStack(spacing: 4) {
-                    Text(analysis.currentFolder)
+                // AI summary
+                if !analysis.recommended.summary.isEmpty {
+                    Text(analysis.recommended.summary)
                         .font(.caption)
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
+                }
+
+                // Source → Destination path
+                HStack(spacing: 3) {
+                    Text(analysis.currentCategory.displayName)
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                    Text("/")
+                        .font(.caption2)
+                        .foregroundColor(.secondary.opacity(0.5))
+                    Text(analysis.currentFolder)
+                        .font(.caption2)
                         .foregroundColor(.secondary)
 
                     Image(systemName: "arrow.right")
-                        .font(.caption2)
-                        .foregroundColor(.purple)
+                        .font(.system(size: 8))
+                        .foregroundColor(.accentColor)
 
-                    Image(systemName: analysis.recommended.para.icon)
+                    Text(analysis.recommended.para.displayName)
                         .font(.caption2)
+                        .fontWeight(.medium)
+                        .foregroundColor(.accentColor)
+                    Text("/")
+                        .font(.caption2)
+                        .foregroundColor(.accentColor.opacity(0.5))
                     Text(analysis.recommended.targetFolder)
-                        .font(.caption)
-                        .foregroundColor(.purple)
+                        .font(.caption2)
+                        .fontWeight(.medium)
+                        .foregroundColor(.accentColor)
                 }
             }
 
             Spacer()
         }
-        .padding(.vertical, 5)
+        .padding(.vertical, 6)
         .padding(.horizontal, 8)
         .background(
             RoundedRectangle(cornerRadius: 6)
