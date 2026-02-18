@@ -127,11 +127,11 @@ final class AppState: ObservableObject {
             if hasErrors || hasPending { return "·_·;" }
             return "^‿^"
         case .settings:
-            return "·_·?"
+            return "·_·"
         case .dashboard:
             return "·_·"
         case .search:
-            return "·_·?"
+            return "·_·"
         case .paraManage:
             return "·_·"
         case .vaultReorganize:
