@@ -91,9 +91,11 @@ enum FrontmatterWriter {
             result += "\n"
         }
 
-        // Original file link
+        // Original file link (centralized _Assets/ path)
+        let ext = extractResult.file?.format ?? ""
+        let subdir = BinaryExtractor.imageExtensions.contains(ext) ? "images" : "documents"
         result += "\n## 원본 파일\n\n"
-        result += "![[_Assets/\(fileName)]]\n"
+        result += "![[_Assets/\(subdir)/\(fileName)]]\n"
 
         // Related Notes
         var lines: [String] = []

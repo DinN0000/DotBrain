@@ -103,25 +103,30 @@ struct PARAMover {
 
             // Skip source's own index note
             if entry == "\(safeSource).md" { continue }
-            // Skip _Assets — merge separately
+            // Skip _Assets — move files to centralized _Assets/{documents,images}/
             if entry == "_Assets" {
                 let sourceAssets = (sourceDir as NSString).appendingPathComponent("_Assets")
-                let targetAssets = (targetDir as NSString).appendingPathComponent("_Assets")
-                try? fm.createDirectory(atPath: targetAssets, withIntermediateDirectories: true)
                 if let assetFiles = try? fm.contentsOfDirectory(atPath: sourceAssets) {
                     for assetFile in assetFiles where !assetFile.hasPrefix(".") {
                         let src = (sourceAssets as NSString).appendingPathComponent(assetFile)
-                        var dst = (targetAssets as NSString).appendingPathComponent(assetFile)
+                        let centralDir = pathManager.assetsDirectory(for: assetFile)
+                        try? fm.createDirectory(atPath: centralDir, withIntermediateDirectories: true)
+                        var dst = (centralDir as NSString).appendingPathComponent(assetFile)
                         if fm.fileExists(atPath: dst) {
                             let ext = (assetFile as NSString).pathExtension
                             let base = (assetFile as NSString).deletingPathExtension
                             let ts = Int(Date().timeIntervalSince1970)
-                            dst = (targetAssets as NSString).appendingPathComponent(
+                            dst = (centralDir as NSString).appendingPathComponent(
                                 ext.isEmpty ? "\(base)_\(ts)" : "\(base)_\(ts).\(ext)"
                             )
                         }
                         try? fm.moveItem(atPath: src, toPath: dst)
                     }
+                }
+                // Remove the now-empty local _Assets/ directory
+                let remaining = (try? fm.contentsOfDirectory(atPath: sourceAssets))?.filter { !$0.hasPrefix(".") } ?? []
+                if remaining.isEmpty {
+                    try? fm.removeItem(atPath: sourceAssets)
                 }
                 continue
             }

@@ -5,7 +5,9 @@ struct PKMPathManager {
     let root: String
 
     var inboxPath: String { (root as NSString).appendingPathComponent("_Inbox") }
-    var assetsPath: String { (root as NSString).appendingPathComponent("_Assets") }
+    var centralAssetsPath: String { (root as NSString).appendingPathComponent("_Assets") }
+    var documentsAssetsPath: String { (centralAssetsPath as NSString).appendingPathComponent("documents") }
+    var imagesAssetsPath: String { (centralAssetsPath as NSString).appendingPathComponent("images") }
     var projectsPath: String { (root as NSString).appendingPathComponent("1_Project") }
     var areaPath: String { (root as NSString).appendingPathComponent("2_Area") }
     var resourcePath: String { (root as NSString).appendingPathComponent("3_Resource") }
@@ -78,9 +80,13 @@ struct PKMPathManager {
         return trimmed
     }
 
-    /// Get the assets directory for a target directory
-    func assetsDirectory(for targetDir: String) -> String {
-        return (targetDir as NSString).appendingPathComponent("_Assets")
+    /// Get the centralized assets subdirectory for a file based on its extension
+    func assetsDirectory(for filePath: String) -> String {
+        let ext = URL(fileURLWithPath: filePath).pathExtension.lowercased()
+        if BinaryExtractor.imageExtensions.contains(ext) {
+            return imagesAssetsPath
+        }
+        return documentsAssetsPath
     }
 
     /// Validate that a path is safely within the PKM root (prevents symlink traversal)
@@ -114,7 +120,8 @@ struct PKMPathManager {
     /// Create the full PARA folder structure
     func initializeStructure() throws {
         let fm = FileManager.default
-        let folders = [inboxPath, projectsPath, areaPath, resourcePath, archivePath]
+        let folders = [inboxPath, projectsPath, areaPath, resourcePath, archivePath,
+                       documentsAssetsPath, imagesAssetsPath]
         for folder in folders {
             try fm.createDirectory(atPath: folder, withIntermediateDirectories: true)
         }

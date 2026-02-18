@@ -212,7 +212,7 @@ struct FileMover {
     ) async throws -> ProcessedFileResult {
         let fm = FileManager.default
 
-        let assetsDir = pathManager.assetsDirectory(for: targetDir)
+        let assetsDir = pathManager.assetsDirectory(for: filePath)
         try fm.createDirectory(atPath: assetsDir, withIntermediateDirectories: true)
 
         // Duplicate check: hash for normal files, metadata for large files (>500MB)
@@ -231,7 +231,7 @@ struct FileMover {
         if let dupPath = dupPath {
             StatisticsService.incrementDuplicates()
             let dupFileName = (dupPath as NSString).lastPathComponent
-            let companionPath = (targetDir as NSString).appendingPathComponent("\(dupFileName).md")
+            let companionPath = (targetDir as NSString).appendingPathComponent("\(fileName).md")
             mergeTags(classification.tags, into: companionPath)
             try fm.trashItem(at: URL(fileURLWithPath: filePath), resultingItemURL: nil)
             return ProcessedFileResult(
@@ -247,7 +247,20 @@ struct FileMover {
         let resolvedAssetPath = resolveConflict(assetPath)
         try fm.moveItem(atPath: filePath, toPath: resolvedAssetPath)
 
-        // Create companion markdown with AI summary
+        // Skip companion .md for image files — EXIF-only data is not useful as standalone notes
+        let isImage = BinaryExtractor.imageExtensions.contains(
+            URL(fileURLWithPath: fileName).pathExtension.lowercased()
+        )
+        if isImage {
+            return ProcessedFileResult(
+                fileName: fileName,
+                para: classification.para,
+                targetPath: resolvedAssetPath,
+                tags: classification.tags
+            )
+        }
+
+        // Create companion markdown with AI summary (documents only from here)
         let extractResult = BinaryExtractor.extract(at: resolvedAssetPath)
 
         // AI summarization — use full extracted text for rich companion note

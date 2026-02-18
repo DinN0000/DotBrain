@@ -9,7 +9,7 @@ struct ProjectManager {
 
     // MARK: - Create
 
-    /// Create a new project with folder, index note, and _Assets/
+    /// Create a new project with folder and index note
     func createProject(name: String, summary: String = "") throws -> String {
         let fm = FileManager.default
         let safeName = sanitizeName(name)
@@ -22,10 +22,8 @@ struct ProjectManager {
             throw ProjectError.alreadyExists(safeName)
         }
 
-        // Create project directory and _Assets/
+        // Create project directory (assets go to centralized _Assets/)
         try fm.createDirectory(atPath: projectDir, withIntermediateDirectories: true)
-        let assetsDir = (projectDir as NSString).appendingPathComponent("_Assets")
-        try fm.createDirectory(atPath: assetsDir, withIntermediateDirectories: true)
 
         // Create index note
         let indexContent = FrontmatterWriter.createIndexNote(
