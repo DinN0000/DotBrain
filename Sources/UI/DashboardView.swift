@@ -341,6 +341,13 @@ struct DashboardView: View {
             var repairCount = 0
             var enrichCount = 0
 
+            StatisticsService.recordActivity(
+                fileName: "볼트 점검",
+                category: "system",
+                action: "started",
+                detail: "오류 검사 · 메타데이터 보완 · MOC 갱신"
+            )
+
             // 1. Audit
             await MainActor.run { vaultCheckPhase = "오류 검사 중..." }
             let auditor = VaultAuditor(pkmRoot: root)
@@ -385,6 +392,13 @@ struct DashboardView: View {
             await MainActor.run { vaultCheckPhase = "\(folderCountSnapshot)개 폴더 요약 갱신 중..." }
             let generator = MOCGenerator(pkmRoot: root)
             await generator.regenerateAll()
+
+            StatisticsService.recordActivity(
+                fileName: "볼트 점검",
+                category: "system",
+                action: "completed",
+                detail: "\(auditTotal)건 발견, \(repairCount)건 복구, \(enrichCount)개 보완"
+            )
 
             let snapshot = VaultCheckResult(
                 auditTotal: auditTotal,

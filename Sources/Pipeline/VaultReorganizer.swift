@@ -53,6 +53,13 @@ struct VaultReorganizer {
 
     /// Scan and classify all files in scope, returning analyses for files that need moving.
     func scan() async throws -> ScanResult {
+        StatisticsService.recordActivity(
+            fileName: "전체 재정리",
+            category: "system",
+            action: "started",
+            detail: "AI 위치 재분류 스캔"
+        )
+
         // 0-0.1: Collect files
         onProgress?(0.0, "파일 수집 중...")
         let collected = collectFiles()
@@ -161,6 +168,13 @@ struct VaultReorganizer {
         }
 
         onProgress?(1.0, "스캔 완료! \(analyses.count)개 파일 이동 필요")
+
+        StatisticsService.recordActivity(
+            fileName: "전체 재정리",
+            category: "system",
+            action: "completed",
+            detail: "\(filesToProcess.count)개 스캔, \(analyses.count)개 이동 필요"
+        )
 
         return ScanResult(
             files: analyses,
