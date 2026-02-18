@@ -20,15 +20,16 @@ struct SettingsView: View {
     @State private var updateCheckHovered = false
     @State private var isUpdateAnimating = false
 
+    @State private var viewingProvider: AIProvider = .claude
+
     private var activeProvider: AIProvider { appState.selectedProvider }
-    private var otherProvider: AIProvider { activeProvider == .claude ? .gemini : .claude }
 
     private var activeHasKey: Bool {
         activeProvider == .claude ? appState.hasClaudeKey : appState.hasGeminiKey
     }
 
-    private var otherHasKey: Bool {
-        otherProvider == .claude ? appState.hasClaudeKey : appState.hasGeminiKey
+    private var viewingHasKey: Bool {
+        viewingProvider == .claude ? appState.hasClaudeKey : appState.hasGeminiKey
     }
 
     var body: some View {
@@ -59,12 +60,14 @@ struct SettingsView: View {
         }
         .onAppear {
             isStructureReady = PKMPathManager(root: appState.pkmRootPath).isInitialized()
-            loadKeyForProvider(activeProvider)
+            viewingProvider = activeProvider
+            loadKeyForProvider(viewingProvider)
         }
-        .onChange(of: appState.selectedProvider) { _ in
-            loadKeyForProvider(activeProvider)
+        .onChange(of: viewingProvider) { _ in
+            loadKeyForProvider(viewingProvider)
             saveMessage = nil
             showingKey = false
+            isEditingKey = false
         }
         .onChange(of: appState.pkmRootPath) { _ in
             isStructureReady = PKMPathManager(root: appState.pkmRootPath).isInitialized()
@@ -101,7 +104,7 @@ struct SettingsView: View {
                     .fontWeight(.medium)
                 Spacer()
                 if activeHasKey {
-                    Label("키 등록됨", systemImage: "checkmark.circle.fill")
+                    Label("\(activeProvider.displayName) 사용 중", systemImage: "checkmark.circle.fill")
                         .font(.caption2)
                         .foregroundColor(.green)
                 }
@@ -116,23 +119,23 @@ struct SettingsView: View {
             .background(Color.primary.opacity(0.04))
             .cornerRadius(6)
 
-            // Model pipeline + cost
+            // Model pipeline + cost (shows viewing provider info)
             HStack {
-                Text(activeProvider.modelPipeline)
+                Text(viewingProvider.modelPipeline)
                     .font(.caption2)
                     .foregroundColor(.secondary)
                 Spacer()
-                Text(activeProvider.costInfo)
+                Text(viewingProvider.costInfo)
                     .font(.caption2)
                     .foregroundColor(.secondary)
             }
 
             // Key section: collapsed when key exists, expanded when editing or no key
-            if activeHasKey && !isEditingKey {
+            if viewingHasKey && !isEditingKey {
                 HStack {
                     Button("API 키 변경") {
                         isEditingKey = true
-                        loadKeyForProvider(activeProvider)
+                        loadKeyForProvider(viewingProvider)
                     }
                     .font(.caption)
                     .buttonStyle(.bordered)
@@ -150,30 +153,29 @@ struct SettingsView: View {
                     }
                 }
             } else {
-                providerKeyInput(activeProvider)
+                providerKeyInput(viewingProvider)
             }
 
-            // Other provider
-            if otherHasKey {
-                Divider()
-                    .padding(.vertical, 2)
-
-                HStack(spacing: 6) {
-                    Text(otherProvider.displayName)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                    Spacer()
-                    Button("전환") {
-                        isEditingKey = false
-                        withAnimation(.easeOut(duration: 0.15)) {
-                            appState.selectedProvider = otherProvider
-                        }
+            // Switch provider button (only when viewing a different provider with a key)
+            if viewingProvider != activeProvider && viewingHasKey {
+                Button(action: {
+                    withAnimation(.easeOut(duration: 0.15)) {
+                        appState.selectedProvider = viewingProvider
                     }
-                    .font(.caption2)
-                    .buttonStyle(.bordered)
-                    .controlSize(.mini)
+                }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "arrow.right.arrow.left")
+                            .font(.caption2)
+                        Text("\(viewingProvider.displayName)(으)로 전환")
+                            .font(.caption)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 4)
                 }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.small)
             }
+
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -182,19 +184,27 @@ struct SettingsView: View {
     }
 
     private func providerTab(_ provider: AIProvider) -> some View {
-        let isActive = appState.selectedProvider == provider
+        let isViewing = viewingProvider == provider
+        let isActiveProvider = activeProvider == provider
         let accent = providerAccentColor(provider)
 
         return Button {
             isEditingKey = false
             withAnimation(.easeOut(duration: 0.15)) {
-                appState.selectedProvider = provider
+                viewingProvider = provider
             }
         } label: {
             HStack(spacing: 5) {
+                // Green dot for active provider
+                if isActiveProvider {
+                    Circle()
+                        .fill(Color.green)
+                        .frame(width: 5, height: 5)
+                }
+
                 Text(provider.rawValue)
                     .font(.caption)
-                    .fontWeight(isActive ? .bold : .medium)
+                    .fontWeight(isViewing ? .bold : .medium)
 
                 if provider == .gemini {
                     Text("무료")
@@ -210,9 +220,9 @@ struct SettingsView: View {
             .padding(.vertical, 6)
             .background(
                 RoundedRectangle(cornerRadius: 5)
-                    .fill(isActive ? accent.opacity(0.12) : Color.clear)
+                    .fill(isViewing ? accent.opacity(0.12) : Color.clear)
             )
-            .foregroundColor(isActive ? accent : .secondary)
+            .foregroundColor(isViewing ? accent : .secondary)
         }
         .buttonStyle(.plain)
     }
@@ -449,13 +459,11 @@ struct SettingsView: View {
 
     private func runUpdate() {
         // Write update script to temp file and run detached
-        let appPath = NSHomeDirectory() + "/Applications/DotBrain.app"
         let updateScript = """
         #!/bin/bash
         sleep 2
         curl -sL https://raw.githubusercontent.com/DinN0000/DotBrain/main/install.sh -o /tmp/dotbrain_install.sh
-        bash /tmp/dotbrain_install.sh || true
-        open "\(appPath)" 2>/dev/null || true
+        bash /tmp/dotbrain_install.sh
         rm -f /tmp/dotbrain_install.sh /tmp/dotbrain_update.sh
         """
         let scriptPath = "/tmp/dotbrain_update.sh"
@@ -606,29 +614,29 @@ struct SettingsView: View {
 
     private func toggleKeyVisibility() {
         showingKey.toggle()
-        if showingKey, keyInput == "••••••••", activeHasKey {
-            if let key = activeProvider == .claude ? KeychainService.getAPIKey() : KeychainService.getGeminiAPIKey() {
+        if showingKey, keyInput == "••••••••", viewingHasKey {
+            if let key = viewingProvider == .claude ? KeychainService.getAPIKey() : KeychainService.getGeminiAPIKey() {
                 keyInput = key
             }
-        } else if !showingKey, activeHasKey, keyInput.hasPrefix(activeProvider.keyPrefix) {
+        } else if !showingKey, viewingHasKey, keyInput.hasPrefix(viewingProvider.keyPrefix) {
             keyInput = "••••••••"
         }
     }
 
     private func saveKey() {
-        if keyInput.hasPrefix(activeProvider.keyPrefix) {
-            let saved = activeProvider.saveAPIKey(keyInput)
+        if keyInput.hasPrefix(viewingProvider.keyPrefix) {
+            let saved = viewingProvider.saveAPIKey(keyInput)
             saveMessage = saved ? "저장 완료" : "저장 실패"
             appState.updateAPIKeyStatus()
             clearMessageAfterDelay()
         } else {
-            saveMessage = "\(activeProvider.keyPrefix)... 형식 필요"
+            saveMessage = "\(viewingProvider.keyPrefix)... 형식 필요"
             clearMessageAfterDelay()
         }
     }
 
     private func deleteKey() {
-        activeProvider.deleteAPIKey()
+        viewingProvider.deleteAPIKey()
         keyInput = ""
         appState.updateAPIKeyStatus()
         saveMessage = "삭제됨"
