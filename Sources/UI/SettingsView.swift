@@ -4,6 +4,7 @@ struct SettingsView: View {
     @EnvironmentObject var appState: AppState
     @State private var showFolderPicker = false
     @State private var isStructureReady = false
+    @State private var showHelp = false
 
     // API key state
     @State private var keyInput = ""
@@ -375,9 +376,7 @@ struct SettingsView: View {
 
             HStack(spacing: 12) {
                 Button(action: {
-                    if let url = URL(string: "https://github.com/DinN0000/DotBrain") {
-                        NSWorkspace.shared.open(url)
-                    }
+                    openExternal("https://github.com/DinN0000/DotBrain")
                 }) {
                     HStack(spacing: 4) {
                         Image(systemName: "arrow.up.right.square")
@@ -484,11 +483,7 @@ struct SettingsView: View {
 
     private var footerBar: some View {
         HStack(spacing: 12) {
-            Button(action: {
-                if let url = URL(string: "https://github.com/DinN0000/DotBrain/issues") {
-                    NSWorkspace.shared.open(url)
-                }
-            }) {
+            Button(action: { showHelp = true }) {
                 HStack(spacing: 3) {
                     Image(systemName: "questionmark.circle")
                         .font(.caption2)
@@ -498,6 +493,9 @@ struct SettingsView: View {
             }
             .buttonStyle(.plain)
             .foregroundColor(.secondary)
+            .popover(isPresented: $showHelp) {
+                helpPopover
+            }
 
             Spacer()
 
@@ -516,6 +514,80 @@ struct SettingsView: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 8)
+    }
+
+    // MARK: - External Links
+
+    private func openExternal(_ urlString: String) {
+        guard let url = URL(string: urlString) else { return }
+        // Delay so the popover doesn't swallow the URL open
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            NSWorkspace.shared.open(url)
+        }
+    }
+
+    // MARK: - Help Popover
+
+    private var helpPopover: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("DotBrain 사용법")
+                .font(.subheadline)
+                .fontWeight(.semibold)
+
+            VStack(alignment: .leading, spacing: 6) {
+                helpRow("1", "인박스에 파일을 드래그하거나 + 버튼으로 추가")
+                helpRow("2", "\"정리하기\" 버튼을 누르면 AI가 PARA로 분류")
+                helpRow("3", "폴더 관리에서 프로젝트 생성/이름 변경/병합")
+                helpRow("4", "검색으로 태그, 키워드, 제목 기반 노트 찾기")
+            }
+
+            Divider()
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text("PARA 구조")
+                    .font(.caption)
+                    .fontWeight(.medium)
+                Text("Project — 진행 중인 일 (마감 있음)")
+                    .font(.caption2).foregroundColor(.secondary)
+                Text("Area — 늘 관리하는 영역 (건강, 재무)")
+                    .font(.caption2).foregroundColor(.secondary)
+                Text("Resource — 참고 자료")
+                    .font(.caption2).foregroundColor(.secondary)
+                Text("Archive — 완료된 것")
+                    .font(.caption2).foregroundColor(.secondary)
+            }
+
+            Divider()
+
+            Button(action: {
+                showHelp = false
+                openExternal("https://github.com/DinN0000/DotBrain/issues")
+            }) {
+                HStack(spacing: 4) {
+                    Image(systemName: "arrow.up.right.square")
+                        .font(.caption2)
+                    Text("버그 신고 / 기능 요청")
+                        .font(.caption)
+                }
+            }
+            .buttonStyle(.plain)
+            .foregroundColor(.accentColor)
+        }
+        .padding(14)
+        .frame(width: 260)
+    }
+
+    private func helpRow(_ num: String, _ text: String) -> some View {
+        HStack(alignment: .top, spacing: 6) {
+            Text(num)
+                .font(.system(.caption2, design: .monospaced))
+                .fontWeight(.bold)
+                .foregroundColor(.accentColor)
+                .frame(width: 12)
+            Text(text)
+                .font(.caption)
+                .foregroundColor(.secondary)
+        }
     }
 
     // MARK: - Key Actions
