@@ -8,7 +8,6 @@ struct InboxStatusView: View {
     @State private var bounceAnimation = false
     @State private var isButtonHovered = false
     @State private var isBounceAnimating = false
-    @State private var mouseOffset: CGSize = .zero
     @State private var cachedInboxFiles: [URL] = []
     @State private var showClearConfirmation = false
 
@@ -45,22 +44,6 @@ struct InboxStatusView: View {
                 .strokeBorder(isDragOver ? Color.primary.opacity(0.4) : Color.clear, lineWidth: 2)
                 .padding(4)
         )
-        .onContinuousHover { phase in
-            switch phase {
-            case .active(let location):
-                let centerX: CGFloat = 180
-                let centerY: CGFloat = 240
-                let dx = (location.x - centerX) / centerX * 8
-                let dy = (location.y - centerY) / centerY * 6
-                mouseOffset = CGSize(width: dx, height: dy)
-            case .ended:
-                withAnimation(.easeOut(duration: 0.4)) {
-                    mouseOffset = .zero
-                }
-            @unknown default:
-                break
-            }
-        }
         .onDrop(of: [.fileURL], isTargeted: $isDragOver) { providers in
             handleDrop(providers)
             return true
@@ -120,18 +103,10 @@ struct InboxStatusView: View {
         }
     }
 
-    /// Face with eyes that follow the mouse, mouth stays fixed
     private func faceView(mouth: String) -> some View {
-        HStack(spacing: 0) {
-            Text("\u{00B7}")
-                .offset(x: mouseOffset.width * 0.5, y: mouseOffset.height * 0.5)
-            Text(mouth)
-            Text("\u{00B7}")
-                .offset(x: mouseOffset.width * 0.5, y: mouseOffset.height * 0.5)
-        }
-        .font(.system(size: 48, design: .monospaced))
-        .foregroundColor(.secondary)
-        .animation(.interactiveSpring(response: 0.25, dampingFraction: 0.6), value: mouseOffset)
+        Text("\u{00B7}\(mouth)\u{00B7}")
+            .font(.system(size: 48, design: .monospaced))
+            .foregroundColor(.secondary)
     }
 
     // MARK: - Active State
