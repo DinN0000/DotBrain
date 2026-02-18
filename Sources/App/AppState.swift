@@ -158,6 +158,26 @@ final class AppState: ObservableObject {
         // Only start services if onboarding is already completed
         if UserDefaults.standard.bool(forKey: "onboardingCompleted") {
             AICompanionService.updateIfNeeded(pkmRoot: pkmRootPath)
+
+            // One-time migration: consolidate scattered _Assets/ to central _Assets/{documents,images}/
+            let migrationKey = "assetMigrationV1Completed"
+            if !UserDefaults.standard.bool(forKey: migrationKey) {
+                let root = pkmRootPath
+                Task.detached(priority: .utility) {
+                    guard AssetMigrator.needsMigration(pkmRoot: root) else {
+                        await MainActor.run {
+                            UserDefaults.standard.set(true, forKey: migrationKey)
+                        }
+                        return
+                    }
+                    let migrationResult = AssetMigrator.migrate(pkmRoot: root)
+                    NSLog("[AppState] 에셋 마이그레이션: 문서 %d, 이미지 %d 이동", migrationResult.movedDocuments, migrationResult.movedImages)
+                    await MainActor.run {
+                        UserDefaults.standard.set(true, forKey: migrationKey)
+                    }
+                }
+            }
+
             setupWatchdog()
         }
     }
