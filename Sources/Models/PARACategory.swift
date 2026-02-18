@@ -1,4 +1,4 @@
-import Foundation
+import SwiftUI
 
 /// PARA methodology categories
 enum PARACategory: String, Codable, CaseIterable {
@@ -31,6 +31,15 @@ enum PARACategory: String, Codable, CaseIterable {
         case .area: return "square.stack.3d.up.fill"
         case .resource: return "book.fill"
         case .archive: return "archivebox.fill"
+        }
+    }
+
+    var color: Color {
+        switch self {
+        case .project: return .blue
+        case .area: return .green
+        case .resource: return .orange
+        case .archive: return .gray
         }
     }
 

@@ -1,5 +1,11 @@
 # Changelog
 
+## v2.0.7 — PARA 색상 통일 (2026-02-19)
+- PARACategory.color 중앙 프로퍼티 추가 (전체 앱 색상 한 곳에서 관리)
+- Area 색상 불일치 수정 (PARAManageView .purple → .green 통일)
+- Dashboard 상단 PARA 레이블 컴팩트 복원 (P A R A)
+- SearchView, DashboardView 하드코딩 색상 → .color 참조로 전환
+
 ## v2.0.6 — 코드 품질 대폭 개선 (2026-02-19)
 - 26개 파일 전면 리뷰 및 수정 (Critical 8, Important 14, Security 3, Bloat 6)
 - print() → NSLog() 전환 (27개소), 사용자 에러 메시지 한국어 통일

@@ -71,10 +71,10 @@ struct SearchView: View {
                 } else {
                     VStack(spacing: 4) {
                         HStack(spacing: 10) {
-                            paraLegend("Project", icon: "folder.fill", color: .blue)
-                            paraLegend("Area", icon: "tray.fill", color: .green)
-                            paraLegend("Resource", icon: "book.fill", color: .orange)
-                            paraLegend("Archive", icon: "archivebox.fill", color: .gray)
+                            paraLegend("Project", icon: PARACategory.project.icon, color: PARACategory.project.color)
+                            paraLegend("Area", icon: PARACategory.area.icon, color: PARACategory.area.color)
+                            paraLegend("Resource", icon: PARACategory.resource.icon, color: PARACategory.resource.color)
+                            paraLegend("Archive", icon: PARACategory.archive.icon, color: PARACategory.archive.color)
                             Spacer()
                         }
 
@@ -230,12 +230,6 @@ struct SearchResultRow: View {
     }
 
     private func paraColor(_ para: PARACategory?) -> Color {
-        switch para {
-        case .project: return .blue
-        case .area: return .green
-        case .resource: return .orange
-        case .archive: return .gray
-        case nil: return .secondary
-        }
+        para?.color ?? .secondary
     }
 }
