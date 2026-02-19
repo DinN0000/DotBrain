@@ -16,6 +16,7 @@ actor Classifier {
         subfolderContext: String,
         projectNames: [String],
         weightedContext: String = "",
+        tagVocabulary: String = "[]",
         onProgress: ((Double, String) -> Void)? = nil
     ) async throws -> [ClassifyResult] {
         guard !files.isEmpty else { return [] }
@@ -57,7 +58,8 @@ actor Classifier {
                         batch,
                         projectContext: projectContext,
                         subfolderContext: subfolderContext,
-                        weightedContext: weightedContext
+                        weightedContext: weightedContext,
+                        tagVocabulary: tagVocabulary
                     )
                 }
                 activeTasks += 1
@@ -107,7 +109,8 @@ actor Classifier {
                             file,
                             projectContext: projectContext,
                             subfolderContext: subfolderContext,
-                            weightedContext: weightedContext
+                            weightedContext: weightedContext,
+                            tagVocabulary: tagVocabulary
                         )
                         return (file.fileName, result)
                     }
@@ -146,7 +149,7 @@ actor Classifier {
                     para: s1.para,
                     tags: s1.tags,
                     summary: s1.summary,
-                    targetFolder: stripParaPrefix(s1.targetFolder ?? ""),
+                    targetFolder: stripNewPrefix(stripParaPrefix(s1.targetFolder ?? "")),
                     project: rawProject.flatMap { fuzzyMatchProject($0, projectNames: projectNames) },
                     confidence: s1.confidence
                 )
@@ -177,13 +180,14 @@ actor Classifier {
         _ files: [ClassifyInput],
         projectContext: String,
         subfolderContext: String,
-        weightedContext: String
+        weightedContext: String,
+        tagVocabulary: String
     ) async throws -> [String: ClassifyResult.Stage1Item] {
         let fileContents = files.map { file in
             (fileName: file.fileName, content: file.content)
         }
 
-        let prompt = buildStage1Prompt(fileContents, projectContext: projectContext, subfolderContext: subfolderContext, weightedContext: weightedContext)
+        let prompt = buildStage1Prompt(fileContents, projectContext: projectContext, subfolderContext: subfolderContext, weightedContext: weightedContext, tagVocabulary: tagVocabulary)
 
         let response = try await aiService.sendFast(maxTokens: 4096, message: prompt)
         StatisticsService.addApiCost(Double(files.count) * 0.001)
@@ -199,7 +203,7 @@ actor Classifier {
                     summary: item.summary ?? "",
                     confidence: max(0, min(1, item.confidence ?? 0)),
                     project: item.project,
-                    targetFolder: item.targetFolder.map { stripParaPrefix($0) }
+                    targetFolder: item.targetFolder.map { stripNewPrefix(stripParaPrefix($0)) }
                 )
             }
         }
@@ -226,14 +230,16 @@ actor Classifier {
         _ file: ClassifyInput,
         projectContext: String,
         subfolderContext: String,
-        weightedContext: String
+        weightedContext: String,
+        tagVocabulary: String
     ) async throws -> ClassifyResult.Stage2Item {
         let prompt = buildStage2Prompt(
             fileName: file.fileName,
             content: file.content,
             projectContext: projectContext,
             subfolderContext: subfolderContext,
-            weightedContext: weightedContext
+            weightedContext: weightedContext,
+            tagVocabulary: tagVocabulary
         )
 
         let response = try await aiService.sendPrecise(maxTokens: 2048, message: prompt)
@@ -245,7 +251,7 @@ actor Classifier {
                 para: para,
                 tags: Array((item.tags ?? []).prefix(5)),
                 summary: item.summary ?? "",
-                targetFolder: stripParaPrefix(item.targetFolder ?? item.targetPath ?? ""),
+                targetFolder: stripNewPrefix(stripParaPrefix(item.targetFolder ?? item.targetPath ?? "")),
                 project: item.project,
                 confidence: item.confidence.map { max(0, min(1, $0)) }
             )
@@ -267,7 +273,8 @@ actor Classifier {
         _ files: [(fileName: String, content: String)],
         projectContext: String,
         subfolderContext: String,
-        weightedContext: String
+        weightedContext: String,
+        tagVocabulary: String
     ) -> String {
         let fileList = files.enumerated().map { (i, f) in
             let truncated = String(f.content.prefix(5000))
@@ -286,26 +293,46 @@ actor Classifier {
 
         """
 
+        let tagSection = tagVocabulary == "[]" ? "" : """
+
+        ## 기존 태그 참고
+        볼트에서 사용 중인 태그입니다. 동일한 개념이면 아래 표기를 그대로 따르세요.
+        새로운 개념의 태그는 자유롭게 생성해도 됩니다.
+        \(tagVocabulary)
+
+        """
+
         return """
         당신은 PARA 방법론 기반 문서 분류 전문가입니다.
 
         ## 활성 프로젝트 목록
         \(projectContext)
 
-        ## 기존 하위 폴더
+        ## 기존 하위 폴더 (이 목록의 정확한 이름만 사용)
         \(subfolderContext)
-        \(weightedSection)
+        새 폴더가 필요하면 targetFolder에 "NEW:폴더명"을 사용하세요. 기존 폴더와 비슷한 이름이 있으면 반드시 기존 이름을 사용하세요.
+        \(weightedSection)\(tagSection)
         ## 분류 규칙
-        - project: 활성 프로젝트 목록에 있는 프로젝트의 직접적인 작업 문서만 (액션 아이템, 체크리스트, 마감 관련 문서). 반드시 project 필드에 위 목록의 정확한 프로젝트명을 기재.
-        - area: 유지보수, 모니터링, 운영, 지속적 책임 영역의 문서
-        - resource: 분석 자료, 가이드, 레퍼런스, 하우투, 학습 자료
-        - archive: 완료된 작업, 오래된 내용, 더 이상 활성이 아닌 문서
 
-        ⚠️ 프로젝트와 관련된 참고 자료는 project가 아니라 resource로, 운영/관리 문서는 area로 분류하세요.
-        ⚠️ 포트폴리오, 이력서, 프로젝트 소개/설명/개요 문서는 resource입니다 (직접 작업 문서가 아님).
-        ⚠️ 프로젝트에 대한 분석/리뷰/회고는 resource 또는 archive입니다.
-        ⚠️ para가 project가 아니더라도, 활성 프로젝트와 관련이 있으면 project 필드에 해당 프로젝트명을 기재하세요. 관련 없으면 생략.
-        ⚠️ 활성 프로젝트 목록에 없지만 명확히 프로젝트 작업(회의록, 체크리스트, 마감일, 진행 상태)인 문서는 para: "project", project: "제안할_프로젝트명"으로 분류하세요. 시스템이 사용자에게 확인합니다.
+        | para | 조건 | 예시 | project 필드 |
+        |------|------|------|-------------|
+        | project | 활성 프로젝트의 직접 작업 문서 (마감 있는 작업, 체크리스트, 회의록) | 스프린트 백로그, 회의록, TODO | 필수: 정확한 프로젝트명 |
+        | area | 여러 프로젝트가 속하는 도메인/영역 (지속적 관리 대상) | 도메인 운영, 인프라 관리 | 관련시만 |
+        | resource | 참고/학습/분석 자료 | 기술 가이드, API 레퍼런스, 분석 보고서 | 관련시만 |
+        | archive | 완료/비활성/오래된 문서 | 종료된 작업, 과거 회고록 | 관련시만 |
+
+        Area는 도메인(상위 영역)이고 그 아래 여러 Project가 묶일 수 있음.
+
+        ## 주의사항
+
+        | 문서 유형 | 올바른 분류 | 흔한 오분류 |
+        |-----------|-----------|-----------|
+        | 프로젝트 참고자료/분석 | resource | project |
+        | 프로젝트 소개/개요/제안서 | resource | project |
+        | 프로젝트 회고/리뷰 | resource 또는 archive | project |
+        | 도메인 운영/관리 문서 | area | project |
+        | project가 아닌데 프로젝트 관련 | project 필드에 프로젝트명 기재 | project 필드 생략 |
+        | 목록에 없는 명확한 프로젝트 작업 | project (project: "제안명") | resource |
 
         ## 분류할 파일 목록
         \(fileList)
@@ -320,14 +347,13 @@ actor Classifier {
             "summary": "핵심 내용 한 줄 요약 (15자 이상)",
             "confidence": 0.0~1.0,
             "project": "관련 프로젝트명 (관련 있을 때만, 없으면 생략)",
-            "targetFolder": "하위 폴더명 (예: DevOps, 회의록). PARA 접두사 포함하지 말 것"
+            "targetFolder": "기존 폴더명 또는 NEW:폴더명. PARA 접두사 포함하지 말 것"
           }
         ]
 
         각 파일에 대해 정확히 하나의 객체를 반환하세요. tags는 최대 5개, 한국어 또는 영어 혼용 가능합니다.
         confidence는 분류 확신도입니다 (0.0=모름, 1.0=확실).
         summary는 이 문서가 무엇에 관한 것인지 구체적으로 한 줄로 요약하세요 (후속 노트 연결에 사용됩니다).
-        ⚠️ 같은 주제의 기존 폴더가 있으면 반드시 그 폴더명을 그대로 사용하세요.
         """
     }
 
@@ -336,7 +362,8 @@ actor Classifier {
         content: String,
         projectContext: String,
         subfolderContext: String,
-        weightedContext: String
+        weightedContext: String,
+        tagVocabulary: String
     ) -> String {
         let weightedSection = weightedContext.isEmpty ? "" : """
 
@@ -350,26 +377,46 @@ actor Classifier {
 
         """
 
+        let tagSection = tagVocabulary == "[]" ? "" : """
+
+        ## 기존 태그 참고
+        볼트에서 사용 중인 태그입니다. 동일한 개념이면 아래 표기를 그대로 따르세요.
+        새로운 개념의 태그는 자유롭게 생성해도 됩니다.
+        \(tagVocabulary)
+
+        """
+
         return """
         당신은 PARA 방법론 기반 문서 분류 전문가입니다. 이 문서를 정밀하게 분석해주세요.
 
         ## 활성 프로젝트 목록
         \(projectContext)
 
-        ## 기존 하위 폴더
+        ## 기존 하위 폴더 (이 목록의 정확한 이름만 사용)
         \(subfolderContext)
-        \(weightedSection)
+        새 폴더가 필요하면 targetFolder에 "NEW:폴더명"을 사용하세요. 기존 폴더와 비슷한 이름이 있으면 반드시 기존 이름을 사용하세요.
+        \(weightedSection)\(tagSection)
         ## 분류 규칙
-        - project: 활성 프로젝트 목록에 있는 프로젝트의 직접적인 작업 문서만 (액션 아이템, 체크리스트, 마감 관련 문서). 반드시 project 필드에 위 목록의 정확한 프로젝트명을 기재.
-        - area: 유지보수, 모니터링, 운영, 지속적 책임 영역의 문서
-        - resource: 분석 자료, 가이드, 레퍼런스, 하우투, 학습 자료
-        - archive: 완료된 작업, 오래된 내용, 더 이상 활성이 아닌 문서
 
-        ⚠️ 프로젝트와 관련된 참고 자료는 project가 아니라 resource로, 운영/관리 문서는 area로 분류하세요.
-        ⚠️ 포트폴리오, 이력서, 프로젝트 소개/설명/개요 문서는 resource입니다 (직접 작업 문서가 아님).
-        ⚠️ 프로젝트에 대한 분석/리뷰/회고는 resource 또는 archive입니다.
-        ⚠️ para가 project가 아니더라도, 활성 프로젝트와 관련이 있으면 project 필드에 해당 프로젝트명을 기재하세요. 관련 없으면 생략.
-        ⚠️ 활성 프로젝트 목록에 없지만 명확히 프로젝트 작업(회의록, 체크리스트, 마감일, 진행 상태)인 문서는 para: "project", project: "제안할_프로젝트명"으로 분류하세요. 시스템이 사용자에게 확인합니다.
+        | para | 조건 | 예시 | project 필드 |
+        |------|------|------|-------------|
+        | project | 활성 프로젝트의 직접 작업 문서 (마감 있는 작업, 체크리스트, 회의록) | 스프린트 백로그, 회의록, TODO | 필수: 정확한 프로젝트명 |
+        | area | 여러 프로젝트가 속하는 도메인/영역 (지속적 관리 대상) | 도메인 운영, 인프라 관리 | 관련시만 |
+        | resource | 참고/학습/분석 자료 | 기술 가이드, API 레퍼런스, 분석 보고서 | 관련시만 |
+        | archive | 완료/비활성/오래된 문서 | 종료된 작업, 과거 회고록 | 관련시만 |
+
+        Area는 도메인(상위 영역)이고 그 아래 여러 Project가 묶일 수 있음.
+
+        ## 주의사항
+
+        | 문서 유형 | 올바른 분류 | 흔한 오분류 |
+        |-----------|-----------|-----------|
+        | 프로젝트 참고자료/분석 | resource | project |
+        | 프로젝트 소개/개요/제안서 | resource | project |
+        | 프로젝트 회고/리뷰 | resource 또는 archive | project |
+        | 도메인 운영/관리 문서 | area | project |
+        | project가 아닌데 프로젝트 관련 | project 필드에 프로젝트명 기재 | project 필드 생략 |
+        | 목록에 없는 명확한 프로젝트 작업 | project (project: "제안명") | resource |
 
         ## 대상 파일
         파일명: \(fileName)
@@ -384,13 +431,12 @@ actor Classifier {
           "tags": ["태그1", "태그2"],
           "summary": "문서 내용을 2~3문장으로 요약",
           "confidence": 0.0~1.0,
-          "targetFolder": "하위 폴더명. PARA 접두사 포함하지 말 것",
+          "targetFolder": "기존 폴더명 또는 NEW:폴더명. PARA 접두사 포함하지 말 것",
           "project": "관련 프로젝트명 (관련 있을 때만, 없으면 생략)"
         }
 
         tags는 최대 5개, summary는 한국어로 작성하세요.
         confidence는 분류 확신도입니다 (0.0=모름, 1.0=확실).
-        ⚠️ 같은 주제의 기존 폴더가 있으면 반드시 그 폴더명을 그대로 사용하세요.
         """
     }
 
@@ -481,6 +527,15 @@ actor Classifier {
         }
 
         return result
+    }
+
+    /// Strip "NEW:" prefix from targetFolder (hallucination prevention protocol)
+    private func stripNewPrefix(_ folder: String) -> String {
+        let trimmed = folder.trimmingCharacters(in: .whitespaces)
+        if trimmed.hasPrefix("NEW:") {
+            return String(trimmed.dropFirst(4)).trimmingCharacters(in: .whitespaces)
+        }
+        return trimmed
     }
 
     /// Fuzzy match AI-returned project name against actual folder names.

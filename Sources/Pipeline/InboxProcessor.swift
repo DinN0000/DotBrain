@@ -41,6 +41,7 @@ struct InboxProcessor {
         let subfolderContext = contextBuilder.buildSubfolderContext()
         let projectNames = contextBuilder.extractProjectNames(from: projectContext)
         let weightedContext = contextBuilder.buildWeightedContext()
+        let tagVocabulary = contextBuilder.buildTagVocabulary()
 
         onProgress?(0.1, "프로젝트 컨텍스트 로드 완료")
 
@@ -98,6 +99,7 @@ struct InboxProcessor {
             subfolderContext: subfolderContext,
             projectNames: projectNames,
             weightedContext: weightedContext,
+            tagVocabulary: tagVocabulary,
             onProgress: { [onProgress] progress, status in
                 // Map classifier's 0-1 progress to our 0.3-0.7 range
                 let mappedProgress = 0.3 + progress * 0.4
@@ -107,7 +109,7 @@ struct InboxProcessor {
 
         // Classifications ready for move (semantic linking happens post-move)
         onPhaseChange?(.linking)
-        var enrichedClassifications = classifications
+        let enrichedClassifications = classifications
         onProgress?(0.7, "파일 이동 준비 중...")
 
         // Move files
