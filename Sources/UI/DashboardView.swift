@@ -435,7 +435,7 @@ struct DashboardView: View {
             if report.totalIssues > 0 {
                 await MainActor.run { vaultCheckPhase = "자동 복구 중..." }
                 let repair = auditor.repair(report: report)
-                repairCount = repair.linksFixed + repair.frontmatterInjected + repair.paraFixed + repair.indexNotesMerged
+                repairCount = repair.linksFixed + repair.frontmatterInjected + repair.paraFixed
             }
             if Task.isCancelled { return }
 
