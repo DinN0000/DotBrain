@@ -283,6 +283,13 @@ struct VaultReorganizer {
             let _ = await linker.linkNotes(filePaths: successPaths)
         }
 
+        let failedCount = results.filter { if case .error = $0.status { return true }; return false }.count
+        NotificationService.sendProcessingComplete(
+            classified: results.filter(\.isSuccess).count,
+            total: selected.count,
+            failed: failedCount
+        )
+
         onProgress?(1.0, "완료!")
         return results
     }
@@ -326,6 +333,7 @@ struct VaultReorganizer {
                     var fileIsDir: ObjCBool = false
                     guard fm.fileExists(atPath: filePath, isDirectory: &fileIsDir),
                           !fileIsDir.boolValue else { continue }
+                    guard pathManager.isPathSafe(filePath) else { continue }
 
                     results.append(CollectedFile(
                         filePath: filePath,
