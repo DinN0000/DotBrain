@@ -270,9 +270,17 @@ struct VaultReorganizer {
         }
 
         if !affectedFolders.isEmpty {
-            onProgress?(0.95, "MOC 갱신 중...")
+            onProgress?(0.93, "MOC 갱신 중...")
             let mocGenerator = MOCGenerator(pkmRoot: pkmRoot)
             await mocGenerator.updateMOCsForFolders(affectedFolders)
+        }
+
+        // Semantic link: reconnect moved files with vault
+        let successPaths = results.filter(\.isSuccess).map(\.targetPath)
+        if !successPaths.isEmpty {
+            onProgress?(0.97, "시맨틱 연결 중...")
+            let linker = SemanticLinker(pkmRoot: pkmRoot)
+            let _ = await linker.linkNotes(filePaths: successPaths)
         }
 
         onProgress?(1.0, "완료!")
