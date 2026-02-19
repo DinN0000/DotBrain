@@ -282,6 +282,19 @@ struct DashboardView: View {
                 }
             }
 
+            // Semantic links
+            if result.linksCreated > 0 {
+                HStack(spacing: 6) {
+                    Image(systemName: "arrow.triangle.branch")
+                        .font(.caption)
+                        .foregroundColor(.blue)
+                    Text("\(result.linksCreated)개 시맨틱 링크 생성")
+                        .font(.caption)
+                        .foregroundColor(.blue)
+                    Spacer()
+                }
+            }
+
             // MOC update
             if result.mocUpdated {
                 HStack(spacing: 6) {
@@ -422,7 +435,7 @@ struct DashboardView: View {
             if report.totalIssues > 0 {
                 await MainActor.run { vaultCheckPhase = "자동 복구 중..." }
                 let repair = auditor.repair(report: report)
-                repairCount = repair.linksFixed + repair.frontmatterInjected + repair.paraFixed
+                repairCount = repair.linksFixed + repair.frontmatterInjected + repair.paraFixed + repair.indexNotesMerged
             }
             if Task.isCancelled { return }
 
@@ -462,11 +475,21 @@ struct DashboardView: View {
             await generator.regenerateAll()
             if Task.isCancelled { return }
 
+            // 5. Semantic linking
+            await MainActor.run { vaultCheckPhase = "노트 간 시맨틱 연결 중..." }
+            let linker = SemanticLinker(pkmRoot: root)
+            let linkResult = await linker.linkAll { progress, status in
+                Task { @MainActor in
+                    vaultCheckPhase = status
+                }
+            }
+            let semanticLinksCreated = linkResult.linksCreated
+
             StatisticsService.recordActivity(
                 fileName: "볼트 점검",
                 category: "system",
                 action: "completed",
-                detail: "\(report.totalIssues)건 발견, \(repairCount)건 복구, \(enrichCount)개 보완"
+                detail: "\(report.totalIssues)건 발견, \(repairCount)건 복구, \(enrichCount)개 보완, \(semanticLinksCreated)개 링크"
             )
 
             let snapshot = VaultCheckResult(
@@ -476,7 +499,8 @@ struct DashboardView: View {
                 untaggedFiles: report.untaggedFiles.count,
                 repairCount: repairCount,
                 enrichCount: enrichCount,
-                mocUpdated: true
+                mocUpdated: true,
+                linksCreated: semanticLinksCreated
             )
             await MainActor.run {
                 vaultCheckResult = snapshot
@@ -594,6 +618,7 @@ private struct VaultCheckResult {
     let repairCount: Int
     let enrichCount: Int
     let mocUpdated: Bool
+    let linksCreated: Int
 
     var auditTotal: Int {
         brokenLinks + missingFrontmatter + missingPARA
