@@ -43,6 +43,19 @@
 - Never switch branches on active working repo — use `/tmp/` temporary clones for cross-branch operations
 - Delete feature branches after merge (local + remote)
 
+## Documentation
+- Architecture docs live in `docs/` — update when code changes affect:
+  - Pipeline phase order or data flow → `docs/pipelines.md`
+  - Service public API or integration points → `docs/services.md`
+  - Model fields or new model types → `docs/models-and-data.md`
+  - Security invariants or concurrency patterns → `docs/security-and-concurrency.md`
+  - Layer boundaries or new modules → `docs/architecture.md`
+- Doc updates go in the same commit as the code change
+- Use Korean explanations + English technical terms
+- New files: add to relevant section in docs
+- Removed files: remove references from docs
+- Design decisions: `docs/plans/YYYY-MM-DD-feature-name.md`
+
 ## Custom Commands
 - `/review` — code review against CLAUDE.md rules
 - `/check` — quick project status (build, git, release)
