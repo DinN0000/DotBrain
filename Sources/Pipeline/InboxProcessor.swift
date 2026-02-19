@@ -105,39 +105,10 @@ struct InboxProcessor {
             }
         )
 
-        // Enrich with related notes — AI-based context linking
+        // Classifications ready for move (semantic linking happens post-move)
         onPhaseChange?(.linking)
         var enrichedClassifications = classifications
-        let needsLinking = classifications.contains { $0.confidence < 0.9 }
-
-        if needsLinking {
-            onProgress?(0.65, "관련 노트 연결 중...")
-            let contextMap = await ContextMapBuilder(pkmRoot: pkmRoot).build()
-            let linker = ContextLinker(pkmRoot: pkmRoot)
-
-            let filePairs: [(input: ClassifyInput, classification: ClassifyResult)] = zip(inputs, classifications)
-                .filter { $0.1.confidence < 0.9 }
-                .map { (input: $0.0, classification: $0.1) }
-            let indexMap: [String: Int] = Dictionary(uniqueKeysWithValues: inputs.enumerated().map { ($1.filePath, $0) })
-            let relatedMap = await linker.findRelatedNotes(
-                for: filePairs,
-                contextMap: contextMap,
-                onProgress: { [onProgress] progress, status in
-                    let mapped = 0.65 + progress * 0.05
-                    onProgress?(mapped, status)
-                }
-            )
-
-            for (batchIndex, notes) in relatedMap {
-                guard batchIndex < filePairs.count else { continue }
-                let filePath = filePairs[batchIndex].input.filePath
-                if let originalIndex = indexMap[filePath] {
-                    enrichedClassifications[originalIndex].relatedNotes = notes
-                }
-            }
-        } else {
-            onProgress?(0.7, "관련 노트 연결 건너뜀")
-        }
+        onProgress?(0.7, "파일 이동 준비 중...")
 
         // Move files
         onPhaseChange?(.processing)
@@ -254,6 +225,14 @@ struct InboxProcessor {
             await mocGenerator.updateMOCsForFolders(affectedFolders)
         }
 
+        // Semantic link: connect newly moved files with vault
+        let successPaths = processed.filter(\.isSuccess).map(\.targetPath)
+        if !successPaths.isEmpty {
+            onProgress?(0.93, "시맨틱 연결 중...")
+            let linker = SemanticLinker(pkmRoot: pkmRoot)
+            let _ = await linker.linkNotes(filePaths: successPaths)
+        }
+
         onFileProgress?(inputs.count, inputs.count, "")
         onProgress?(0.95, "완료 정리 중...")
 
@@ -296,6 +275,9 @@ struct InboxProcessor {
             }
             if desc.contains("429") || desc.contains("rate") {
                 return "API 요청 한도 초과. 잠시 후 다시 시도해주세요."
+            }
+            if desc.contains("credit") || desc.contains("balance") || desc.contains("400") {
+                return "API 크레딧이 부족합니다. Anthropic 콘솔에서 잔액을 확인해주세요."
             }
             if desc.contains("401") || desc.contains("403") || desc.contains("authentication") {
                 return "API 키가 유효하지 않습니다. 설정에서 확인해주세요."
