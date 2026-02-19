@@ -139,45 +139,11 @@ struct FolderReorganizer {
             }
         )
 
-        // Enrich with related notes — AI-based context linking
-        onPhaseChange?(.linking)
-        var enrichedClassifications = classifications
-        let needsLinking = classifications.contains { $0.confidence < 0.9 }
-
-        if needsLinking {
-            onProgress?(0.65, "관련 노트 연결 중...")
-            let contextMap = await ContextMapBuilder(pkmRoot: pkmRoot).build()
-            let linker = ContextLinker(pkmRoot: pkmRoot)
-
-            let filePairs: [(input: ClassifyInput, classification: ClassifyResult)] = zip(inputs, classifications)
-                .filter { $0.1.confidence < 0.9 }
-                .map { (input: $0.0, classification: $0.1) }
-            let indexMap: [String: Int] = Dictionary(uniqueKeysWithValues: inputs.enumerated().map { ($1.filePath, $0) })
-            let relatedMap = await linker.findRelatedNotes(
-                for: filePairs,
-                contextMap: contextMap,
-                onProgress: { [onProgress] progress, status in
-                    let mapped = 0.65 + progress * 0.05
-                    onProgress?(mapped, status)
-                }
-            )
-
-            for (batchIndex, notes) in relatedMap {
-                guard batchIndex < filePairs.count else { continue }
-                let filePath = filePairs[batchIndex].input.filePath
-                if let originalIndex = indexMap[filePath] {
-                    enrichedClassifications[originalIndex].relatedNotes = notes
-                }
-            }
-        } else {
-            onProgress?(0.7, "관련 노트 연결 건너뜀")
-        }
-
         // Compare and process
         onPhaseChange?(.processing)
-        for (i, (classification, input)) in zip(enrichedClassifications, inputs).enumerated() {
+        for (i, (classification, input)) in zip(classifications, inputs).enumerated() {
             if Task.isCancelled { throw CancellationError() }
-            let progress = 0.7 + Double(i) / Double(max(enrichedClassifications.count, 1)) * 0.25
+            let progress = 0.7 + Double(i) / Double(max(classifications.count, 1)) * 0.25
             onProgress?(progress, "\(input.fileName) 처리 중...")
             onFileProgress?(i, inputs.count, input.fileName)
 
@@ -256,6 +222,15 @@ struct FolderReorganizer {
         })
         if !affectedFolders.isEmpty {
             await mocGenerator.updateMOCsForFolders(affectedFolders)
+        }
+
+        // Semantic link: connect processed files with vault (post-move)
+        let allSuccessPaths = processed.filter(\.isSuccess).map(\.targetPath)
+        if !allSuccessPaths.isEmpty {
+            onPhaseChange?(.linking)
+            onProgress?(0.9, "시맨틱 연결 중...")
+            let linker = SemanticLinker(pkmRoot: pkmRoot)
+            let _ = await linker.linkNotes(filePaths: allSuccessPaths)
         }
 
         onFileProgress?(inputs.count, inputs.count, "")
