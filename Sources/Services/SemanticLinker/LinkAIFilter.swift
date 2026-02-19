@@ -6,6 +6,7 @@ struct LinkAIFilter: Sendable {
     struct FilteredLink {
         let name: String
         let context: String
+        let relation: String  // prerequisite, project, reference, related
     }
 
     func filterBatch(
@@ -37,9 +38,14 @@ struct LinkAIFilter: Sendable {
         1. 실질적 맥락 연관성 기준 선택 (단순 태그 일치 불충분)
         2. context: "~하려면", "~할 때", "~와 비교할 때" 형식 (한국어, 15자 이내)
         3. 관련 없는 후보 제외
+        4. relation: 관계 유형을 하나 선택
+           - "prerequisite": 이해하려면 먼저 봐야 하는 문서
+           - "project": 같은 프로젝트/업무 관련
+           - "reference": 참고/비교할 수 있는 자료
+           - "related": 주제가 비슷한 문서
 
         ## 응답 (순수 JSON, 코드블록 없이)
-        [{"noteIndex": 0, "links": [{"index": 0, "context": "~하려면 참고"}]}]
+        [{"noteIndex": 0, "links": [{"index": 0, "context": "~하려면 참고", "relation": "reference"}]}]
         """
 
         let response = try await aiService.sendFast(maxTokens: 2048, message: prompt)
@@ -75,9 +81,14 @@ struct LinkAIFilter: Sendable {
         1. 단순 태그 일치가 아닌 실질적 맥락 연관성 기준
         2. context는 "~하려면", "~할 때", "~와 비교할 때" 형식 (한국어, 15자 이내)
         3. 관련 없는 후보는 제외
+        4. relation: 관계 유형을 하나 선택
+           - "prerequisite": 이해하려면 먼저 봐야 하는 문서
+           - "project": 같은 프로젝트/업무 관련
+           - "reference": 참고/비교할 수 있는 자료
+           - "related": 주제가 비슷한 문서
 
         ## 응답 (순수 JSON, 코드블록 없이)
-        [{"index": 0, "context": "~하려면 참고"}]
+        [{"index": 0, "context": "~하려면 참고", "relation": "reference"}]
         """
 
         let response = try await aiService.sendFast(maxTokens: 512, message: prompt)
@@ -101,7 +112,7 @@ struct LinkAIFilter: Sendable {
         let jsonStr = String(cleaned[startBracket...endBracket])
         guard let data = jsonStr.data(using: .utf8) else { return [] }
 
-        struct Item: Decodable { let index: Int; let context: String? }
+        struct Item: Decodable { let index: Int; let context: String?; let relation: String? }
 
         guard let items = try? JSONDecoder().decode([Item].self, from: data) else { return [] }
 
@@ -109,7 +120,8 @@ struct LinkAIFilter: Sendable {
             guard item.index >= 0, item.index < candidates.count else { return nil }
             return FilteredLink(
                 name: candidates[item.index].name,
-                context: item.context ?? "관련 문서"
+                context: item.context ?? "관련 문서",
+                relation: Self.validRelation(item.relation)
             )
         }
     }
@@ -131,7 +143,7 @@ struct LinkAIFilter: Sendable {
             return Array(repeating: [], count: notes.count)
         }
 
-        struct LinkItem: Decodable { let index: Int; let context: String? }
+        struct LinkItem: Decodable { let index: Int; let context: String?; let relation: String? }
         struct NoteItem: Decodable { let noteIndex: Int; let links: [LinkItem]? }
 
         guard let items = try? JSONDecoder().decode([NoteItem].self, from: data) else {
@@ -146,12 +158,20 @@ struct LinkAIFilter: Sendable {
                 guard link.index >= 0, link.index < candidates.count else { return nil }
                 return FilteredLink(
                     name: candidates[link.index].name,
-                    context: link.context ?? "관련 문서"
+                    context: link.context ?? "관련 문서",
+                    relation: Self.validRelation(link.relation)
                 )
             }
             results[item.noteIndex] = links
         }
         return results
+    }
+
+    private static let validRelations: Set<String> = ["prerequisite", "project", "reference", "related"]
+
+    private static func validRelation(_ raw: String?) -> String {
+        guard let raw = raw, validRelations.contains(raw) else { return "related" }
+        return raw
     }
 
     private func stripCodeBlock(_ text: String) -> String {

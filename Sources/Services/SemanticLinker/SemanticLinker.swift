@@ -114,11 +114,11 @@ struct SemanticLinker: Sendable {
         let writer = RelatedNotesWriter()
         let notePathMap = Dictionary(uniqueKeysWithValues: allNotes.map { ($0.name, $0.filePath) })
 
-        var reverseLinks: [String: [(name: String, context: String)]] = [:]
+        var reverseLinks: [String: [(name: String, context: String, relation: String)]] = [:]
         for entry in allLinks {
             for link in entry.links {
                 let reverseContext = "\(entry.noteName)에서 참조"
-                reverseLinks[link.name, default: []].append((name: entry.noteName, context: reverseContext))
+                reverseLinks[link.name, default: []].append((name: entry.noteName, context: reverseContext, relation: "related"))
             }
         }
 
@@ -137,7 +137,7 @@ struct SemanticLinker: Sendable {
 
         for (targetName, sources) in reverseLinks {
             guard let targetPath = notePathMap[targetName] else { continue }
-            let reverseFilteredLinks = sources.map { LinkAIFilter.FilteredLink(name: $0.name, context: $0.context) }
+            let reverseFilteredLinks = sources.map { LinkAIFilter.FilteredLink(name: $0.name, context: $0.context, relation: $0.relation) }
             do {
                 try writer.writeRelatedNotes(filePath: targetPath, newLinks: reverseFilteredLinks, noteNames: noteNames)
                 linksCreated += reverseFilteredLinks.count
@@ -198,7 +198,7 @@ struct SemanticLinker: Sendable {
 
                     for link in filtered {
                         guard let targetPath = notePathMap[link.name] else { continue }
-                        let reverseLink = LinkAIFilter.FilteredLink(name: note.name, context: "\(note.name)에서 참조")
+                        let reverseLink = LinkAIFilter.FilteredLink(name: note.name, context: "\(note.name)에서 참조", relation: "related")
                         try writer.writeRelatedNotes(filePath: targetPath, newLinks: [reverseLink], noteNames: noteNames)
                         linksCreated += 1
                     }

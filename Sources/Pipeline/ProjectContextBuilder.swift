@@ -42,22 +42,28 @@ struct ProjectContextBuilder {
         return lines.isEmpty ? "활성 프로젝트 없음" : lines.joined(separator: "\n")
     }
 
-    /// Build subfolder context string for classifier prompts
+    /// Build subfolder context as JSON for classifier prompts (prevents folder name hallucination)
     func buildSubfolderContext() -> String {
         let subfolders = pathManager.existingSubfolders()
-        var lines: [String] = []
+        var dict: [String: [String]] = [:]
 
         if let area = subfolders["area"], !area.isEmpty {
-            lines.append("2_Area 기존 폴더: \(area.joined(separator: ", "))")
+            dict["area"] = area.sorted()
         }
         if let resource = subfolders["resource"], !resource.isEmpty {
-            lines.append("3_Resource 기존 폴더: \(resource.joined(separator: ", "))")
+            dict["resource"] = resource.sorted()
         }
         if let archive = subfolders["archive"], !archive.isEmpty {
-            lines.append("4_Archive 기존 폴더: \(archive.joined(separator: ", "))")
+            dict["archive"] = archive.sorted()
         }
 
-        return lines.isEmpty ? "기존 하위 폴더 없음" : lines.joined(separator: "\n")
+        guard !dict.isEmpty else { return "{}" }
+
+        if let data = try? JSONSerialization.data(withJSONObject: dict, options: [.sortedKeys]),
+           let json = String(data: data, encoding: .utf8) {
+            return json
+        }
+        return "{}"
     }
 
     /// Extract project names from project context string
@@ -229,6 +235,55 @@ struct ProjectContextBuilder {
         }
 
         return lines.joined(separator: "\n")
+    }
+
+    // MARK: - Tag Vocabulary
+
+    /// Collect existing tags from vault for classifier prompt injection
+    /// Returns JSON array of top tags sorted by frequency
+    func buildTagVocabulary() -> String {
+        var tagCounts: [String: Int] = [:]
+        let fm = FileManager.default
+
+        let categories = [
+            pathManager.projectsPath,
+            pathManager.areaPath,
+            pathManager.resourcePath,
+            pathManager.archivePath,
+        ]
+
+        for basePath in categories {
+            guard let folders = try? fm.contentsOfDirectory(atPath: basePath) else { continue }
+            for folder in folders {
+                guard !folder.hasPrefix("."), !folder.hasPrefix("_") else { continue }
+                let folderPath = (basePath as NSString).appendingPathComponent(folder)
+                var isDir: ObjCBool = false
+                guard fm.fileExists(atPath: folderPath, isDirectory: &isDir), isDir.boolValue else { continue }
+                guard pathManager.isPathSafe(folderPath) else { continue }
+
+                guard let files = try? fm.contentsOfDirectory(atPath: folderPath) else { continue }
+                let mdFiles = files.filter { $0.hasSuffix(".md") && !$0.hasPrefix(".") && !$0.hasPrefix("_") }
+
+                for file in mdFiles.prefix(5) {
+                    let filePath = (folderPath as NSString).appendingPathComponent(file)
+                    if let content = try? String(contentsOfFile: filePath, encoding: .utf8) {
+                        let (fileFM, _) = Frontmatter.parse(markdown: content)
+                        for tag in fileFM.tags {
+                            tagCounts[tag, default: 0] += 1
+                        }
+                    }
+                }
+            }
+        }
+
+        guard !tagCounts.isEmpty else { return "[]" }
+
+        let topTags = tagCounts.sorted { $0.value > $1.value }.prefix(50).map { $0.key }
+        if let data = try? JSONSerialization.data(withJSONObject: topTags, options: []),
+           let json = String(data: data, encoding: .utf8) {
+            return json
+        }
+        return "[]"
     }
 
     /// Build minimal archive summary (folder names + count only)
