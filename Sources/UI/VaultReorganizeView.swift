@@ -412,7 +412,13 @@ struct VaultReorganizeView: View {
 
             do {
                 let result = try await reorganizer.scan()
-                if Task.isCancelled { return }
+                if Task.isCancelled {
+                    await MainActor.run {
+                        isScanning = false
+                        scanTask = nil
+                    }
+                    return
+                }
 
                 await MainActor.run {
                     scanResult = result

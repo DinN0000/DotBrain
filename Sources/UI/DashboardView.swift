@@ -397,11 +397,9 @@ struct DashboardView: View {
         vaultCheckTask?.cancel()
         vaultCheckTask = Task.detached(priority: .utility) {
             defer {
-                if Task.isCancelled {
-                    Task { @MainActor in
-                        isVaultChecking = false
-                        vaultCheckTask = nil
-                    }
+                Task { @MainActor in
+                    isVaultChecking = false
+                    vaultCheckTask = nil
                 }
             }
             var repairCount = 0
@@ -482,9 +480,7 @@ struct DashboardView: View {
             )
             await MainActor.run {
                 vaultCheckResult = snapshot
-                isVaultChecking = false
                 refreshStats()
-                vaultCheckTask = nil
             }
         }
     }

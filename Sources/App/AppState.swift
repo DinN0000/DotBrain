@@ -29,8 +29,6 @@ final class AppState: ObservableObject {
             switch self {
             case .paraManage, .search, .vaultReorganize:
                 return .dashboard
-            case .results:
-                return nil
             default:
                 return nil
             }
@@ -224,6 +222,7 @@ final class AppState: ObservableObject {
         currentScreen = .processing
 
         processingTask = Task { @MainActor in
+            defer { isProcessing = false }
             let processor = InboxProcessor(
                 pkmRoot: pkmRootPath,
                 onProgress: { [weak self] progress, status in
@@ -266,7 +265,6 @@ final class AppState: ObservableObject {
                 }
             }
 
-            isProcessing = false
         }
     }
 
@@ -308,6 +306,7 @@ final class AppState: ObservableObject {
         currentScreen = .processing
 
         processingTask = Task { @MainActor in
+            defer { isProcessing = false }
             let reorganizer = FolderReorganizer(
                 pkmRoot: pkmRootPath,
                 category: category,
@@ -354,8 +353,6 @@ final class AppState: ObservableObject {
                     currentScreen = .results
                 }
             }
-
-            isProcessing = false
         }
     }
 
@@ -380,6 +377,7 @@ final class AppState: ObservableObject {
         currentScreen = .processing
 
         processingTask = Task { @MainActor in
+            defer { isProcessing = false }
             var allProcessed: [ProcessedFileResult] = []
             var allConfirmations: [PendingConfirmation] = []
             var allAffected: Set<String> = []
@@ -439,19 +437,14 @@ final class AppState: ObservableObject {
             }
 
             guard !Task.isCancelled else {
-                isProcessing = false
                 currentScreen = processingOrigin == .paraManage ? .paraManage : .inbox
                 return
             }
-
-            // Double-check cancellation before writing final state
-            guard !Task.isCancelled else { return }
 
             processedResults = allProcessed
             pendingConfirmations = allConfirmations
             affectedFolders = allAffected
             currentScreen = .results
-            isProcessing = false
         }
     }
 
@@ -668,7 +661,8 @@ final class AppState: ObservableObject {
         for category in PARACategory.allCases {
             let basePath = pathManager.paraPath(for: category)
             let resolvedBase = URL(fileURLWithPath: basePath).resolvingSymlinksInPath().path
-            guard resolvedFolder.hasPrefix(resolvedBase) else { continue }
+            let resolvedBaseDir = resolvedBase.hasSuffix("/") ? resolvedBase : resolvedBase + "/"
+            guard resolvedFolder.hasPrefix(resolvedBaseDir) || resolvedFolder == resolvedBase else { continue }
             let relative = String(resolvedFolder.dropFirst(resolvedBase.count))
                 .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
             let subfolder = relative.components(separatedBy: "/").first ?? ""

@@ -174,6 +174,7 @@ struct ResultRow: View {
                             isHovered = inside
                             if inside { NSCursor.pointingHand.push() } else { NSCursor.pop() }
                         }
+                        .onDisappear { if isHovered { NSCursor.pop() } }
 
                     switch result.status {
                     case .success:
@@ -225,6 +226,9 @@ struct ResultRow: View {
                 }
 
                 Spacer()
+            }
+            .onDisappear {
+                if isHovered { NSCursor.pop() }
             }
 
             if isErrorExpanded, let error = result.error {
@@ -356,6 +360,7 @@ struct ConfirmationRow: View {
                                 isConfirming = true
                                 Task {
                                     await appState.confirmClassification(confirmation, choice: option)
+                                    isConfirming = false
                                 }
                             }
                         }
@@ -369,6 +374,7 @@ struct ConfirmationRow: View {
                             isConfirming = true
                             Task {
                                 await appState.confirmClassification(confirmation, choice: option)
+                                isConfirming = false
                             }
                         }
                     }
@@ -405,6 +411,7 @@ struct ConfirmationRow: View {
         isConfirming = true
         Task {
             await appState.createProjectAndClassify(confirmation, projectName: name)
+            isConfirming = false
         }
     }
 }
@@ -666,6 +673,7 @@ struct AffectedFolderRow: View {
             isHovered = inside
             if inside { NSCursor.pointingHand.push() } else { NSCursor.pop() }
         }
+        .onDisappear { if isHovered { NSCursor.pop() } }
     }
 }
 
@@ -687,6 +695,7 @@ struct ClickableFileName: View {
                 isHovered = inside
                 if inside { NSCursor.pointingHand.push() } else { NSCursor.pop() }
             }
+            .onDisappear { if isHovered { NSCursor.pop() } }
             .animation(.easeOut(duration: 0.1), value: isHovered)
     }
 }
@@ -734,6 +743,7 @@ struct HoverTextLink: View {
             isHovered = inside
             if inside { NSCursor.pointingHand.push() } else { NSCursor.pop() }
         }
+        .onDisappear { if isHovered { NSCursor.pop() } }
     }
 }
 

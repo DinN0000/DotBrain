@@ -36,7 +36,7 @@ enum AICompanionService {
             try forceGenerateAll(pkmRoot: pkmRoot)
             try writeVersion(pkmRoot: pkmRoot)
         } catch {
-            // Non-fatal — vault still works without updated companion files
+            NSLog("[AICompanionService] 컴패니언 파일 업데이트 실패: %@", error.localizedDescription)
         }
     }
 

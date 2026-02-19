@@ -25,6 +25,10 @@ struct FolderReorganizer {
         let folderPath = (pathManager.paraPath(for: category) as NSString)
             .appendingPathComponent(subfolder)
 
+        guard pathManager.isPathSafe(folderPath) else {
+            return Result(processed: [], needsConfirmation: [], total: 0)
+        }
+
         onPhaseChange?(.preparing)
         onProgress?(0.02, "폴더 구조 정리 중...")
 
@@ -240,7 +244,11 @@ struct FolderReorganizer {
         // Update MOCs for affected folders (source + all targets)
         onPhaseChange?(.finishing)
         let mocGenerator = MOCGenerator(pkmRoot: pkmRoot)
-        try? await mocGenerator.generateMOC(folderPath: folderPath, folderName: subfolder, para: category)
+        do {
+            try await mocGenerator.generateMOC(folderPath: folderPath, folderName: subfolder, para: category)
+        } catch {
+            NSLog("[FolderReorganizer] MOC 생성 실패: %@ — %@", subfolder, error.localizedDescription)
+        }
 
         let affectedFolders = Set(processed.filter(\.isSuccess).compactMap { result -> String? in
             let dir = (result.targetPath as NSString).deletingLastPathComponent
@@ -335,7 +343,11 @@ struct FolderReorganizer {
                     let indexDest = (dirPath as NSString).appendingPathComponent("\(topFolderName).md")
                     if !fm.fileExists(atPath: indexDest) {
                         // Move it as the index note instead of deleting
-                        try? fm.moveItem(atPath: fullPath, toPath: indexDest)
+                        do {
+                            try fm.moveItem(atPath: fullPath, toPath: indexDest)
+                        } catch {
+                            NSLog("[FolderReorganizer] 인덱스 노트 이동 실패: %@ — %@", fullPath, error.localizedDescription)
+                        }
                         continue
                     }
                 }
@@ -502,7 +514,11 @@ struct FolderReorganizer {
         var updated = targetFM
         updated.tags = mergedTags
         let result = updated.stringify() + "\n" + targetBody
-        try? result.write(toFile: targetPath, atomically: true, encoding: .utf8)
+        do {
+            try result.write(toFile: targetPath, atomically: true, encoding: .utf8)
+        } catch {
+            NSLog("[FolderReorganizer] 태그 병합 실패: %@ — %@", targetPath, error.localizedDescription)
+        }
     }
 
     // MARK: - Frontmatter Update

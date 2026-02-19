@@ -496,8 +496,12 @@ enum AssetMigrator {
 
                 if removed {
                     content = newLines.joined(separator: "\n")
-                    try? content.write(toFile: indexPath, atomically: true, encoding: .utf8)
-                    NSLog("[AssetMigrator] 인덱스 노트 정리: %@", subfolder)
+                    do {
+                        try content.write(toFile: indexPath, atomically: true, encoding: .utf8)
+                        NSLog("[AssetMigrator] 인덱스 노트 정리: %@", subfolder)
+                    } catch {
+                        NSLog("[AssetMigrator] 인덱스 노트 쓰기 실패: %@ — %@", indexPath, error.localizedDescription)
+                    }
                 }
             }
         }

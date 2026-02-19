@@ -176,7 +176,11 @@ struct VaultAuditor {
                 }
             }
             if modified {
-                try? content.write(toFile: filePath, atomically: true, encoding: .utf8)
+                do {
+                    try content.write(toFile: filePath, atomically: true, encoding: .utf8)
+                } catch {
+                    NSLog("[VaultAuditor] 링크 수정 쓰기 실패: %@ — %@", filePath, error.localizedDescription)
+                }
             }
         }
 
@@ -224,7 +228,11 @@ struct VaultAuditor {
                 }
             }
             if modified {
-                try? content.write(toFile: filePath, atomically: true, encoding: .utf8)
+                do {
+                    try content.write(toFile: filePath, atomically: true, encoding: .utf8)
+                } catch {
+                    NSLog("[VaultAuditor] 링크 정리 쓰기 실패: %@ — %@", filePath, error.localizedDescription)
+                }
             }
         }
 
@@ -241,8 +249,11 @@ struct VaultAuditor {
                 status: .active
             )
             content = fm.stringify() + "\n" + content
-            if (try? content.write(toFile: filePath, atomically: true, encoding: .utf8)) != nil {
+            do {
+                try content.write(toFile: filePath, atomically: true, encoding: .utf8)
                 frontmatterInjected += 1
+            } catch {
+                NSLog("[VaultAuditor] 프론트매터 주입 실패: %@ — %@", filePath, error.localizedDescription)
             }
         }
 
@@ -264,8 +275,11 @@ struct VaultAuditor {
             updatedFM.para = inferCategory(from: filePath)
 
             let newContent = updatedFM.stringify() + "\n" + body
-            if (try? newContent.write(toFile: filePath, atomically: true, encoding: .utf8)) != nil {
+            do {
+                try newContent.write(toFile: filePath, atomically: true, encoding: .utf8)
                 paraFixed += 1
+            } catch {
+                NSLog("[VaultAuditor] PARA 수정 실패: %@ — %@", filePath, error.localizedDescription)
             }
         }
 

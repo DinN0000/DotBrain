@@ -105,79 +105,6 @@ struct ProjectManager {
         return updatedCount
     }
 
-    // MARK: - Rename
-
-    /// Rename a project: folder, index note, and all WikiLink references
-    func renameProject(from oldName: String, to newName: String) throws -> Int {
-        let fm = FileManager.default
-        let safeOld = sanitizeName(oldName)
-        let safeNew = sanitizeName(newName)
-        let oldDir = (pathManager.projectsPath as NSString).appendingPathComponent(safeOld)
-
-        guard pathManager.isPathSafe(oldDir) else {
-            throw ProjectError.notFound(safeOld)
-        }
-        guard fm.fileExists(atPath: oldDir) else {
-            throw ProjectError.notFound(safeOld)
-        }
-
-        let newDir = (pathManager.projectsPath as NSString).appendingPathComponent(safeNew)
-        guard !fm.fileExists(atPath: newDir) else {
-            throw ProjectError.alreadyExists(safeNew)
-        }
-
-        let oldIndex = (oldDir as NSString).appendingPathComponent("\(safeOld).md")
-        let newIndex = (oldDir as NSString).appendingPathComponent("\(safeNew).md")
-        if fm.fileExists(atPath: oldIndex) {
-            try fm.moveItem(atPath: oldIndex, toPath: newIndex)
-        }
-
-        try fm.moveItem(atPath: oldDir, toPath: newDir)
-
-        let updatedCount = updateWikiLinks(from: safeOld, to: safeNew)
-
-        return updatedCount
-    }
-
-    // MARK: - List
-
-    /// List all projects with their status
-    func listProjects() -> [(name: String, status: NoteStatus, summary: String)] {
-        let fm = FileManager.default
-        var projects: [(name: String, status: NoteStatus, summary: String)] = []
-
-        if let entries = try? fm.contentsOfDirectory(atPath: pathManager.projectsPath) {
-            for entry in entries.sorted() {
-                guard !entry.hasPrefix("."), !entry.hasPrefix("_") else { continue }
-                let indexPath = (pathManager.projectsPath as NSString)
-                    .appendingPathComponent(entry)
-                    .appending("/\(entry).md")
-                if let content = try? String(contentsOfFile: indexPath, encoding: .utf8) {
-                    let (frontmatter, _) = Frontmatter.parse(markdown: content)
-                    projects.append((
-                        name: entry,
-                        status: frontmatter.status ?? .active,
-                        summary: frontmatter.summary ?? ""
-                    ))
-                } else {
-                    projects.append((name: entry, status: .active, summary: ""))
-                }
-            }
-        }
-
-        if let entries = try? fm.contentsOfDirectory(atPath: pathManager.archivePath) {
-            for entry in entries.sorted() {
-                guard !entry.hasPrefix("."), !entry.hasPrefix("_") else { continue }
-                let dir = (pathManager.archivePath as NSString).appendingPathComponent(entry)
-                var isDir: ObjCBool = false
-                guard fm.fileExists(atPath: dir, isDirectory: &isDir), isDir.boolValue else { continue }
-                projects.append((name: entry, status: .completed, summary: "(아카이브)"))
-            }
-        }
-
-        return projects
-    }
-
     // MARK: - Private Helpers
 
     private func sanitizeName(_ name: String) -> String {
@@ -277,8 +204,12 @@ struct ProjectManager {
             guard content.contains(pattern) else { continue }
             let updated = content.replacingOccurrences(of: pattern, with: replacement)
             if updated != content {
-                try? updated.write(toFile: filePath, atomically: true, encoding: .utf8)
-                count += 1
+                do {
+                    try updated.write(toFile: filePath, atomically: true, encoding: .utf8)
+                    count += 1
+                } catch {
+                    NSLog("[ProjectManager] WikiLink 업데이트 실패: %@ — %@", filePath, error.localizedDescription)
+                }
             }
         }
 
@@ -295,8 +226,12 @@ struct ProjectManager {
             guard let content = try? String(contentsOfFile: filePath, encoding: .utf8) else { continue }
             let updated = content.replacingOccurrences(of: pattern, with: replacement)
             if updated != content {
-                try? updated.write(toFile: filePath, atomically: true, encoding: .utf8)
-                count += 1
+                do {
+                    try updated.write(toFile: filePath, atomically: true, encoding: .utf8)
+                    count += 1
+                } catch {
+                    NSLog("[ProjectManager] WikiLink 이름변경 실패: %@ — %@", filePath, error.localizedDescription)
+                }
             }
         }
 
