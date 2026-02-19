@@ -23,6 +23,7 @@ actor ClaudeAPIClient {
     struct MessageRequest: Encodable {
         let model: String
         let max_tokens: Int
+        let temperature: Double
         let messages: [Message]
 
         struct Message: Encodable {
@@ -75,6 +76,7 @@ actor ClaudeAPIClient {
         let request = MessageRequest(
             model: model,
             max_tokens: maxTokens,
+            temperature: 0.1,
             messages: [.init(role: "user", content: userMessage)]
         )
 
