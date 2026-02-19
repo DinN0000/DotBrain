@@ -1,5 +1,19 @@
 # Changelog
 
+## v2.1.10 — 10-Agent Deep Review Round 3 (2026-02-19)
+- 10개 전문 에이전트 심층 코드 리뷰 (동시성, 메모리, 에러경로, 경로안전, UI상태, 파일작업, CLAUDE.md 준수, 수치정확성, API계약, 데드코드)
+- AppState: isProcessing defer 패턴으로 전환 (3개 메서드) — 취소 시 UI 멈춤 방지
+- AppState: hasPrefix 경로 검증 트레일링 슬래시 추가 (경로 조작 방어)
+- ResultsView: NSCursor.pop() 5개 컴포넌트 onDisappear 처리 (커서 스택 누수 방지)
+- ResultsView: isConfirming 3곳 비동기 완료 후 리셋 (버튼 비활성 해제)
+- VaultReorganizeView/DashboardView: 취소 시 상태 리셋 보장
+- OnboardingView: isPathSafe 가드 + .. 필터 + 에러 로깅
+- FolderReorganizer: isPathSafe 가드 + try? 3곳 do/catch+NSLog 전환
+- VaultAuditor: try? 4곳 do/catch+NSLog + 정확한 카운트 로직
+- PARAMover/ProjectManager: WikiLink 쓰기 실패 로깅 + 카운트 정확성
+- 데드코드 제거: listFolders, listProjects, renameProject, companionMdPath
+- 14개 파일, 25건 수정, 0 warnings
+
 ## v2.1.9 — 10-Agent Defensive Fixes (2026-02-19)
 - 10개 병렬 에이전트 코드 리뷰 후 7건 방어적 수정 (비즈니스 로직 무변경)
 - FileMover: source==dest 가드 추가 (재분류 시 데이터 손실 방지)
