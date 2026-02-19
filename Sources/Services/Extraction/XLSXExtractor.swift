@@ -57,7 +57,7 @@ enum XLSXExtractor {
 
         for (idx, entry) in sheetEntries {
             guard let content = readEntry(entry, from: archive) else { continue }
-            let sheetName = (idx - 1) < sheetNames.count ? sheetNames[idx - 1] : "Sheet\(idx)"
+            let sheetName = (idx >= 1 && idx - 1 < sheetNames.count) ? sheetNames[idx - 1] : "Sheet\(idx)"
             let rows = extractRows(from: content, sharedStrings: sharedStrings)
 
             if !rows.isEmpty {

@@ -830,7 +830,8 @@ struct OnboardingView: View {
 
     private func sanitizeProjectName(_ raw: String) -> String {
         let invalid = CharacterSet(charactersIn: "/:\\0\t\n\r")
-        let cleaned = raw.components(separatedBy: invalid).joined()
+        var cleaned = raw.components(separatedBy: invalid).joined()
+        cleaned = cleaned.replacingOccurrences(of: "..", with: "")
         return String(cleaned.prefix(255)).trimmingCharacters(in: .whitespaces)
     }
 
@@ -841,6 +842,7 @@ struct OnboardingView: View {
 
         let pathManager = PKMPathManager(root: appState.pkmRootPath)
         let projectDir = (pathManager.projectsPath as NSString).appendingPathComponent(name)
+        guard pathManager.isPathSafe(projectDir) else { return }
         let fm = FileManager.default
 
         do {
@@ -858,7 +860,7 @@ struct OnboardingView: View {
             projects.sort()
             newProjectName = ""
         } catch {
-            // Show inline feedback if project creation fails
+            NSLog("[OnboardingView] 프로젝트 생성 실패: %@", error.localizedDescription)
             newProjectName = ""
         }
     }

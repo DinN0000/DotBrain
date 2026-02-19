@@ -86,7 +86,7 @@ final class InboxWatchdog {
         retryCount += 1
         NSLog("[InboxWatchdog] Folder missing, retry in %.0fs (%d/%d)", Self.retryInterval, retryCount, Self.maxRetries)
 
-        retryTask = Task { [weak self] in
+        retryTask = Task { @MainActor [weak self] in
             try? await Task.sleep(for: .seconds(Self.retryInterval))
             guard !Task.isCancelled else { return }
             self?.start()
@@ -101,7 +101,7 @@ final class InboxWatchdog {
     private func handleChange() {
         // Debounce: cancel any pending callback and schedule a new one
         debounceTask?.cancel()
-        debounceTask = Task { [weak self] in
+        debounceTask = Task { @MainActor [weak self] in
             try? await Task.sleep(for: .seconds(self?.debounceInterval ?? 2.0))
             guard !Task.isCancelled else { return }
             self?.onChange()

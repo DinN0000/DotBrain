@@ -162,7 +162,11 @@ struct PARAMover {
                         var updated = existing
                         updated.project = safeTarget
                         content = updated.stringify() + "\n" + body
-                        try? content.write(toFile: dstPath, atomically: true, encoding: .utf8)
+                        do {
+                            try content.write(toFile: dstPath, atomically: true, encoding: .utf8)
+                        } catch {
+                            NSLog("[PARAMover] 프론트매터 업데이트 실패: %@ — %@", dstPath, error.localizedDescription)
+                        }
                     }
                 }
             }
@@ -235,50 +239,6 @@ struct PARAMover {
         markInVault(pattern: "[[\(safeOld)]]", replacement: "[[\(safeNew)]]")
 
         return count
-    }
-
-    // MARK: - List
-
-    /// List all folders in a given PARA category with file count and summary.
-    func listFolders(in category: PARACategory) -> [(name: String, fileCount: Int, summary: String)] {
-        let fm = FileManager.default
-        let basePath = pathManager.paraPath(for: category)
-
-        guard let entries = try? fm.contentsOfDirectory(atPath: basePath) else {
-            return []
-        }
-
-        var results: [(name: String, fileCount: Int, summary: String)] = []
-
-        for entry in entries.sorted() {
-            guard !entry.hasPrefix("."), !entry.hasPrefix("_") else { continue }
-
-            let dirPath = (basePath as NSString).appendingPathComponent(entry)
-            var isDir: ObjCBool = false
-            guard fm.fileExists(atPath: dirPath, isDirectory: &isDir), isDir.boolValue else { continue }
-
-            // Count non-hidden, non-underscore files
-            let fileCount: Int
-            if let files = try? fm.contentsOfDirectory(atPath: dirPath) {
-                fileCount = files.filter { !$0.hasPrefix(".") && !$0.hasPrefix("_") }.count
-            } else {
-                fileCount = 0
-            }
-
-            // Read index note frontmatter for summary
-            let indexPath = (dirPath as NSString).appendingPathComponent("\(entry).md")
-            let summary: String
-            if let content = try? String(contentsOfFile: indexPath, encoding: .utf8) {
-                let (frontmatter, _) = Frontmatter.parse(markdown: content)
-                summary = frontmatter.summary ?? ""
-            } else {
-                summary = ""
-            }
-
-            results.append((name: entry, fileCount: fileCount, summary: summary))
-        }
-
-        return results
     }
 
     // MARK: - Private Helpers
@@ -375,8 +335,12 @@ struct PARAMover {
             guard content.contains(pattern) else { continue }
             let updated = content.replacingOccurrences(of: pattern, with: replacement)
             if updated != content {
-                try? updated.write(toFile: filePath, atomically: true, encoding: .utf8)
-                count += 1
+                do {
+                    try updated.write(toFile: filePath, atomically: true, encoding: .utf8)
+                    count += 1
+                } catch {
+                    NSLog("[PARAMover] WikiLink 업데이트 실패: %@ — %@", filePath, error.localizedDescription)
+                }
             }
         }
 

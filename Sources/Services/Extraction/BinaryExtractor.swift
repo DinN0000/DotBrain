@@ -67,10 +67,4 @@ enum BinaryExtractor {
             return .failure(name: fileName, error: "텍스트 읽기 실패: \(error.localizedDescription)")
         }
     }
-
-    /// Get companion markdown path for a binary file
-    /// e.g., report.pdf → report.pdf.md
-    static func companionMdPath(for filePath: String) -> String {
-        return filePath + ".md"
-    }
 }
