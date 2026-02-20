@@ -16,6 +16,7 @@ struct VaultInspectorView: View {
     @State private var reorgProgress: Double = 0
     @State private var reorgStatus: String = ""
     @State private var reorgTask: Task<Void, Never>?
+    @State private var reorgChangedOnly = false
 
     enum ReorgPhase {
         case idle
@@ -76,6 +77,9 @@ struct VaultInspectorView: View {
             }
         }
         .onAppear { loadFolders() }
+        .onChange(of: appState.backgroundTaskCompleted) { completed in
+            if completed { loadFolders() }
+        }
         .onDisappear {
             reorgTask?.cancel()
             appState.viewTaskActive = false
@@ -89,25 +93,35 @@ struct VaultInspectorView: View {
             // Action buttons
             HStack(spacing: 8) {
                 Button(action: { appState.startVaultCheck() }) {
-                    HStack(spacing: 4) {
-                        Image(systemName: "stethoscope")
-                            .font(.caption)
-                        Text("진단")
-                            .font(.caption)
+                    VStack(spacing: 1) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "stethoscope")
+                                .font(.caption)
+                            Text("자동 수리")
+                                .font(.caption)
+                        }
+                        Text("메타 · 링크 · 태그")
+                            .font(.system(size: 9))
+                            .foregroundColor(.secondary)
                     }
                     .padding(.horizontal, 10)
                     .padding(.vertical, 5)
                 }
                 .buttonStyle(.bordered)
                 .disabled(appState.isAnyTaskRunning)
-                .help("깨진 링크, 누락 태그 등 문제를 찾아 자동 복구")
+                .help("깨진 링크, 누락 메타데이터, 태그 등 문제를 찾아 자동 복구")
 
                 Button(action: { startFullReorg() }) {
-                    HStack(spacing: 4) {
-                        Image(systemName: "sparkles")
-                            .font(.caption)
-                        Text("전체 정리")
-                            .font(.caption)
+                    VStack(spacing: 1) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "arrow.triangle.2.circlepath")
+                                .font(.caption)
+                            Text("AI 재분류")
+                                .font(.caption)
+                        }
+                        Text("파일 위치 재배치")
+                            .font(.system(size: 9))
+                            .foregroundColor(.secondary)
                     }
                     .padding(.horizontal, 10)
                     .padding(.vertical, 5)
@@ -159,6 +173,8 @@ struct VaultInspectorView: View {
                                 }
                                 .padding(.vertical, 6)
                                 .padding(.top, 8)
+                                .contentShape(Rectangle())
+                                .onTapGesture { showCategoryMenu(category) }
                             case .folder(let folder):
                                 VaultFolderRow(folder: folder) {
                                     showFolderMenu(folder)
@@ -216,6 +232,18 @@ struct VaultInspectorView: View {
             item.image = NSImage(systemSymbolName: icon, accessibilityDescription: nil)
         }
         menu.addItem(item)
+    }
+
+    private func showCategoryMenu(_ category: PARACategory) {
+        let menu = NSMenu()
+        addMenuItem(
+            to: menu,
+            title: "\(category.displayName) 전체 AI 재분류",
+            icon: "arrow.triangle.2.circlepath"
+        ) {
+            self.startCategoryReorg(category)
+        }
+        menu.popUp(positioning: nil, at: NSEvent.mouseLocation, in: nil)
     }
 
     private func openInFinder(_ folder: FolderInfo) {
@@ -711,12 +739,19 @@ struct VaultInspectorView: View {
 
     private func startFolderReorg(_ folder: FolderInfo) {
         reorgScope = .folder(folder.path)
+        reorgChangedOnly = true
         reorgPhase = .scanning
         startReorgScan()
     }
 
     private func startFolderFullReorg(_ folder: FolderInfo) {
-        reorgScope = .category(folder.category)
+        reorgScope = .folder(folder.path)
+        reorgPhase = .scanning
+        startReorgScan()
+    }
+
+    private func startCategoryReorg(_ category: PARACategory) {
+        reorgScope = .category(category)
         reorgPhase = .scanning
         startReorgScan()
     }
@@ -728,9 +763,36 @@ struct VaultInspectorView: View {
         let root = appState.pkmRootPath
         let currentScope = reorgScope
 
+        let changedOnly = reorgChangedOnly
+        reorgChangedOnly = false
+
         reorgTask?.cancel()
         reorgTask = Task {
-            let reorganizer = VaultReorganizer(
+            // When filtering changed files only, load hash cache and collect non-unchanged paths
+            var changedFileSet: Set<String>?
+            if changedOnly, case .folder(let folderPath) = currentScope {
+                let cache = ContentHashCache(pkmRoot: root)
+                await cache.load()
+                let statuses = await cache.checkFolder(folderPath)
+                let changedPaths = statuses
+                    .filter { $0.status != .unchanged }
+                    .map { $0.filePath }
+                if !changedPaths.isEmpty {
+                    changedFileSet = Set(changedPaths)
+                } else {
+                    // Nothing changed — skip scan
+                    await MainActor.run {
+                        analyses = []
+                        appState.viewTaskActive = false
+                        reorgResults = []
+                        reorgPhase = .done
+                        reorgStatus = "변경된 파일이 없습니다"
+                    }
+                    return
+                }
+            }
+
+            var reorganizer = VaultReorganizer(
                 pkmRoot: root,
                 scope: currentScope,
                 onProgress: { value, status in
@@ -740,6 +802,7 @@ struct VaultInspectorView: View {
                     }
                 }
             )
+            reorganizer.changedFilesOnly = changedFileSet
 
             do {
                 let result = try await reorganizer.scan()
@@ -830,6 +893,7 @@ struct VaultInspectorView: View {
         appState.viewTaskActive = false
         reorgTask = nil
         reorgPhase = .idle
+        reorgChangedOnly = false
         analyses = []
         reorgResults = []
         reorgProgress = 0

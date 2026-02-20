@@ -7,6 +7,8 @@ struct VaultReorganizer {
     let pkmRoot: String
     let scope: Scope
     let onProgress: ((Double, String) -> Void)?
+    /// When set, only files in this set are processed (used for "바뀐 파일만 정리")
+    var changedFilesOnly: Set<String>?
 
     private static let maxFilesPerScan = 200
 
@@ -328,6 +330,7 @@ struct VaultReorganizer {
                 guard fm.fileExists(atPath: filePath, isDirectory: &fileIsDir),
                       !fileIsDir.boolValue else { continue }
                 guard pathManager.isPathSafe(filePath) else { continue }
+                if let filter = changedFilesOnly, !filter.contains(filePath) { continue }
                 results.append(CollectedFile(filePath: filePath, category: category, folder: folderName))
             }
             return results
@@ -358,6 +361,7 @@ struct VaultReorganizer {
                     guard fm.fileExists(atPath: filePath, isDirectory: &fileIsDir),
                           !fileIsDir.boolValue else { continue }
                     guard pathManager.isPathSafe(filePath) else { continue }
+                    if let filter = changedFilesOnly, !filter.contains(filePath) { continue }
 
                     results.append(CollectedFile(
                         filePath: filePath,
