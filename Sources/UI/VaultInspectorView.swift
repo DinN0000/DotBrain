@@ -850,27 +850,10 @@ private struct VaultFolderRow: View {
                     .foregroundColor(folder.category.color)
                     .frame(width: 16)
 
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(folder.name)
-                        .font(.caption)
-                        .fontWeight(.medium)
-                        .lineLimit(1)
-
-                    if folder.modifiedCount > 0 || folder.newCount > 0 {
-                        HStack(spacing: 4) {
-                            if folder.modifiedCount > 0 {
-                                Text("변경 \(folder.modifiedCount)")
-                                    .font(.caption2)
-                                    .foregroundColor(.orange)
-                            }
-                            if folder.newCount > 0 {
-                                Text("신규 \(folder.newCount)")
-                                    .font(.caption2)
-                                    .foregroundColor(.blue)
-                            }
-                        }
-                    }
-                }
+                Text(folder.name)
+                    .font(.caption)
+                    .fontWeight(.medium)
+                    .lineLimit(1)
 
                 Spacer()
 
@@ -891,25 +874,18 @@ private struct VaultFolderRow: View {
                     )
             }
 
-            // Health issues always visible for unhealthy folders
+            // Health summary: single line with actionable guidance
             if hasHealthIssue {
-                HStack(spacing: 6) {
-                    Image(systemName: "exclamationmark.triangle")
-                        .font(.system(size: 9))
-                        .foregroundColor(healthColor)
+                let parts = [
+                    folder.modifiedCount > 0 ? "변경 \(folder.modifiedCount)개" : nil,
+                    folder.newCount > 0 ? "신규 \(folder.newCount)개" : nil,
+                ].compactMap { $0 }.joined(separator: ", ")
 
-                    if folder.modifiedCount > 0 {
-                        Text("변경 \(folder.modifiedCount)개")
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
-                    }
-                    if folder.newCount > 0 {
-                        Text("신규 \(folder.newCount)개")
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
-                    }
-
-                    Text(folder.healthRatio <= 0.5 ? "정리 필요" : "점검 권장")
+                HStack(spacing: 4) {
+                    Text(parts)
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                    Text("- 클릭하여 정리")
                         .font(.caption2)
                         .foregroundColor(healthColor)
                 }
