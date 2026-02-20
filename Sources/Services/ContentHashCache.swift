@@ -113,6 +113,17 @@ actor ContentHashCache {
         return results
     }
 
+    // MARK: - Batch Status Checks
+
+    /// Check multiple files in a single actor call to avoid per-file serialization
+    func checkFiles(_ filePaths: [String]) -> [String: FileStatus] {
+        var results: [String: FileStatus] = [:]
+        for path in filePaths {
+            results[path] = checkFile(path)
+        }
+        return results
+    }
+
     // MARK: - Hash Updates
 
     /// Update the cached hash for a single file
