@@ -504,7 +504,19 @@ struct VaultInspectorView: View {
                     let successCount = reorgResults.filter(\.isSuccess).count
                     let errorCount = reorgResults.filter(\.isError).count
 
-                    if successCount > 0 || errorCount > 0 {
+                    if reorgResults.isEmpty {
+                        // No files needed moving
+                        VStack(spacing: 8) {
+                            Image(systemName: "checkmark.circle.fill")
+                                .font(.title2)
+                                .foregroundColor(.green)
+                            Text("모든 파일이 적절한 위치에 있습니다")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 24)
+                    } else if successCount > 0 || errorCount > 0 {
                         VStack(alignment: .leading, spacing: 6) {
                             Label("\(successCount)개 파일 재정리 완료", systemImage: "checkmark.circle")
                                 .font(.caption)
@@ -635,7 +647,8 @@ struct VaultInspectorView: View {
             let hashCache = ContentHashCache(pkmRoot: root)
             await hashCache.load()
 
-            var result: [FolderInfo] = []
+            // Collect all .md file paths and their folder info in one pass
+            var folderFiles: [String: (name: String, category: PARACategory, files: [String])] = [:]
 
             for category in PARACategory.allCases {
                 let basePath = pathManager.paraPath(for: category)
@@ -647,20 +660,44 @@ struct VaultInspectorView: View {
                     var isDir: ObjCBool = false
                     guard fm.fileExists(atPath: folderPath, isDirectory: &isDir), isDir.boolValue else { continue }
 
-                    let statusEntries = await hashCache.checkFolder(folderPath)
-                    let fileCount = statusEntries.count
-                    let modifiedCount = statusEntries.filter { $0.status == .modified }.count
-                    let newCount = statusEntries.filter { $0.status == .new }.count
-
-                    result.append(FolderInfo(
-                        name: entry,
-                        path: folderPath,
-                        category: category,
-                        fileCount: fileCount,
-                        modifiedCount: modifiedCount,
-                        newCount: newCount
-                    ))
+                    // Collect .md files for this folder
+                    var mdFiles: [String] = []
+                    if let files = try? fm.contentsOfDirectory(atPath: folderPath) {
+                        for file in files {
+                            guard file.hasSuffix(".md"), !file.hasPrefix("."), !file.hasPrefix("_") else { continue }
+                            mdFiles.append((folderPath as NSString).appendingPathComponent(file))
+                        }
+                    }
+                    folderFiles[folderPath] = (name: entry, category: category, files: mdFiles)
                 }
+            }
+
+            // Single batch call to check all files at once
+            let allFiles = folderFiles.values.flatMap { $0.files }
+            let allStatuses = await hashCache.checkFiles(allFiles)
+
+            // Build folder info from batch results
+            var result: [FolderInfo] = []
+            for (folderPath, info) in folderFiles.sorted(by: { $0.key < $1.key }) {
+                var fileCount = 0
+                var modifiedCount = 0
+                var newCount = 0
+                for file in info.files {
+                    fileCount += 1
+                    switch allStatuses[file] {
+                    case .modified: modifiedCount += 1
+                    case .new: newCount += 1
+                    default: break
+                    }
+                }
+                result.append(FolderInfo(
+                    name: info.name,
+                    path: folderPath,
+                    category: info.category,
+                    fileCount: fileCount,
+                    modifiedCount: modifiedCount,
+                    newCount: newCount
+                ))
             }
 
             let loaded = result

@@ -32,33 +32,49 @@ struct MenuBarPopover: View {
             // Background task indicator
             if let taskName = appState.backgroundTaskName {
                 Divider()
-                HStack(spacing: 8) {
-                    ProgressView()
-                        .controlSize(.small)
-                    VStack(alignment: .leading, spacing: 1) {
-                        Text(taskName)
-                            .font(.caption2)
-                            .fontWeight(.medium)
-                        if !appState.backgroundTaskPhase.isEmpty {
-                            Text(appState.backgroundTaskPhase)
+                VStack(spacing: 6) {
+                    HStack(spacing: 8) {
+                        if appState.backgroundTaskCompleted {
+                            Image(systemName: "checkmark.circle.fill")
+                                .font(.system(size: 14))
+                                .foregroundColor(.green)
+                        } else {
+                            ProgressView()
+                                .controlSize(.small)
+                        }
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(taskName)
                                 .font(.caption2)
-                                .foregroundColor(.secondary)
-                                .lineLimit(1)
+                                .fontWeight(.medium)
+                            if !appState.backgroundTaskPhase.isEmpty {
+                                Text(appState.backgroundTaskPhase)
+                                    .font(.caption2)
+                                    .foregroundColor(appState.backgroundTaskCompleted ? .green : .secondary)
+                                    .lineLimit(1)
+                            }
+                        }
+                        Spacer()
+                        if !appState.backgroundTaskCompleted {
+                            Button {
+                                appState.cancelBackgroundTask()
+                            } label: {
+                                Image(systemName: "xmark.circle.fill")
+                                    .font(.system(size: 14))
+                                    .foregroundColor(.secondary)
+                            }
+                            .buttonStyle(.plain)
                         }
                     }
-                    Spacer()
-                    Button {
-                        appState.cancelBackgroundTask()
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 14))
-                            .foregroundColor(.secondary)
+                    if !appState.backgroundTaskCompleted {
+                        ProgressView(value: appState.backgroundTaskProgress)
+                            .progressViewStyle(.linear)
                     }
-                    .buttonStyle(.plain)
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
-                .background(Color.accentColor.opacity(0.06))
+                .background(appState.backgroundTaskCompleted
+                    ? Color.green.opacity(0.06)
+                    : Color.accentColor.opacity(0.06))
             }
 
             // Footer (hidden during onboarding and processing)
