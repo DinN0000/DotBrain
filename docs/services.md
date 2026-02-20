@@ -1,6 +1,6 @@
 # Services
 
-서비스 레이어 레퍼런스. `Sources/Services/` — 39개 파일, 6개 하위 디렉토리.
+서비스 레이어 레퍼런스. `Sources/Services/` — 43개 파일, 6개 하위 디렉토리.
 
 ## AI Services
 
@@ -15,6 +15,10 @@
 | `sendMessage(model:maxTokens:userMessage:)` | 현재 프로바이더로 메시지 전송 |
 | `sendFast(maxTokens:message:)` | 빠른 모델 사용 (Haiku / Flash) |
 | `sendPrecise(maxTokens:message:)` | 정밀 모델 사용 (Sonnet / Pro) |
+| `sendFastWithUsage(maxTokens:message:)` | 빠른 모델 + 토큰 사용량 반환 → `AIResponse` |
+| `sendPreciseWithUsage(maxTokens:message:)` | 정밀 모델 + 토큰 사용량 반환 → `AIResponse` |
+
+**WithUsage 변형**: `AIResponse` (text + TokenUsage?)를 반환. 실제 토큰 사용량을 추적하여 APIUsageLogger에 기록할 수 있도록 함. Classifier, NoteEnricher, MOCGenerator, LinkAIFilter, FileMover에서 사용.
 
 **재시도 로직**: 최대 3회, 120초 deadline. Rate limit(429) 및 서버 에러(5xx) 시 재시도. 전체 실패 시 대체 프로바이더 fallback.
 
@@ -56,9 +60,11 @@
 
 | 메서드 | 설명 |
 |--------|------|
-| `sendMessage(model:maxTokens:userMessage:)` | Claude API 호출 |
+| `sendMessage(model:maxTokens:userMessage:)` | Claude API 호출, `(String, TokenUsage?)` 반환 |
 
 모델: `haikuModel = "claude-haiku-4-5-20251001"`, `sonnetModel = "claude-sonnet-4-5-20250929"`
+
+내부 `Usage` struct로 Claude API 응답의 `usage` 필드를 디코딩하여 `TokenUsage`로 변환.
 
 ### GeminiAPIClient
 
@@ -66,9 +72,11 @@
 
 | 메서드 | 설명 |
 |--------|------|
-| `sendMessage(model:maxTokens:userMessage:)` | Gemini API 호출 |
+| `sendMessage(model:maxTokens:userMessage:)` | Gemini API 호출, `(String, TokenUsage?)` 반환 |
 
 모델: `flashModel = "gemini-2.5-flash"`, `proModel = "gemini-2.5-pro"`
+
+내부 `UsageMetadata` struct로 Gemini API 응답의 `usageMetadata` 필드를 디코딩하여 `TokenUsage`로 변환. `cachedContentTokenCount`도 지원.
 
 ## File System Services
 
@@ -379,6 +387,13 @@ Map of Contents 생성. 폴더 수준의 자동 목차.
 | `static recordActivity(fileName:category:action:detail:)` | 활동 기록 (스레드 안전) |
 | `static addApiCost(_:)` | API 비용 누적 (스레드 안전) |
 | `static incrementDuplicates()` | 중복 카운터 증가 (스레드 안전) |
+| `static logTokenUsage(operation:model:usage:)` | 실제 토큰 기반 비용 계산 및 로깅 |
+
+| 속성 | 설명 |
+|------|------|
+| `static sharedPkmRoot: String?` | AppState가 초기화 시 설정하는 PKM 루트 경로. APIUsageLogger가 `.dotbrain/` 경로를 결정하는 데 사용 |
+
+**logTokenUsage**: `APIUsageLogger.calculateCost(model:usage:)`로 실제 비용을 계산한 후, `addApiCost()`로 UserDefaults에 누적하고 `APIUsageLogger.log()`로 상세 내역을 JSON에 기록. 기존 hardcoded `addApiCost()` 호출을 대체.
 
 **저장**: UserDefaults (`pkmApiCost`, `pkmDuplicatesFound`, `pkmActivityHistory` — 최근 100건).
 **동시성**: 내부 `StatisticsActor` (private actor)로 UserDefaults 뮤테이션 직렬화.
@@ -414,6 +429,59 @@ Map of Contents 생성. 폴더 수준의 자동 목차.
 | `send(title:body:)` | 범용 알림 |
 
 `NSSound.beep()` + NSLog. SPM 실행파일은 `.app` 번들이 아니라 `UNUserNotificationCenter` 사용 불가.
+
+## Data / Cache Services
+
+### ContentHashCache
+
+`Sources/Services/ContentHashCache.swift` — **actor**
+
+SHA256 기반 파일 변경 감지. 볼트 내 파일의 해시를 캐싱하여 변경/신규/미변경 상태를 판별.
+
+| 메서드 | 설명 |
+|--------|------|
+| `load()` | `.dotbrain/content-hashes.json`에서 해시 캐시 로드 |
+| `checkFile(_:)` | 단일 파일 상태 확인 → `FileStatus` |
+| `checkFolder(_:)` | 폴더 내 모든 파일 상태 확인 → `[FileStatusEntry]` |
+| `updateHash(_:)` | 단일 파일 해시 갱신 |
+| `updateHashes(_:)` | 복수 파일 해시 일괄 갱신 |
+| `save()` | 해시 캐시를 JSON으로 저장 |
+
+**FileStatus**: `.unchanged` (해시 동일), `.modified` (해시 변경), `.new` (캐시에 없음).
+
+**저장 경로**: `{pkmRoot}/.dotbrain/content-hashes.json`
+
+**해시 알고리즘**: CryptoKit SHA256. 마크다운 파일의 전체 내용을 해싱.
+
+**경로 보안**: `URL.resolvingSymlinksInPath()`로 canonicalize 후 `hasPrefix` 검사.
+
+### APIUsageLogger
+
+`Sources/Services/APIUsageLogger.swift` — **actor**
+
+실제 토큰 사용량 기반 API 비용 추적. 모델별 가격표로 정확한 비용 계산.
+
+| 메서드 | 설명 |
+|--------|------|
+| `log(operation:model:usage:)` | API 호출 내역 기록 (operation, model, tokens, cost) |
+| `loadEntries()` | `.dotbrain/api-usage.json`에서 전체 내역 로드 |
+| `costByOperation()` | operation별 누적 비용 집계 |
+| `totalCost()` | 전체 누적 비용 |
+| `recentEntries(limit:)` | 최근 N건의 API 호출 내역 |
+| `static calculateCost(model:usage:)` | 모델 + TokenUsage로 비용 계산 (StatisticsService에서 호출) |
+
+**모델 가격 (per 1M tokens)**:
+
+| 모델 | Input | Output |
+|------|-------|--------|
+| Haiku | $0.80 | $4.00 |
+| Sonnet | $3.00 | $15.00 |
+| Flash | $0.15 | $0.60 |
+| Pro | $1.25 | $5.00 |
+
+**저장 경로**: `{pkmRoot}/.dotbrain/api-usage.json`
+
+**저장 형식**: `[APIUsageEntry]` — id, timestamp, operation, model, inputTokens, outputTokens, cachedTokens, cost.
 
 ## Service Dependency Graph
 

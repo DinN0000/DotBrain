@@ -54,7 +54,7 @@ actor AIService {
         model: String,
         maxTokens: Int,
         userMessage: String
-    ) async throws -> String {
+    ) async throws -> (String, TokenUsage?) {
         try await sendWithRetry(
             provider: currentProvider,
             model: model,
@@ -68,7 +68,7 @@ actor AIService {
         model: String,
         maxTokens: Int,
         userMessage: String
-    ) async throws -> String {
+    ) async throws -> (String, TokenUsage?) {
         var lastError: Error?
         let deadline = ContinuousClock.now + .seconds(120)
 
@@ -137,7 +137,7 @@ actor AIService {
         model: String,
         maxTokens: Int,
         userMessage: String
-    ) async throws -> String {
+    ) async throws -> (String, TokenUsage?) {
         switch provider {
         case .claude:
             return try await claudeClient.sendMessage(
@@ -230,12 +230,24 @@ actor AIService {
 
     /// Send using the fast model (Haiku / Flash)
     func sendFast(maxTokens: Int = 4096, message: String) async throws -> String {
-        try await sendMessage(model: fastModel, maxTokens: maxTokens, userMessage: message)
+        try await sendMessage(model: fastModel, maxTokens: maxTokens, userMessage: message).0
     }
 
     /// Send using the precise model (Sonnet / Pro)
     func sendPrecise(maxTokens: Int = 2048, message: String) async throws -> String {
-        try await sendMessage(model: preciseModel, maxTokens: maxTokens, userMessage: message)
+        try await sendMessage(model: preciseModel, maxTokens: maxTokens, userMessage: message).0
+    }
+
+    /// Send using the fast model and return full AIResponse with token usage
+    func sendFastWithUsage(maxTokens: Int = 4096, message: String) async throws -> AIResponse {
+        let (text, usage) = try await sendMessage(model: fastModel, maxTokens: maxTokens, userMessage: message)
+        return AIResponse(text: text, usage: usage)
+    }
+
+    /// Send using the precise model and return full AIResponse with token usage
+    func sendPreciseWithUsage(maxTokens: Int = 2048, message: String) async throws -> AIResponse {
+        let (text, usage) = try await sendMessage(model: preciseModel, maxTokens: maxTokens, userMessage: message)
+        return AIResponse(text: text, usage: usage)
     }
 }
 

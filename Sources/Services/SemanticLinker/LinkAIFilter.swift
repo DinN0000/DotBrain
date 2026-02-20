@@ -48,10 +48,13 @@ struct LinkAIFilter: Sendable {
         [{"noteIndex": 0, "links": [{"index": 0, "context": "~하려면 참고", "relation": "reference"}]}]
         """
 
-        let response = try await aiService.sendFast(maxTokens: 2048, message: prompt)
-        StatisticsService.addApiCost(Double(notes.count) * 0.0005)
+        let response = try await aiService.sendFastWithUsage(message: prompt)
+        if let usage = response.usage {
+            let model = await aiService.fastModel
+            StatisticsService.logTokenUsage(operation: "semantic-link", model: model, usage: usage)
+        }
 
-        return parseBatchResponse(response, notes: notes, maxResultsPerNote: maxResultsPerNote)
+        return parseBatchResponse(response.text, notes: notes, maxResultsPerNote: maxResultsPerNote)
     }
 
     func filterSingle(
@@ -91,10 +94,13 @@ struct LinkAIFilter: Sendable {
         [{"index": 0, "context": "~하려면 참고", "relation": "reference"}]
         """
 
-        let response = try await aiService.sendFast(maxTokens: 512, message: prompt)
-        StatisticsService.addApiCost(0.0005)
+        let response = try await aiService.sendFastWithUsage(message: prompt)
+        if let usage = response.usage {
+            let model = await aiService.fastModel
+            StatisticsService.logTokenUsage(operation: "semantic-link", model: model, usage: usage)
+        }
 
-        return parseSingleResponse(response, candidates: candidates, maxResults: maxResults)
+        return parseSingleResponse(response.text, candidates: candidates, maxResults: maxResults)
     }
 
     // MARK: - Parsing

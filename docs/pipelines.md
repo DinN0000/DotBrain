@@ -143,10 +143,22 @@ PARA 하위 폴더 (예: 2_Area/DevOps/)
 
 `Sources/Pipeline/VaultReorganizer.swift` — 볼트 전체 대상 AI 재분류.
 
+### Scope
+
+```swift
+enum Scope {
+    case all                       // 전체 볼트
+    case category(PARACategory)    // 특정 PARA 카테고리
+    case folder(String)            // 특정 폴더 경로 (VaultInspectorView에서 사용)
+}
+```
+
+**`.folder(String)` 추가**: VaultInspectorView에서 개별 폴더 단위로 재분류할 때 사용. 폴더 경로를 직접 지정하여 해당 폴더 내 파일만 scan/execute 대상으로 삼음.
+
 ### Phase 1: Scan
 
 ```
-PARA 폴더 전체 (또는 특정 카테고리)
+PARA 폴더 전체, 특정 카테고리, 또는 특정 폴더
     │
     ▼
 1. Collect ── collectFiles() (max 200 파일)
@@ -307,7 +319,7 @@ struct LinkResult {
 |-----------|-----------|----------|----------|----------|
 | InboxProcessor | async | max 5 | max 3 (배치) + max 3 (정밀) | Task.isCancelled |
 | FolderReorganizer | async | max 5 | Classifier 재사용 | - |
-| VaultReorganizer | async | max 5 | Classifier 재사용 | - |
+| VaultReorganizer | async | max 5 | Classifier 재사용 | Task.isCancelled |
 | VaultAuditor | sync | - | - | - |
 | SemanticLinker | async | - | max 3 (AI 필터) | - |
 

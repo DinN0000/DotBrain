@@ -3,6 +3,7 @@ import Foundation
 /// Collects and persists PKM statistics
 class StatisticsService {
     private let pkmRoot: String
+    static var sharedPkmRoot: String?  // Set by AppState on init
 
     /// Actor for atomic read-modify-write on UserDefaults (replaces DispatchQueue serial)
     private static let atomicActor = StatisticsActor()
@@ -60,6 +61,17 @@ class StatisticsService {
         Task {
             await atomicActor.incrementDuplicates()
         }
+    }
+
+    /// Log actual token usage with real cost calculation
+    static func logTokenUsage(operation: String, model: String, usage: TokenUsage) {
+        guard let root = sharedPkmRoot else { return }
+        let cost = APIUsageLogger.calculateCost(model: model, usage: usage)
+        Task {
+            let logger = APIUsageLogger(pkmRoot: root)
+            await logger.log(operation: operation, model: model, usage: usage)
+        }
+        addApiCost(cost)
     }
 
     // MARK: - Private

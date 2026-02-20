@@ -20,7 +20,7 @@ func isPathSafe(_ path: String) -> Bool {
 
 **규칙**: 심볼릭 링크를 먼저 해석한 후 `hasPrefix`로 비교. 슬래시 정규화 포함.
 
-**호출 위치**: `FileMover.moveFile()`, `FileMover.moveFolder()`, `FolderReorganizer.process()`, `ProjectManager.createProject()`, `PARAMover.moveFolder()`
+**호출 위치**: `FileMover.moveFile()`, `FileMover.moveFolder()`, `FolderReorganizer.process()`, `ProjectManager.createProject()`, `PARAMover.moveFolder()`, `ContentHashCache.checkFile()`, `ContentHashCache.checkFolder()`, `VaultReorganizer.collectFiles()`
 
 ### sanitizeFolderName()
 
@@ -106,6 +106,8 @@ V1 (SHA256 hash) → V2 (HKDF-SHA256) 자동 마이그레이션. V1 키로 복�
 | `RateLimiter` | `Sources/Services/RateLimiter.swift` | 프로바이더별 rate limit 상태 |
 | `ClaudeAPIClient` | `Sources/Services/Claude/ClaudeAPIClient.swift` | URLSession, API 통신 |
 | `GeminiAPIClient` | `Sources/Services/Gemini/GeminiAPIClient.swift` | URLSession, API 통신 |
+| `ContentHashCache` | `Sources/Services/ContentHashCache.swift` | SHA256 해시 캐시 (JSON 파일 I/O) |
+| `APIUsageLogger` | `Sources/Services/APIUsageLogger.swift` | 토큰 사용량 로그 (JSON 파일 I/O) |
 
 ### RateLimiter 상세
 

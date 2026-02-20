@@ -41,6 +41,13 @@ actor GeminiAPIClient {
     struct GenerateContentResponse: Decodable {
         let candidates: [Candidate]?
         let error: APIError?
+        let usageMetadata: UsageMetadata?
+
+        struct UsageMetadata: Decodable {
+            let promptTokenCount: Int?
+            let candidatesTokenCount: Int?
+            let totalTokenCount: Int?
+        }
 
         struct Candidate: Decodable {
             let content: Content?
@@ -72,12 +79,12 @@ actor GeminiAPIClient {
 
     // MARK: - API Call
 
-    /// Send a message to Gemini and get the text response
+    /// Send a message to Gemini and get the text response with token usage
     func sendMessage(
         model: String,
         maxTokens: Int,
         userMessage: String
-    ) async throws -> String {
+    ) async throws -> (String, TokenUsage?) {
         guard let apiKey = KeychainService.getGeminiAPIKey() else {
             throw GeminiAPIError.noAPIKey
         }
@@ -152,7 +159,14 @@ actor GeminiAPIClient {
             throw GeminiAPIError.emptyResponse
         }
 
-        return text
+        let tokenUsage: TokenUsage? = geminiResponse.usageMetadata.map {
+            TokenUsage(
+                inputTokens: $0.promptTokenCount ?? 0,
+                outputTokens: $0.candidatesTokenCount ?? 0,
+                cachedTokens: 0
+            )
+        }
+        return (text, tokenUsage)
     }
 }
 

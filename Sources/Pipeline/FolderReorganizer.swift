@@ -102,10 +102,12 @@ struct FolderReorganizer {
                 group.addTask {
                     let content = self.extractContent(from: filePath)
                     let fileName = (filePath as NSString).lastPathComponent
+                    let preview = FileContentExtractor.extractPreview(from: filePath, content: content)
                     return ClassifyInput(
                         filePath: filePath,
                         content: content,
-                        fileName: fileName
+                        fileName: fileName,
+                        preview: preview
                     )
                 }
                 activeTasks += 1

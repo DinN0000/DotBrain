@@ -23,11 +23,12 @@ final class AppState: ObservableObject {
         case dashboard
         case search
         case paraManage
-        case vaultReorganize
+        case vaultInspector    // replaces vaultReorganize
+        case aiStatistics      // new
 
         var parent: Screen? {
             switch self {
-            case .paraManage, .search, .vaultReorganize:
+            case .paraManage, .search, .vaultInspector, .aiStatistics:
                 return .dashboard
             default:
                 return nil
@@ -41,7 +42,8 @@ final class AppState: ObservableObject {
             case .settings: return "설정"
             case .paraManage: return "폴더 관리"
             case .search: return "검색"
-            case .vaultReorganize: return "AI 재분류"
+            case .vaultInspector: return "볼트 점검"
+            case .aiStatistics: return "AI 통계"
             case .results: return "정리 결과"
             default: return ""
             }
@@ -74,6 +76,7 @@ final class AppState: ObservableObject {
             inboxWatchdog?.stop()
             if UserDefaults.standard.bool(forKey: "onboardingCompleted") {
                 setupWatchdog()
+                StatisticsService.sharedPkmRoot = pkmRootPath
             }
         }
     }
@@ -121,8 +124,10 @@ final class AppState: ObservableObject {
             return "·_·"
         case .paraManage:
             return "·_·"
-        case .vaultReorganize:
+        case .vaultInspector:
             return "·_·…"
+        case .aiStatistics:
+            return "·_·"
         }
     }
 
@@ -156,6 +161,7 @@ final class AppState: ObservableObject {
         // Only start services if onboarding is already completed
         if UserDefaults.standard.bool(forKey: "onboardingCompleted") {
             AICompanionService.updateIfNeeded(pkmRoot: pkmRootPath)
+            StatisticsService.sharedPkmRoot = pkmRootPath
 
             // One-time migration: consolidate scattered _Assets/ to central _Assets/{documents,images}/
             let migrationKey = "assetMigrationV1Completed"
@@ -631,8 +637,8 @@ final class AppState: ObservableObject {
         if currentScreen == .results {
             if processingOrigin == .paraManage {
                 currentScreen = .paraManage
-            } else if processingOrigin == .vaultReorganize {
-                currentScreen = .vaultReorganize
+            } else if processingOrigin == .vaultInspector {
+                currentScreen = .vaultInspector
             } else {
                 currentScreen = .inbox
             }
