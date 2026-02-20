@@ -73,6 +73,7 @@ final class AppState: ObservableObject {
     @Published var backgroundTaskName: String?
     @Published var backgroundTaskPhase: String = ""
     @Published var backgroundTaskProgress: Double = 0
+    @Published var backgroundTaskCompleted: Bool = false
     @Published var vaultCheckResult: VaultCheckResult?
     @Published var taskBlockedAlert: String?
     @Published var viewTaskActive: Bool = false
@@ -225,9 +226,15 @@ final class AppState: ObservableObject {
         backgroundTask = Task.detached(priority: .utility) {
             defer {
                 Task { @MainActor in
+                    // Show completion state briefly before clearing
+                    AppState.shared.backgroundTaskPhase = "완료"
+                    AppState.shared.backgroundTaskProgress = 1.0
+                    AppState.shared.backgroundTaskCompleted = true
+                    try? await Task.sleep(for: .seconds(3))
                     AppState.shared.backgroundTaskName = nil
                     AppState.shared.backgroundTaskPhase = ""
                     AppState.shared.backgroundTaskProgress = 0
+                    AppState.shared.backgroundTaskCompleted = false
                 }
             }
 
@@ -245,15 +252,20 @@ final class AppState: ObservableObject {
             let cache = ContentHashCache(pkmRoot: root)
             await cache.load()
 
-            // Phase 1: Audit
+            // Phase 1: Audit (0% -> 10%)
+            await MainActor.run { AppState.shared.backgroundTaskProgress = 0.02 }
             let auditor = VaultAuditor(pkmRoot: root)
             let report = auditor.audit()
             if Task.isCancelled { return }
+            await MainActor.run { AppState.shared.backgroundTaskProgress = 0.10 }
 
-            // Phase 2: Repair
+            // Phase 2: Repair (10% -> 20%)
             var repairedFiles: [String] = []
             if report.totalIssues > 0 {
-                await MainActor.run { AppState.shared.backgroundTaskPhase = "자동 복구 중..." }
+                await MainActor.run {
+                    AppState.shared.backgroundTaskPhase = "자동 복구 중..."
+                    AppState.shared.backgroundTaskProgress = 0.12
+                }
                 let repair = auditor.repair(report: report)
                 repairCount = repair.linksFixed + repair.frontmatterInjected + repair.paraFixed
 
@@ -261,6 +273,7 @@ final class AppState: ObservableObject {
                 await cache.updateHashes(repairedFiles)
             }
             if Task.isCancelled { return }
+            await MainActor.run { AppState.shared.backgroundTaskProgress = 0.20 }
 
             // Check all .md files for changes (single batch actor call)
             await MainActor.run { AppState.shared.backgroundTaskPhase = "변경 파일 확인 중..." }
@@ -271,11 +284,16 @@ final class AppState: ObservableObject {
 
             NSLog("[VaultCheck] %d/%d files changed", changedFiles.count, allMdFiles.count)
 
-            // Phase 3: Enrich (changed files only, skip archive)
-            await MainActor.run { AppState.shared.backgroundTaskPhase = "메타데이터 보완 중..." }
+            // Phase 3: Enrich (changed files only, skip archive) (25% -> 60%)
+            await MainActor.run {
+                AppState.shared.backgroundTaskPhase = "메타데이터 보완 중..."
+                AppState.shared.backgroundTaskProgress = 0.25
+            }
             let enricher = NoteEnricher(pkmRoot: root)
             let filesToEnrich = Array(changedFiles.filter { !$0.contains("/4_Archive/") })
             var enrichedFiles: [String] = []
+            let enrichTotal = filesToEnrich.count
+            var enrichDone = 0
 
             await withTaskGroup(of: EnrichResult?.self) { group in
                 var active = 0
@@ -298,9 +316,16 @@ final class AppState: ObservableObject {
                     }
                     if let result = await group.next() {
                         active -= 1
+                        enrichDone += 1
                         if let r = result, r.fieldsUpdated > 0 {
                             enrichedFiles.append(r.filePath)
                             enrichCount += 1
+                        }
+                        let enrichProgress = enrichTotal > 0
+                            ? 0.25 + Double(enrichDone) / Double(enrichTotal) * 0.35
+                            : 0.60
+                        await MainActor.run {
+                            AppState.shared.backgroundTaskProgress = enrichProgress
                         }
                     }
                 }
@@ -310,8 +335,11 @@ final class AppState: ObservableObject {
             }
             if Task.isCancelled { return }
 
-            // Phase 4: MOC (dirty folders only)
-            await MainActor.run { AppState.shared.backgroundTaskPhase = "폴더 요약 갱신 중..." }
+            // Phase 4: MOC (dirty folders only) (60% -> 70%)
+            await MainActor.run {
+                AppState.shared.backgroundTaskPhase = "폴더 요약 갱신 중..."
+                AppState.shared.backgroundTaskProgress = 0.60
+            }
             let allChangedFiles = changedFiles.union(Set(enrichedFiles))
             let dirtyFolders = Set(allChangedFiles.map {
                 ($0 as NSString).deletingLastPathComponent
@@ -320,13 +348,16 @@ final class AppState: ObservableObject {
             await generator.regenerateAll(dirtyFolders: dirtyFolders)
             if Task.isCancelled { return }
 
-            // Phase 5: Semantic Link (changed notes only)
-            await MainActor.run { AppState.shared.backgroundTaskPhase = "노트 간 시맨틱 연결 중..." }
+            // Phase 5: Semantic Link (changed notes only) (70% -> 95%)
+            await MainActor.run {
+                AppState.shared.backgroundTaskPhase = "노트 간 시맨틱 연결 중..."
+                AppState.shared.backgroundTaskProgress = 0.70
+            }
             let linker = SemanticLinker(pkmRoot: root)
             let linkResult = await linker.linkAll(changedFiles: allChangedFiles) { progress, status in
                 Task { @MainActor in
                     AppState.shared.backgroundTaskPhase = status
-                    AppState.shared.backgroundTaskProgress = progress
+                    AppState.shared.backgroundTaskProgress = 0.70 + progress * 0.25
                 }
             }
 
@@ -406,6 +437,7 @@ final class AppState: ObservableObject {
         backgroundTaskName = nil
         backgroundTaskPhase = ""
         backgroundTaskProgress = 0
+        backgroundTaskCompleted = false
     }
 
     // MARK: - Actions
