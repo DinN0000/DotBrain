@@ -274,9 +274,9 @@ struct VaultReorganizer {
         }
 
         if !affectedFolders.isEmpty {
-            onProgress?(0.93, "MOC 갱신 중...")
-            let mocGenerator = MOCGenerator(pkmRoot: pkmRoot)
-            await mocGenerator.updateMOCsForFolders(affectedFolders)
+            onProgress?(0.93, "노트 인덱스 갱신 중...")
+            let indexGenerator = NoteIndexGenerator(pkmRoot: pkmRoot)
+            await indexGenerator.updateForFolders(affectedFolders)
         }
 
         // Semantic link: reconnect moved files with vault

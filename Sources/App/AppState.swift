@@ -335,17 +335,17 @@ final class AppState: ObservableObject {
             }
             if Task.isCancelled { return }
 
-            // Phase 4: MOC (dirty folders only) (60% -> 70%)
+            // Phase 4: Note Index (dirty folders only) (60% -> 70%)
             await MainActor.run {
-                AppState.shared.backgroundTaskPhase = "폴더 요약 갱신 중..."
+                AppState.shared.backgroundTaskPhase = "노트 인덱스 갱신 중..."
                 AppState.shared.backgroundTaskProgress = 0.60
             }
             let allChangedFiles = changedFiles.union(Set(enrichedFiles))
             let dirtyFolders = Set(allChangedFiles.map {
                 ($0 as NSString).deletingLastPathComponent
             })
-            let generator = MOCGenerator(pkmRoot: root)
-            await generator.regenerateAll(dirtyFolders: dirtyFolders)
+            let indexGenerator = NoteIndexGenerator(pkmRoot: root)
+            await indexGenerator.updateForFolders(dirtyFolders)
             if Task.isCancelled { return }
 
             // Phase 5: Semantic Link (changed notes only) (70% -> 95%)
