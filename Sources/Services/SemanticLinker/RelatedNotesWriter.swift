@@ -28,7 +28,7 @@ struct RelatedNotesWriter: Sendable {
             mergedEntries.append((name: link.name, context: link.context, relation: link.relation))
         }
 
-        let finalEntries = Array(mergedEntries.prefix(5))
+        let finalEntries = mergedEntries
         guard !finalEntries.isEmpty else { return }
 
         let sectionText: String
