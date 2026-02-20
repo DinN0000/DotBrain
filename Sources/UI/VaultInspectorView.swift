@@ -3,8 +3,6 @@ import SwiftUI
 struct VaultInspectorView: View {
     @EnvironmentObject var appState: AppState
 
-    // Level 1: Folder list
-    @State private var selectedFolder: FolderInfo?
     @State private var folders: [FolderInfo] = []
     @State private var isLoading = true
 
@@ -47,9 +45,7 @@ struct VaultInspectorView: View {
             BreadcrumbView(current: .vaultInspector)
             Divider()
 
-            if selectedFolder != nil {
-                folderDetailView
-            } else if reorgPhase != .idle {
+            if reorgPhase != .idle {
                 reorgView
             } else {
                 folderListView
@@ -72,7 +68,7 @@ struct VaultInspectorView: View {
                     HStack(spacing: 4) {
                         Image(systemName: "stethoscope")
                             .font(.caption)
-                        Text("전체 점검")
+                        Text("진단")
                             .font(.caption)
                     }
                     .padding(.horizontal, 10)
@@ -80,12 +76,13 @@ struct VaultInspectorView: View {
                 }
                 .buttonStyle(.bordered)
                 .disabled(appState.isAnyTaskRunning)
+                .help("깨진 링크, 누락 태그 등 문제를 찾아 자동 복구")
 
                 Button(action: { startFullReorg() }) {
                     HStack(spacing: 4) {
-                        Image(systemName: "arrow.triangle.2.circlepath")
+                        Image(systemName: "sparkles")
                             .font(.caption)
-                        Text("전체 재분류")
+                        Text("전체 정리")
                             .font(.caption)
                     }
                     .padding(.horizontal, 10)
@@ -93,6 +90,7 @@ struct VaultInspectorView: View {
                 }
                 .buttonStyle(.bordered)
                 .disabled(appState.isAnyTaskRunning)
+                .help("AI가 모든 파일을 분석해서 적절한 폴더로 재배치")
 
                 Spacer()
             }
@@ -135,194 +133,110 @@ struct VaultInspectorView: View {
     @ViewBuilder
     private func folderSection(category: PARACategory, folders: [FolderInfo]) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: 6) {
+            HStack(spacing: 4) {
                 Image(systemName: category.icon)
                     .font(.caption)
                     .foregroundColor(category.color)
                 Text(category.displayName)
                     .font(.caption)
                     .fontWeight(.semibold)
-                Text("(\(folders.count))")
-                    .font(.caption2)
-                    .foregroundColor(.secondary)
+                if folders.count > 0 {
+                    Text("(\(folders.count))")
+                        .font(.caption2)
+                        .foregroundColor(.secondary.opacity(0.7))
+                }
                 Spacer()
             }
             .padding(.vertical, 6)
 
             ForEach(folders) { folder in
-                folderRow(folder)
+                VaultFolderRow(folder: folder) {
+                    showFolderMenu(folder)
+                }
+                .contextMenu {
+                    folderContextMenu(folder)
+                }
             }
         }
+        .padding(.top, 8)
     }
 
-    private func folderRow(_ folder: FolderInfo) -> some View {
+    // MARK: - Folder Menu (NSMenu popup, matching PARAManageView)
+
+    @ViewBuilder
+    private func folderContextMenu(_ folder: FolderInfo) -> some View {
+        let changedCount = folder.modifiedCount + folder.newCount
+
+        if changedCount > 0 {
+            Button {
+                startFolderReorg(folder)
+            } label: {
+                Label(
+                    "바뀐 파일만 정리 (\(changedCount)개)",
+                    systemImage: "sparkles"
+                )
+            }
+        }
+
         Button {
-            selectedFolder = folder
+            startFolderFullReorg(folder)
         } label: {
-            HStack(spacing: 8) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(folder.name)
-                        .font(.caption)
-                        .fontWeight(.medium)
-                        .lineLimit(1)
-
-                    HStack(spacing: 4) {
-                        Text("\(folder.fileCount)개")
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
-                        if folder.modifiedCount > 0 {
-                            Text("변경 \(folder.modifiedCount)")
-                                .font(.caption2)
-                                .foregroundColor(.orange)
-                        }
-                        if folder.newCount > 0 {
-                            Text("신규 \(folder.newCount)")
-                                .font(.caption2)
-                                .foregroundColor(.blue)
-                        }
-                    }
-                }
-
-                Spacer()
-
-                // Health bar
-                GeometryReader { geo in
-                    ZStack(alignment: .leading) {
-                        RoundedRectangle(cornerRadius: 2)
-                            .fill(Color.primary.opacity(0.08))
-                        RoundedRectangle(cornerRadius: 2)
-                            .fill(folder.healthRatio > 0.8 ? Color.green : folder.healthRatio > 0.5 ? Color.orange : Color.red)
-                            .frame(width: geo.size.width * folder.healthRatio)
-                    }
-                }
-                .frame(width: 40, height: 4)
-
-                Image(systemName: "chevron.right")
-                    .font(.caption2)
-                    .foregroundColor(.secondary)
-            }
-            .padding(.vertical, 6)
-            .padding(.horizontal, 8)
-            .contentShape(Rectangle())
+            Label("전체 파일 정리", systemImage: "arrow.2.squarepath")
         }
-        .buttonStyle(.plain)
-    }
 
-    // MARK: - Level 2: Folder Detail
+        Divider()
 
-    private var folderDetailView: some View {
-        VStack(spacing: 0) {
-            // Back button + folder name
-            HStack(spacing: 8) {
-                Button {
-                    selectedFolder = nil
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "chevron.left")
-                            .font(.caption)
-                        Text("목록")
-                            .font(.caption)
-                    }
-                }
-                .buttonStyle(.plain)
-                .foregroundColor(.accentColor)
-
-                if let folder = selectedFolder {
-                    Text(folder.name)
-                        .font(.subheadline)
-                        .fontWeight(.medium)
-                }
-
-                Spacer()
-            }
-            .padding(.horizontal)
-            .padding(.vertical, 8)
-
-            Divider()
-
-            if let folder = selectedFolder {
-                ScrollView {
-                    VStack(spacing: 12) {
-                        // Diagnostic summary
-                        HStack(spacing: 12) {
-                            miniStat(value: "\(folder.fileCount)", label: "파일")
-                            miniStat(value: "\(folder.modifiedCount)", label: "변경됨", color: .orange)
-                            miniStat(value: "\(folder.newCount)", label: "신규", color: .blue)
-                        }
-                        .padding(.horizontal)
-
-                        // Tool cards
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("도구")
-                                .font(.caption)
-                                .fontWeight(.semibold)
-                                .foregroundColor(.secondary)
-
-                            HStack(spacing: 8) {
-                                toolButton(
-                                    icon: "arrow.triangle.2.circlepath",
-                                    label: "변경 파일 재분류",
-                                    isDisabled: folder.modifiedCount + folder.newCount == 0
-                                ) {
-                                    startFolderReorg(folder)
-                                }
-
-                                toolButton(
-                                    icon: "arrow.2.squarepath",
-                                    label: "전체 재분류",
-                                    isDisabled: false
-                                ) {
-                                    startFolderFullReorg(folder)
-                                }
-                            }
-                        }
-                        .padding(.horizontal)
-                    }
-                    .padding(.vertical, 8)
-                }
-            }
+        Button {
+            openInFinder(folder)
+        } label: {
+            Label("Finder에서 열기", systemImage: "folder")
         }
     }
 
-    private func miniStat(value: String, label: String, color: Color = .primary) -> some View {
-        VStack(spacing: 2) {
-            Text(value)
-                .font(.title3)
-                .fontWeight(.bold)
-                .foregroundColor(color)
-                .monospacedDigit()
-            Text(label)
-                .font(.caption2)
-                .foregroundColor(.secondary)
+    private func showFolderMenu(_ folder: FolderInfo) {
+        let menu = NSMenu()
+        let changedCount = folder.modifiedCount + folder.newCount
+
+        if changedCount > 0 {
+            addMenuItem(
+                to: menu,
+                title: "바뀐 파일만 정리 (\(changedCount)개)",
+                icon: "sparkles"
+            ) {
+                self.startFolderReorg(folder)
+            }
         }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 8)
-        .background(Color.primary.opacity(0.03))
-        .cornerRadius(8)
+
+        addMenuItem(
+            to: menu,
+            title: "전체 파일 정리",
+            icon: "arrow.2.squarepath"
+        ) {
+            self.startFolderFullReorg(folder)
+        }
+
+        menu.addItem(.separator())
+
+        addMenuItem(to: menu, title: "Finder에서 열기", icon: "folder") {
+            self.openInFinder(folder)
+        }
+
+        menu.popUp(positioning: nil, at: NSEvent.mouseLocation, in: nil)
     }
 
-    private func toolButton(icon: String, label: String, isDisabled: Bool, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            VStack(spacing: 4) {
-                Image(systemName: icon)
-                    .font(.system(size: 14))
-                Text(label)
-                    .font(.caption2)
-                    .lineLimit(2)
-                    .multilineTextAlignment(.center)
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 8)
-            .background(Color.primary.opacity(0.03))
-            .cornerRadius(8)
-            .overlay(
-                RoundedRectangle(cornerRadius: 8)
-                    .strokeBorder(Color.primary.opacity(0.06), lineWidth: 0.5)
-            )
+    private func addMenuItem(to menu: NSMenu, title: String, icon: String?, action: @escaping () -> Void) {
+        let item = VaultMenuItem(title: title, action: #selector(VaultMenuItem.invoke), keyEquivalent: "")
+        item.target = item
+        item.callback = action
+        if let icon {
+            item.image = NSImage(systemSymbolName: icon, accessibilityDescription: nil)
         }
-        .buttonStyle(.plain)
-        .disabled(isDisabled)
-        .opacity(isDisabled ? 0.4 : 1)
+        menu.addItem(item)
+    }
+
+    private func openInFinder(_ folder: FolderInfo) {
+        let safeURL = URL(fileURLWithPath: folder.path).resolvingSymlinksInPath()
+        NSWorkspace.shared.open(safeURL)
     }
 
     // MARK: - Reorganize View (absorbed from VaultReorganizeView)
@@ -765,14 +679,12 @@ struct VaultInspectorView: View {
 
     private func startFolderReorg(_ folder: FolderInfo) {
         reorgScope = .folder(folder.path)
-        selectedFolder = nil
         reorgPhase = .scanning
         startReorgScan()
     }
 
     private func startFolderFullReorg(_ folder: FolderInfo) {
         reorgScope = .category(folder.category)
-        selectedFolder = nil
         reorgPhase = .scanning
         startReorgScan()
     }
@@ -873,5 +785,104 @@ struct VaultInspectorView: View {
         reorgProgress = 0
         reorgStatus = ""
         loadFolders()
+    }
+}
+
+// MARK: - Vault Folder Row
+
+private struct VaultFolderRow: View {
+    let folder: VaultInspectorView.FolderInfo
+    let action: () -> Void
+    @State private var isHovered = false
+
+    private var healthColor: Color {
+        if folder.healthRatio > 0.8 { return .green }
+        if folder.healthRatio > 0.5 { return .orange }
+        return .red
+    }
+
+    private var healthTooltip: String {
+        var parts: [String] = []
+        if folder.modifiedCount > 0 {
+            parts.append("변경 \(folder.modifiedCount)개")
+        }
+        if folder.newCount > 0 {
+            parts.append("신규 \(folder.newCount)개")
+        }
+        let detail = parts.joined(separator: ", ")
+        if folder.healthRatio <= 0.5 {
+            return "\(detail) — 정리가 필요합니다"
+        }
+        return "\(detail) — 재배치를 권장합니다"
+    }
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "folder")
+                .font(.system(size: 13))
+                .foregroundColor(folder.category.color)
+                .frame(width: 16)
+
+            VStack(alignment: .leading, spacing: 1) {
+                Text(folder.name)
+                    .font(.caption)
+                    .fontWeight(.medium)
+                    .lineLimit(1)
+
+                if folder.modifiedCount > 0 || folder.newCount > 0 {
+                    HStack(spacing: 4) {
+                        if folder.modifiedCount > 0 {
+                            Text("변경 \(folder.modifiedCount)")
+                                .font(.caption2)
+                                .foregroundColor(.orange)
+                        }
+                        if folder.newCount > 0 {
+                            Text("신규 \(folder.newCount)")
+                                .font(.caption2)
+                                .foregroundColor(.blue)
+                        }
+                    }
+                }
+            }
+
+            Spacer()
+
+            if folder.healthRatio <= 0.8 {
+                Circle()
+                    .fill(healthColor)
+                    .frame(width: 6, height: 6)
+                    .help(healthTooltip)
+            }
+
+            Text("\(folder.fileCount)")
+                .font(.caption)
+                .foregroundColor(.secondary)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 2)
+                .background(
+                    Capsule()
+                        .fill(Color.secondary.opacity(0.12))
+                )
+        }
+        .padding(.vertical, 4)
+        .padding(.horizontal, 8)
+        .background(
+            RoundedRectangle(cornerRadius: 6)
+                .fill(isHovered ? Color.primary.opacity(0.04) : Color.primary.opacity(0.02))
+        )
+        .contentShape(Rectangle())
+        .onTapGesture { action() }
+        .animation(.easeOut(duration: 0.12), value: isHovered)
+        .onHover { isHovered = $0 }
+    }
+}
+
+// MARK: - NSMenuItem with Closure
+
+private class VaultMenuItem: NSMenuItem {
+    var callback: (() -> Void)?
+
+    @objc func invoke() {
+        callback?()
     }
 }
