@@ -29,6 +29,38 @@ struct MenuBarPopover: View {
                 AIStatisticsView()
             }
 
+            // Background task indicator
+            if let taskName = appState.backgroundTaskName {
+                Divider()
+                HStack(spacing: 8) {
+                    ProgressView()
+                        .controlSize(.small)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(taskName)
+                            .font(.caption2)
+                            .fontWeight(.medium)
+                        if !appState.backgroundTaskPhase.isEmpty {
+                            Text(appState.backgroundTaskPhase)
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                                .lineLimit(1)
+                        }
+                    }
+                    Spacer()
+                    Button {
+                        appState.cancelBackgroundTask()
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 14))
+                            .foregroundColor(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(Color.accentColor.opacity(0.06))
+            }
+
             // Footer (hidden during onboarding and processing)
             if ![.onboarding, .processing].contains(appState.currentScreen) {
                 Divider()
@@ -42,6 +74,16 @@ struct MenuBarPopover: View {
             }
         }
         .frame(width: 360, height: 480)
+        .alert("작업 충돌", isPresented: Binding(
+            get: { appState.taskBlockedAlert != nil },
+            set: { if !$0 { appState.taskBlockedAlert = nil } }
+        )) {
+            Button("확인", role: .cancel) {
+                appState.taskBlockedAlert = nil
+            }
+        } message: {
+            Text(appState.taskBlockedAlert ?? "")
+        }
     }
 
     private func footerTab(icon: String, screen: AppState.Screen) -> some View {
