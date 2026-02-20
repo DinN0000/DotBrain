@@ -11,7 +11,7 @@ struct LinkAIFilter: Sendable {
 
     func filterBatch(
         notes: [(name: String, summary: String, tags: [String], candidates: [LinkCandidateGenerator.Candidate])],
-        maxResultsPerNote: Int = 5
+        maxResultsPerNote: Int = 15
     ) async throws -> [[FilteredLink]] {
         guard !notes.isEmpty else { return [] }
 
@@ -30,15 +30,16 @@ struct LinkAIFilter: Sendable {
         }.joined(separator: "\n\n")
 
         let prompt = """
-        각 노트에 대해 가장 관련 깊은 후보를 최대 \(maxResultsPerNote)개씩 선택하세요.
+        각 노트에 대해 진짜 관련있는 후보를 모두 선택하세요.
 
         \(noteDescriptions)
 
         ## 규칙
-        1. 실질적 맥락 연관성 기준 선택 (단순 태그 일치 불충분)
-        2. context: "~하려면", "~할 때", "~와 비교할 때" 형식 (한국어, 15자 이내)
-        3. 관련 없는 후보 제외
-        4. relation: 관계 유형을 하나 선택
+        1. 핵심 기준: "이 연결을 따라가면 새로운 인사이트를 얻을 수 있는가?"
+        2. 단순히 같은 주제라서가 아니라, 실제로 함께 읽을 가치가 있는 문서만 선택
+        3. context: "~하려면", "~할 때", "~와 비교할 때" 형식 (한국어, 15자 이내)
+        4. 관련 없는 후보는 반드시 제외
+        5. relation: 관계 유형을 하나 선택
            - "prerequisite": 이해하려면 먼저 봐야 하는 문서
            - "project": 같은 프로젝트/업무 관련
            - "reference": 참고/비교할 수 있는 자료
@@ -62,7 +63,7 @@ struct LinkAIFilter: Sendable {
         noteSummary: String,
         noteTags: [String],
         candidates: [LinkCandidateGenerator.Candidate],
-        maxResults: Int = 5
+        maxResults: Int = 15
     ) async throws -> [FilteredLink] {
         guard !candidates.isEmpty else { return [] }
 
@@ -71,7 +72,7 @@ struct LinkAIFilter: Sendable {
         }.joined(separator: "\n")
 
         let prompt = """
-        다음 노트와 가장 관련이 깊은 후보를 최대 \(maxResults)개 선택하고, 각각 연결 이유를 작성하세요.
+        다음 노트와 진짜 관련있는 후보를 모두 선택하고, 각각 연결 이유를 작성하세요.
 
         노트: \(noteName)
         태그: \(noteTags.joined(separator: ", "))
@@ -81,10 +82,11 @@ struct LinkAIFilter: Sendable {
         \(candidateList)
 
         ## 규칙
-        1. 단순 태그 일치가 아닌 실질적 맥락 연관성 기준
-        2. context는 "~하려면", "~할 때", "~와 비교할 때" 형식 (한국어, 15자 이내)
-        3. 관련 없는 후보는 제외
-        4. relation: 관계 유형을 하나 선택
+        1. 핵심 기준: "이 연결을 따라가면 새로운 인사이트를 얻을 수 있는가?"
+        2. 단순히 같은 주제라서가 아니라, 실제로 함께 읽을 가치가 있는 문서만 선택
+        3. context: "~하려면", "~할 때", "~와 비교할 때" 형식 (한국어, 15자 이내)
+        4. 관련 없는 후보는 반드시 제외
+        5. relation: 관계 유형을 하나 선택
            - "prerequisite": 이해하려면 먼저 봐야 하는 문서
            - "project": 같은 프로젝트/업무 관련
            - "reference": 참고/비교할 수 있는 자료

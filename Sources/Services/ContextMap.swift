@@ -1,16 +1,16 @@
 import Foundation
 
-/// A single note entry extracted from a MOC file
+/// A single note entry from the vault index
 struct ContextMapEntry: Sendable {
     let noteName: String        // "Aave_Analysis"
-    let summary: String         // MOC에 기록된 요약
+    let summary: String         // 프론트매터 요약
     let folderName: String      // "DeFi"
     let para: PARACategory      // .resource
     let folderSummary: String   // 폴더 전체 요약
     let tags: [String]          // 폴더 태그 클라우드
 }
 
-/// Vault-wide context map built from all MOC files
+/// Vault-wide context map built from note-index.json
 struct VaultContextMap: Sendable {
     let entries: [ContextMapEntry]
     let folderCount: Int

@@ -184,9 +184,7 @@ Task.detached(priority: .utility) {
 | Stage 1 분류 (Haiku/Flash) | 3 | 5 파일/배치 | `Classifier.swift` |
 | Stage 2 분류 (Sonnet/Pro) | 3 | 1 파일 | `Classifier.swift` |
 | AI 링크 필터링 | 3 | 5 노트/배치 | `SemanticLinker.swift` |
-| MOC 재생성 | 3 | 1 폴더 | `MOCGenerator.swift` |
 | 노트 보강 | 3 | 1 파일 | `NoteEnricher.swift` |
-| Context Map 빌드 | 3 | 1 MOC | `ContextMapBuilder.swift` |
 
 ### 패턴: 수동 동시성 제한
 

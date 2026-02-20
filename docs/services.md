@@ -18,7 +18,7 @@
 | `sendFastWithUsage(maxTokens:message:)` | 빠른 모델 + 토큰 사용량 반환 → `AIResponse` |
 | `sendPreciseWithUsage(maxTokens:message:)` | 정밀 모델 + 토큰 사용량 반환 → `AIResponse` |
 
-**WithUsage 변형**: `AIResponse` (text + TokenUsage?)를 반환. 실제 토큰 사용량을 추적하여 APIUsageLogger에 기록할 수 있도록 함. Classifier, NoteEnricher, MOCGenerator, LinkAIFilter, FileMover에서 사용.
+**WithUsage 변형**: `AIResponse` (text + TokenUsage?)를 반환. 실제 토큰 사용량을 추적하여 APIUsageLogger에 기록할 수 있도록 함. Classifier, NoteEnricher, LinkAIFilter, FileMover에서 사용.
 
 **재시도 로직**: 최대 3회, 120초 deadline. Rate limit(429) 및 서버 에러(5xx) 시 재시도. 전체 실패 시 대체 프로바이더 fallback.
 
@@ -113,7 +113,7 @@ PARA 경로 관리 및 보안 검증.
 | `initializeStructure()` | 전체 PARA 폴더 + AI 컴패니언 파일 생성 |
 | `existingSubfolders()` | Area/Resource/Archive 서브폴더 목록 |
 
-**경로 속성**: `inboxPath`, `projectsPath`, `areaPath`, `resourcePath`, `archivePath`, `centralAssetsPath`, `documentsAssetsPath`, `imagesAssetsPath`
+**경로 속성**: `inboxPath`, `projectsPath`, `areaPath`, `resourcePath`, `archivePath`, `centralAssetsPath`, `documentsAssetsPath`, `imagesAssetsPath`, `metaPath`, `noteIndexPath`
 
 ### InboxScanner
 
@@ -197,22 +197,20 @@ PARA 경로 관리 및 보안 검증.
 
 ## Knowledge Management Services
 
-### MOCGenerator
+### NoteIndexGenerator
 
-`Sources/Services/MOCGenerator.swift` — **struct**
+`Sources/Services/NoteIndexGenerator.swift` — **struct: Sendable**
 
-Map of Contents 생성. 폴더 수준의 자동 목차.
+`_meta/note-index.json` 생성. 볼트 전체 노트/폴더를 단일 JSON 인덱스로 관리.
 
 | 메서드 | 설명 |
 |--------|------|
-| `generateMOC(folderPath:folderName:para:)` | AI 요약으로 MOC 생성. 태그 클라우드 포함 |
-| `generateCategoryRootMOC(basePath:para:)` | 카테고리 루트 인덱스 생성 (예: `1_Project.md`) |
-| `updateMOCsForFolders(_:)` | 변경된 폴더들의 MOC 업데이트 + 상위 카테고리 |
-| `regenerateAll()` | 전체 볼트 MOC 재생성 (max 3 병렬 AI) |
+| `updateForFolders(_:)` | 변경된 폴더만 증분 업데이트 (기존 인덱스와 병합) |
+| `regenerateAll()` | 전체 볼트 스캔 후 인덱스 완전 재생성 |
 
-**MOC 구조**: frontmatter + `## 문서 목록` (wikilink + context) + `## 태그 클라우드` (top 10).
+**인덱스 구조**: `NoteIndex` (version, updated, folders: `[String: FolderIndexEntry]`, notes: `[String: NoteIndexEntry]`). 각 노트는 path, folder, para, tags, summary, project, status를 포함.
 
-**의존**: AIService, StatisticsService, PKMPathManager
+**의존**: PKMPathManager (AI 호출 없음 — 프론트매터 파싱으로 구축)
 
 ### VaultAuditor
 
@@ -279,7 +277,7 @@ Map of Contents 생성. 폴더 수준의 자동 목차.
 
 | 메서드 | 설명 |
 |--------|------|
-| `build()` | 모든 MOC 파싱 → VaultContextMap (max 3 병렬) |
+| `build()` | `_meta/note-index.json` 읽기 → VaultContextMap |
 
 **의존**: PKMPathManager
 
@@ -312,9 +310,9 @@ Map of Contents 생성. 폴더 수준의 자동 목차.
 
 | 메서드 | 설명 |
 |--------|------|
-| `generateCandidates(for:allNotes:mocEntries:maxCandidates:)` | 노트별 top 10 링크 후보 |
+| `generateCandidates(for:allNotes:mocEntries:folderBonus:excludeSameFolder:)` | 노트별 링크 후보 생성 (인위적 제한 없음) |
 
-**스코어링**: 태그 겹침 >= 2 (+1.5/태그), 태그 겹침 == 1 (+0.5), 공유 MOC 폴더 (+1.0/폴더), 같은 프로젝트 (+2.0).
+**스코어링**: 태그 겹침 >= 2 (+1.5/태그), 공유 인덱스 폴더 (+folderBonus/폴더), 같은 프로젝트 (+2.0). 최소 점수 >= 3.0. 단일 태그 겹침은 무시.
 
 ### LinkAIFilter
 
@@ -322,7 +320,7 @@ Map of Contents 생성. 폴더 수준의 자동 목차.
 
 | 메서드 | 설명 |
 |--------|------|
-| `filterBatch(notes:maxResultsPerNote:)` | 배치 AI 필터링 (노트당 max 5) |
+| `filterBatch(notes:maxResultsPerNote:)` | 배치 AI 필터링 (노트당 기본 max 15, 인사이트 기준) |
 | `filterSingle(...)` | 단일 노트 필터링 |
 
 **Context 형식**: "~하려면", "~할 때", "~와 비교할 때" (15자 이내, 한국어).
@@ -335,7 +333,7 @@ Map of Contents 생성. 폴더 수준의 자동 목차.
 
 | 메서드 | 설명 |
 |--------|------|
-| `writeRelatedNotes(filePath:newLinks:noteNames:)` | `## Related Notes` 섹션 파싱, 병합, 작성 (max 5) |
+| `writeRelatedNotes(filePath:newLinks:noteNames:)` | `## Related Notes` 섹션 파싱, 병합, 작성 (인위적 제한 없음) |
 
 **Wikilink Sanitization**: `[[`, `]]`, `/`, `\`, `..` 제거. 노트 이름 존재 검증.
 
@@ -492,7 +490,7 @@ AppState
 │   ├── ProjectContextBuilder ← PKMPathManager
 │   ├── Classifier ← AIService ← (ClaudeAPIClient, GeminiAPIClient, RateLimiter)
 │   ├── FileMover ← (PKMPathManager, BinaryExtractor, FrontmatterWriter, AIService)
-│   ├── MOCGenerator ← (AIService, PKMPathManager)
+│   ├── NoteIndexGenerator ← PKMPathManager
 │   ├── SemanticLinker ← (TagNormalizer, LinkCandidateGenerator, LinkAIFilter, RelatedNotesWriter)
 │   ├── StatisticsService ← StatisticsActor
 │   └── NotificationService

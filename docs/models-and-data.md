@@ -409,12 +409,12 @@ struct ExtractResult {
 
 ## ContextMap Types
 
-`Sources/Services/ContextMap.swift` — MOC 기반 볼트 컨텍스트 맵. AI 분류 프롬프트에 사용.
+`Sources/Services/ContextMap.swift` — note-index.json 기반 볼트 컨텍스트 맵. AI 분류 프롬프트에 사용.
 
 ```swift
 struct ContextMapEntry: Sendable {
     let noteName: String        // "Aave_Analysis"
-    let summary: String         // MOC에 기록된 요약
+    let summary: String         // 프론트매터 요약
     let folderName: String      // "DeFi"
     let para: PARACategory      // .resource
     let folderSummary: String   // 폴더 전체 요약

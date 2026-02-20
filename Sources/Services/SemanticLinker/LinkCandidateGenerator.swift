@@ -24,7 +24,6 @@ struct LinkCandidateGenerator: Sendable {
         for note: NoteInfo,
         allNotes: [NoteInfo],
         mocEntries: [ContextMapEntry],
-        maxCandidates: Int = 10,
         folderBonus: Double = 1.0,
         excludeSameFolder: Bool = false
     ) -> [Candidate] {
@@ -45,12 +44,11 @@ struct LinkCandidateGenerator: Sendable {
 
             var score: Double = 0
 
+            // Tag overlap: minimum 2 tags required for genuine relevance
             let otherTags = Set(other.tags.map { $0.lowercased() })
             let tagOverlap = noteTags.intersection(otherTags).count
             if tagOverlap >= 2 {
                 score += Double(tagOverlap) * 1.5
-            } else if tagOverlap == 1 {
-                score += 0.5
             }
 
             let otherFolders = mocFolders[other.name] ?? []
@@ -65,7 +63,8 @@ struct LinkCandidateGenerator: Sendable {
                 score += 2.0
             }
 
-            guard score > 0 else { continue }
+            // Minimum score threshold for meaningful connections
+            guard score >= 3.0 else { continue }
 
             candidates.append(Candidate(
                 name: other.name,
@@ -75,6 +74,7 @@ struct LinkCandidateGenerator: Sendable {
             ))
         }
 
-        return Array(candidates.sorted { $0.score > $1.score }.prefix(maxCandidates))
+        // No artificial limit — all qualifying candidates pass to AI filter
+        return candidates.sorted { $0.score > $1.score }
     }
 }

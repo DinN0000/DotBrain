@@ -1,0 +1,52 @@
+{
+  "version": "1.0",
+  "enabled": true,
+  "teamName": "",
+  "feature": "fassto-patterns",
+  "pdcaPhase": "plan",
+  "orchestrationPattern": "leader",
+  "ctoAgent": "opus",
+  "startedAt": "2026-02-20T14:21:43.047Z",
+  "lastUpdated": "2026-02-20T14:25:48.775Z",
+  "teammates": [
+    {
+      "name": "a2f093f",
+      "role": "general-purpose",
+      "model": "sonnet",
+      "status": "completed",
+      "currentTask": null,
+      "taskId": null,
+      "startedAt": "2026-02-20T14:21:43.049Z",
+      "lastActivityAt": "2026-02-20T14:23:41.657Z"
+    },
+    {
+      "name": "a82663f",
+      "role": "general-purpose",
+      "model": "sonnet",
+      "status": "completed",
+      "currentTask": null,
+      "taskId": null,
+      "startedAt": "2026-02-20T14:24:02.194Z",
+      "lastActivityAt": "2026-02-20T14:24:17.473Z"
+    },
+    {
+      "name": "a642f93",
+      "role": "superpowers:code-reviewer",
+      "model": "sonnet",
+      "status": "completed",
+      "currentTask": null,
+      "taskId": null,
+      "startedAt": "2026-02-20T14:24:31.205Z",
+      "lastActivityAt": "2026-02-20T14:25:48.773Z"
+    }
+  ],
+  "progress": {
+    "totalTasks": 0,
+    "completedTasks": 0,
+    "inProgressTasks": 0,
+    "failedTasks": 0,
+    "pendingTasks": 0
+  },
+  "recentMessages": [],
+  "sessionId": "17d31c0d-5fc9-4e4c-9f65-96cdfae1c7e5"
+}

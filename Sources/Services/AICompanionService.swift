@@ -6,7 +6,7 @@ import Foundation
 enum AICompanionService {
 
     /// Bump this when companion file content changes — triggers overwrite on existing vaults
-    static let version = 11
+    static let version = 12
 
     /// Generate all AI companion files in the PKM root (first-time only)
     static func generateAll(pkmRoot: String) throws {
@@ -99,7 +99,7 @@ enum AICompanionService {
             ("weekly-review", weeklyReviewSkillContent),
             ("literature-note", literatureNoteSkillContent),
             ("frontmatter-validator", frontmatterValidatorSkillContent),
-            ("moc-integrity", mocIntegritySkillContent),
+            ("index-integrity", indexIntegritySkillContent),
         ]
         for (skillName, skillBody) in allSkills {
             let skillsDir = (pkmRoot as NSString).appendingPathComponent(".claude/skills/\(skillName)")
@@ -165,19 +165,18 @@ enum AICompanionService {
     이 볼트를 탐색할 때 다음 순서를 따르세요:
 
     1. **이 파일(CLAUDE.md)** 을 먼저 읽어 구조와 규칙을 파악
-    2. **프로젝트 인덱스 노트** 확인: `1_Project/프로젝트명/프로젝트명.md`
-    3. **각 폴더의 MOC(인덱스 노트)** 확인: `폴더명/폴더명.md`
-    4. **Grep 검색**으로 태그/키워드 기반 탐색 (아래 검색 패턴 참조)
-    5. **관련 노트 링크** 따라가기: 프론트매터 `project` 필드 및 `## Related Notes` 섹션
+    2. **`_meta/note-index.json`** 읽기: 전체 볼트 구조, 노트 메타데이터(태그, 요약, 프로젝트, 상태) 조회
+    3. **프론트매터 필드**로 필터링: `project`, `status: active`, `para` 등
+    4. **`## Related Notes` 링크** 따라가기: 관계 유형(prerequisite > project > reference > related) 우선순위로 탐색
+    5. **Grep 검색**으로 태그/키워드 기반 탐색 (아래 검색 패턴 참조)
 
-    ### MOC (Map of Content)
+    ### 노트 인덱스 (`_meta/note-index.json`)
 
-    각 하위 폴더에 `폴더명/폴더명.md` 파일이 MOC 역할을 합니다.
-    - AI가 자동 생성한 **폴더 요약** 포함
-    - 해당 폴더의 모든 노트가 `[[위키링크]] — 요약` 형식으로 나열
-    - **태그 클라우드**: 폴더 내 상위 10개 태그 집계
+    DotBrain이 자동 생성/갱신하는 볼트 메타데이터 인덱스입니다.
+    - 모든 노트의 경로, 태그, 요약, 프로젝트, 상태 정보 포함
+    - 폴더별 요약 태그 포함
     - 파일 분류/이동 시 자동으로 갱신됨
-    - 폴더 전체를 파악하려면 개별 파일 대신 MOC를 먼저 읽으세요
+    - 볼트 전체를 파악하려면 개별 파일 대신 이 인덱스를 먼저 읽으세요
 
     ---
 
@@ -200,7 +199,7 @@ enum AICompanionService {
     ```
     1_Project/
     ├── MyProject/
-    │   ├── MyProject.md    ← 인덱스 노트 (MOC)
+    │   ├── MyProject.md    ← 인덱스 노트
     │   ├── _Assets/        ← 프로젝트 첨부파일
     │   ├── meeting_0115.md
     │   └── design_spec.md
@@ -215,8 +214,8 @@ enum AICompanionService {
     1. 콘텐츠 추출 (마크다운/바이너리 병렬 처리)
     2. **2단계 AI 분류**: Fast 모델로 배치 분류 → 확신도 낮은 파일은 Precise 모델로 정밀 분류
     3. 기존 볼트 문서와의 가중치 기반 맥락 매칭 (🔴 Project 높음 / 🟡 Area·Resource 중간 / ⚪ Archive 낮음)
-    4. **AI 시맨틱 관련 노트 링크** (MOC 기반 VaultContextMap 활용, 최대 5개)
-    5. 대상 폴더로 이동 + 프론트매터 삽입 + MOC 갱신
+    4. **AI 시맨틱 관련 노트 링크** (note-index.json 기반 VaultContextMap 활용)
+    5. 대상 폴더로 이동 + 프론트매터 삽입 + 노트 인덱스 갱신
 
     ### 폴더 정리 (Reorganize)
     기존 폴더를 선택하면 DotBrain이:
@@ -225,7 +224,7 @@ enum AICompanionService {
     3. 중복 시 태그 병합 후 삭제
     4. 전체 파일 AI 재분류
     5. **잘못 분류된 파일 자동 이동** (relocated 상태로 표시)
-    6. 프론트매터 갱신 + 관련 노트 링크 + MOC 업데이트
+    6. 프론트매터 갱신 + 관련 노트 링크 + 노트 인덱스 갱신
 
     ### PARA 관리
     대시보드 → "PARA 관리"에서:
@@ -402,26 +401,16 @@ enum AICompanionService {
        - `status:` 필드를 이동 유형에 맞게 변경
        - Archive 이동 시: `para: archive`, `status: completed`
        - `project:` 필드가 있으면 새 상위 프로젝트명으로 갱신
-    3. **출발지 MOC 갱신** — 원래 있던 폴더의 `폴더명.md`에서:
-       - 이동한 항목의 `[[위키링크]]` 줄 제거
-       - summary의 폴더/문서 수 갱신
-    4. **도착지 MOC 갱신** — 새로 들어간 폴더의 `폴더명.md`에:
-       - `[[위키링크]] — 설명` 형식으로 항목 추가
-       - summary의 폴더/문서 수 갱신
-    5. **상위 카테고리 MOC 갱신** — `1_Project.md`, `4_Archive.md` 등:
-       - 카테고리 간 이동이면 양쪽 MOC 갱신
-       - summary의 폴더 수 갱신
-    6. **하위 파일 일괄 처리** — 폴더 이동인 경우:
+    3. **노트 인덱스 자동 갱신** — DotBrain이 다음 실행 시 `_meta/note-index.json` 자동 갱신
+       - AI 에이전트가 직접 인덱스를 수정할 필요 없음
+    4. **하위 파일 일괄 처리** — 폴더 이동인 경우:
        - 폴더 내 모든 `.md` 파일의 프론트매터도 동일하게 갱신
-    7. **결과 보고** — 변경 사항 테이블로 보고
+    5. **결과 보고** — 변경 사항 테이블로 보고
 
     ### 검증 질문 (자가 점검)
 
     이동 완료 후 스스로 확인:
     - ✅ 이동한 모든 파일의 `para:` 필드가 새 위치와 일치하는가?
-    - ✅ 출발지 MOC에서 이동 항목이 제거되었는가?
-    - ✅ 도착지 MOC에 이동 항목이 추가되었는가?
-    - ✅ 카테고리 MOC의 폴더 수가 정확한가?
     - ✅ 하위 파일의 프론트매터도 모두 갱신되었는가?
 
     ---
@@ -429,7 +418,7 @@ enum AICompanionService {
     ## 관련 노트 링크
 
     DotBrain은 **AI 시맨틱 분석**으로 관련 노트를 연결합니다:
-    - 볼트 전체 MOC를 파싱하여 **VaultContextMap**을 구축
+    - `_meta/note-index.json`을 파싱하여 **VaultContextMap**을 구축
     - 단순 태그 일치가 아닌 **맥락적 연관성** 기반 추천
     - 같은 폴더뿐 아니라 **다른 카테고리의 노트도** 적극 연결
     - 문서당 최대 **5개** 관련 노트
@@ -478,7 +467,7 @@ enum AICompanionService {
     | 주간 리뷰 | `.claude/skills/weekly-review/SKILL.md` | 주간/월간 리뷰 보고서 |
     | 문헌 노트 | `.claude/skills/literature-note/SKILL.md` | 외부 자료 → 구조화된 문헌 노트 |
     | 프론트매터 검증 | `.claude/skills/frontmatter-validator/SKILL.md` | 프론트매터 스키마 검증 및 자동 수정 |
-    | MOC 무결성 | `.claude/skills/moc-integrity/SKILL.md` | MOC ↔ 실제 폴더/파일 동기화 검증 |
+    | 인덱스 무결성 | `.claude/skills/index-integrity/SKILL.md` | note-index.json ↔ 실제 폴더/파일 동기화 검증 |
 
     ---
 
@@ -564,7 +553,7 @@ enum AICompanionService {
     ## 관련 노트 링크 규칙
 
     DotBrain은 **AI 시맨틱 분석**으로 관련 노트를 찾습니다:
-    - 볼트 전체 MOC를 파싱하여 VaultContextMap 구축
+    - `_meta/note-index.json`을 파싱하여 VaultContextMap 구축
     - 단순 태그 일치가 아닌 **맥락적 연관성** 기반 추천
     - 같은 폴더뿐 아니라 **다른 카테고리의 노트도** 적극 연결
     - 문서당 최대 **5개** 관련 노트
@@ -607,7 +596,7 @@ enum AICompanionService {
     - `.claude/skills/`: AI skill definitions
 
     ## DotBrain Automation
-    - **Inbox Processing**: 2-stage AI classification (Fast batch → Precise for uncertain), weighted context matching, AI semantic linking, auto MOC generation
+    - **Inbox Processing**: 2-stage AI classification (Fast batch → Precise for uncertain), weighted context matching, AI semantic linking, auto note-index.json update
     - **Folder Reorganization**: Flatten nested folders → deduplicate (SHA256) → AI reclassify → auto-relocate misclassified files
     - **PARA Management**: Move folders between P/A/R/A categories, create projects, per-folder auto-reorganize (Dashboard → PARA 관리)
     - **Vault Reorganization**: Cross-category AI scan → compare current vs recommended location → selective execution (Dashboard → 전체 재정리, max 200 files)
@@ -623,7 +612,7 @@ enum AICompanionService {
     - link-health-agent: WikiLink health check and orphan detection
     - tag-cleanup-agent: Tag standardization and deduplication
     - stale-review-agent: Stale content review and quality check
-    - vault-audit-agent: Comprehensive vault health check (structure, frontmatter, links, MOC)
+    - vault-audit-agent: Comprehensive vault health check (structure, frontmatter, links, index)
 
     ## AI Skills (7 skills in `.claude/skills/`)
     - inbox-processor: Binary file text extraction
@@ -632,13 +621,13 @@ enum AICompanionService {
     - weekly-review: Weekly/monthly review report
     - literature-note: External sources → structured literature note
     - frontmatter-validator: Frontmatter schema validation and auto-fix
-    - moc-integrity: MOC ↔ folder/file synchronization check
+    - index-integrity: note-index.json ↔ folder/file synchronization check
 
     ## Navigation Priority
-    1. Check **MOC (index notes)**: `FolderName/FolderName.md` — AI-generated folder summary + `[[wikilink]] — summary` list + tag cloud
+    1. Read `_meta/note-index.json` for vault structure overview (tags, summary, project, status per note)
     2. Read `CLAUDE.md` for detailed structure, frontmatter schema, and classification rules
-    3. Search by frontmatter fields using grep patterns
-    4. Follow `[[wikilinks]]` in `## Related Notes` sections — each link has context explaining why to visit
+    3. Follow `[[wikilinks]]` in `## Related Notes` sections — relation priority: prerequisite > project > reference > related
+    4. Search by frontmatter fields using grep patterns
 
     ## Frontmatter Schema (8 fields)
     ```yaml
@@ -674,9 +663,9 @@ enum AICompanionService {
 
     ## Related Notes
     - DotBrain uses **AI semantic analysis** (not tag matching) to find related notes
-    - Based on VaultContextMap built from all MOC files
+    - Based on VaultContextMap built from _meta/note-index.json
     - Cross-category linking encouraged
-    - Max 5 related notes per document
+    - No artificial limit — all genuinely related notes are connected
     - Context format: "~하려면", "~할 때", "~와 비교할 때"
 
     ## Writing Rules
@@ -770,8 +759,8 @@ enum AICompanionService {
 
     ### Step 5: AI 시맨틱 관련 노트 링크
 
-    - 볼트 전체 MOC를 파싱하여 VaultContextMap 구축
-    - 맥락적 연관성 기반으로 관련 노트 추천 (최대 5개)
+    - `_meta/note-index.json`을 파싱하여 VaultContextMap 구축
+    - 맥락적 연관성 기반으로 관련 노트 추천
     - 같은 폴더뿐 아니라 다른 카테고리 노트도 적극 연결
     - context 형식: `"~하려면"`, `"~할 때"`, `"~와 비교할 때"`
 
@@ -786,9 +775,9 @@ enum AICompanionService {
     - 인덱스 노트 충돌 → 파일명이 `폴더명.md`와 같을 때
     - 이름 충돌 → 대상에 같은 파일명이 존재할 때
 
-    ### Step 7: MOC 갱신 + 알림
+    ### Step 7: 인덱스 갱신 + 알림
 
-    - 영향받은 모든 폴더의 MOC 자동 갱신
+    - 영향받은 모든 폴더의 노트 인덱스 자동 갱신
     - macOS 알림으로 처리 결과 보고
 
     ### Step 8: 결과 요약
@@ -1017,8 +1006,8 @@ enum AICompanionService {
     - 일반 주제 → `3_Resource/적절한폴더/`
     - 사용자에게 위치 확인
 
-    ### Step 5: MOC 갱신
-    저장 폴더의 인덱스 노트에 브리핑 등록
+    ### Step 5: 인덱스 갱신
+    DotBrain이 노트 인덱스 자동 갱신 (에이전트 수동 작업 불필요)
 
     ## 주의사항
     - 볼트에 없는 정보를 지어내지 않음
@@ -1116,7 +1105,7 @@ enum AICompanionService {
        ---
        ```
     5. `## Related Notes` 섹션에 관련 노트 링크
-    6. 대상 폴더의 MOC 갱신
+    6. DotBrain이 노트 인덱스 자동 갱신
 
     ## 모드 2: 다듬기 (Polish)
 
@@ -1177,7 +1166,7 @@ enum AICompanionService {
     ## 공통 규칙
     - 기존 프론트매터 값 보존
     - 기존 태그 삭제 금지
-    - 작업 후 MOC 갱신
+    - DotBrain이 노트 인덱스 자동 갱신
     """
 
     private static let linkHealthAgentContent = """
@@ -1207,7 +1196,7 @@ enum AICompanionService {
 
     ### Step 3: 고아 노트 탐지
     다른 어떤 노트에서도 `[[참조]]`되지 않는 노트를 찾습니다:
-    - 인덱스 노트(MOC)는 제외 (고아여도 정상)
+    - 인덱스 노트(`폴더명.md`)는 제외 (고아여도 정상)
     - `.Templates/`, `.claude/` 등 시스템 폴더 제외
 
     ### Step 4: 링크 밀도 분석
@@ -1306,7 +1295,7 @@ enum AICompanionService {
     ### Step 4: 사용자 승인 후 실행
     - 각 통합/삭제에 대해 사용자 확인
     - 프론트매터의 `tags` 필드를 일괄 수정
-    - 영향받은 MOC 갱신
+    - DotBrain이 노트 인덱스 자동 갱신
 
     ## 주의사항
     - 태그 삭제는 반드시 사용자 확인 후
@@ -1397,7 +1386,7 @@ enum AICompanionService {
     # PARA 이동 에이전트
 
     파일/폴더의 PARA 카테고리 간 이동 및 폴더 내 재배치를 처리합니다.
-    이동 시 프론트매터, MOC, 카운트를 자동으로 갱신합니다.
+    이동 시 프론트매터를 자동으로 갱신합니다. DotBrain이 노트 인덱스를 자동 갱신합니다.
 
     ## 트리거
 
@@ -1434,10 +1423,9 @@ enum AICompanionService {
     - **카테고리 이동**: `para:` → 대상 카테고리, status 유지
     - **폴더 내 이동**: para/status 유지, `project:` 필드만 갱신
 
-    ### Step 4: MOC 갱신
-    - **출발지 MOC**: 이동 항목 `[[위키링크]]` 줄 제거
-    - **도착지 MOC**: `[[위키링크]] — 설명` 형식으로 추가
-    - **카테고리 MOC**: 폴더 수 갱신
+    ### Step 4: 인덱스 자동 갱신
+    - DotBrain이 `_meta/note-index.json`을 자동 갱신
+    - AI 에이전트가 직접 인덱스를 수정할 필요 없음
 
     ### Step 5: 결과 보고
     변경 사항을 테이블로 보고
@@ -1446,19 +1434,16 @@ enum AICompanionService {
     여러 항목 동시 이동 시:
     1. 파일 이동을 먼저 모두 수행
     2. 프론트매터를 일괄 갱신
-    3. MOC를 한 번에 갱신
+    3. DotBrain이 인덱스 자동 갱신
     4. 전체 결과를 하나의 테이블로 보고
 
     ## 검증 (자가 점검)
     - ✅ 이동한 모든 파일의 `para:` 필드가 새 위치와 일치?
-    - ✅ 출발지 MOC에서 이동 항목 제거됨?
-    - ✅ 도착지 MOC에 이동 항목 추가됨?
-    - ✅ 카테고리 MOC 폴더 수 정확?
     - ✅ 하위 파일 프론트매터 모두 갱신됨?
 
     ## 주의 사항
     - `_Inbox/`는 이동 대상/목적지로 사용 불가
-    - 인덱스 노트(MOC) 파일명이 폴더명과 같은 경우 충돌 확인
+    - 인덱스 노트 파일명이 폴더명과 같은 경우 충돌 확인
     - 대상 폴더에 같은 이름의 파일이 있으면 사용자에게 확인
     - 위키링크는 파일명 기반이므로 경로 이동으로는 깨지지 않음
     """
@@ -1474,7 +1459,7 @@ enum AICompanionService {
 
     ## 개요
 
-    볼트 전체의 구조, 프론트매터, 링크, MOC 무결성을 한번에 검사합니다.
+    볼트 전체의 구조, 프론트매터, 링크, 인덱스 무결성을 한번에 검사합니다.
     3개 검사를 **병렬 에이전트**로 실행한 뒤 종합 보고서를 생성하고, 자동 수정을 제안합니다.
 
     ## 워크플로
@@ -1497,8 +1482,8 @@ enum AICompanionService {
     3. Related Notes 누락 파일 탐지 (콘텐츠 파일 중)
     4. 고아 노트 탐지
 
-    **에이전트 C: MOC 무결성**
-    `.claude/skills/moc-integrity/SKILL.md` 참조
+    **에이전트 C: 인덱스 무결성**
+    `.claude/skills/index-integrity/SKILL.md` 참조
 
     ### Phase 2: 종합 보고서 생성
 
@@ -1512,7 +1497,7 @@ enum AICompanionService {
     | PARA 구조 | /25 | ✅/⚠️/❌ | N건 |
     | 프론트매터 | /25 | ✅/⚠️/❌ | N건 |
     | 링크 무결성 | /25 | ✅/⚠️/❌ | N건 |
-    | MOC 무결성 | /25 | ✅/⚠️/❌ | N건 |
+    | 인덱스 무결성 | /25 | ✅/⚠️/❌ | N건 |
 
     ## 높은 우선순위 (자동 수정 가능)
     | # | 파일 | 문제 | 수정 내용 |
@@ -1549,10 +1534,10 @@ enum AICompanionService {
     - Related Notes 커버율 × 5
     - 고아 노트 비율: (1 - 고아/전체) × 5
 
-    **MOC 무결성 (25점)**
-    - MOC 파일 존재율 × 10
-    - MOC ↔ 폴더 동기화율 × 10
-    - 카테고리 MOC Related Notes 존재: 5점
+    **인덱스 무결성 (25점)**
+    - note-index.json 존재 및 최신 여부: 10점
+    - 인덱스 ↔ 실제 파일 동기화율 × 10
+    - 인덱스 메타데이터(태그, 요약) 완성도: 5점
 
     ### Phase 3: 자동 수정
 
@@ -1561,8 +1546,8 @@ enum AICompanionService {
     **자동 수정 (확인 불필요):**
     - para ↔ 폴더 불일치 → para 값 변경
     - Archive 파일 status → completed
-    - MOC 누락 문서 항목 → 추가
-    - 카테고리 MOC Related Notes → 추가
+    - 인덱스 누락 노트 → DotBrain 재생성 트리거
+    - 인덱스 ↔ 실제 불일치 → DotBrain 재생성 트리거
 
     **반자동 수정 (사용자 확인):**
     - summary 빈 값 → AI 요약 생성
@@ -1571,7 +1556,7 @@ enum AICompanionService {
     - orphan 파일 → PARA 분류 제안
 
     **수정 안함:**
-    - MOC 태그 클라우드 (DotBrain 자동 생성)
+    - 노트 인덱스 (DotBrain 자동 생성)
     - _Inbox 내부 (DotBrain 자동 처리)
 
     ### Phase 4: 변경 보고
@@ -1588,7 +1573,7 @@ enum AICompanionService {
     - `_Inbox/` (DotBrain 자동 처리)
     - `.claude/`, `.Templates/`, `.obsidian/` (시스템)
     - Personal_Images 스텁 (summary 검증에서 제외)
-    - MOC 파일의 tags 개수 (태그 클라우드)
+    - 인덱스 노트(`폴더명.md`)의 tags 개수
 
     ## 주의사항
     - 삭제는 절대 하지 않음 — 이동 또는 수정만
@@ -1607,7 +1592,7 @@ enum AICompanionService {
             ("weekly-review", weeklyReviewSkillContent),
             ("literature-note", literatureNoteSkillContent),
             ("frontmatter-validator", frontmatterValidatorSkillContent),
-            ("moc-integrity", mocIntegritySkillContent),
+            ("index-integrity", indexIntegritySkillContent),
         ]
         for (skillName, skillBody) in allSkills {
             let skillsDir = (pkmRoot as NSString).appendingPathComponent(".claude/skills/\(skillName)")
@@ -1965,7 +1950,7 @@ enum AICompanionService {
 
     ```yaml
     para: project | area | resource | archive
-    tags: [태그1, 태그2]       # 최대 5개 (MOC 파일 제외)
+    tags: [태그1, 태그2]       # 최대 5개 (인덱스 노트 제외)
     created: YYYY-MM-DD
     status: active | draft | completed | on-hold
     summary: "2-3문장 요약"    # 빈 값 불가
@@ -2031,12 +2016,12 @@ enum AICompanionService {
     ### Step 5: tags 개수
 
     - **일반 파일**: 최대 5개. 초과 시 위반.
-    - **MOC 파일** (폴더명/폴더명.md): DotBrain 태그 클라우드이므로 **검사 제외**
+    - **인덱스 노트** (폴더명/폴더명.md): DotBrain 태그 클라우드이므로 **검사 제외**
 
-    MOC 판별법:
+    인덱스 노트 판별법:
     ```
     파일명 == 부모폴더명 + ".md"
-    예: Research/Research.md → MOC
+    예: Research/Research.md → 인덱스 노트
     예: Research/paper.md → 일반 파일
     ```
 
@@ -2074,7 +2059,7 @@ enum AICompanionService {
     | para ↔ 폴더 불일치 | para를 폴더에 맞게 변경 | 불필요 |
     | Archive status: active | → completed | 불필요 |
     | summary 비어있음 | AI 요약 생성 | 필요 |
-    | tags > 5개 (비-MOC) | 상위 5개 유지 제안 | 필요 |
+    | tags > 5개 (비인덱스) | 상위 5개 유지 제안 | 필요 |
     | Enum 값 오류 | 유사 값 제안 | 필요 |
     | project 참조 없음 | 보고만 (수정 안함) | - |
 
@@ -2110,168 +2095,100 @@ enum AICompanionService {
     - 프론트매터가 아예 없는 파일은 생성하지 않고 보고만
     """
 
-    private static let mocIntegritySkillContent = """
-    # MOC 무결성 점검 스킬
+    private static let indexIntegritySkillContent = """
+    # 인덱스 무결성 점검 스킬
 
     ## 용도
 
-    MOC(Map of Content) 파일이 실제 폴더 내용과 동기화되어 있는지 검증하고, 불일치를 수정합니다.
-    `vault-audit-agent`의 하위 검사로 호출되거나, 단독으로 "MOC 점검해줘"로 실행할 수 있습니다.
+    `_meta/note-index.json`이 실제 볼트 내용과 동기화되어 있는지 검증하고, 불일치를 보고합니다.
+    `vault-audit-agent`의 하위 검사로 호출되거나, 단독으로 "인덱스 점검해줘"로 실행할 수 있습니다.
 
-    ## MOC 파일 유형
-
-    ### 카테고리 MOC (4개)
+    ## 인덱스 파일
 
     | 파일 | 역할 |
     |------|------|
-    | `1_Project/1_Project.md` | Project 하위 폴더 목록 |
-    | `2_Area/2_Area.md` | Area 하위 폴더 목록 |
-    | `3_Resource/3_Resource.md` | Resource 하위 폴더 목록 |
-    | `4_Archive/4_Archive.md` | Archive 하위 폴더 목록 |
+    | `_meta/note-index.json` | 전체 볼트 노트/폴더 메타데이터 인덱스 |
 
-    ### 폴더 MOC
-
-    `폴더명/폴더명.md` 형식 (예: `Research/Research.md`)
-
-    역할: 해당 폴더의 문서 목록, 태그 클라우드, 폴더 요약
+    DotBrain이 자동 생성/갱신합니다. 구조:
+    - `notes`: 노트명 → {path, folder, para, tags, summary, project, status}
+    - `folders`: 폴더명 → {path, para, summary, tags}
+    - `version`, `updated` (ISO8601 타임스탬프)
 
     ## 검증 절차
 
-    ### Step 1: MOC 파일 존재 확인
-
-    각 하위 폴더에 MOC 파일이 있는지 확인:
+    ### Step 1: 인덱스 파일 존재 확인
 
     ```
-    # 각 PARA 카테고리의 하위 폴더 목록
-    Bash: ls -d 1_Project/*/
-    # 각 폴더에 대해:
-    Glob("1_Project/{폴더명}/{폴더명}.md")
+    Read("_meta/note-index.json")
     ```
 
-    **누락 시**: 새 MOC 생성 제안 (사용자 확인 후)
+    **누락 시**: DotBrain에서 "볼트 점검" 실행을 안내
 
-    ### Step 2: 카테고리 MOC ↔ 실제 폴더 동기화
+    ### Step 2: 인덱스 ↔ 실제 파일 동기화
 
-    각 카테고리 MOC를 읽고:
-    1. MOC에 `[[폴더명]]`으로 나열된 폴더 목록 추출
-    2. 실제 하위 폴더 목록과 비교
+    1. 인덱스의 `notes` 키 목록 추출
+    2. 실제 PARA 폴더 내 .md 파일 목록과 비교 (인덱스 노트, _Assets 제외)
     3. 차이 기록:
-       - MOC에 있지만 실제 없음 → **삭제된 폴더** (MOC에서 제거)
-       - 실제 있지만 MOC에 없음 → **누락 폴더** (MOC에 추가)
+       - 인덱스에 있지만 실제 없음 → **삭제된 문서** (인덱스 재생성 필요)
+       - 실제 있지만 인덱스에 없음 → **누락 문서** (인덱스 재생성 필요)
 
-    ### Step 3: 폴더 MOC ↔ 실제 파일 동기화
+    ### Step 3: 폴더 동기화
 
-    각 폴더 MOC를 읽고:
-    1. MOC에 `[[문서명]]`으로 나열된 파일 목록 추출
-    2. 실제 폴더 내 .md 파일 목록과 비교 (MOC 자신, _Assets 제외)
-    3. 차이 기록:
-       - MOC에 있지만 실제 없음 → **삭제된 문서** (MOC에서 제거)
-       - 실제 있지만 MOC에 없음 → **누락 문서** (MOC에 추가)
+    1. 인덱스의 `folders` 키 목록 추출
+    2. 실제 PARA 하위 폴더 목록과 비교
+    3. 차이 기록
 
-    ### Step 4: 문서/폴더 수 정확성
+    ### Step 4: 메타데이터 정확성 (샘플링)
 
-    카테고리 MOC의 summary 필드:
-    ```yaml
-    summary: "Project 카테고리 인덱스 — N개 폴더"
-    ```
+    무작위 10개 노트에 대해:
+    1. 실제 파일의 프론트매터 읽기
+    2. 인덱스의 tags, summary, para, project와 비교
+    3. 불일치율 기록
 
-    폴더 MOC의 summary 필드:
-    ```yaml
-    summary: "폴더명 폴더 요약 텍스트"
-    ```
+    ### Step 5: 타임스탬프 확인
 
-    MOC 본문의 개수 표기:
-    ```
-    - [[폴더명]] — 설명 (N개)
-    ```
-
-    실제 개수와 불일치하면 → **자동 수정**
-
-    ### Step 5: 카테고리 MOC Related Notes
-
-    4개 카테고리 MOC에 `## Related Notes` 섹션이 있는지 확인.
-    다른 3개 카테고리로의 상호 참조가 있어야 함:
-
-    ```markdown
-    ## Related Notes
-
-    - [[다른_카테고리]] — 맥락 설명
-    ```
-
-    누락 시 → **자동 추가**
-
-    ### Step 6: 위키링크 형식
-
-    MOC 내 모든 항목이 올바른 형식인지 확인:
-    - ✅ `[[링크]] — 설명 텍스트`
-    - ❌ `[[링크]]` (설명 없음)
-    - ❌ `- 링크` (위키링크 형식 아님)
-
-    설명 없는 항목 → 위반 기록 (AI가 설명 생성 제안)
+    `updated` 필드가 24시간 이내인지 확인.
+    오래된 경우 → DotBrain "볼트 점검" 실행 안내
 
     ## 자동 수정 규칙
 
     | 위반 유형 | 수정 방법 | 사용자 확인 |
     |----------|----------|-----------
-    | MOC 파일 누락 | 폴더 스캔하여 새 MOC 생성 | 필요 |
-    | 누락 문서/폴더 항목 | MOC에 `[[링크]] — 설명` 추가 | 불필요 |
-    | 삭제된 문서/폴더 항목 | MOC에서 해당 줄 제거 | 불필요 |
-    | 개수 불일치 | summary 및 본문 개수 갱신 | 불필요 |
-    | Related Notes 누락 (카테고리) | 상호 참조 섹션 추가 | 불필요 |
-    | 위키링크 설명 누락 | AI 설명 생성 제안 | 필요 |
-
-    ### 새 MOC 생성 템플릿
-
-    ```yaml
-    ---
-    para: {카테고리}
-    created: {오늘날짜}
-    status: active
-    summary: "{폴더명} 폴더 요약"
-    source: original
-    ---
-
-    # {폴더명}
-
-    ## 문서 목록
-
-    - [[문서1]] — 설명
-    - [[문서2]] — 설명
-    ```
+    | 인덱스 파일 누락 | DotBrain "볼트 점검" 실행 안내 | 필요 |
+    | 누락/잔여 노트 | DotBrain "볼트 점검" 실행 안내 | 필요 |
+    | 메타데이터 불일치 | DotBrain "볼트 점검" 실행 안내 | 필요 |
+    | 타임스탬프 오래됨 | DotBrain "볼트 점검" 실행 안내 | 불필요 |
 
     ## 보고서 형식
 
     ```markdown
-    # MOC 무결성 보고서
+    # 인덱스 무결성 보고서
 
     ## 요약
-    - 전체 MOC: N개
-    - 정상 동기화: N개
-    - 불일치: N개
+    - 인덱스 노트 수: N개
+    - 실제 노트 수: N개
+    - 동기화율: N%
+    - 메타데이터 정확도: N% (샘플 10개 기준)
 
     ## 불일치 상세
 
-    ### 누락 항목 (실제 존재 → MOC 미등록)
-    | MOC 파일 | 누락 문서 |
-    |---------|----------|
+    ### 누락 노트 (실제 존재 → 인덱스 미등록)
+    | 파일 경로 | PARA |
+    |----------|------|
 
-    ### 잔여 항목 (MOC 등록 → 실제 삭제됨)
-    | MOC 파일 | 잔여 문서 |
-    |---------|----------|
+    ### 잔여 노트 (인덱스 등록 → 실제 삭제됨)
+    | 노트명 | 인덱스 경로 |
+    |--------|-----------|
 
-    ### 개수 불일치
-    | MOC 파일 | 표기 | 실제 |
-    |---------|------|------|
-
-    ### Related Notes 누락
-    | MOC 파일 | 상태 |
-    |---------|------|
+    ### 메타데이터 불일치
+    | 노트명 | 필드 | 인덱스 값 | 실제 값 |
+    |--------|------|----------|---------|
     ```
 
     ## 주의사항
-    - MOC의 태그 클라우드(tags 필드)는 DotBrain이 자동 갱신하므로 수정하지 않음
-    - MOC의 기존 설명 텍스트는 보존 (새로 추가하는 항목만 AI가 작성)
-    - 폴더 MOC의 Related Notes는 필수 아님 (카테고리 MOC만 필수)
-    - _Assets 폴더는 MOC 항목에 포함하지 않음
+    - 인덱스는 DotBrain이 자동 관리하므로 직접 수정하지 않음
+    - 불일치 발견 시 DotBrain "볼트 점검" 실행으로 해결
+    - 인덱스 노트(`폴더명.md`)는 검사 대상에서 제외
+    - _Assets 폴더는 인덱스에 포함되지 않음
     """
 }

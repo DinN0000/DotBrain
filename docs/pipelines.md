@@ -33,7 +33,7 @@ _Inbox/ 파일
     ▼
 5. Link ── SemanticLinker.linkNotes() (이동 완료된 파일만)
     ▼
-6. Finish ── MOCGenerator.updateMOCsForFolders()
+6. Finish ── NoteIndexGenerator.updateForFolders()
               NotificationService 알림
 ```
 
@@ -116,7 +116,7 @@ PARA 하위 폴더 (예: 2_Area/DevOps/)
     │           같은 위치: frontmatter 업데이트 + Related Notes 추가
     │           다른 위치: FileMover로 이동 (relocated 상태)
     ▼
-5. Finish ── MOC 재생성 (소스 + 타겟 폴더)
+5. Finish ── 노트 인덱스 갱신 (소스 + 타겟 폴더)
 ```
 
 ### Flatten 상세
@@ -184,7 +184,7 @@ FileAnalysis 목록 (사용자가 선택한 것만)
     ▼
 1. Move ── FileMover.moveFile() (isSelected == true만)
     ▼
-2. MOC ── 소스 폴더 + 타겟 폴더 MOC 업데이트
+2. Index ── 소스 폴더 + 타겟 폴더 노트 인덱스 갱신
     ▼
 3. Link ── SemanticLinker.linkNotes()로 이동된 파일 재연결
 ```
@@ -280,16 +280,16 @@ AuditReport
     ▼
 4. AI Filter ── LinkAIFilter.filterBatch()
     │             배치: 5 노트/요청, 3 병렬
-    │             노트당 최대 5개 링크 선택
+    │             진짜 관련있는 링크 모두 선택 (인사이트 기준)
     │             Context 형식: "~하려면", "~할 때", "~와 비교할 때" (15자)
     ▼
 5. Write ── RelatedNotesWriter.writeRelatedNotes()
     │          ## Related Notes 섹션 파싱
-    │          기존 + 신규 병합 (최대 5개)
+    │          기존 + 신규 병합 (인위적 제한 없음)
     │          형식: - [[NoteName]] -- context
     ▼
 6. Reverse ── 역방향 링크 생성
-               대상 노트에 "SourceName에서 참조" 역링크 추가
+               관계 유형 기반 역링크 추가 (예: "이 문서를 선행 지식으로 활용")
 ```
 
 ### linkNotes(filePaths:) — 대상 파일만
@@ -336,12 +336,12 @@ struct LinkResult {
 | `buildProjectContext()` | `1_Project/` 폴더 목록 + 요약/태그를 텍스트로 구성 |
 | `buildSubfolderContext()` | Area/Resource/Archive 서브폴더를 JSON 형식으로 구성 (폴더명 할루시네이션 방지) |
 | `extractProjectNames(from:)` | 프로젝트 컨텍스트에서 프로젝트명 추출 |
-| `buildWeightedContext()` | 루트 MOC 파일 기반 가중 컨텍스트 구성 (카테고리별: Project 높음, Archive 낮음) |
+| `buildWeightedContext()` | 루트 인덱스 노트 기반 가중 컨텍스트 구성 (카테고리별: Project 높음, Archive 낮음) |
 | `buildTagVocabulary()` | 볼트 전체 상위 50개 태그를 빈도순 JSON 배열로 반환 |
 
 **사용처**: InboxProcessor, FolderReorganizer, VaultReorganizer.
 
-**최적화**: `buildWeightedContext()`는 루트 MOC 파일 우선 사용 (최대 4회 파일 읽기), MOC 없는 카테고리만 레거시 서브폴더 스캔으로 fallback.
+**최적화**: `buildWeightedContext()`는 루트 인덱스 노트 우선 사용 (최대 4회 파일 읽기), 인덱스 노트 없는 카테고리만 레거시 서브폴더 스캔으로 fallback.
 
 ## Cross-References
 
