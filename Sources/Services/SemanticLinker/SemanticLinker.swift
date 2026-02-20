@@ -136,8 +136,8 @@ struct SemanticLinker: Sendable {
         var reverseLinks: [String: [(name: String, context: String, relation: String)]] = [:]
         for entry in allLinks {
             for link in entry.links {
-                let reverseContext = "\(entry.noteName)에서 참조"
-                reverseLinks[link.name, default: []].append((name: entry.noteName, context: reverseContext, relation: "related"))
+                let reverseContext = Self.reverseRelationContext[link.relation] ?? "관련 문서"
+                reverseLinks[link.name, default: []].append((name: entry.noteName, context: reverseContext, relation: link.relation))
             }
         }
 
@@ -269,7 +269,8 @@ struct SemanticLinker: Sendable {
 
                 for link in entry.links {
                     guard let targetPath = notePathMap[link.name] else { continue }
-                    let reverseLink = LinkAIFilter.FilteredLink(name: entry.noteName, context: "\(entry.noteName)에서 참조", relation: "related")
+                    let reverseContext = Self.reverseRelationContext[link.relation] ?? "관련 문서"
+                    let reverseLink = LinkAIFilter.FilteredLink(name: entry.noteName, context: reverseContext, relation: link.relation)
                     try writer.writeRelatedNotes(filePath: targetPath, newLinks: [reverseLink], noteNames: noteNames)
                     linksCreated += 1
                 }
@@ -282,6 +283,15 @@ struct SemanticLinker: Sendable {
 
         return LinkResult(tagsNormalized: tagResult, notesLinked: notesLinked, linksCreated: linksCreated)
     }
+
+    // MARK: - Constants
+
+    private static let reverseRelationContext: [String: String] = [
+        "prerequisite": "이 문서를 선행 지식으로 활용",
+        "project": "이 자료를 활용하는 프로젝트",
+        "reference": "이 문서를 참고 자료로 인용",
+        "related": "관련 주제를 다루는 문서",
+    ]
 
     // MARK: - Private
 
