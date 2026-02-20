@@ -69,12 +69,16 @@ struct NoteIndexGenerator: Sendable {
             if let folderEntry {
                 index.folders[relFolder] = folderEntry
             } else {
-                // Folder is empty or gone, remove it
                 index.folders.removeValue(forKey: relFolder)
             }
 
             for (notePath, entry) in noteEntries {
                 index.notes[notePath] = entry
+            }
+
+            // Clean up orphaned folder if no notes remain
+            if !index.notes.values.contains(where: { $0.folder == relFolder }) {
+                index.folders.removeValue(forKey: relFolder)
             }
         }
 
@@ -214,13 +218,13 @@ struct NoteIndexGenerator: Sendable {
         return (folderEntry, noteEntries)
     }
 
-    /// Convert an absolute path to a path relative to pkmRoot
+    /// Convert an absolute path to a path relative to pkmRoot (canonicalized for symlink safety)
     private func relativePath(_ absolutePath: String) -> String {
-        let root = pkmRoot.hasSuffix("/") ? pkmRoot : pkmRoot + "/"
-        if absolutePath.hasPrefix(root) {
-            return String(absolutePath.dropFirst(root.count))
-        }
-        return absolutePath
+        let canonicalRoot = URL(fileURLWithPath: pkmRoot).resolvingSymlinksInPath().path
+        let canonicalPath = URL(fileURLWithPath: absolutePath).resolvingSymlinksInPath().path
+        let root = canonicalRoot.hasSuffix("/") ? canonicalRoot : canonicalRoot + "/"
+        guard canonicalPath.hasPrefix(root) else { return absolutePath }
+        return String(canonicalPath.dropFirst(root.count))
     }
 
     /// Load existing note-index.json if present
@@ -281,9 +285,6 @@ struct NoteIndexGenerator: Sendable {
 
     /// ISO 8601 date string for the updated field
     private static func timestamp() -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ssZ"
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        return formatter.string(from: Date())
+        ISO8601DateFormatter().string(from: Date())
     }
 }
