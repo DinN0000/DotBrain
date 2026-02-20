@@ -25,6 +25,29 @@ struct VaultInspectorView: View {
         case done
     }
 
+    private enum FlatItemKind {
+        case header(PARACategory, Int)
+        case folder(FolderInfo)
+    }
+
+    private struct FlatItem: Identifiable {
+        let id: String
+        let kind: FlatItemKind
+    }
+
+    private var flatItems: [FlatItem] {
+        var items: [FlatItem] = []
+        for category in PARACategory.allCases {
+            let categoryFolders = folders.filter { $0.category == category }
+            guard !categoryFolders.isEmpty else { continue }
+            items.append(FlatItem(id: "header-\(category.rawValue)", kind: .header(category, categoryFolders.count)))
+            for folder in categoryFolders {
+                items.append(FlatItem(id: folder.id.uuidString, kind: .folder(folder)))
+            }
+        }
+        return items
+    }
+
     struct FolderInfo: Identifiable {
         let id = UUID()
         let name: String
@@ -116,10 +139,29 @@ struct VaultInspectorView: View {
             } else {
                 ScrollView {
                     LazyVStack(spacing: 0) {
-                        ForEach(PARACategory.allCases, id: \.self) { category in
-                            let categoryFolders = folders.filter { $0.category == category }
-                            if !categoryFolders.isEmpty {
-                                folderSection(category: category, folders: categoryFolders)
+                        ForEach(flatItems) { item in
+                            switch item.kind {
+                            case .header(let category, let count):
+                                HStack(spacing: 4) {
+                                    Image(systemName: category.icon)
+                                        .font(.caption)
+                                        .foregroundColor(category.color)
+                                    Text(category.displayName)
+                                        .font(.caption)
+                                        .fontWeight(.semibold)
+                                    if count > 0 {
+                                        Text("(\(count))")
+                                            .font(.caption2)
+                                            .foregroundColor(.secondary.opacity(0.7))
+                                    }
+                                    Spacer()
+                                }
+                                .padding(.vertical, 6)
+                                .padding(.top, 8)
+                            case .folder(let folder):
+                                VaultFolderRow(folder: folder) {
+                                    showFolderMenu(folder)
+                                }
                             }
                         }
                     }
@@ -130,68 +172,9 @@ struct VaultInspectorView: View {
         }
     }
 
-    @ViewBuilder
-    private func folderSection(category: PARACategory, folders: [FolderInfo]) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: 4) {
-                Image(systemName: category.icon)
-                    .font(.caption)
-                    .foregroundColor(category.color)
-                Text(category.displayName)
-                    .font(.caption)
-                    .fontWeight(.semibold)
-                if folders.count > 0 {
-                    Text("(\(folders.count))")
-                        .font(.caption2)
-                        .foregroundColor(.secondary.opacity(0.7))
-                }
-                Spacer()
-            }
-            .padding(.vertical, 6)
-
-            ForEach(folders) { folder in
-                VaultFolderRow(folder: folder) {
-                    showFolderMenu(folder)
-                }
-                .contextMenu {
-                    folderContextMenu(folder)
-                }
-            }
-        }
-        .padding(.top, 8)
-    }
+    // folderSection removed — rows are now flat inside LazyVStack for true lazy rendering
 
     // MARK: - Folder Menu (NSMenu popup, matching PARAManageView)
-
-    @ViewBuilder
-    private func folderContextMenu(_ folder: FolderInfo) -> some View {
-        let changedCount = folder.modifiedCount + folder.newCount
-
-        if changedCount > 0 {
-            Button {
-                startFolderReorg(folder)
-            } label: {
-                Label(
-                    "바뀐 파일만 정리 (\(changedCount)개)",
-                    systemImage: "sparkles"
-                )
-            }
-        }
-
-        Button {
-            startFolderFullReorg(folder)
-        } label: {
-            Label("전체 파일 정리", systemImage: "arrow.2.squarepath")
-        }
-
-        Divider()
-
-        Button {
-            openInFinder(folder)
-        } label: {
-            Label("Finder에서 열기", systemImage: "folder")
-        }
-    }
 
     private func showFolderMenu(_ folder: FolderInfo) {
         let menu = NSMenu()
@@ -848,7 +831,6 @@ struct VaultInspectorView: View {
 private struct VaultFolderRow: View {
     let folder: VaultInspectorView.FolderInfo
     let action: () -> Void
-    @State private var isHovered = false
 
     private var hasHealthIssue: Bool {
         folder.healthRatio <= 0.8
@@ -909,8 +891,8 @@ private struct VaultFolderRow: View {
                     )
             }
 
-            // Hover detail: show health issues inline below the row
-            if isHovered && hasHealthIssue {
+            // Health issues always visible for unhealthy folders
+            if hasHealthIssue {
                 HStack(spacing: 6) {
                     Image(systemName: "exclamationmark.triangle")
                         .font(.system(size: 9))
@@ -939,11 +921,10 @@ private struct VaultFolderRow: View {
         .padding(.horizontal, 8)
         .background(
             RoundedRectangle(cornerRadius: 6)
-                .fill(isHovered ? Color.primary.opacity(0.04) : Color.primary.opacity(0.02))
+                .fill(Color.primary.opacity(0.02))
         )
         .contentShape(Rectangle())
         .onTapGesture { action() }
-        .onHover { isHovered = $0 }
     }
 }
 
