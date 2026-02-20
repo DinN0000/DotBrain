@@ -68,6 +68,27 @@ final class AppState: ObservableObject {
     @Published var navigationId = UUID()
     @Published var paraManageInitialCategory: PARACategory?
 
+    // MARK: - Background Task State
+
+    @Published var backgroundTaskName: String?
+    @Published var backgroundTaskPhase: String = ""
+    @Published var backgroundTaskProgress: Double = 0
+    @Published var vaultCheckResult: VaultCheckResult?
+    @Published var taskBlockedAlert: String?
+    @Published var viewTaskActive: Bool = false
+    private var backgroundTask: Task<Void, Never>?
+
+    var isAnyTaskRunning: Bool {
+        isProcessing || backgroundTaskName != nil || viewTaskActive
+    }
+
+    private var runningTaskDisplayName: String {
+        if let bg = backgroundTaskName { return bg }
+        if isProcessing { return "파일 처리" }
+        if viewTaskActive { return "재분류" }
+        return ""
+    }
+
     // MARK: - Settings
 
     @Published var pkmRootPath: String {
@@ -104,6 +125,9 @@ final class AppState: ObservableObject {
 
     /// Black text face expression for the menubar
     var menuBarFace: String {
+        if backgroundTaskName != nil {
+            return "·_·…"
+        }
         switch currentScreen {
         case .onboarding:
             return "·‿·"
@@ -186,6 +210,108 @@ final class AppState: ObservableObject {
         }
     }
 
+    func startVaultCheck() {
+        guard !isAnyTaskRunning else {
+            taskBlockedAlert = "'\(runningTaskDisplayName)' 진행 중입니다. 완료 또는 취소 후 다시 시도해주세요."
+            return
+        }
+
+        backgroundTaskName = "전체 점검"
+        backgroundTaskPhase = "오류 검사 중..."
+        backgroundTaskProgress = 0
+        vaultCheckResult = nil
+        let root = pkmRootPath
+
+        backgroundTask = Task.detached(priority: .utility) {
+            defer {
+                Task { @MainActor in
+                    AppState.shared.backgroundTaskName = nil
+                    AppState.shared.backgroundTaskPhase = ""
+                    AppState.shared.backgroundTaskProgress = 0
+                }
+            }
+
+            var repairCount = 0
+            var enrichCount = 0
+
+            StatisticsService.recordActivity(
+                fileName: "볼트 점검",
+                category: "system",
+                action: "started",
+                detail: "오류 검사 · 메타데이터 보완 · MOC 갱신"
+            )
+
+            let auditor = VaultAuditor(pkmRoot: root)
+            let report = auditor.audit()
+            if Task.isCancelled { return }
+
+            if report.totalIssues > 0 {
+                await MainActor.run { AppState.shared.backgroundTaskPhase = "자동 복구 중..." }
+                let repair = auditor.repair(report: report)
+                repairCount = repair.linksFixed + repair.frontmatterInjected + repair.paraFixed
+            }
+            if Task.isCancelled { return }
+
+            await MainActor.run { AppState.shared.backgroundTaskPhase = "메타데이터 보완 중..." }
+            let enricher = NoteEnricher(pkmRoot: root)
+            let pm = PKMPathManager(root: root)
+            let fm = FileManager.default
+            for basePath in [pm.projectsPath, pm.areaPath, pm.resourcePath] {
+                if Task.isCancelled { return }
+                guard let folders = try? fm.contentsOfDirectory(atPath: basePath) else { continue }
+                for folder in folders where !folder.hasPrefix(".") && !folder.hasPrefix("_") {
+                    if Task.isCancelled { return }
+                    let folderPath = (basePath as NSString).appendingPathComponent(folder)
+                    let results = await enricher.enrichFolder(at: folderPath)
+                    enrichCount += results.filter { $0.fieldsUpdated > 0 }.count
+                }
+            }
+
+            await MainActor.run { AppState.shared.backgroundTaskPhase = "폴더 요약 갱신 중..." }
+            let generator = MOCGenerator(pkmRoot: root)
+            await generator.regenerateAll()
+            if Task.isCancelled { return }
+
+            await MainActor.run { AppState.shared.backgroundTaskPhase = "노트 간 시맨틱 연결 중..." }
+            let linker = SemanticLinker(pkmRoot: root)
+            let linkResult = await linker.linkAll { progress, status in
+                Task { @MainActor in
+                    AppState.shared.backgroundTaskPhase = status
+                    AppState.shared.backgroundTaskProgress = progress
+                }
+            }
+
+            StatisticsService.recordActivity(
+                fileName: "볼트 점검",
+                category: "system",
+                action: "completed",
+                detail: "\(report.totalIssues)건 발견, \(repairCount)건 복구, \(enrichCount)개 보완, \(linkResult.linksCreated)개 링크"
+            )
+
+            let snapshot = VaultCheckResult(
+                brokenLinks: report.brokenLinks.count,
+                missingFrontmatter: report.missingFrontmatter.count,
+                missingPARA: report.missingPARA.count,
+                untaggedFiles: report.untaggedFiles.count,
+                repairCount: repairCount,
+                enrichCount: enrichCount,
+                mocUpdated: true,
+                linksCreated: linkResult.linksCreated
+            )
+            await MainActor.run {
+                AppState.shared.vaultCheckResult = snapshot
+            }
+        }
+    }
+
+    func cancelBackgroundTask() {
+        backgroundTask?.cancel()
+        backgroundTask = nil
+        backgroundTaskName = nil
+        backgroundTaskPhase = ""
+        backgroundTaskProgress = 0
+    }
+
     // MARK: - Actions
 
     func setupWatchdog() {
@@ -208,7 +334,12 @@ final class AppState: ObservableObject {
     private var processingTask: Task<Void, Never>?
 
     func startProcessing() async {
-        guard !isProcessing else { return }
+        guard !isAnyTaskRunning else {
+            if backgroundTaskName != nil || viewTaskActive {
+                taskBlockedAlert = "'\(runningTaskDisplayName)' 진행 중입니다. 완료 또는 취소 후 다시 시도해주세요."
+            }
+            return
+        }
         guard hasAPIKey else {
             currentScreen = .settings
             return
@@ -291,7 +422,12 @@ final class AppState: ObservableObject {
     }
 
     func startReorganizing() async {
-        guard !isProcessing else { return }
+        guard !isAnyTaskRunning else {
+            if backgroundTaskName != nil || viewTaskActive {
+                taskBlockedAlert = "'\(runningTaskDisplayName)' 진행 중입니다. 완료 또는 취소 후 다시 시도해주세요."
+            }
+            return
+        }
         guard hasAPIKey else {
             currentScreen = .settings
             return
@@ -364,7 +500,12 @@ final class AppState: ObservableObject {
 
     /// Reorganize multiple folders sequentially
     func startBatchReorganizing(folders: [(category: PARACategory, subfolder: String)]) async {
-        guard !isProcessing, !folders.isEmpty else { return }
+        guard !isAnyTaskRunning, !folders.isEmpty else {
+            if isAnyTaskRunning {
+                taskBlockedAlert = "'\(runningTaskDisplayName)' 진행 중입니다. 완료 또는 취소 후 다시 시도해주세요."
+            }
+            return
+        }
         guard hasAPIKey else {
             currentScreen = .settings
             return
@@ -701,5 +842,20 @@ final class AppState: ObservableObject {
             guard pendingConfirmations.isEmpty else { return }
             navigateBack()
         }
+    }
+}
+
+struct VaultCheckResult {
+    let brokenLinks: Int
+    let missingFrontmatter: Int
+    let missingPARA: Int
+    let untaggedFiles: Int
+    let repairCount: Int
+    let enrichCount: Int
+    let mocUpdated: Bool
+    let linksCreated: Int
+
+    var auditTotal: Int {
+        brokenLinks + missingFrontmatter + missingPARA
     }
 }

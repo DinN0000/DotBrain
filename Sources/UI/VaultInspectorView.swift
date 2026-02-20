@@ -8,11 +8,7 @@ struct VaultInspectorView: View {
     @State private var folders: [FolderInfo] = []
     @State private var isLoading = true
 
-    // Vault check state (moved from DashboardView)
-    @State private var isVaultChecking = false
-    @State private var vaultCheckPhase = ""
-    @State private var vaultCheckResult: VaultCheckResult?
-    @State private var vaultCheckTask: Task<Void, Never>?
+    // Vault check state managed by AppState
 
     // Reorganize state (absorbed from VaultReorganizeView)
     @State private var reorgPhase: ReorgPhase = .idle
@@ -61,8 +57,8 @@ struct VaultInspectorView: View {
         }
         .onAppear { loadFolders() }
         .onDisappear {
-            vaultCheckTask?.cancel()
             reorgTask?.cancel()
+            appState.viewTaskActive = false
         }
     }
 
@@ -72,7 +68,7 @@ struct VaultInspectorView: View {
         VStack(spacing: 0) {
             // Action buttons
             HStack(spacing: 8) {
-                Button(action: { runVaultCheck() }) {
+                Button(action: { appState.startVaultCheck() }) {
                     HStack(spacing: 4) {
                         Image(systemName: "stethoscope")
                             .font(.caption)
@@ -83,7 +79,7 @@ struct VaultInspectorView: View {
                     .padding(.vertical, 5)
                 }
                 .buttonStyle(.bordered)
-                .disabled(isVaultChecking)
+                .disabled(appState.isAnyTaskRunning)
 
                 Button(action: { startFullReorg() }) {
                     HStack(spacing: 4) {
@@ -96,18 +92,19 @@ struct VaultInspectorView: View {
                     .padding(.vertical, 5)
                 }
                 .buttonStyle(.bordered)
+                .disabled(appState.isAnyTaskRunning)
 
                 Spacer()
             }
             .padding(.horizontal)
             .padding(.vertical, 8)
 
-            // Vault check inline progress
-            if isVaultChecking {
-                InlineProgress(message: vaultCheckPhase)
+            // Vault check inline progress (from AppState)
+            if appState.backgroundTaskName == "전체 점검" {
+                InlineProgress(message: appState.backgroundTaskPhase)
             }
 
-            if let result = vaultCheckResult {
+            if let result = appState.vaultCheckResult {
                 vaultCheckResultCard(result)
             }
 
@@ -690,7 +687,7 @@ struct VaultInspectorView: View {
             }
             HStack {
                 Spacer()
-                Button("닫기") { vaultCheckResult = nil }
+                Button("닫기") { appState.vaultCheckResult = nil }
                     .font(.caption2)
                     .buttonStyle(.plain)
                     .foregroundColor(.secondary)
@@ -760,94 +757,6 @@ struct VaultInspectorView: View {
         }
     }
 
-    private func runVaultCheck() {
-        guard !isVaultChecking else { return }
-        isVaultChecking = true
-        vaultCheckResult = nil
-        let root = appState.pkmRootPath
-
-        vaultCheckTask?.cancel()
-        vaultCheckTask = Task.detached(priority: .utility) {
-            defer {
-                Task { @MainActor in
-                    isVaultChecking = false
-                    vaultCheckTask = nil
-                }
-            }
-            var repairCount = 0
-            var enrichCount = 0
-
-            StatisticsService.recordActivity(
-                fileName: "볼트 점검",
-                category: "system",
-                action: "started",
-                detail: "오류 검사 · 메타데이터 보완 · MOC 갱신"
-            )
-
-            await MainActor.run { vaultCheckPhase = "오류 검사 중..." }
-            let auditor = VaultAuditor(pkmRoot: root)
-            let report = auditor.audit()
-            if Task.isCancelled { return }
-
-            if report.totalIssues > 0 {
-                await MainActor.run { vaultCheckPhase = "자동 복구 중..." }
-                let repair = auditor.repair(report: report)
-                repairCount = repair.linksFixed + repair.frontmatterInjected + repair.paraFixed
-            }
-            if Task.isCancelled { return }
-
-            await MainActor.run { vaultCheckPhase = "메타데이터 보완 중..." }
-            let enricher = NoteEnricher(pkmRoot: root)
-            let pm = PKMPathManager(root: root)
-            let fm = FileManager.default
-            for basePath in [pm.projectsPath, pm.areaPath, pm.resourcePath] {
-                if Task.isCancelled { return }
-                guard let folders = try? fm.contentsOfDirectory(atPath: basePath) else { continue }
-                for folder in folders where !folder.hasPrefix(".") && !folder.hasPrefix("_") {
-                    if Task.isCancelled { return }
-                    let folderPath = (basePath as NSString).appendingPathComponent(folder)
-                    let results = await enricher.enrichFolder(at: folderPath)
-                    enrichCount += results.filter { $0.fieldsUpdated > 0 }.count
-                }
-            }
-
-            await MainActor.run { vaultCheckPhase = "폴더 요약 갱신 중..." }
-            let generator = MOCGenerator(pkmRoot: root)
-            await generator.regenerateAll()
-            if Task.isCancelled { return }
-
-            await MainActor.run { vaultCheckPhase = "노트 간 시맨틱 연결 중..." }
-            let linker = SemanticLinker(pkmRoot: root)
-            let linkResult = await linker.linkAll { progress, status in
-                Task { @MainActor in
-                    vaultCheckPhase = status
-                }
-            }
-
-            StatisticsService.recordActivity(
-                fileName: "볼트 점검",
-                category: "system",
-                action: "completed",
-                detail: "\(report.totalIssues)건 발견, \(repairCount)건 복구, \(enrichCount)개 보완, \(linkResult.linksCreated)개 링크"
-            )
-
-            let snapshot = VaultCheckResult(
-                brokenLinks: report.brokenLinks.count,
-                missingFrontmatter: report.missingFrontmatter.count,
-                missingPARA: report.missingPARA.count,
-                untaggedFiles: report.untaggedFiles.count,
-                repairCount: repairCount,
-                enrichCount: enrichCount,
-                mocUpdated: true,
-                linksCreated: linkResult.linksCreated
-            )
-            await MainActor.run {
-                vaultCheckResult = snapshot
-                loadFolders()  // Refresh after check
-            }
-        }
-    }
-
     private func startFullReorg() {
         reorgScope = .all
         reorgPhase = .scanning
@@ -871,6 +780,7 @@ struct VaultInspectorView: View {
     private func startReorgScan() {
         reorgProgress = 0
         reorgStatus = "스캔 준비 중..."
+        appState.viewTaskActive = true
         let root = appState.pkmRootPath
         let currentScope = reorgScope
 
@@ -893,6 +803,7 @@ struct VaultInspectorView: View {
 
                 await MainActor.run {
                     analyses = result.files
+                    appState.viewTaskActive = false
                     if analyses.contains(where: \.needsMove) {
                         reorgPhase = .reviewPlan
                     } else {
@@ -902,6 +813,7 @@ struct VaultInspectorView: View {
                 }
             } catch {
                 await MainActor.run {
+                    appState.viewTaskActive = false
                     reorgStatus = "오류: \(error.localizedDescription)"
                     reorgPhase = .idle
                 }
@@ -916,6 +828,7 @@ struct VaultInspectorView: View {
         reorgPhase = .executing
         reorgProgress = 0
         reorgStatus = "실행 준비 중..."
+        appState.viewTaskActive = true
         let root = appState.pkmRootPath
 
         reorgTask?.cancel()
@@ -936,11 +849,13 @@ struct VaultInspectorView: View {
                 if Task.isCancelled { return }
 
                 await MainActor.run {
+                    appState.viewTaskActive = false
                     reorgResults = executionResults
                     reorgPhase = .done
                 }
             } catch {
                 await MainActor.run {
+                    appState.viewTaskActive = false
                     reorgStatus = "오류: \(error.localizedDescription)"
                     reorgPhase = .done
                 }
@@ -950,6 +865,7 @@ struct VaultInspectorView: View {
 
     private func resetReorg() {
         reorgTask?.cancel()
+        appState.viewTaskActive = false
         reorgTask = nil
         reorgPhase = .idle
         analyses = []
@@ -957,21 +873,5 @@ struct VaultInspectorView: View {
         reorgProgress = 0
         reorgStatus = ""
         loadFolders()
-    }
-}
-
-// Reused from DashboardView -- now lives with VaultInspectorView
-private struct VaultCheckResult {
-    let brokenLinks: Int
-    let missingFrontmatter: Int
-    let missingPARA: Int
-    let untaggedFiles: Int
-    let repairCount: Int
-    let enrichCount: Int
-    let mocUpdated: Bool
-    let linksCreated: Int
-
-    var auditTotal: Int {
-        brokenLinks + missingFrontmatter + missingPARA
     }
 }
