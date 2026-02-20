@@ -89,8 +89,8 @@ struct ClassifyResult: Codable {
     let summary: String
     var targetFolder: String
     var project: String?          // 프로젝트 이름 (para == .project일 때)
-    let confidence: Double        // 0.0–1.0
-    let relatedNotes: [RelatedNote]
+    var confidence: Double        // 0.0–1.0 (mutable: Stage 2에서 업데이트)
+    var relatedNotes: [RelatedNote] = []  // 기본값 빈 배열
     var suggestedProject: String? // fuzzyMatch 실패 시 AI 원본 프로젝트명
 }
 
@@ -236,6 +236,12 @@ struct ProcessedFileResult: Identifiable {
         case deduplicated(String)          // 중복 제거됨
         case error(String)                 // 에러
     }
+
+    // Computed properties
+    var isSuccess: Bool    // success, relocated, deduplicated → true
+    var isError: Bool      // error → true
+    var error: String?     // error 메시지 추출
+    var displayTarget: String  // targetPath의 마지막 2 컴포넌트 (예: "2_Area/DevOps")
 }
 ```
 
@@ -273,8 +279,11 @@ enum AIProvider: String, CaseIterable, Identifiable {
 
 | 속성 | claude | gemini |
 |------|--------|--------|
-| `modelPipeline` | "Haiku → Sonnet" | "Flash → Pro" |
-| `keyPrefix` | `"sk-ant-"` | `"AI"` |
+| `displayName` | "Claude (Anthropic)" | "Gemini (Google)" |
+| `modelPipeline` | "Haiku 4.5 → Sonnet 4.5" | "Flash → Pro" |
+| `costInfo` | "파일당 약 $0.002 (Haiku 4.5)" | "무료 티어: 분당 15회, 일 1500회" |
+| `keyPrefix` | `"sk-ant-"` | `"AIza"` |
+| `keyPlaceholder` | `"sk-ant-..."` | `"AIza..."` |
 
 메서드: `hasAPIKey()`, `saveAPIKey(_:)`, `deleteAPIKey()`
 
@@ -343,6 +352,29 @@ struct ExtractResult {
     }
 }
 ```
+
+## ContextMap Types
+
+`Sources/Services/ContextMap.swift` — MOC 기반 볼트 컨텍스트 맵. AI 분류 프롬프트에 사용.
+
+```swift
+struct ContextMapEntry: Sendable {
+    let noteName: String        // "Aave_Analysis"
+    let summary: String         // MOC에 기록된 요약
+    let folderName: String      // "DeFi"
+    let para: PARACategory      // .resource
+    let folderSummary: String   // 폴더 전체 요약
+    let tags: [String]          // 폴더 태그 클라우드
+}
+
+struct VaultContextMap: Sendable {
+    let entries: [ContextMapEntry]
+    let folderCount: Int
+    let buildDate: Date
+}
+```
+
+`VaultContextMap.toPromptText()` — PARA 카테고리별로 그룹화된 프롬프트 텍스트 생성. 빈 볼트일 경우 "볼트에 기존 문서 없음" 반환.
 
 ## Data Flow Between Layers
 

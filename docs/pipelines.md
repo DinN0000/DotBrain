@@ -23,15 +23,15 @@ _Inbox/ 파일
     ▼
 3. Classify ── Classifier 2단계 AI 분류
     │           ProjectContextBuilder로 볼트 컨텍스트 구성
+    │           + buildTagVocabulary()로 상위 50 태그 어휘 주입
     │           Stage 1: Haiku/Flash 배치 (5파일/요청, 3병렬)
     │           Stage 2: Sonnet/Pro 정밀 (confidence < 0.8만, 3병렬)
     ▼
-4. Link ── SemanticLinker.linkNotes() (처리 완료 후)
-    │
-    ▼
-5. Process ── 충돌 감지 → FileMover.moveFile()/moveFolder()
+4. Process ── 충돌 감지 → FileMover.moveFile()/moveFolder()
     │           충돌 없으면 자동 이동
     │           충돌 있으면 PendingConfirmation 생성
+    ▼
+5. Link ── SemanticLinker.linkNotes() (이동 완료된 파일만)
     ▼
 6. Finish ── MOCGenerator.updateMOCsForFolders()
               NotificationService 알림
@@ -310,6 +310,22 @@ struct LinkResult {
 | VaultReorganizer | async | max 5 | Classifier 재사용 | - |
 | VaultAuditor | sync | - | - | - |
 | SemanticLinker | async | - | max 3 (AI 필터) | - |
+
+## ProjectContextBuilder
+
+`Sources/Pipeline/ProjectContextBuilder.swift` — 모든 파이프라인이 공유하는 볼트 컨텍스트 빌더.
+
+| 메서드 | 설명 |
+|--------|------|
+| `buildProjectContext()` | `1_Project/` 폴더 목록 + 요약/태그를 텍스트로 구성 |
+| `buildSubfolderContext()` | Area/Resource/Archive 서브폴더를 JSON 형식으로 구성 (폴더명 할루시네이션 방지) |
+| `extractProjectNames(from:)` | 프로젝트 컨텍스트에서 프로젝트명 추출 |
+| `buildWeightedContext()` | 루트 MOC 파일 기반 가중 컨텍스트 구성 (카테고리별: Project 높음, Archive 낮음) |
+| `buildTagVocabulary()` | 볼트 전체 상위 50개 태그를 빈도순 JSON 배열로 반환 |
+
+**사용처**: InboxProcessor, FolderReorganizer, VaultReorganizer.
+
+**최적화**: `buildWeightedContext()`는 루트 MOC 파일 우선 사용 (최대 4회 파일 읽기), MOC 없는 카테고리만 레거시 서브폴더 스캔으로 fallback.
 
 ## Cross-References
 
