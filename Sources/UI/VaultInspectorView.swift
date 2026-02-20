@@ -874,23 +874,13 @@ private struct VaultFolderRow: View {
                     )
             }
 
-            // Health summary: single line with actionable guidance
             if hasHealthIssue {
-                let parts = [
-                    folder.modifiedCount > 0 ? "변경 \(folder.modifiedCount)개" : nil,
-                    folder.newCount > 0 ? "신규 \(folder.newCount)개" : nil,
-                ].compactMap { $0 }.joined(separator: ", ")
-
-                HStack(spacing: 4) {
-                    Text(parts)
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
-                    Text("- 클릭하여 정리")
-                        .font(.caption2)
-                        .foregroundColor(healthColor)
-                }
-                .padding(.leading, 28)
-                .padding(.top, 2)
+                let changedCount = folder.modifiedCount + folder.newCount
+                Text("\(changedCount)개 파일 정리하기")
+                    .font(.caption2)
+                    .foregroundColor(healthColor.opacity(0.8))
+                    .padding(.leading, 28)
+                    .padding(.top, 2)
             }
         }
         .padding(.vertical, 4)
