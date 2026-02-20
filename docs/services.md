@@ -1,6 +1,6 @@
 # Services
 
-서비스 레이어 레퍼런스. `Sources/Services/` — 39개 파일, 6개 하위 디렉토리.
+서비스 레이어 레퍼런스. `Sources/Services/` — 37개 파일, 5개 하위 디렉토리 (Claude/, Extraction/, FileSystem/, Gemini/, SemanticLinker/).
 
 ## AI Services
 
@@ -28,7 +28,7 @@
 
 | 메서드 | 설명 |
 |--------|------|
-| `classifyFiles(_:projectContext:subfolderContext:projectNames:weightedContext:onProgress:)` | 파일 목록을 2단계로 분류 |
+| `classifyFiles(_:projectContext:subfolderContext:projectNames:weightedContext:tagVocabulary:onProgress:)` | 파일 목록을 2단계로 분류 |
 
 **내부 흐름**:
 1. `classifyBatchStage1()` — Haiku/Flash, 5파일/배치, 3병렬
@@ -87,7 +87,7 @@
 **충돌 해결**: `_2`, `_3`, UUID 접미사.
 **바이너리**: `_Assets/{documents,images}/`로 이동 + 컴패니언 마크다운.
 
-**의존**: PKMPathManager, BinaryExtractor, FrontmatterWriter, AIService, StatisticsService
+**의존**: PKMPathManager, BinaryExtractor, FrontmatterWriter, AIService (바이너리 컴패니언 AI 요약 생성), StatisticsService
 
 ### PKMPathManager
 
@@ -255,16 +255,6 @@ Map of Contents 생성. 폴더 수준의 자동 목차.
 
 **업데이트 전략**: `<!-- DotBrain:start/end -->` 마커로 DotBrain 생성 영역만 교체. 사용자 수정 보존.
 
-### ContextLinker
-
-`Sources/Services/ContextLinker.swift` — **struct: Sendable**
-
-| 메서드 | 설명 |
-|--------|------|
-| `findRelatedNotes(for:contextMap:onProgress:)` | AI로 관련 노트 검색 (배치 5, 병렬 3) |
-
-**의존**: AIService, FileContentExtractor, StatisticsService
-
 ### ContextMapBuilder
 
 `Sources/Services/ContextMapBuilder.swift` — **struct: Sendable**
@@ -363,6 +353,7 @@ Map of Contents 생성. 폴더 수준의 자동 목차.
 | 메서드 | 설명 |
 |--------|------|
 | `analyze(folderPath:folderName:category:)` | 폴더 건강 점수 (AI 호출 없음) |
+| `analyzeAll(folderPaths:pkmRoot:)` | 여러 폴더 일괄 분석, 건강 점수 나쁜 순으로 정렬 반환 |
 
 **점수 요소**: 파일 수(>40 감점), missing frontmatter, 태그 다양성, 인덱스 노트 유무.
 **점수 레벨**: >= 0.8 good, 0.5–0.8 attention, < 0.5 urgent.
@@ -429,8 +420,7 @@ AppState
 │   ├── StatisticsService ← StatisticsActor
 │   └── NotificationService
 ├── FolderReorganizer
-│   ├── (InboxProcessor 서비스 공유)
-│   └── ContextLinker ← (AIService, FileContentExtractor)
+│   └── (InboxProcessor 서비스 공유)
 ├── VaultReorganizer
 │   └── (InboxProcessor 서비스 공유)
 └── VaultAuditor
