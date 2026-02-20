@@ -159,7 +159,7 @@ struct NoteIndexGenerator: Sendable {
         var summaries: [String] = []
 
         for entry in entries.sorted() {
-            // Skip non-markdown, hidden, underscore-prefixed, and MOC files
+            // Skip non-markdown, hidden, underscore-prefixed, and index note files
             guard entry.hasSuffix(".md"),
                   !entry.hasPrefix("."),
                   !entry.hasPrefix("_"),

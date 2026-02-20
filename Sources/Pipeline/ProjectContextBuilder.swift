@@ -80,8 +80,8 @@ struct ProjectContextBuilder {
 
     // MARK: - Weighted Context
 
-    /// Build weighted context from root MOC files (optimized: max 4 file reads)
-    /// Per-category hybrid fallback: uses root MOC when available, legacy for missing categories
+    /// Build weighted context from root index notes (optimized: max 4 file reads)
+    /// Per-category hybrid fallback: uses root index note when available, legacy for missing categories
     func buildWeightedContext() -> String {
         let categories: [(path: String, label: String, weight: String)] = [
             (pathManager.projectsPath, "Project", "높은 연결 가중치"),
@@ -96,7 +96,7 @@ struct ProjectContextBuilder {
             let categoryName = (basePath as NSString).lastPathComponent
             let mocPath = (basePath as NSString).appendingPathComponent("\(categoryName).md")
 
-            // Try root MOC first
+            // Try root index note first
             if let content = try? String(contentsOfFile: mocPath, encoding: .utf8) {
                 let (_, body) = Frontmatter.parse(markdown: content)
                 let trimmed = body.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -106,7 +106,7 @@ struct ProjectContextBuilder {
                 }
             }
 
-            // Per-category fallback: no root MOC or empty body
+            // Per-category fallback: no root index note or empty body
             let fallback = buildCategoryFallback(basePath: basePath, label: label, weight: weight)
             if !fallback.isEmpty {
                 sections.append(fallback)
@@ -116,7 +116,7 @@ struct ProjectContextBuilder {
         return sections.isEmpty ? "기존 문서 없음" : sections.joined(separator: "\n\n")
     }
 
-    /// Per-category legacy fallback when root MOC is missing or empty
+    /// Per-category legacy fallback when root index note is missing or empty
     private func buildCategoryFallback(basePath: String, label: String, weight: String) -> String {
         let section: String
         switch label {
