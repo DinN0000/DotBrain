@@ -225,8 +225,8 @@ struct InboxProcessor {
             return dir.isEmpty ? nil : dir
         })
         if !affectedFolders.isEmpty {
-            let mocGenerator = MOCGenerator(pkmRoot: pkmRoot)
-            await mocGenerator.updateMOCsForFolders(affectedFolders)
+            let indexGenerator = NoteIndexGenerator(pkmRoot: pkmRoot)
+            await indexGenerator.updateForFolders(affectedFolders)
         }
 
         // Semantic link: connect newly moved files with vault

@@ -211,20 +211,14 @@ struct FolderReorganizer {
 
         // Update MOCs for affected folders (source + all targets)
         onPhaseChange?(.finishing)
-        let mocGenerator = MOCGenerator(pkmRoot: pkmRoot)
-        do {
-            try await mocGenerator.generateMOC(folderPath: folderPath, folderName: subfolder, para: category)
-        } catch {
-            NSLog("[FolderReorganizer] MOC 생성 실패: %@ — %@", subfolder, error.localizedDescription)
-        }
-
-        let affectedFolders = Set(processed.filter(\.isSuccess).compactMap { result -> String? in
+        var foldersToUpdate: Set<String> = [folderPath]
+        let additionalFolders = Set(processed.filter(\.isSuccess).compactMap { result -> String? in
             let dir = (result.targetPath as NSString).deletingLastPathComponent
             return dir.isEmpty || dir == folderPath ? nil : dir
         })
-        if !affectedFolders.isEmpty {
-            await mocGenerator.updateMOCsForFolders(affectedFolders)
-        }
+        foldersToUpdate.formUnion(additionalFolders)
+        let indexGenerator = NoteIndexGenerator(pkmRoot: pkmRoot)
+        await indexGenerator.updateForFolders(foldersToUpdate)
 
         // Semantic link: connect processed files with vault (post-move)
         let allSuccessPaths = processed.filter(\.isSuccess).map(\.targetPath)
