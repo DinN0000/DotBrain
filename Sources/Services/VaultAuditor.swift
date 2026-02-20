@@ -40,7 +40,7 @@ struct VaultAuditor {
     /// Perform a full audit of the vault, returning all detected issues
     func audit() -> AuditReport {
         let files = allMarkdownFiles()
-        let noteNames = allNoteNames()
+        let noteNames = self.noteNames(from: files)
 
         var brokenLinks: [AuditReport.BrokenLink] = []
         var missingFrontmatter: [String] = []
@@ -333,9 +333,8 @@ struct VaultAuditor {
         return results
     }
 
-    /// Build a set of all note basenames (without .md) for WikiLink resolution
-    private func allNoteNames() -> Set<String> {
-        let files = allMarkdownFiles()
+    /// Build a set of all note basenames (without .md) from a pre-collected file list
+    private func noteNames(from files: [String]) -> Set<String> {
         var names = Set<String>()
         for file in files {
             let basename = ((file as NSString).lastPathComponent as NSString).deletingPathExtension

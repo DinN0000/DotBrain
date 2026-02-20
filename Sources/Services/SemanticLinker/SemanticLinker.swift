@@ -17,7 +17,10 @@ struct SemanticLinker: Sendable {
 
     // MARK: - Public API
 
-    func linkAll(onProgress: ((Double, String) -> Void)? = nil) async -> LinkResult {
+    /// Link notes semantically using AI filtering.
+    /// - Parameter changedFiles: If provided, only generate candidates and AI-filter for
+    ///   changed notes and their existing Related Notes neighbors. Pass nil for full scan.
+    func linkAll(changedFiles: Set<String>? = nil, onProgress: ((Double, String) -> Void)? = nil) async -> LinkResult {
         onProgress?(0.0, "태그 정규화 중...")
         let tagResult: TagNormalizer.Result
         do {
@@ -39,9 +42,25 @@ struct SemanticLinker: Sendable {
             return LinkResult(tagsNormalized: tagResult, notesLinked: 0, linksCreated: 0)
         }
 
+        // Determine which notes to process
+        let targetNotes: [LinkCandidateGenerator.NoteInfo]
+        if let changed = changedFiles {
+            let changedNames = Set(changed.map {
+                (($0 as NSString).lastPathComponent as NSString).deletingPathExtension
+            })
+            // Include changed notes + notes that already reference changed notes
+            targetNotes = allNotes.filter { note in
+                changedNames.contains(note.name) ||
+                !note.existingRelated.isDisjoint(with: changedNames)
+            }
+            NSLog("[SemanticLinker] Incremental: %d/%d notes targeted", targetNotes.count, allNotes.count)
+        } else {
+            targetNotes = allNotes
+        }
+
         let candidateGen = LinkCandidateGenerator()
         var notesWithCandidates: [(note: LinkCandidateGenerator.NoteInfo, candidates: [LinkCandidateGenerator.Candidate])] = []
-        for note in allNotes {
+        for note in targetNotes {
             let candidates = candidateGen.generateCandidates(
                 for: note,
                 allNotes: allNotes,

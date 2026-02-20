@@ -247,8 +247,10 @@ struct MOCGenerator {
         try content.write(toFile: mocPath, atomically: true, encoding: .utf8)
     }
 
-    /// Regenerate all MOCs across the entire vault
-    func regenerateAll() async {
+    /// Regenerate MOCs across the vault.
+    /// - Parameter dirtyFolders: If provided, only regenerate MOCs for these folder paths.
+    ///   Pass nil to regenerate all (default behavior).
+    func regenerateAll(dirtyFolders: Set<String>? = nil) async {
         let fm = FileManager.default
         let categories: [(PARACategory, String)] = [
             (.project, pathManager.projectsPath),
@@ -266,15 +268,22 @@ struct MOCGenerator {
                 let folderPath = (basePath as NSString).appendingPathComponent(folder)
                 var isDir: ObjCBool = false
                 guard fm.fileExists(atPath: folderPath, isDirectory: &isDir), isDir.boolValue else { continue }
-                // Skip .md files at category root (they're root MOCs, not subfolders)
                 folderTasks.append((para: para, folderPath: folderPath, folderName: folder))
             }
+        }
+
+        // Filter to dirty folders only when specified
+        let tasksToRun: [(para: PARACategory, folderPath: String, folderName: String)]
+        if let dirty = dirtyFolders {
+            tasksToRun = folderTasks.filter { dirty.contains($0.folderPath) }
+        } else {
+            tasksToRun = folderTasks
         }
 
         let maxConcurrentMOC = 3
         await withTaskGroup(of: Void.self) { group in
             var activeTasks = 0
-            for task in folderTasks {
+            for task in tasksToRun {
                 if activeTasks >= maxConcurrentMOC {
                     await group.next()
                     activeTasks -= 1
@@ -294,8 +303,19 @@ struct MOCGenerator {
             }
         }
 
-        // Generate root-level category index notes (e.g., 1_Project.md, 2_Area.md, ...)
-        for (para, basePath) in categories {
+        // Generate root-level category MOCs only for affected categories
+        let affectedCategories: Set<String>
+        if dirtyFolders != nil {
+            affectedCategories = Set(tasksToRun.map {
+                ($0.folderPath as NSString).deletingLastPathComponent
+            })
+            // Skip root MOC entirely if no folders were dirty
+            guard !affectedCategories.isEmpty else { return }
+        } else {
+            affectedCategories = Set(categories.map { $0.1 })
+        }
+
+        for (para, basePath) in categories where affectedCategories.contains(basePath) {
             do {
                 try await generateCategoryRootMOC(basePath: basePath, para: para)
             } catch {

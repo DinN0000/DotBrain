@@ -241,45 +241,98 @@ final class AppState: ObservableObject {
                 detail: "오류 검사 · 메타데이터 보완 · MOC 갱신"
             )
 
+            // Load content hash cache for incremental processing
+            let cache = ContentHashCache(pkmRoot: root)
+            await cache.load()
+
+            // Phase 1: Audit
             let auditor = VaultAuditor(pkmRoot: root)
             let report = auditor.audit()
             if Task.isCancelled { return }
 
+            // Phase 2: Repair
+            var repairedFiles: [String] = []
             if report.totalIssues > 0 {
                 await MainActor.run { AppState.shared.backgroundTaskPhase = "자동 복구 중..." }
                 let repair = auditor.repair(report: report)
                 repairCount = repair.linksFixed + repair.frontmatterInjected + repair.paraFixed
+
+                repairedFiles = Self.collectRepairedFiles(from: report)
+                await cache.updateHashes(repairedFiles)
             }
             if Task.isCancelled { return }
 
+            // Check all .md files for changes (single batch actor call)
+            await MainActor.run { AppState.shared.backgroundTaskPhase = "변경 파일 확인 중..." }
+            let pm = PKMPathManager(root: root)
+            let allMdFiles = Self.collectAllMdFiles(pm: pm)
+            let fileStatuses = await cache.checkFiles(allMdFiles)
+            let changedFiles = Set(fileStatuses.filter { $0.value != .unchanged }.map { $0.key })
+
+            NSLog("[VaultCheck] %d/%d files changed", changedFiles.count, allMdFiles.count)
+
+            // Phase 3: Enrich (changed files only, skip archive)
             await MainActor.run { AppState.shared.backgroundTaskPhase = "메타데이터 보완 중..." }
             let enricher = NoteEnricher(pkmRoot: root)
-            let pm = PKMPathManager(root: root)
-            let fm = FileManager.default
-            for basePath in [pm.projectsPath, pm.areaPath, pm.resourcePath] {
-                if Task.isCancelled { return }
-                guard let folders = try? fm.contentsOfDirectory(atPath: basePath) else { continue }
-                for folder in folders where !folder.hasPrefix(".") && !folder.hasPrefix("_") {
-                    if Task.isCancelled { return }
-                    let folderPath = (basePath as NSString).appendingPathComponent(folder)
-                    let results = await enricher.enrichFolder(at: folderPath)
-                    enrichCount += results.filter { $0.fieldsUpdated > 0 }.count
+            let filesToEnrich = Array(changedFiles.filter { !$0.contains("/4_Archive/") })
+            var enrichedFiles: [String] = []
+
+            await withTaskGroup(of: EnrichResult?.self) { group in
+                var active = 0
+                var index = 0
+
+                while index < filesToEnrich.count || !group.isEmpty {
+                    while active < 3 && index < filesToEnrich.count {
+                        let path = filesToEnrich[index]
+                        index += 1
+                        active += 1
+                        group.addTask {
+                            do {
+                                return try await enricher.enrichNote(at: path)
+                            } catch {
+                                NSLog("[NoteEnricher] enrichNote 실패 %@: %@",
+                                      (path as NSString).lastPathComponent, error.localizedDescription)
+                                return nil
+                            }
+                        }
+                    }
+                    if let result = await group.next() {
+                        active -= 1
+                        if let r = result, r.fieldsUpdated > 0 {
+                            enrichedFiles.append(r.filePath)
+                            enrichCount += 1
+                        }
+                    }
                 }
             }
-
-            await MainActor.run { AppState.shared.backgroundTaskPhase = "폴더 요약 갱신 중..." }
-            let generator = MOCGenerator(pkmRoot: root)
-            await generator.regenerateAll()
+            if !enrichedFiles.isEmpty {
+                await cache.updateHashes(enrichedFiles)
+            }
             if Task.isCancelled { return }
 
+            // Phase 4: MOC (dirty folders only)
+            await MainActor.run { AppState.shared.backgroundTaskPhase = "폴더 요약 갱신 중..." }
+            let allChangedFiles = changedFiles.union(Set(enrichedFiles))
+            let dirtyFolders = Set(allChangedFiles.map {
+                ($0 as NSString).deletingLastPathComponent
+            })
+            let generator = MOCGenerator(pkmRoot: root)
+            await generator.regenerateAll(dirtyFolders: dirtyFolders)
+            if Task.isCancelled { return }
+
+            // Phase 5: Semantic Link (changed notes only)
             await MainActor.run { AppState.shared.backgroundTaskPhase = "노트 간 시맨틱 연결 중..." }
             let linker = SemanticLinker(pkmRoot: root)
-            let linkResult = await linker.linkAll { progress, status in
+            let linkResult = await linker.linkAll(changedFiles: allChangedFiles) { progress, status in
                 Task { @MainActor in
                     AppState.shared.backgroundTaskPhase = status
                     AppState.shared.backgroundTaskProgress = progress
                 }
             }
+
+            // Update hashes for all changed files (including MOC/SemanticLinker modifications) and save
+            await cache.updateHashes(Array(allChangedFiles))
+            await cache.save()
 
             StatisticsService.recordActivity(
                 fileName: "볼트 점검",
@@ -302,6 +355,49 @@ final class AppState: ObservableObject {
                 AppState.shared.vaultCheckResult = snapshot
             }
         }
+    }
+
+    /// Collect files that were actually modified by repair
+    private nonisolated static func collectRepairedFiles(from report: AuditReport) -> [String] {
+        var files = Set<String>()
+        // Only include broken links where a suggestion existed (those were actually fixed)
+        for link in report.brokenLinks where link.suggestion != nil {
+            files.insert(link.filePath)
+        }
+        for path in report.missingFrontmatter {
+            files.insert(path)
+        }
+        for path in report.missingPARA {
+            files.insert(path)
+        }
+        return Array(files)
+    }
+
+    /// Collect all .md files across PARA folders
+    private nonisolated static func collectAllMdFiles(pm: PKMPathManager) -> [String] {
+        let fm = FileManager.default
+        var results: [String] = []
+        for basePath in [pm.projectsPath, pm.areaPath, pm.resourcePath, pm.archivePath] {
+            guard let enumerator = fm.enumerator(atPath: basePath) else { continue }
+            while let element = enumerator.nextObject() as? String {
+                let name = (element as NSString).lastPathComponent
+                if name.hasPrefix(".") || name.hasPrefix("_") {
+                    let full = (basePath as NSString).appendingPathComponent(element)
+                    var isDir: ObjCBool = false
+                    if fm.fileExists(atPath: full, isDirectory: &isDir), isDir.boolValue {
+                        enumerator.skipDescendants()
+                    }
+                    continue
+                }
+                guard name.hasSuffix(".md") else { continue }
+                let fullPath = (basePath as NSString).appendingPathComponent(element)
+                var isDir: ObjCBool = false
+                if fm.fileExists(atPath: fullPath, isDirectory: &isDir), !isDir.boolValue {
+                    results.append(fullPath)
+                }
+            }
+        }
+        return results
     }
 
     func cancelBackgroundTask() {
