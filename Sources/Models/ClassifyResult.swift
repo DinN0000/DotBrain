@@ -45,4 +45,6 @@ struct ClassifyInput {
     let filePath: String
     let content: String
     let fileName: String
+    /// Condensed structural preview (800 chars) for Stage 1 batch classification
+    let preview: String
 }

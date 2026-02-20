@@ -5,13 +5,8 @@ struct DashboardView: View {
     @State private var stats = PKMStatistics()
     @State private var urgentFolderCount = 0
 
-    // Vault check state
-    @State private var isVaultChecking = false
-    @State private var vaultCheckPhase = ""
-    @State private var vaultCheckResult: VaultCheckResult?
     @State private var selectedActivity: ActivityEntry?
     @State private var healthScanTask: Task<Void, Never>?
-    @State private var vaultCheckTask: Task<Void, Never>?
 
     // Cached PARA counts to avoid recalculation on every render
     private var projectCount: Int { stats.byCategory["project"] ?? 0 }
@@ -97,7 +92,7 @@ struct DashboardView: View {
                         }
                     }
 
-                    // Group 2: Vault maintenance
+                    // Group 2: AI management
                     DashboardCardGroup(
                         label: "AI 관리",
                         description: "AI가 볼트 전체를 점검하고 분류",
@@ -106,29 +101,19 @@ struct DashboardView: View {
                         DashboardHubCard(
                             icon: "checkmark.shield",
                             title: "볼트 점검",
-                            subtitle: "오류 수정 · 메타 보완",
-                            tint: .accentColor,
-                            isDisabled: isVaultChecking
-                        ) {
-                            runVaultCheck()
-                        }
-                        DashboardHubCard(
-                            icon: "arrow.triangle.2.circlepath",
-                            title: "AI 재분류",
-                            subtitle: "파일 위치 재배치",
+                            subtitle: "진단 · 재분류 · 정리",
                             tint: .accentColor
                         ) {
-                            appState.currentScreen = .vaultReorganize
+                            appState.currentScreen = .vaultInspector
                         }
-                    }
-
-                    // Vault check inline results
-                    if isVaultChecking {
-                        InlineProgress(message: vaultCheckPhase)
-                    }
-
-                    if let result = vaultCheckResult {
-                        vaultCheckResultView(result)
+                        DashboardHubCard(
+                            icon: "chart.bar.xaxis",
+                            title: "AI 통계",
+                            subtitle: "비용 · 사용량 · 이력",
+                            tint: .accentColor
+                        ) {
+                            appState.currentScreen = .aiStatistics
+                        }
                     }
 
                     // Recent activity
@@ -207,8 +192,6 @@ struct DashboardView: View {
         .onDisappear {
             healthScanTask?.cancel()
             healthScanTask = nil
-            vaultCheckTask?.cancel()
-            vaultCheckTask = nil
         }
         .onChange(of: appState.currentScreen) { newScreen in
             if newScreen == .dashboard {
@@ -221,134 +204,6 @@ struct DashboardView: View {
         let service = StatisticsService(pkmRoot: appState.pkmRootPath)
         stats = service.collectStatistics()
         scanHealthSummary()
-    }
-
-    // MARK: - Vault Check Result View
-
-    @ViewBuilder
-    private func vaultCheckResultView(_ result: VaultCheckResult) -> some View {
-        let hasIssues = result.auditTotal > 0 || result.untaggedFiles > 0
-        let allClean = !hasIssues && result.enrichCount == 0
-
-        VStack(spacing: 6) {
-            // Audit detail rows
-            if result.brokenLinks > 0 {
-                auditResultRow(
-                    icon: "link",
-                    label: "깨진 링크",
-                    count: result.brokenLinks,
-                    color: .orange
-                )
-            }
-            if result.missingFrontmatter > 0 {
-                auditResultRow(
-                    icon: "doc.badge.plus",
-                    label: "프론트매터 누락",
-                    count: result.missingFrontmatter,
-                    color: .orange
-                )
-            }
-            if result.missingPARA > 0 {
-                auditResultRow(
-                    icon: "folder.badge.questionmark",
-                    label: "PARA 미분류",
-                    count: result.missingPARA,
-                    color: .orange
-                )
-            }
-
-            // Repair summary
-            if result.repairCount > 0 {
-                HStack(spacing: 6) {
-                    Image(systemName: "wrench.and.screwdriver")
-                        .font(.caption)
-                        .foregroundColor(.green)
-                    Text("\(result.repairCount)건 자동 복구")
-                        .font(.caption)
-                        .foregroundColor(.green)
-                    Spacer()
-                }
-            }
-
-            // Enrich results
-            if result.enrichCount > 0 {
-                HStack(spacing: 6) {
-                    Image(systemName: "text.badge.star")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                    Text("\(result.enrichCount)개 메타데이터 보완")
-                        .font(.caption)
-                    Spacer()
-                }
-            }
-
-            // Semantic links
-            if result.linksCreated > 0 {
-                HStack(spacing: 6) {
-                    Image(systemName: "arrow.triangle.branch")
-                        .font(.caption)
-                        .foregroundColor(.blue)
-                    Text("\(result.linksCreated)개 시맨틱 링크 생성")
-                        .font(.caption)
-                        .foregroundColor(.blue)
-                    Spacer()
-                }
-            }
-
-            // MOC update
-            if result.mocUpdated {
-                HStack(spacing: 6) {
-                    Image(systemName: "doc.text.magnifyingglass")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                    Text("폴더 요약 갱신 완료")
-                        .font(.caption)
-                    Spacer()
-                }
-            }
-
-            // All clean
-            if allClean {
-                HStack(spacing: 6) {
-                    Image(systemName: "checkmark.circle.fill")
-                        .font(.caption)
-                        .foregroundColor(.green)
-                    Text("볼트 상태 양호")
-                        .font(.caption)
-                        .foregroundColor(.green)
-                    Spacer()
-                }
-            }
-
-            // Dismiss
-            HStack {
-                Spacer()
-                Button("닫기") { vaultCheckResult = nil }
-                    .font(.caption2)
-                    .buttonStyle(.plain)
-                    .foregroundColor(.secondary)
-            }
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .background(allClean ? Color.green.opacity(0.06) : Color.orange.opacity(0.06))
-        .cornerRadius(8)
-    }
-
-    private func auditResultRow(icon: String, label: String, count: Int, color: Color) -> some View {
-        HStack(spacing: 6) {
-            Image(systemName: icon)
-                .font(.caption)
-                .foregroundColor(color)
-                .frame(width: 16)
-            Text(label)
-                .font(.caption)
-            Spacer()
-            Text("\(count)건")
-                .font(.caption)
-                .monospacedDigit()
-                .foregroundColor(.secondary)
-        }
     }
 
     // MARK: - Interactive Stat Button
@@ -395,116 +250,6 @@ struct DashboardView: View {
             await MainActor.run {
                 urgentFolderCount = snapshot
                 healthScanTask = nil
-            }
-        }
-    }
-
-    // MARK: - Vault Check (Audit + Repair + Enrich + MOC)
-
-    private func runVaultCheck() {
-        guard !isVaultChecking else { return }
-        isVaultChecking = true
-        vaultCheckResult = nil
-        let root = appState.pkmRootPath
-
-        vaultCheckTask?.cancel()
-        vaultCheckTask = Task.detached(priority: .utility) {
-            defer {
-                Task { @MainActor in
-                    isVaultChecking = false
-                    vaultCheckTask = nil
-                }
-            }
-            var repairCount = 0
-            var enrichCount = 0
-
-            StatisticsService.recordActivity(
-                fileName: "볼트 점검",
-                category: "system",
-                action: "started",
-                detail: "오류 검사 · 메타데이터 보완 · MOC 갱신"
-            )
-
-            // 1. Audit
-            await MainActor.run { vaultCheckPhase = "오류 검사 중..." }
-            let auditor = VaultAuditor(pkmRoot: root)
-            let report = auditor.audit()
-            if Task.isCancelled { return }
-
-            // 2. Auto-repair
-            if report.totalIssues > 0 {
-                await MainActor.run { vaultCheckPhase = "자동 복구 중..." }
-                let repair = auditor.repair(report: report)
-                repairCount = repair.linksFixed + repair.frontmatterInjected + repair.paraFixed
-            }
-            if Task.isCancelled { return }
-
-            // 3. Enrich metadata
-            await MainActor.run { vaultCheckPhase = "메타데이터 보완 중..." }
-            let enricher = NoteEnricher(pkmRoot: root)
-            let pm = PKMPathManager(root: root)
-            let fm = FileManager.default
-            for basePath in [pm.projectsPath, pm.areaPath, pm.resourcePath] {
-                if Task.isCancelled { return }
-                guard let folders = try? fm.contentsOfDirectory(atPath: basePath) else { continue }
-                for folder in folders where !folder.hasPrefix(".") && !folder.hasPrefix("_") {
-                    if Task.isCancelled { return }
-                    let folderPath = (basePath as NSString).appendingPathComponent(folder)
-                    let results = await enricher.enrichFolder(at: folderPath)
-                    enrichCount += results.filter { $0.fieldsUpdated > 0 }.count
-                }
-            }
-
-            // 4. MOC regenerate — count PARA folders for progress visibility
-            var folderCount = 0
-            for basePath in [pm.projectsPath, pm.areaPath, pm.resourcePath] {
-                if Task.isCancelled { return }
-                if let entries = try? fm.contentsOfDirectory(atPath: basePath) {
-                    for entry in entries where !entry.hasPrefix(".") && !entry.hasPrefix("_") {
-                        let fullPath = (basePath as NSString).appendingPathComponent(entry)
-                        var isDir: ObjCBool = false
-                        if fm.fileExists(atPath: fullPath, isDirectory: &isDir), isDir.boolValue {
-                            folderCount += 1
-                        }
-                    }
-                }
-            }
-            let folderCountSnapshot = folderCount
-            await MainActor.run { vaultCheckPhase = "\(folderCountSnapshot)개 폴더 요약 갱신 중..." }
-            let generator = MOCGenerator(pkmRoot: root)
-            await generator.regenerateAll()
-            if Task.isCancelled { return }
-
-            // 5. Semantic linking
-            await MainActor.run { vaultCheckPhase = "노트 간 시맨틱 연결 중..." }
-            let linker = SemanticLinker(pkmRoot: root)
-            let linkResult = await linker.linkAll { progress, status in
-                Task { @MainActor in
-                    vaultCheckPhase = status
-                }
-            }
-            let semanticLinksCreated = linkResult.linksCreated
-
-            StatisticsService.recordActivity(
-                fileName: "볼트 점검",
-                category: "system",
-                action: "completed",
-                detail: "\(report.totalIssues)건 발견, \(repairCount)건 복구, \(enrichCount)개 보완, \(semanticLinksCreated)개 링크"
-            )
-
-            let snapshot = VaultCheckResult(
-                brokenLinks: report.brokenLinks.count,
-                missingFrontmatter: report.missingFrontmatter.count,
-                missingPARA: report.missingPARA.count,
-                untaggedFiles: report.untaggedFiles.count,
-                repairCount: repairCount,
-                enrichCount: enrichCount,
-                mocUpdated: true,
-                linksCreated: semanticLinksCreated
-            )
-            await MainActor.run {
-                vaultCheckResult = snapshot
-                refreshStats()
             }
         }
     }
@@ -607,21 +352,6 @@ struct DashboardView: View {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd HH:mm"
         return formatter.string(from: date)
-    }
-}
-
-private struct VaultCheckResult {
-    let brokenLinks: Int
-    let missingFrontmatter: Int
-    let missingPARA: Int
-    let untaggedFiles: Int
-    let repairCount: Int
-    let enrichCount: Int
-    let mocUpdated: Bool
-    let linksCreated: Int
-
-    var auditTotal: Int {
-        brokenLinks + missingFrontmatter + missingPARA
     }
 }
 
