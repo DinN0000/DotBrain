@@ -97,6 +97,54 @@ struct LinkAIFilter: Sendable {
         return parseSingleResponse(response, candidates: candidates, maxResults: maxResults)
     }
 
+    // MARK: - Context-Only Generation (same-folder auto-link)
+
+    struct SiblingInfo {
+        let name: String
+        let summary: String
+        let tags: [String]
+    }
+
+    func generateContextOnly(
+        notes: [(name: String, summary: String, tags: [String], siblings: [SiblingInfo])]
+    ) async throws -> [[FilteredLink]] {
+        guard !notes.isEmpty else { return [] }
+
+        let noteDescriptions = notes.enumerated().map { (i, note) in
+            let siblingList = note.siblings.enumerated().map { (j, s) in
+                "  [\(j)] \(s.name) — \(s.tags.prefix(3).joined(separator: ", ")) — \(s.summary)"
+            }.joined(separator: "\n")
+
+            return """
+            ### 노트 \(i): \(note.name)
+            태그: \(note.tags.joined(separator: ", "))
+            요약: \(note.summary)
+            형제:
+            \(siblingList)
+            """
+        }.joined(separator: "\n\n")
+
+        let prompt = """
+        다음 노트들은 같은 폴더에 있는 문서입니다.
+        각 노트의 형제 노트에 대해 연결 맥락을 작성하세요.
+
+        \(noteDescriptions)
+
+        ## 규칙
+        1. 모든 형제에 대해 반드시 context를 작성 (건너뛰기 불가)
+        2. context: "~하려면", "~할 때", "~와 비교할 때" 형식 (한국어, 15자 이내)
+        3. relation: prerequisite / project / reference / related 중 하나
+
+        ## 응답 (순수 JSON, 코드블록 없이)
+        [{"noteIndex": 0, "links": [{"index": 0, "context": "~할 때 참고", "relation": "project"}]}]
+        """
+
+        let response = try await aiService.sendFast(maxTokens: 2048, message: prompt)
+        StatisticsService.addApiCost(Double(notes.count) * 0.0003)
+
+        return parseContextOnlyResponse(response, notes: notes)
+    }
+
     // MARK: - Parsing
 
     private func parseSingleResponse(
@@ -164,6 +212,62 @@ struct LinkAIFilter: Sendable {
             }
             results[item.noteIndex] = links
         }
+        return results
+    }
+
+    private func parseContextOnlyResponse(
+        _ text: String,
+        notes: [(name: String, summary: String, tags: [String], siblings: [SiblingInfo])]
+    ) -> [[FilteredLink]] {
+        let cleaned = stripCodeBlock(text)
+
+        guard let startBracket = cleaned.firstIndex(of: "["),
+              let endBracket = cleaned.lastIndex(of: "]") else {
+            // Fallback: generate default context for all siblings
+            return notes.map { note in
+                note.siblings.map { FilteredLink(name: $0.name, context: "같은 폴더 문서", relation: "related") }
+            }
+        }
+
+        let jsonStr = String(cleaned[startBracket...endBracket])
+        guard let data = jsonStr.data(using: .utf8) else {
+            return notes.map { note in
+                note.siblings.map { FilteredLink(name: $0.name, context: "같은 폴더 문서", relation: "related") }
+            }
+        }
+
+        struct LinkItem: Decodable { let index: Int; let context: String?; let relation: String? }
+        struct NoteItem: Decodable { let noteIndex: Int; let links: [LinkItem]? }
+
+        guard let items = try? JSONDecoder().decode([NoteItem].self, from: data) else {
+            return notes.map { note in
+                note.siblings.map { FilteredLink(name: $0.name, context: "같은 폴더 문서", relation: "related") }
+            }
+        }
+
+        var results: [[FilteredLink]] = notes.map { note in
+            // Default: all siblings with fallback context
+            note.siblings.map { FilteredLink(name: $0.name, context: "같은 폴더 문서", relation: "related") }
+        }
+
+        for item in items {
+            guard item.noteIndex >= 0, item.noteIndex < notes.count else { continue }
+            let siblings = notes[item.noteIndex].siblings
+            guard let links = item.links else { continue }
+
+            var merged = results[item.noteIndex]
+            for link in links {
+                guard link.index >= 0, link.index < siblings.count else { continue }
+                // Overwrite fallback with AI-generated context
+                merged[link.index] = FilteredLink(
+                    name: siblings[link.index].name,
+                    context: link.context ?? "같은 폴더 문서",
+                    relation: Self.validRelation(link.relation)
+                )
+            }
+            results[item.noteIndex] = merged
+        }
+
         return results
     }
 
