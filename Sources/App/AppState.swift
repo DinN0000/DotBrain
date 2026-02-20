@@ -245,7 +245,7 @@ final class AppState: ObservableObject {
                 fileName: "볼트 점검",
                 category: "system",
                 action: "started",
-                detail: "오류 검사 · 메타데이터 보완 · MOC 갱신"
+                detail: "오류 검사 · 메타데이터 보완 · 인덱스 갱신"
             )
 
             // Load content hash cache for incremental processing
@@ -361,7 +361,7 @@ final class AppState: ObservableObject {
                 }
             }
 
-            // Update hashes for all changed files (including MOC/SemanticLinker modifications) and save
+            // Update hashes for all changed files (including index/SemanticLinker modifications) and save
             await cache.updateHashes(Array(allChangedFiles))
             await cache.save()
 
