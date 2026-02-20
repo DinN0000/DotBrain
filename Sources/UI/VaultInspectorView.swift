@@ -750,6 +750,15 @@ struct VaultInspectorView: View {
                 let result = try await reorganizer.scan()
                 if Task.isCancelled { return }
 
+                // Update hash cache for scanned files so health dots refresh
+                let scannedPaths = result.files.map { $0.filePath }
+                if !scannedPaths.isEmpty {
+                    let cache = ContentHashCache(pkmRoot: root)
+                    await cache.load()
+                    await cache.updateHashes(scannedPaths)
+                    await cache.save()
+                }
+
                 await MainActor.run {
                     analyses = result.files
                     appState.viewTaskActive = false
@@ -797,6 +806,15 @@ struct VaultInspectorView: View {
                 let executionResults = try await reorganizer.execute(plan: selected)
                 if Task.isCancelled { return }
 
+                // Update hash cache for moved files (new paths)
+                let movedPaths = executionResults.filter(\.isSuccess).map { $0.targetPath }
+                if !movedPaths.isEmpty {
+                    let cache = ContentHashCache(pkmRoot: root)
+                    await cache.load()
+                    await cache.updateHashes(movedPaths)
+                    await cache.save()
+                }
+
                 await MainActor.run {
                     appState.viewTaskActive = false
                     reorgResults = executionResults
@@ -832,74 +850,91 @@ private struct VaultFolderRow: View {
     let action: () -> Void
     @State private var isHovered = false
 
+    private var hasHealthIssue: Bool {
+        folder.healthRatio <= 0.8
+    }
+
     private var healthColor: Color {
         if folder.healthRatio > 0.8 { return .green }
         if folder.healthRatio > 0.5 { return .orange }
         return .red
     }
 
-    private var healthTooltip: String {
-        var parts: [String] = []
-        if folder.modifiedCount > 0 {
-            parts.append("변경 \(folder.modifiedCount)개")
-        }
-        if folder.newCount > 0 {
-            parts.append("신규 \(folder.newCount)개")
-        }
-        let detail = parts.joined(separator: ", ")
-        if folder.healthRatio <= 0.5 {
-            return "\(detail) — 정리가 필요합니다"
-        }
-        return "\(detail) — 재배치를 권장합니다"
-    }
-
     var body: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "folder")
-                .font(.system(size: 13))
-                .foregroundColor(folder.category.color)
-                .frame(width: 16)
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 8) {
+                Image(systemName: "folder")
+                    .font(.system(size: 13))
+                    .foregroundColor(folder.category.color)
+                    .frame(width: 16)
 
-            VStack(alignment: .leading, spacing: 1) {
-                Text(folder.name)
-                    .font(.caption)
-                    .fontWeight(.medium)
-                    .lineLimit(1)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(folder.name)
+                        .font(.caption)
+                        .fontWeight(.medium)
+                        .lineLimit(1)
 
-                if folder.modifiedCount > 0 || folder.newCount > 0 {
-                    HStack(spacing: 4) {
-                        if folder.modifiedCount > 0 {
-                            Text("변경 \(folder.modifiedCount)")
-                                .font(.caption2)
-                                .foregroundColor(.orange)
-                        }
-                        if folder.newCount > 0 {
-                            Text("신규 \(folder.newCount)")
-                                .font(.caption2)
-                                .foregroundColor(.blue)
+                    if folder.modifiedCount > 0 || folder.newCount > 0 {
+                        HStack(spacing: 4) {
+                            if folder.modifiedCount > 0 {
+                                Text("변경 \(folder.modifiedCount)")
+                                    .font(.caption2)
+                                    .foregroundColor(.orange)
+                            }
+                            if folder.newCount > 0 {
+                                Text("신규 \(folder.newCount)")
+                                    .font(.caption2)
+                                    .foregroundColor(.blue)
+                            }
                         }
                     }
                 }
+
+                Spacer()
+
+                if hasHealthIssue {
+                    Circle()
+                        .fill(healthColor)
+                        .frame(width: 6, height: 6)
+                }
+
+                Text("\(folder.fileCount)")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(
+                        Capsule()
+                            .fill(Color.secondary.opacity(0.12))
+                    )
             }
 
-            Spacer()
+            // Hover detail: show health issues inline below the row
+            if isHovered && hasHealthIssue {
+                HStack(spacing: 6) {
+                    Image(systemName: "exclamationmark.triangle")
+                        .font(.system(size: 9))
+                        .foregroundColor(healthColor)
 
-            if folder.healthRatio <= 0.8 {
-                Circle()
-                    .fill(healthColor)
-                    .frame(width: 6, height: 6)
-                    .help(healthTooltip)
+                    if folder.modifiedCount > 0 {
+                        Text("변경 \(folder.modifiedCount)개")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
+                    if folder.newCount > 0 {
+                        Text("신규 \(folder.newCount)개")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
+
+                    Text(folder.healthRatio <= 0.5 ? "정리 필요" : "점검 권장")
+                        .font(.caption2)
+                        .foregroundColor(healthColor)
+                }
+                .padding(.leading, 28)
+                .padding(.top, 2)
+                .transition(.opacity.combined(with: .move(edge: .top)))
             }
-
-            Text("\(folder.fileCount)")
-                .font(.caption)
-                .foregroundColor(.secondary)
-                .padding(.horizontal, 6)
-                .padding(.vertical, 2)
-                .background(
-                    Capsule()
-                        .fill(Color.secondary.opacity(0.12))
-                )
         }
         .padding(.vertical, 4)
         .padding(.horizontal, 8)
@@ -909,7 +944,7 @@ private struct VaultFolderRow: View {
         )
         .contentShape(Rectangle())
         .onTapGesture { action() }
-        .animation(.easeOut(duration: 0.12), value: isHovered)
+        .animation(.easeOut(duration: 0.15), value: isHovered)
         .onHover { isHovered = $0 }
     }
 }
