@@ -24,7 +24,9 @@ struct LinkCandidateGenerator: Sendable {
         for note: NoteInfo,
         allNotes: [NoteInfo],
         mocEntries: [ContextMapEntry],
-        maxCandidates: Int = 10
+        maxCandidates: Int = 10,
+        folderBonus: Double = 1.0,
+        excludeSameFolder: Bool = false
     ) -> [Candidate] {
         var mocFolders: [String: Set<String>] = [:]
         for entry in mocEntries {
@@ -39,6 +41,7 @@ struct LinkCandidateGenerator: Sendable {
         for other in allNotes {
             guard other.name != note.name else { continue }
             guard !note.existingRelated.contains(other.name) else { continue }
+            if excludeSameFolder && other.folderName == note.folderName { continue }
 
             var score: Double = 0
 
@@ -53,7 +56,7 @@ struct LinkCandidateGenerator: Sendable {
             let otherFolders = mocFolders[other.name] ?? []
             let sharedFolders = noteFolders.intersection(otherFolders)
             if !sharedFolders.isEmpty {
-                score += Double(sharedFolders.count) * 1.0
+                score += Double(sharedFolders.count) * folderBonus
             }
 
             if let noteProject = note.project, !noteProject.isEmpty,
