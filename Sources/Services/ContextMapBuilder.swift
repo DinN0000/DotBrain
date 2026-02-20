@@ -1,149 +1,50 @@
 import Foundation
 
-/// Builds a VaultContextMap by parsing all MOC files (pure file I/O, no AI calls)
+/// Builds a VaultContextMap from note-index.json (pure file I/O, no AI calls)
 struct ContextMapBuilder: Sendable {
     let pkmRoot: String
 
-    private var pathManager: PKMPathManager {
-        PKMPathManager(root: pkmRoot)
+    private var indexPath: String {
+        ((pkmRoot as NSString).appendingPathComponent("_meta") as NSString)
+            .appendingPathComponent("note-index.json")
     }
 
-    /// Build context map from all MOC files across PARA categories
+    /// Build context map from note index
     func build() async -> VaultContextMap {
-        let categories: [(PARACategory, String)] = [
-            (.project, pathManager.projectsPath),
-            (.area, pathManager.areaPath),
-            (.resource, pathManager.resourcePath),
-            (.archive, pathManager.archivePath),
-        ]
-
-        let fm = FileManager.default
-        var folderTasks: [(para: PARACategory, folderPath: String, folderName: String)] = []
-
-        for (para, basePath) in categories {
-            guard let folders = try? fm.contentsOfDirectory(atPath: basePath) else { continue }
-            for folder in folders {
-                guard !folder.hasPrefix("."), !folder.hasPrefix("_") else { continue }
-                let folderPath = (basePath as NSString).appendingPathComponent(folder)
-                var isDir: ObjCBool = false
-                guard fm.fileExists(atPath: folderPath, isDirectory: &isDir), isDir.boolValue else { continue }
-                folderTasks.append((para: para, folderPath: folderPath, folderName: folder))
-            }
+        guard let data = try? Data(contentsOf: URL(fileURLWithPath: indexPath)),
+              let index = try? JSONDecoder().decode(NoteIndex.self, from: data) else {
+            return VaultContextMap(entries: [], folderCount: 0, buildDate: Date())
         }
 
-        // Parse all MOC files in parallel
-        let allEntries: [ContextMapEntry] = await withTaskGroup(
-            of: [ContextMapEntry].self,
-            returning: [ContextMapEntry].self
-        ) { group in
-            var nextIndex = 0
-            let maxConcurrent = 3
+        var entries: [ContextMapEntry] = []
 
-            while nextIndex < min(maxConcurrent, folderTasks.count) {
-                let task = folderTasks[nextIndex]
-                group.addTask {
-                    return self.parseMOC(
-                        folderPath: task.folderPath,
-                        folderName: task.folderName,
-                        para: task.para
-                    )
-                }
-                nextIndex += 1
+        for (noteName, note) in index.notes {
+            let para = PARACategory(rawValue: note.para) ?? .archive
+            let folder = index.folders[note.folder]
+
+            // Extract note name from path (remove folder prefix and .md suffix)
+            let baseName: String
+            if let lastSlash = noteName.lastIndex(of: "/") {
+                let fileName = String(noteName[noteName.index(after: lastSlash)...])
+                baseName = (fileName as NSString).deletingPathExtension
+            } else {
+                baseName = (noteName as NSString).deletingPathExtension
             }
 
-            var collected: [ContextMapEntry] = []
-            for await entries in group {
-                collected.append(contentsOf: entries)
-                if nextIndex < folderTasks.count {
-                    let task = folderTasks[nextIndex]
-                    group.addTask {
-                        return self.parseMOC(
-                            folderPath: task.folderPath,
-                            folderName: task.folderName,
-                            para: task.para
-                        )
-                    }
-                    nextIndex += 1
-                }
-            }
-            return collected
+            entries.append(ContextMapEntry(
+                noteName: baseName,
+                summary: note.summary,
+                folderName: note.folder,
+                para: para,
+                folderSummary: folder?.summary ?? "",
+                tags: folder?.tags ?? []
+            ))
         }
 
         return VaultContextMap(
-            entries: allEntries,
-            folderCount: folderTasks.count,
+            entries: entries,
+            folderCount: index.folders.count,
             buildDate: Date()
         )
-    }
-
-    /// Parse a single MOC file to extract document entries
-    private func parseMOC(folderPath: String, folderName: String, para: PARACategory) -> [ContextMapEntry] {
-        let mocPath = (folderPath as NSString).appendingPathComponent("\(folderName).md")
-
-        guard let content = try? String(contentsOfFile: mocPath, encoding: .utf8) else {
-            return []
-        }
-
-        let (frontmatter, body) = Frontmatter.parse(markdown: content)
-        let folderTags = frontmatter.tags
-        let folderSummary = frontmatter.summary ?? ""
-
-        // Parse "## 문서 목록" section for [[WikiLink]] — summary entries
-        var entries: [ContextMapEntry] = []
-        var inDocSection = false
-
-        for line in body.components(separatedBy: "\n") {
-            let trimmedLine = line.trimmingCharacters(in: .whitespaces)
-
-            if trimmedLine.hasPrefix("## 문서 목록") {
-                inDocSection = true
-                continue
-            }
-
-            // Another ## heading ends the document section
-            if trimmedLine.hasPrefix("## ") && inDocSection {
-                break
-            }
-
-            if inDocSection, trimmedLine.hasPrefix("- [[") {
-                if let (noteName, summary) = parseDocListEntry(trimmedLine) {
-                    entries.append(ContextMapEntry(
-                        noteName: noteName,
-                        summary: summary,
-                        folderName: folderName,
-                        para: para,
-                        folderSummary: folderSummary,
-                        tags: folderTags
-                    ))
-                }
-            }
-        }
-
-        return entries
-    }
-
-    /// Parse a single doc list entry: "- [[NoteName]] — summary" or "- [[NoteName]]"
-    private func parseDocListEntry(_ line: String) -> (name: String, summary: String)? {
-        // Extract text between [[ and ]]
-        guard let startRange = line.range(of: "[["),
-              let endRange = line.range(of: "]]") else {
-            return nil
-        }
-
-        let noteName = String(line[startRange.upperBound..<endRange.lowerBound])
-        guard !noteName.isEmpty else { return nil }
-
-        // Extract summary after " — " if present
-        let afterLink = String(line[endRange.upperBound...]).trimmingCharacters(in: .whitespaces)
-        let summary: String
-        if afterLink.hasPrefix("—") || afterLink.hasPrefix("—") {
-            summary = afterLink.dropFirst().trimmingCharacters(in: .whitespaces)
-        } else if afterLink.hasPrefix("-") {
-            summary = afterLink.dropFirst().trimmingCharacters(in: .whitespaces)
-        } else {
-            summary = ""
-        }
-
-        return (name: noteName, summary: summary)
     }
 }

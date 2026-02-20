@@ -419,8 +419,8 @@ struct PARAManageView: View {
             statusMessage = "'\(name)' -> \(target.displayName) (\(count)개 노트 갱신)"
             loadFolders()
             clearStatusAfterDelay()
-            refreshMOC(folderName: name, category: target)
-            refreshCategoryMOC(source)
+            refreshIndex(folderName: name, category: target)
+            refreshCategoryIndex(source)
         } catch {
             isStatusError = true
             statusMessage = error.localizedDescription
@@ -470,7 +470,7 @@ struct PARAManageView: View {
             newFolderCategory = nil
             loadFolders()
             clearStatusAfterDelay()
-            refreshCategoryMOC(category)
+            refreshCategoryIndex(category)
         } catch {
             isStatusError = true
             statusMessage = error.localizedDescription
@@ -486,8 +486,8 @@ struct PARAManageView: View {
             statusMessage = "'\(name)' 완료 -> 아카이브 (\(count)개 노트 갱신)"
             loadFolders()
             clearStatusAfterDelay()
-            refreshCategoryMOC(.project)
-            refreshMOC(folderName: name, category: .archive)
+            refreshCategoryIndex(.project)
+            refreshIndex(folderName: name, category: .archive)
         } catch {
             isStatusError = true
             statusMessage = error.localizedDescription
@@ -503,8 +503,8 @@ struct PARAManageView: View {
             statusMessage = "'\(name)' 재활성화됨 (\(count)개 노트 갱신)"
             loadFolders()
             clearStatusAfterDelay()
-            refreshCategoryMOC(.archive)
-            refreshMOC(folderName: name, category: .project)
+            refreshCategoryIndex(.archive)
+            refreshIndex(folderName: name, category: .project)
         } catch {
             isStatusError = true
             statusMessage = error.localizedDescription
@@ -522,8 +522,8 @@ struct PARAManageView: View {
             statusMessage = "'\(oldName)' -> '\(trimmed)' (\(count)개 노트 갱신)"
             loadFolders()
             clearStatusAfterDelay()
-            refreshMOC(folderName: trimmed, category: category)
-            refreshCategoryMOC(category)
+            refreshIndex(folderName: trimmed, category: category)
+            refreshCategoryIndex(category)
         } catch {
             isStatusError = true
             statusMessage = error.localizedDescription
@@ -539,7 +539,7 @@ struct PARAManageView: View {
             statusMessage = "'\(name)' 삭제됨 (휴지통)"
             loadFolders()
             clearStatusAfterDelay()
-            refreshCategoryMOC(category)
+            refreshCategoryIndex(category)
         } catch {
             isStatusError = true
             statusMessage = error.localizedDescription
@@ -555,8 +555,8 @@ struct PARAManageView: View {
             statusMessage = "'\(source)' -> '\(target)' 병합 (\(count)개 파일)"
             loadFolders()
             clearStatusAfterDelay()
-            refreshMOC(folderName: target, category: category)
-            refreshCategoryMOC(category)
+            refreshIndex(folderName: target, category: category)
+            refreshCategoryIndex(category)
         } catch {
             isStatusError = true
             statusMessage = error.localizedDescription
@@ -579,24 +579,35 @@ struct PARAManageView: View {
         NSWorkspace.shared.open(safeURL)
     }
 
-    private func refreshMOC(folderName: String, category: PARACategory) {
+    private func refreshIndex(folderName: String, category: PARACategory) {
         let root = appState.pkmRootPath
         Task.detached(priority: .utility) {
-            let moc = MOCGenerator(pkmRoot: root)
             let pathManager = PKMPathManager(root: root)
             let basePath = pathManager.paraPath(for: category)
             let folderPath = (basePath as NSString).appendingPathComponent(folderName)
-            try? await moc.generateMOC(folderPath: folderPath, folderName: folderName, para: category)
-            try? await moc.generateCategoryRootMOC(basePath: basePath, para: category)
+            let indexGenerator = NoteIndexGenerator(pkmRoot: root)
+            await indexGenerator.updateForFolders([folderPath])
         }
     }
 
-    private func refreshCategoryMOC(_ category: PARACategory) {
+    private func refreshCategoryIndex(_ category: PARACategory) {
         let root = appState.pkmRootPath
         Task.detached(priority: .utility) {
-            let moc = MOCGenerator(pkmRoot: root)
-            let basePath = PKMPathManager(root: root).paraPath(for: category)
-            try? await moc.generateCategoryRootMOC(basePath: basePath, para: category)
+            let pathManager = PKMPathManager(root: root)
+            let basePath = pathManager.paraPath(for: category)
+            let fm = FileManager.default
+            guard let folders = try? fm.contentsOfDirectory(atPath: basePath) else { return }
+            var folderPaths: Set<String> = []
+            for folder in folders {
+                guard !folder.hasPrefix("."), !folder.hasPrefix("_") else { continue }
+                let folderPath = (basePath as NSString).appendingPathComponent(folder)
+                var isDir: ObjCBool = false
+                if fm.fileExists(atPath: folderPath, isDirectory: &isDir), isDir.boolValue {
+                    folderPaths.insert(folderPath)
+                }
+            }
+            let indexGenerator = NoteIndexGenerator(pkmRoot: root)
+            await indexGenerator.updateForFolders(folderPaths)
         }
     }
 

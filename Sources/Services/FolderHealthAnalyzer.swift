@@ -84,7 +84,7 @@ struct FolderHealthAnalyzer {
             issues.append(.lowTagDiversity(uniqueTags: uniqueTagCount, fileCount: mdFiles.count))
         }
 
-        // Issue: No index/MOC note for the folder
+        // Issue: No index note for the folder
         let indexNotePath = (folderPath as NSString).appendingPathComponent(indexNoteName)
         if !fm.fileExists(atPath: indexNotePath) {
             issues.append(.noIndexNote)
