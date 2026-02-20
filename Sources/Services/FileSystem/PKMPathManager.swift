@@ -12,6 +12,8 @@ struct PKMPathManager {
     var areaPath: String { (root as NSString).appendingPathComponent("2_Area") }
     var resourcePath: String { (root as NSString).appendingPathComponent("3_Resource") }
     var archivePath: String { (root as NSString).appendingPathComponent("4_Archive") }
+    var metaPath: String { (root as NSString).appendingPathComponent("_meta") }
+    var noteIndexPath: String { (metaPath as NSString).appendingPathComponent("note-index.json") }
 
     /// Get the base path for a PARA category
     func paraPath(for category: PARACategory) -> String {
@@ -121,7 +123,7 @@ struct PKMPathManager {
     func initializeStructure() throws {
         let fm = FileManager.default
         let folders = [inboxPath, projectsPath, areaPath, resourcePath, archivePath,
-                       documentsAssetsPath, imagesAssetsPath]
+                       documentsAssetsPath, imagesAssetsPath, metaPath]
         for folder in folders {
             try fm.createDirectory(atPath: folder, withIntermediateDirectories: true)
         }
