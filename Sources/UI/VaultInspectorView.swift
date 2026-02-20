@@ -56,6 +56,7 @@ struct VaultInspectorView: View {
         let fileCount: Int
         let modifiedCount: Int
         let newCount: Int
+        let summary: String
 
         var healthRatio: Double {
             guard fileCount > 0 else { return 1.0 }
@@ -172,7 +173,7 @@ struct VaultInspectorView: View {
         }
     }
 
-    // folderSection removed — rows are now flat inside LazyVStack for true lazy rendering
+    // folderSection/folderContextMenu removed — flat LazyVStack for scroll performance
 
     // MARK: - Folder Menu (NSMenu popup, matching PARAManageView)
 
@@ -673,13 +674,24 @@ struct VaultInspectorView: View {
                     default: break
                     }
                 }
+                // Read summary from index note
+                let indexPath = (folderPath as NSString).appendingPathComponent("\(info.name).md")
+                let summary: String
+                if let content = try? String(contentsOfFile: indexPath, encoding: .utf8) {
+                    let (frontmatter, _) = Frontmatter.parse(markdown: content)
+                    summary = frontmatter.summary ?? ""
+                } else {
+                    summary = ""
+                }
+
                 result.append(FolderInfo(
                     name: info.name,
                     path: folderPath,
                     category: info.category,
                     fileCount: fileCount,
                     modifiedCount: modifiedCount,
-                    newCount: newCount
+                    newCount: newCount,
+                    summary: summary
                 ))
             }
 
@@ -831,10 +843,7 @@ struct VaultInspectorView: View {
 private struct VaultFolderRow: View {
     let folder: VaultInspectorView.FolderInfo
     let action: () -> Void
-
-    private var hasHealthIssue: Bool {
-        folder.healthRatio <= 0.8
-    }
+    @State private var isHovered = false
 
     private var healthColor: Color {
         if folder.healthRatio > 0.8 { return .green }
@@ -842,11 +851,20 @@ private struct VaultFolderRow: View {
         return .red
     }
 
-    private var healthTooltip: String {
+    private var hasHealthIssue: Bool {
+        folder.healthRatio <= 0.8
+    }
+
+    private var healthIssues: String {
         var parts: [String] = []
         if folder.modifiedCount > 0 { parts.append("변경 \(folder.modifiedCount)개") }
         if folder.newCount > 0 { parts.append("신규 \(folder.newCount)개") }
-        return parts.joined(separator: ", ") + " — 클릭하여 정리"
+        if folder.healthRatio <= 0.5 {
+            parts.append("정리 필요")
+        } else {
+            parts.append("점검 권장")
+        }
+        return parts.joined(separator: " · ")
     }
 
     var body: some View {
@@ -857,10 +875,18 @@ private struct VaultFolderRow: View {
                     .foregroundColor(folder.category.color)
                     .frame(width: 16)
 
-                Text(folder.name)
-                    .font(.caption)
-                    .fontWeight(.medium)
-                    .lineLimit(1)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(folder.name)
+                        .font(.caption)
+                        .fontWeight(.medium)
+                        .lineLimit(1)
+                    if !folder.summary.isEmpty {
+                        Text(folder.summary)
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                            .lineLimit(1)
+                    }
+                }
 
                 Spacer()
 
@@ -868,7 +894,6 @@ private struct VaultFolderRow: View {
                     Circle()
                         .fill(healthColor)
                         .frame(width: 6, height: 6)
-                        .help(healthTooltip)
                 }
 
                 Text("\(folder.fileCount)")
@@ -881,15 +906,26 @@ private struct VaultFolderRow: View {
                             .fill(Color.secondary.opacity(0.12))
                     )
             }
+
+            if hasHealthIssue {
+                Text(healthIssues)
+                    .font(.caption2)
+                    .foregroundColor(healthColor)
+                    .opacity(isHovered ? 1.0 : 0.8)
+                    .padding(.leading, 24)
+                    .padding(.top, 2)
+            }
         }
         .padding(.vertical, 4)
         .padding(.horizontal, 8)
         .background(
             RoundedRectangle(cornerRadius: 6)
-                .fill(Color.primary.opacity(0.02))
+                .fill(isHovered ? Color.primary.opacity(0.04) : Color.primary.opacity(0.02))
         )
         .contentShape(Rectangle())
         .onTapGesture { action() }
+        .animation(.easeOut(duration: 0.12), value: isHovered)
+        .onHover { isHovered = $0 }
     }
 }
 
