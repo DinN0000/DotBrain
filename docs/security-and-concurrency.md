@@ -20,9 +20,7 @@ func isPathSafe(_ path: String) -> Bool {
 
 **규칙**: 심볼릭 링크를 먼저 해석한 후 `hasPrefix`로 비교. 슬래시 정규화 포함.
 
-**호출 위치**: `FileMover.moveFile()`, `FileMover.moveFolder()`, `FolderReorganizer.process()`, `ProjectManager.createProject()`, `PARAMover.moveFolder()`, `ProjectContextBuilder.buildProjectContext()`
-
-**UI 레이어 직접 사용** (`resolvingSymlinksInPath()`): `AppState` (폴더 선택 검증), `PARAManageView` (폴더 삭제), `SettingsView` (PKM 루트 선택), `InboxStatusView` (폴더 선택)
+**호출 위치**: `FileMover.moveFile()`, `FileMover.moveFolder()`, `FolderReorganizer.process()`, `ProjectManager.createProject()`, `PARAMover.moveFolder()`, `ContentHashCache.checkFile()`, `ContentHashCache.checkFolder()`, `VaultReorganizer.collectFiles()`
 
 ### sanitizeFolderName()
 
@@ -82,7 +80,7 @@ HKDF<SHA256>.deriveKey(
 AES-GCM.seal(keyData, using: derivedKey)
         │
         ▼
-~/Library/Application Support/com.hwaa.dotbrain/keys.enc  (chmod 0o600)
+~/.local/share/com.hwaa.dotbrain/keys.enc  (chmod 0o600)
 ```
 
 | 레이어 | 기술 |
@@ -108,6 +106,8 @@ V1 (SHA256 hash) → V2 (HKDF-SHA256) 자동 마이그레이션. V1 키로 복�
 | `RateLimiter` | `Sources/Services/RateLimiter.swift` | 프로바이더별 rate limit 상태 |
 | `ClaudeAPIClient` | `Sources/Services/Claude/ClaudeAPIClient.swift` | URLSession, API 통신 |
 | `GeminiAPIClient` | `Sources/Services/Gemini/GeminiAPIClient.swift` | URLSession, API 통신 |
+| `ContentHashCache` | `Sources/Services/ContentHashCache.swift` | SHA256 해시 캐시 (JSON 파일 I/O) |
+| `APIUsageLogger` | `Sources/Services/APIUsageLogger.swift` | 토큰 사용량 로그 (JSON 파일 I/O) |
 
 ### RateLimiter 상세
 
@@ -167,15 +167,12 @@ Task.detached(priority: .utility) {
 
 | priority | 사용처 |
 |----------|--------|
-| `.userInitiated` | 사용자 반응성이 필요한 작업 (볼트 검색) |
 | `.utility` | 일회성 백그라운드 작업 (에셋 마이그레이션, 볼트 감사) |
 | 미지정 (기본) | 일반 파이프라인 작업 |
 
 **패턴**: detached task 내부에서 UI 업데이트 시 반드시 `await MainActor.run` 사용.
 
 **InboxWatchdog 예외**: `DispatchSource.makeFileSystemObjectSource`는 커널 레벨 FS 이벤트 API라 GCD가 유일한 선택. 디바운스/재시도는 Task로 브릿징.
-
-**DispatchQueue.main.asyncAfter 예외**: UI 타이밍 지연이 필요한 경우 사용 (스크롤 타이밍 0.1초, 상태 메시지 자동 해제 2초, 화면 전환 딜레이 0.3초). `PARAManageView`, `InboxStatusView`, `SettingsView`에서 사용.
 
 ## TaskGroup Concurrency Patterns
 
@@ -290,10 +287,6 @@ for file in files {
 | Headings | ~30% | 모든 `##` 제목 목록 |
 | Tail | ~20% | 마지막 500자 (결론, 참고문헌) |
 
-### FileHandle Resource Management
-
-`FileHandle` 사용 시 반드시 `defer { try? handle.close() }` 패턴으로 파일 디스크립터를 해제. 누락 시 파일 디스크립터 리크 발생.
-
 ### Streaming Hash (중복 감지)
 
 `Sources/Services/FileSystem/FileMover.swift`
@@ -301,7 +294,7 @@ for file in files {
 ```swift
 func streamingHash(at path: String) -> SHA256Digest? {
     guard let handle = FileHandle(forReadingAtPath: path) else { return nil }
-    defer { try? handle.close() }  // 필수: 파일 디스크립터 리크 방지
+    defer { handle.closeFile() }
     var hasher = SHA256()
     while true {
         let chunk = handle.readData(ofLength: 1024 * 1024)  // 1MB

@@ -54,13 +54,14 @@ struct NoteEnricher: Sendable {
         tags는 최대 5개, summary는 한국어로 작성하세요.
         """
 
-        let response = try await aiService.sendFast(maxTokens: 512, message: prompt)
-
-        // Track API cost for note enrichment
-        StatisticsService.addApiCost(0.0005)  // ~$0.0005 per file for fast model
+        let response = try await aiService.sendFastWithUsage(message: prompt)
+        if let usage = response.usage {
+            let model = await aiService.fastModel
+            StatisticsService.logTokenUsage(operation: "enrich", model: model, usage: usage)
+        }
 
         // Parse AI response
-        guard let data = extractJSON(from: response),
+        guard let data = extractJSON(from: response.text),
               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
             throw EnrichError.aiParseFailed
         }

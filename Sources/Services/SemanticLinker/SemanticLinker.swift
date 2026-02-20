@@ -33,321 +33,41 @@ struct SemanticLinker: Sendable {
         let allNotes = buildNoteIndex()
         let contextMap = await ContextMapBuilder(pkmRoot: pkmRoot).build()
         let noteNames = Set(allNotes.map { $0.name })
-        let notePathMap = Dictionary(uniqueKeysWithValues: allNotes.map { ($0.name, $0.filePath) })
         onProgress?(0.2, "\(allNotes.count)개 노트 인덱스 완료")
 
         guard !allNotes.isEmpty else {
             return LinkResult(tagsNormalized: tagResult, notesLinked: 0, linksCreated: 0)
         }
 
-        let writer = RelatedNotesWriter()
-        var totalNotesLinked = 0
-        var totalLinksCreated = 0
-
-        // STEP 1: Project/Area — same-folder auto-link
-        let projectAreaNotes = allNotes.filter { $0.para == .project || $0.para == .area }
-        onProgress?(0.25, "Project/Area 자동 연결 중...")
-
-        let autoLinkCounts = await processAutoLinks(
-            notes: projectAreaNotes,
-            noteNames: noteNames,
-            notePathMap: notePathMap,
-            writer: writer,
-            notesLinked: &totalNotesLinked,
-            linksCreated: &totalLinksCreated
-        )
-
-        // STEP 2: Project/Area — cross-folder AI-filtered links (remaining slots)
-        onProgress?(0.4, "Project/Area 크로스폴더 연결 중...")
-        await processAIFilteredLinks(
-            notes: projectAreaNotes,
-            allNotes: allNotes,
-            contextMap: contextMap,
-            noteNames: noteNames,
-            notePathMap: notePathMap,
-            writer: writer,
-            folderBonus: 1.0,
-            excludeSameFolder: true,
-            existingLinkCounts: autoLinkCounts,
-            notesLinked: &totalNotesLinked,
-            linksCreated: &totalLinksCreated,
-            onProgress: { p, msg in onProgress?(0.4 + p * 0.2, msg) }
-        )
-
-        // STEP 3: Resource/Archive — standard flow with boosted folder bonus
-        let resourceArchiveNotes = allNotes.filter { $0.para == .resource || $0.para == .archive }
-        onProgress?(0.6, "Resource/Archive 연결 중...")
-        await processAIFilteredLinks(
-            notes: resourceArchiveNotes,
-            allNotes: allNotes,
-            contextMap: contextMap,
-            noteNames: noteNames,
-            notePathMap: notePathMap,
-            writer: writer,
-            folderBonus: 2.5,
-            excludeSameFolder: false,
-            existingLinkCounts: [:],
-            notesLinked: &totalNotesLinked,
-            linksCreated: &totalLinksCreated,
-            onProgress: { p, msg in onProgress?(0.6 + p * 0.35, msg) }
-        )
-
-        onProgress?(1.0, "시맨틱 링크 완료: \(totalNotesLinked)개 노트, \(totalLinksCreated)개 링크")
-        return LinkResult(tagsNormalized: tagResult, notesLinked: totalNotesLinked, linksCreated: totalLinksCreated)
-    }
-
-    func linkNotes(filePaths: [String], onProgress: ((Double, String) -> Void)? = nil) async -> LinkResult {
-        let tagResult = TagNormalizer.Result()
-
-        let allNotes = buildNoteIndex()
-        let contextMap = await ContextMapBuilder(pkmRoot: pkmRoot).build()
-        let noteNames = Set(allNotes.map { $0.name })
-        let notePathMap = Dictionary(uniqueKeysWithValues: allNotes.map { ($0.name, $0.filePath) })
-
-        let targetNames = Set(filePaths.map {
-            (($0 as NSString).lastPathComponent as NSString).deletingPathExtension
-        })
-        let targetNotes = allNotes.filter { targetNames.contains($0.name) }
-
-        guard !targetNotes.isEmpty else {
-            return LinkResult(tagsNormalized: tagResult, notesLinked: 0, linksCreated: 0)
-        }
-
-        let writer = RelatedNotesWriter()
-        let aiFilter = LinkAIFilter()
         let candidateGen = LinkCandidateGenerator()
-        var notesLinked = 0
-        var linksCreated = 0
-
-        for (i, note) in targetNotes.enumerated() {
-            let isProjectArea = note.para == .project || note.para == .area
-            var autoLinkedCount = 0
-
-            // Project/Area: auto-link same-folder siblings
-            if isProjectArea {
-                let siblings = allNotes.filter {
-                    $0.name != note.name
-                    && $0.folderName == note.folderName
-                    && !note.existingRelated.contains($0.name)
-                }
-
-                if !siblings.isEmpty {
-                    let selected = selectTopSiblings(note: note, siblings: siblings, max: 5)
-                    let siblingInfos = selected.map {
-                        LinkAIFilter.SiblingInfo(name: $0.name, summary: $0.summary, tags: $0.tags)
-                    }
-
-                    do {
-                        let results = try await aiFilter.generateContextOnly(
-                            notes: [(name: note.name, summary: note.summary, tags: note.tags, siblings: siblingInfos)]
-                        )
-                        let links = results.first ?? []
-                        if !links.isEmpty {
-                            try writer.writeRelatedNotes(filePath: note.filePath, newLinks: links, noteNames: noteNames)
-                            notesLinked += 1
-                            linksCreated += links.count
-                            autoLinkedCount = links.count
-
-                            for link in links {
-                                guard let targetPath = notePathMap[link.name] else { continue }
-                                let reverse = LinkAIFilter.FilteredLink(name: note.name, context: "\(note.name)에서 참조", relation: "related")
-                                try writer.writeRelatedNotes(filePath: targetPath, newLinks: [reverse], noteNames: noteNames)
-                                linksCreated += 1
-                            }
-                        }
-                    } catch {
-                        NSLog("[SemanticLinker] 자동 연결 실패: %@ — %@", note.name, error.localizedDescription)
-                    }
-                }
-            }
-
-            // Cross-folder or standard linking
-            let remainingSlots = 5 - autoLinkedCount
-            guard remainingSlots > 0 else {
-                let progress = Double(i + 1) / Double(targetNotes.count)
-                onProgress?(progress, "\(note.name) 연결 완료")
-                continue
-            }
-
-            let folderBonus: Double = isProjectArea ? 1.0 : 2.5
-            let excludeFolder = isProjectArea
-
-            let candidates = candidateGen.generateCandidates(
-                for: note,
-                allNotes: allNotes,
-                mocEntries: contextMap.entries,
-                maxCandidates: remainingSlots * 2,
-                folderBonus: folderBonus,
-                excludeSameFolder: excludeFolder
-            )
-
-            if !candidates.isEmpty {
-                do {
-                    let filtered = try await aiFilter.filterSingle(
-                        noteName: note.name,
-                        noteSummary: note.summary,
-                        noteTags: note.tags,
-                        candidates: candidates,
-                        maxResults: remainingSlots
-                    )
-
-                    if !filtered.isEmpty {
-                        try writer.writeRelatedNotes(filePath: note.filePath, newLinks: filtered, noteNames: noteNames)
-                        if autoLinkedCount == 0 { notesLinked += 1 }
-                        linksCreated += filtered.count
-
-                        for link in filtered {
-                            guard let targetPath = notePathMap[link.name] else { continue }
-                            let reverse = LinkAIFilter.FilteredLink(name: note.name, context: "\(note.name)에서 참조", relation: "related")
-                            try writer.writeRelatedNotes(filePath: targetPath, newLinks: [reverse], noteNames: noteNames)
-                            linksCreated += 1
-                        }
-                    }
-                } catch {
-                    NSLog("[SemanticLinker] 노트 링크 실패: %@ — %@", note.name, error.localizedDescription)
-                }
-            }
-
-            let progress = Double(i + 1) / Double(targetNotes.count)
-            onProgress?(progress, "\(note.name) 연결 완료")
-        }
-
-        return LinkResult(tagsNormalized: tagResult, notesLinked: notesLinked, linksCreated: linksCreated)
-    }
-
-    // MARK: - Same-Folder Auto-Link (Project/Area)
-
-    /// Returns a map of noteName -> number of auto-linked siblings
-    private func processAutoLinks(
-        notes: [LinkCandidateGenerator.NoteInfo],
-        noteNames: Set<String>,
-        notePathMap: [String: String],
-        writer: RelatedNotesWriter,
-        notesLinked: inout Int,
-        linksCreated: inout Int
-    ) async -> [String: Int] {
-        guard !notes.isEmpty else { return [:] }
-
-        // Group by folder
-        var folderGroups: [String: [LinkCandidateGenerator.NoteInfo]] = [:]
-        for note in notes {
-            folderGroups[note.folderName, default: []].append(note)
-        }
-
-        let aiFilter = LinkAIFilter()
-        var linkCounts: [String: Int] = [:]
-
-        // Process each folder group
-        for (_, folderNotes) in folderGroups {
-            guard folderNotes.count >= 2 else { continue }
-
-            // Build batch input: each note with its siblings
-            var batchInput: [(name: String, summary: String, tags: [String], siblings: [LinkAIFilter.SiblingInfo])] = []
-            var batchNotes: [LinkCandidateGenerator.NoteInfo] = []
-
-            for note in folderNotes {
-                let siblings = folderNotes.filter {
-                    $0.name != note.name && !note.existingRelated.contains($0.name)
-                }
-                guard !siblings.isEmpty else { continue }
-
-                let selected = selectTopSiblings(note: note, siblings: siblings, max: 5)
-                let siblingInfos = selected.map {
-                    LinkAIFilter.SiblingInfo(name: $0.name, summary: $0.summary, tags: $0.tags)
-                }
-                batchInput.append((name: note.name, summary: note.summary, tags: note.tags, siblings: siblingInfos))
-                batchNotes.append(note)
-            }
-
-            guard !batchInput.isEmpty else { continue }
-
-            // Batch AI call for context generation
-            let batches = stride(from: 0, to: batchInput.count, by: batchSize).map {
-                Array(batchInput[$0..<min($0 + batchSize, batchInput.count)])
-            }
-            let noteBatches = stride(from: 0, to: batchNotes.count, by: batchSize).map {
-                Array(batchNotes[$0..<min($0 + batchSize, batchNotes.count)])
-            }
-
-            for (batchIdx, batch) in batches.enumerated() {
-                let currentNotes = noteBatches[batchIdx]
-
-                do {
-                    let results = try await aiFilter.generateContextOnly(notes: batch)
-
-                    for (noteIdx, links) in results.enumerated() where !links.isEmpty {
-                        let note = currentNotes[noteIdx]
-                        try writer.writeRelatedNotes(filePath: note.filePath, newLinks: links, noteNames: noteNames)
-                        notesLinked += 1
-                        linksCreated += links.count
-                        linkCounts[note.name] = links.count
-
-                        // Reverse links
-                        for link in links {
-                            guard let targetPath = notePathMap[link.name] else { continue }
-                            let reverse = LinkAIFilter.FilteredLink(name: note.name, context: "\(note.name)에서 참조", relation: "related")
-                            try writer.writeRelatedNotes(filePath: targetPath, newLinks: [reverse], noteNames: noteNames)
-                            linksCreated += 1
-                        }
-                    }
-                } catch {
-                    NSLog("[SemanticLinker] 자동 연결 배치 실패: %@", error.localizedDescription)
-                }
-            }
-        }
-
-        return linkCounts
-    }
-
-    // MARK: - AI-Filtered Links (cross-folder or standard)
-
-    private func processAIFilteredLinks(
-        notes: [LinkCandidateGenerator.NoteInfo],
-        allNotes: [LinkCandidateGenerator.NoteInfo],
-        contextMap: VaultContextMap,
-        noteNames: Set<String>,
-        notePathMap: [String: String],
-        writer: RelatedNotesWriter,
-        folderBonus: Double,
-        excludeSameFolder: Bool,
-        existingLinkCounts: [String: Int],
-        notesLinked: inout Int,
-        linksCreated: inout Int,
-        onProgress: ((Double, String) -> Void)?
-    ) async {
-        let candidateGen = LinkCandidateGenerator()
-        let aiFilter = LinkAIFilter()
-
         var notesWithCandidates: [(note: LinkCandidateGenerator.NoteInfo, candidates: [LinkCandidateGenerator.Candidate])] = []
-
-        for note in notes {
-            let remainingSlots = 5 - (existingLinkCounts[note.name] ?? 0)
-            guard remainingSlots > 0 else { continue }
-
+        for note in allNotes {
             let candidates = candidateGen.generateCandidates(
                 for: note,
                 allNotes: allNotes,
-                mocEntries: contextMap.entries,
-                maxCandidates: remainingSlots * 2,
-                folderBonus: folderBonus,
-                excludeSameFolder: excludeSameFolder
+                mocEntries: contextMap.entries
             )
             if !candidates.isEmpty {
                 notesWithCandidates.append((note: note, candidates: candidates))
             }
         }
 
-        guard !notesWithCandidates.isEmpty else { return }
+        onProgress?(0.3, "\(notesWithCandidates.count)개 노트에 후보 생성 완료")
 
+        guard !notesWithCandidates.isEmpty else {
+            return LinkResult(tagsNormalized: tagResult, notesLinked: 0, linksCreated: 0)
+        }
+
+        let aiFilter = LinkAIFilter()
         let batches = stride(from: 0, to: notesWithCandidates.count, by: batchSize).map {
             Array(notesWithCandidates[$0..<min($0 + batchSize, notesWithCandidates.count)])
         }
 
-        var allLinks: [(filePath: String, noteName: String, links: [LinkAIFilter.FilteredLink], maxLinks: Int)] = []
+        var allLinks: [(filePath: String, noteName: String, links: [LinkAIFilter.FilteredLink])] = []
         let totalBatches = batches.count
         var completedBatches = 0
 
-        await withTaskGroup(of: [(filePath: String, noteName: String, links: [LinkAIFilter.FilteredLink], maxLinks: Int)].self) { group in
+        await withTaskGroup(of: [(filePath: String, noteName: String, links: [LinkAIFilter.FilteredLink])].self) { group in
             var activeTasks = 0
 
             for batch in batches {
@@ -356,11 +76,12 @@ struct SemanticLinker: Sendable {
                         allLinks.append(contentsOf: results)
                         activeTasks -= 1
                         completedBatches += 1
-                        onProgress?(Double(completedBatches) / Double(totalBatches), "AI 필터링 \(completedBatches)/\(totalBatches)")
+                        let progress = 0.3 + Double(completedBatches) / Double(totalBatches) * 0.5
+                        onProgress?(progress, "AI 필터링 \(completedBatches)/\(totalBatches) 배치")
                     }
                 }
 
-                group.addTask { [existingLinkCounts] in
+                group.addTask {
                     let batchInput = batch.map { item in
                         (name: item.note.name, summary: item.note.summary, tags: item.note.tags, candidates: item.candidates)
                     }
@@ -368,14 +89,12 @@ struct SemanticLinker: Sendable {
                     do {
                         let results = try await aiFilter.filterBatch(notes: batchInput)
                         return zip(batch, results).map { (item, links) in
-                            let maxLinks = 5 - (existingLinkCounts[item.note.name] ?? 0)
-                            let capped = Array(links.prefix(maxLinks))
-                            return (filePath: item.note.filePath, noteName: item.note.name, links: capped, maxLinks: maxLinks)
+                            (filePath: item.note.filePath, noteName: item.note.name, links: links)
                         }
                     } catch {
                         NSLog("[SemanticLinker] AI 필터 배치 실패: %@", error.localizedDescription)
                         return batch.map { item in
-                            (filePath: item.note.filePath, noteName: item.note.name, links: [LinkAIFilter.FilteredLink](), maxLinks: 0)
+                            (filePath: item.note.filePath, noteName: item.note.name, links: [LinkAIFilter.FilteredLink]())
                         }
                     }
                 }
@@ -385,12 +104,27 @@ struct SemanticLinker: Sendable {
             for await results in group {
                 allLinks.append(contentsOf: results)
                 completedBatches += 1
-                onProgress?(Double(completedBatches) / Double(totalBatches), "AI 필터링 \(completedBatches)/\(totalBatches)")
+                let progress = 0.3 + Double(completedBatches) / Double(totalBatches) * 0.5
+                onProgress?(progress, "AI 필터링 \(completedBatches)/\(totalBatches) 배치")
             }
         }
 
-        // Write forward + reverse links
+        onProgress?(0.8, "관련 노트 기록 중...")
+
+        let writer = RelatedNotesWriter()
+        let notePathMap = Dictionary(uniqueKeysWithValues: allNotes.map { ($0.name, $0.filePath) })
+
         var reverseLinks: [String: [(name: String, context: String, relation: String)]] = [:]
+        for entry in allLinks {
+            for link in entry.links {
+                let reverseContext = "\(entry.noteName)에서 참조"
+                reverseLinks[link.name, default: []].append((name: entry.noteName, context: reverseContext, relation: "related"))
+            }
+        }
+
+        var notesLinked = 0
+        var linksCreated = 0
+
         for entry in allLinks where !entry.links.isEmpty {
             do {
                 try writer.writeRelatedNotes(filePath: entry.filePath, newLinks: entry.links, noteNames: noteNames)
@@ -398,10 +132,6 @@ struct SemanticLinker: Sendable {
                 linksCreated += entry.links.count
             } catch {
                 NSLog("[SemanticLinker] 링크 기록 실패: %@ — %@", entry.noteName, error.localizedDescription)
-            }
-
-            for link in entry.links {
-                reverseLinks[link.name, default: []].append((name: entry.noteName, context: "\(entry.noteName)에서 참조", relation: "related"))
             }
         }
 
@@ -415,23 +145,123 @@ struct SemanticLinker: Sendable {
                 NSLog("[SemanticLinker] 역방향 링크 기록 실패: %@ — %@", targetName, error.localizedDescription)
             }
         }
+
+        onProgress?(1.0, "시맨틱 링크 완료: \(notesLinked)개 노트, \(linksCreated)개 링크")
+
+        return LinkResult(tagsNormalized: tagResult, notesLinked: notesLinked, linksCreated: linksCreated)
     }
 
-    // MARK: - Helpers
+    func linkNotes(filePaths: [String], onProgress: ((Double, String) -> Void)? = nil) async -> LinkResult {
+        let tagResult = TagNormalizer.Result()
 
-    /// Select top siblings by tag overlap score, capped at max
-    private func selectTopSiblings(
-        note: LinkCandidateGenerator.NoteInfo,
-        siblings: [LinkCandidateGenerator.NoteInfo],
-        max limit: Int
-    ) -> [LinkCandidateGenerator.NoteInfo] {
-        guard siblings.count > limit else { return siblings }
-        let noteTags = Set(note.tags.map { $0.lowercased() })
-        let scored = siblings.map { sibling -> (LinkCandidateGenerator.NoteInfo, Double) in
-            let sibTags = Set(sibling.tags.map { $0.lowercased() })
-            return (sibling, Double(noteTags.intersection(sibTags).count))
+        let allNotes = buildNoteIndex()
+        let contextMap = await ContextMapBuilder(pkmRoot: pkmRoot).build()
+        let noteNames = Set(allNotes.map { $0.name })
+
+        let targetNames = Set(filePaths.map {
+            (($0 as NSString).lastPathComponent as NSString).deletingPathExtension
+        })
+        let targetNotes = allNotes.filter { targetNames.contains($0.name) }
+
+        guard !targetNotes.isEmpty else {
+            return LinkResult(tagsNormalized: tagResult, notesLinked: 0, linksCreated: 0)
         }
-        return scored.sorted { $0.1 > $1.1 }.prefix(limit).map { $0.0 }
+
+        let candidateGen = LinkCandidateGenerator()
+        let aiFilter = LinkAIFilter()
+        let writer = RelatedNotesWriter()
+        let notePathMap = Dictionary(uniqueKeysWithValues: allNotes.map { ($0.name, $0.filePath) })
+
+        // Build candidates for all target notes
+        var notesWithCandidates: [(note: LinkCandidateGenerator.NoteInfo, candidates: [LinkCandidateGenerator.Candidate])] = []
+        for note in targetNotes {
+            let candidates = candidateGen.generateCandidates(
+                for: note,
+                allNotes: allNotes,
+                mocEntries: contextMap.entries
+            )
+            if !candidates.isEmpty {
+                notesWithCandidates.append((note: note, candidates: candidates))
+            }
+        }
+
+        guard !notesWithCandidates.isEmpty else {
+            return LinkResult(tagsNormalized: tagResult, notesLinked: 0, linksCreated: 0)
+        }
+
+        // Batch AI filtering (same pattern as linkAll)
+        let batches = stride(from: 0, to: notesWithCandidates.count, by: batchSize).map {
+            Array(notesWithCandidates[$0..<min($0 + batchSize, notesWithCandidates.count)])
+        }
+
+        var allLinks: [(filePath: String, noteName: String, links: [LinkAIFilter.FilteredLink])] = []
+        let totalBatches = batches.count
+        var completedBatches = 0
+
+        await withTaskGroup(of: [(filePath: String, noteName: String, links: [LinkAIFilter.FilteredLink])].self) { group in
+            var activeTasks = 0
+
+            for batch in batches {
+                if activeTasks >= maxConcurrentAI {
+                    if let results = await group.next() {
+                        allLinks.append(contentsOf: results)
+                        activeTasks -= 1
+                        completedBatches += 1
+                        onProgress?(Double(completedBatches) / Double(totalBatches) * 0.8, "AI 필터링 \(completedBatches)/\(totalBatches) 배치")
+                    }
+                }
+
+                group.addTask {
+                    let batchInput = batch.map { item in
+                        (name: item.note.name, summary: item.note.summary, tags: item.note.tags, candidates: item.candidates)
+                    }
+
+                    do {
+                        let results = try await aiFilter.filterBatch(notes: batchInput)
+                        return zip(batch, results).map { (item, links) in
+                            (filePath: item.note.filePath, noteName: item.note.name, links: links)
+                        }
+                    } catch {
+                        NSLog("[SemanticLinker] AI 필터 배치 실패: %@", error.localizedDescription)
+                        return batch.map { item in
+                            (filePath: item.note.filePath, noteName: item.note.name, links: [LinkAIFilter.FilteredLink]())
+                        }
+                    }
+                }
+                activeTasks += 1
+            }
+
+            for await results in group {
+                allLinks.append(contentsOf: results)
+                completedBatches += 1
+                onProgress?(Double(completedBatches) / Double(totalBatches) * 0.8, "AI 필터링 \(completedBatches)/\(totalBatches) 배치")
+            }
+        }
+
+        // Write links + reverse links
+        var notesLinked = 0
+        var linksCreated = 0
+
+        for entry in allLinks where !entry.links.isEmpty {
+            do {
+                try writer.writeRelatedNotes(filePath: entry.filePath, newLinks: entry.links, noteNames: noteNames)
+                notesLinked += 1
+                linksCreated += entry.links.count
+
+                for link in entry.links {
+                    guard let targetPath = notePathMap[link.name] else { continue }
+                    let reverseLink = LinkAIFilter.FilteredLink(name: entry.noteName, context: "\(entry.noteName)에서 참조", relation: "related")
+                    try writer.writeRelatedNotes(filePath: targetPath, newLinks: [reverseLink], noteNames: noteNames)
+                    linksCreated += 1
+                }
+            } catch {
+                NSLog("[SemanticLinker] 노트 링크 실패: %@ — %@", entry.noteName, error.localizedDescription)
+            }
+        }
+
+        onProgress?(1.0, "시맨틱 링크 완료: \(notesLinked)개 노트, \(linksCreated)개 링크")
+
+        return LinkResult(tagsNormalized: tagResult, notesLinked: notesLinked, linksCreated: linksCreated)
     }
 
     // MARK: - Private

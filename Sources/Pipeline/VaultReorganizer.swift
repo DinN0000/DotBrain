@@ -17,11 +17,13 @@ struct VaultReorganizer {
     enum Scope {
         case all
         case category(PARACategory)
+        case folder(String)
 
         var categories: [PARACategory] {
             switch self {
             case .all: return PARACategory.allCases
             case .category(let cat): return [cat]
+            case .folder: return PARACategory.allCases
             }
         }
     }
@@ -110,10 +112,12 @@ struct VaultReorganizer {
                 group.addTask {
                     let content = self.extractContent(from: entry.filePath)
                     let fileName = (entry.filePath as NSString).lastPathComponent
+                    let preview = FileContentExtractor.extractPreview(from: entry.filePath, content: content)
                     return ClassifyInput(
                         filePath: entry.filePath,
                         content: content,
-                        fileName: fileName
+                        fileName: fileName,
+                        preview: preview
                     )
                 }
                 activeTasks += 1
@@ -308,6 +312,26 @@ struct VaultReorganizer {
     private func collectFiles() -> [CollectedFile] {
         let fm = FileManager.default
         var results: [CollectedFile] = []
+
+        // Handle folder scope: only scan the specified folder
+        if case .folder(let folderPath) = scope {
+            let folderName = (folderPath as NSString).lastPathComponent
+            let category = PARACategory.fromPath(folderPath) ?? .resource
+            let indexNoteName = "\(folderName).md"
+
+            guard let entries = try? fm.contentsOfDirectory(atPath: folderPath) else { return [] }
+            for entry in entries.sorted() {
+                guard !entry.hasPrefix("."), !entry.hasPrefix("_") else { continue }
+                guard entry != indexNoteName else { continue }
+                let filePath = (folderPath as NSString).appendingPathComponent(entry)
+                var fileIsDir: ObjCBool = false
+                guard fm.fileExists(atPath: filePath, isDirectory: &fileIsDir),
+                      !fileIsDir.boolValue else { continue }
+                guard pathManager.isPathSafe(filePath) else { continue }
+                results.append(CollectedFile(filePath: filePath, category: category, folder: folderName))
+            }
+            return results
+        }
 
         for category in scope.categories {
             let basePath = pathManager.paraPath(for: category)

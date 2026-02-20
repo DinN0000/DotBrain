@@ -1,6 +1,6 @@
 # Models and Data
 
-데이터 모델, frontmatter 스키마, 상태 관리. `Sources/Models/` — 8개 파일.
+데이터 모델, frontmatter 스키마, 상태 관리. `Sources/Models/` — 10개 파일.
 
 ## AppState Screen Enum
 
@@ -16,14 +16,18 @@ enum Screen {
     case dashboard        // 대시보드 허브
     case search           // 볼트 검색
     case paraManage       // PARA 폴더 관리
-    case vaultReorganize  // AI 볼트 재분류
+    case vaultInspector   // 볼트 점검 + AI 재분류 (통합)
+    case aiStatistics     // AI 사용량 통계
 }
 ```
+
+**변경**: `.vaultReorganize` 제거, `.vaultInspector`와 `.aiStatistics` 추가. VaultInspectorView가 기존 볼트 점검 + AI 재분류 기능을 통합.
 
 각 Screen은 optional `parent` 속성을 가짐:
 - `.paraManage.parent = .dashboard`
 - `.search.parent = .dashboard`
-- `.vaultReorganize.parent = .dashboard`
+- `.vaultInspector.parent = .dashboard`
+- `.aiStatistics.parent = .dashboard`
 - `.results.parent` = `processingOrigin` (inbox 또는 paraManage)
 
 ## AppState Published Properties
@@ -131,8 +135,9 @@ struct Stage2Item: Codable {
 ```swift
 struct ClassifyInput {
     let filePath: String
-    let content: String
+    let content: String       // 전체 추출 텍스트 (5000자, Stage 2용)
     let fileName: String
+    let preview: String       // 압축 프리뷰 (800자, Stage 1 배치용)
 }
 ```
 
@@ -286,6 +291,55 @@ enum AIProvider: String, CaseIterable, Identifiable {
 | `keyPlaceholder` | `"sk-ant-..."` | `"AIza..."` |
 
 메서드: `hasAPIKey()`, `saveAPIKey(_:)`, `deleteAPIKey()`
+
+## AIResponse
+
+`Sources/Models/AIResponse.swift` — AI 응답 + 토큰 사용량.
+
+```swift
+struct AIResponse {
+    let text: String          // AI 응답 텍스트
+    let usage: TokenUsage?    // 토큰 사용량 (프로바이더가 반환하지 않으면 nil)
+}
+```
+
+`sendFastWithUsage()`, `sendPreciseWithUsage()` 메서드의 반환 타입. 기존 `sendFast()` / `sendPrecise()`는 `String`만 반환하지만, WithUsage 변형은 `AIResponse`를 반환하여 실제 토큰 추적이 가능.
+
+## TokenUsage
+
+`Sources/Models/AIResponse.swift`
+
+```swift
+struct TokenUsage: Codable {
+    let inputTokens: Int
+    let outputTokens: Int
+    let cachedTokens: Int      // 캐시된 입력 토큰 (Gemini cachedContentTokenCount)
+    var totalTokens: Int {     // computed: inputTokens + outputTokens
+        inputTokens + outputTokens
+    }
+}
+```
+
+ClaudeAPIClient의 `Usage` struct와 GeminiAPIClient의 `UsageMetadata` struct에서 각각 변환되어 생성됨.
+
+## APIUsageEntry
+
+`Sources/Services/APIUsageLogger.swift`
+
+```swift
+struct APIUsageEntry: Codable, Identifiable {
+    let id: UUID
+    let timestamp: Date
+    let operation: String      // "classify", "enrich", "moc", "link-filter", "move" 등
+    let model: String          // 실제 모델명 (예: "claude-haiku-4-5-20251001")
+    let inputTokens: Int
+    let outputTokens: Int
+    let cachedTokens: Int
+    let cost: Double           // 계산된 비용 (USD)
+}
+```
+
+`.dotbrain/api-usage.json`에 JSON 배열로 저장됨. AIStatisticsView에서 operation별 비용 집계 및 최근 호출 내역 표시에 사용.
 
 ## PKMStatistics
 

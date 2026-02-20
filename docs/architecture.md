@@ -29,11 +29,11 @@ macOS 메뉴바 앱. Obsidian 볼트의 `_Inbox/` 폴더에 드롭된 파일을 
 │  App Layer                                       │
 │  DotBrainApp → AppDelegate → AppState (singleton)│
 ├─────────────────────────────────────────────────┤
-│  UI Layer                         Pipeline Layer    │
-│  SwiftUI Views (9 screens)       InboxProcessor     │
-│  MenuBarPopover (root)           FolderReorganizer   │
-│  BreadcrumbView, etc.            VaultReorganizer    │
-│                                  ProjectContextBuilder│
+│  UI Layer                         Pipeline Layer │
+│  SwiftUI Views (9 screens)       InboxProcessor  │
+│  MenuBarPopover (root)           FolderReorganizer│
+│  BreadcrumbView, etc.            VaultReorganizer │
+│                                  VaultAuditor     │
 ├─────────────────────────────────────────────────┤
 │  Service Layer                                   │
 │  AI / FileSystem / Extraction / SemanticLinker   │
@@ -73,14 +73,14 @@ macOS 메뉴바 앱. Obsidian 볼트의 `_Inbox/` 폴더에 드롭된 파일을 
 | **InboxProcessor** | `InboxProcessor.swift` | 6단계 | 사용자가 "정리하기" 클릭 |
 | **FolderReorganizer** | `FolderReorganizer.swift` | 5단계 | PARA 폴더 재정리 |
 | **VaultReorganizer** | `VaultReorganizer.swift` | 2페이즈 (scan + execute) | 볼트 전체 재분류 |
-| **ProjectContextBuilder** | `ProjectContextBuilder.swift` | - | 모든 파이프라인의 컨텍스트 구성 |
+| **VaultAuditor** | `VaultAuditor.swift` | audit + repair | 대시보드에서 볼트 점검 |
 | **SemanticLinker** | `Services/SemanticLinker/SemanticLinker.swift` | 6단계 | 처리 후 자동 실행 |
 
 > 상세: [pipelines.md](pipelines.md) — 각 파이프라인의 단계별 상세, 충돌 감지, 에지 케이스
 
 ## Service Layer
 
-`Sources/Services/` — 37개 파일, 5개 하위 디렉토리 (Claude/, Extraction/, FileSystem/, Gemini/, SemanticLinker/).
+`Sources/Services/` — 43개 파일, 6개 하위 디렉토리.
 
 | 그룹 | 주요 서비스 | 역할 |
 |------|------------|------|
@@ -88,32 +88,34 @@ macOS 메뉴바 앱. Obsidian 볼트의 `_Inbox/` 폴더에 드롭된 파일을 
 | **FileSystem** | FileMover, PKMPathManager, InboxScanner, InboxWatchdog, FrontmatterWriter, AssetMigrator | 파일 이동, 경로 관리, 볼트 감시, frontmatter 주입 |
 | **Extraction** | FileContentExtractor, BinaryExtractor, PDF/PPTX/XLSX/DOCX/ImageExtractor | 텍스트/바이너리 콘텐츠 추출 |
 | **SemanticLinker** | SemanticLinker, TagNormalizer, LinkCandidateGenerator, LinkAIFilter, RelatedNotesWriter | 태그 정규화, 후보 생성, AI 필터링, wikilink 작성 |
-| **Knowledge Mgmt** | MOCGenerator, VaultAuditor, VaultSearcher, NoteEnricher, AICompanionService, ContextMapBuilder | MOC 생성, 볼트 감사, 검색, AI 컴패니언 파일, 볼트 컨텍스트 맵 |
+| **Knowledge Mgmt** | MOCGenerator, VaultAuditor, VaultSearcher, NoteEnricher, AICompanionService | MOC 생성, 볼트 감사, 검색, AI 컴패니언 파일 |
 | **Project/Folder** | ProjectManager, PARAMover, FolderHealthAnalyzer | 프로젝트 생명주기, PARA 이동, 폴더 건강 분석 |
 | **Utility** | StatisticsService, KeychainService, TemplateService, NotificationService | 통계, 암호화 키 저장, 템플릿, 알림 |
+| **Data/Cache** | ContentHashCache(actor), APIUsageLogger(actor) | SHA256 파일 변경 감지, 실제 토큰 기반 API 비용 추적 |
 
 > 상세: [services.md](services.md) — 각 서비스의 public API, 의존성, actor 격리 모델
 
 ## UI Layer
 
-`Sources/UI/` — 9개 화면 + 3개 재사용 컴포넌트.
+`Sources/UI/` — 10개 화면 + 3개 재사용 컴포넌트.
 
 ```
 MenuBarPopover (root, 화면 전환)
-├── OnboardingView       (.onboarding)  — 5단계 초기 설정
-├── InboxStatusView      (.inbox)       — 파일 드래그&드롭, 처리 시작
-│   ├── ProcessingView   (.processing)  — 실시간 진행률
-│   └── ResultsView      (.results)     — 처리 결과, 사용자 확인
-├── DashboardView        (.dashboard)   — 통계, 볼트 점검, 도구
-│   ├── PARAManageView   (.paraManage)  — 폴더 CRUD
-│   ├── SearchView       (.search)      — 볼트 검색
-│   └── VaultReorganizeView (.vaultReorganize) — AI 재분류
-├── SettingsView         (.settings)    — AI 프로바이더, 키, 경로
-└── Components/
-    ├── BreadcrumbView       — 뒤로가기 + 제목
-    ├── APIKeyInputView      — Claude/Gemini 키 입력
-    └── FileThumbnailView    — QuickLook 썸네일
+├── OnboardingView       (.onboarding)      — 5단계 초기 설정
+├── InboxStatusView      (.inbox)           — 파일 드래그&드롭, 처리 시작
+│   ├── ProcessingView   (.processing)      — 실시간 진행률
+│   └── ResultsView      (.results)         — 처리 결과, 사용자 확인
+├── DashboardView        (.dashboard)       — 통계, 볼트 점검, 도구
+│   ├── PARAManageView   (.paraManage)      — 폴더 CRUD
+│   ├── SearchView       (.search)          — 볼트 검색
+│   ├── VaultInspectorView (.vaultInspector) — 볼트 점검 + AI 재분류 (통합)
+│   └── AIStatisticsView (.aiStatistics)    — AI 사용량 통계, 토큰 비용
+└── SettingsView         (.settings)        — AI 프로바이더, 키, 경로
 ```
+
+**VaultReorganizeView 제거**: 기존 `.vaultReorganize` 화면은 `VaultInspectorView`에 흡수됨. VaultInspectorView는 Level 1 폴더 목록 + Level 2 폴더 상세 + 재분류 기능을 통합 제공.
+
+**AIStatisticsView 추가**: 실제 토큰 사용량 기반 API 비용 통계. APIUsageLogger에서 데이터를 읽어 operation별 비용, 최근 API 호출 내역을 표시.
 
 **네비게이션 모델**: `NavigationStack` 미사용. `AppState.currentScreen` (Screen enum)으로 화면 전환. 각 Screen은 optional `parent` 속성으로 계층 구성. 하단 3탭 (Inbox, Dashboard, Settings).
 

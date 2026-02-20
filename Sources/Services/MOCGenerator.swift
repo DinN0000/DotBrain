@@ -52,10 +52,12 @@ struct MOCGenerator {
 
         let folderSummary: String
         do {
-            folderSummary = try await aiService.sendFast(maxTokens: 200, message: prompt)
-
-            // Track API cost for MOC generation
-            StatisticsService.addApiCost(0.0005)  // ~$0.0005 per folder for fast model
+            let aiResponse = try await aiService.sendFastWithUsage(maxTokens: 200, message: prompt)
+            folderSummary = aiResponse.text
+            if let usage = aiResponse.usage {
+                let model = await aiService.fastModel
+                StatisticsService.logTokenUsage(operation: "moc", model: model, usage: usage)
+            }
         } catch {
             // Fallback: use basic description without AI
             folderSummary = "\(folderName) 폴더 — \(docs.count)개 문서 포함"
