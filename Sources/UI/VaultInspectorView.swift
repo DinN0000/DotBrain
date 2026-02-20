@@ -842,6 +842,13 @@ private struct VaultFolderRow: View {
         return .red
     }
 
+    private var healthTooltip: String {
+        var parts: [String] = []
+        if folder.modifiedCount > 0 { parts.append("변경 \(folder.modifiedCount)개") }
+        if folder.newCount > 0 { parts.append("신규 \(folder.newCount)개") }
+        return parts.joined(separator: ", ") + " — 클릭하여 정리"
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 8) {
@@ -861,6 +868,7 @@ private struct VaultFolderRow: View {
                     Circle()
                         .fill(healthColor)
                         .frame(width: 6, height: 6)
+                        .help(healthTooltip)
                 }
 
                 Text("\(folder.fileCount)")
@@ -872,15 +880,6 @@ private struct VaultFolderRow: View {
                         Capsule()
                             .fill(Color.secondary.opacity(0.12))
                     )
-            }
-
-            if hasHealthIssue {
-                let changedCount = folder.modifiedCount + folder.newCount
-                Text("\(changedCount)개 파일 정리하기")
-                    .font(.caption2)
-                    .foregroundColor(healthColor.opacity(0.8))
-                    .padding(.leading, 28)
-                    .padding(.top, 2)
             }
         }
         .padding(.vertical, 4)
