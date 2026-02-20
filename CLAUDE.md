@@ -8,7 +8,7 @@
 - PARA-based PKM organizer: `_Inbox/` → AI classifies → `1_Project/`, `2_Area/`, `3_Resource/`, `4_Archive/`
 - `AppState` (singleton) — central state, `@MainActor`, `ObservableObject`
 - `Sources/Pipeline/` — InboxProcessor, FolderReorganizer, ProjectContextBuilder
-- `Sources/Services/` — AIService, FileMover, PKMPathManager, VaultSearcher, MOCGenerator, StatisticsService
+- `Sources/Services/` — AIService, FileMover, PKMPathManager, VaultSearcher, NoteIndexGenerator, StatisticsService
 - `Sources/UI/` — SwiftUI views (menubar popover)
 - `Sources/Models/` — Frontmatter, ClassifyResult, PARACategory
 
@@ -29,7 +29,16 @@
 - AI companion files use marker-based updates (`<!-- DotBrain:start/end -->`) to preserve user content
 - `StatisticsService` calls (addApiCost, incrementDuplicates, recordActivity) must be wired manually at each call site
 - Wiki-links `[[note]]` in `## Related Notes` sections enable cross-note navigation for both humans and AI
-- MOC files (`folderName.md`) auto-generated as folder-level table of contents
+- `_meta/note-index.json` — vault metadata index for AI navigation (NoteIndexGenerator)
+
+## Vault Navigation (for Claude Code)
+- Read `_meta/note-index.json` first for vault structure overview
+- Use tags, summary, project fields from index to identify relevant notes
+- Prioritize `status: active` notes when gathering context
+- Follow `[[wiki-links]]` in `## Related Notes` for context expansion
+- Relation type priority: prerequisite > project > reference > related
+- Traversal depth: self-determined by task relevance (no fixed limit)
+- Resolve note names to file paths via index (no grep needed)
 
 ## Release Workflow
 - GitHub: `DinN0000/DotBrain`
