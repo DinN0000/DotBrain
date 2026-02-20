@@ -23,8 +23,10 @@ struct MenuBarPopover: View {
             case .paraManage:
                 PARAManageView()
                     .id(appState.navigationId)
-            case .vaultReorganize:
-                VaultReorganizeView()
+            case .vaultInspector:
+                VaultInspectorView()
+            case .aiStatistics:
+                AIStatisticsView()
             }
 
             // Footer (hidden during onboarding and processing)

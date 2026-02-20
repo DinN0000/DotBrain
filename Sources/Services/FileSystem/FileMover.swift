@@ -278,8 +278,12 @@ struct FileMover {
             \(fullText)
             """
             do {
-                aiSummary = try await AIService.shared.sendFast(maxTokens: 1024, message: prompt)
-                StatisticsService.addApiCost(0.0005)
+                let aiResponse = try await AIService.shared.sendFastWithUsage(maxTokens: 1024, message: prompt)
+                aiSummary = aiResponse.text
+                if let usage = aiResponse.usage {
+                    let model = await AIService.shared.fastModel
+                    StatisticsService.logTokenUsage(operation: "summary", model: model, usage: usage)
+                }
             } catch {
                 // AI 요약 실패 시 원본 텍스트 앞부분 사용
                 aiSummary = nil

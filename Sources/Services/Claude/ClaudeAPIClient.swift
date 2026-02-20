@@ -34,10 +34,18 @@ actor ClaudeAPIClient {
 
     struct MessageResponse: Decodable {
         let content: [ContentBlock]
+        let usage: Usage?
 
         struct ContentBlock: Decodable {
             let type: String
             let text: String?
+        }
+
+        struct Usage: Decodable {
+            let input_tokens: Int
+            let output_tokens: Int
+            let cache_creation_input_tokens: Int?
+            let cache_read_input_tokens: Int?
         }
 
         var text: String {
@@ -59,12 +67,12 @@ actor ClaudeAPIClient {
 
     // MARK: - API Call
 
-    /// Send a message to Claude and get the text response
+    /// Send a message to Claude and get the text response with token usage
     func sendMessage(
         model: String,
         maxTokens: Int,
         userMessage: String
-    ) async throws -> String {
+    ) async throws -> (String, TokenUsage?) {
         guard let apiKey = KeychainService.getAPIKey() else {
             throw ClaudeAPIError.noAPIKey
         }
@@ -110,7 +118,14 @@ actor ClaudeAPIClient {
         guard !text.isEmpty else {
             throw ClaudeAPIError.emptyResponse
         }
-        return text
+        let tokenUsage: TokenUsage? = messageResponse.usage.map {
+            TokenUsage(
+                inputTokens: $0.input_tokens,
+                outputTokens: $0.output_tokens,
+                cachedTokens: $0.cache_read_input_tokens ?? 0
+            )
+        }
+        return (text, tokenUsage)
     }
 }
 

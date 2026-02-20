@@ -183,17 +183,21 @@ actor Classifier {
         weightedContext: String,
         tagVocabulary: String
     ) async throws -> [String: ClassifyResult.Stage1Item] {
+        // Use condensed preview (800 chars) instead of full content (5000 chars) for Stage 1 triage
         let fileContents = files.map { file in
-            (fileName: file.fileName, content: file.content)
+            (fileName: file.fileName, content: file.preview)
         }
 
         let prompt = buildStage1Prompt(fileContents, projectContext: projectContext, subfolderContext: subfolderContext, weightedContext: weightedContext, tagVocabulary: tagVocabulary)
 
-        let response = try await aiService.sendFast(maxTokens: 4096, message: prompt)
-        StatisticsService.addApiCost(Double(files.count) * 0.001)
+        let response = try await aiService.sendFastWithUsage(maxTokens: 4096, message: prompt)
+        if let usage = response.usage {
+            let model = await aiService.fastModel
+            StatisticsService.logTokenUsage(operation: "classify-stage1", model: model, usage: usage)
+        }
 
         var results: [String: ClassifyResult.Stage1Item] = [:]
-        if let items = parseJSONSafe([Stage1RawItem].self, from: response) {
+        if let items = parseJSONSafe([Stage1RawItem].self, from: response.text) {
             for item in items {
                 guard let para = PARACategory(rawValue: item.para), !item.fileName.isEmpty else { continue }
                 results[item.fileName] = ClassifyResult.Stage1Item(
@@ -242,10 +246,13 @@ actor Classifier {
             tagVocabulary: tagVocabulary
         )
 
-        let response = try await aiService.sendPrecise(maxTokens: 2048, message: prompt)
-        StatisticsService.addApiCost(0.003)
+        let response = try await aiService.sendPreciseWithUsage(maxTokens: 2048, message: prompt)
+        if let usage = response.usage {
+            let model = await aiService.preciseModel
+            StatisticsService.logTokenUsage(operation: "classify-stage2", model: model, usage: usage)
+        }
 
-        if let item = parseJSONSafe(Stage2RawItem.self, from: response),
+        if let item = parseJSONSafe(Stage2RawItem.self, from: response.text),
            let para = PARACategory(rawValue: item.para) {
             return ClassifyResult.Stage2Item(
                 para: para,
@@ -277,8 +284,7 @@ actor Classifier {
         tagVocabulary: String
     ) -> String {
         let fileList = files.enumerated().map { (i, f) in
-            let truncated = String(f.content.prefix(5000))
-            return "[\(i)] 파일명: \(f.fileName)\n내용: \(truncated)"
+            return "[\(i)] 파일명: \(f.fileName)\n내용: \(f.content)"
         }.joined(separator: "\n\n")
 
         let weightedSection = weightedContext.isEmpty ? "" : """
