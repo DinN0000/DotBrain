@@ -933,7 +933,6 @@ private struct VaultFolderRow: View {
                 }
                 .padding(.leading, 28)
                 .padding(.top, 2)
-                .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
         .padding(.vertical, 4)
@@ -944,7 +943,6 @@ private struct VaultFolderRow: View {
         )
         .contentShape(Rectangle())
         .onTapGesture { action() }
-        .animation(.easeOut(duration: 0.15), value: isHovered)
         .onHover { isHovered = $0 }
     }
 }
