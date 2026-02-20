@@ -254,13 +254,17 @@ AuditReport
     │         모든 PARA .md 파일 인덱싱
     │         NoteInfo: name, tags, summary, project, folderName, para, existingRelated
     ▼
-3. Candidates ── LinkCandidateGenerator.generateCandidates()
-    │              노트별 최대 10개 후보
-    │              스코어링:
-    │                태그 겹침 >= 2: +1.5/태그
-    │                태그 겹침 == 1: +0.5
-    │                공유 MOC 폴더: +1.0/폴더
-    │                같은 프로젝트: +2.0
+3. PARA 분기 ── 카테고리별 연결 전략 분기
+    │
+    ├── Project/Area ── processAutoLinks()
+    │   │                같은 폴더 sibling 자동 연결 (AI 필터 없이)
+    │   │                generateContextOnly()로 맥락 설명만 AI 생성
+    │   │                + processAIFilteredLinks() (다른 폴더 후보)
+    │   │                  excludeSameFolder=true, folderBonus=1.0
+    │   │
+    │   └── Resource/Archive ── processAIFilteredLinks()
+    │                           folderBonus=2.5 (같은 폴더 가산점 상향)
+    │                           excludeSameFolder=false
     ▼
 4. AI Filter ── LinkAIFilter.filterBatch()
     │             배치: 5 노트/요청, 3 병렬

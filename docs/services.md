@@ -294,9 +294,11 @@ Map of Contents 생성. 폴더 수준의 자동 목차.
 
 | 메서드 | 설명 |
 |--------|------|
-| `generateCandidates(for:allNotes:mocEntries:maxCandidates:)` | 노트별 top 10 링크 후보 |
+| `generateCandidates(for:allNotes:mocEntries:maxCandidates:folderBonus:excludeSameFolder:)` | 노트별 top 10 링크 후보 |
 
-**스코어링**: 태그 겹침 >= 2 (+1.5/태그), 태그 겹침 == 1 (+0.5), 공유 MOC 폴더 (+1.0/폴더), 같은 프로젝트 (+2.0).
+**파라미터**: `folderBonus` (기본 1.0, Resource/Archive는 2.5), `excludeSameFolder` (true: 같은 폴더 노트 제외, autoLink 대상용).
+
+**스코어링**: 태그 겹침 >= 2 (+1.5/태그), 태그 겹침 == 1 (+0.5), 공유 MOC 폴더 (+folderBonus/폴더), 같은 프로젝트 (+2.0).
 
 ### LinkAIFilter
 
@@ -306,6 +308,7 @@ Map of Contents 생성. 폴더 수준의 자동 목차.
 |--------|------|
 | `filterBatch(notes:maxResultsPerNote:)` | 배치 AI 필터링 (노트당 max 5) |
 | `filterSingle(...)` | 단일 노트 필터링 |
+| `generateContextOnly(notes:)` | 같은 폴더 sibling에 대한 맥락만 AI 생성 (거부 없이 전수 연결) |
 
 **Context 형식**: "~하려면", "~할 때", "~와 비교할 때" (15자 이내, 한국어).
 
