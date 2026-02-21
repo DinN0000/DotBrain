@@ -35,7 +35,7 @@ struct CorrectionMemory {
         let entries = load(pkmRoot: pkmRoot)
         guard !entries.isEmpty else { return "" }
 
-        let correctionActions: Set<String> = ["confirm", "skip"]
+        let correctionActions: Set<String> = ["confirm", "skip", "manual-move"]
         var patterns: [String] = []
 
         // Pattern 1: PARA category corrections (AI -> User, 1+ times)
