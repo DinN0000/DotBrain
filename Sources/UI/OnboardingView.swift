@@ -280,22 +280,22 @@ struct OnboardingView: View {
                             paraExplanationRow(
                                 folder: "Project",
                                 metaphor: "책상 위",
-                                desc: "진행 중인 일. 마감이 있는 것"
+                                desc: "마감이 있는 진행 중인 작업"
                             )
                             paraExplanationRow(
                                 folder: "Area",
-                                metaphor: "서랍",
-                                desc: "늘 관리하는 것. 건강, 재무, 팀 운영"
+                                metaphor: "도메인",
+                                desc: "프로젝트를 묶는 상위 영역. 제품, 사업, 팀"
                             )
                             paraExplanationRow(
                                 folder: "Resource",
-                                metaphor: "책장",
-                                desc: "참고 자료. 가이드, 레퍼런스"
+                                metaphor: "참고 자료",
+                                desc: "가이드, 레퍼런스, 분석 보고서"
                             )
                             paraExplanationRow(
                                 folder: "Archive",
-                                metaphor: "창고",
-                                desc: "끝난 것. 완료된 프로젝트"
+                                metaphor: "보관함",
+                                desc: "완료되거나 비활성화된 문서"
                             )
                         }
                     }
@@ -548,11 +548,22 @@ struct OnboardingView: View {
                 )
                 .cornerRadius(6)
 
-                HStack(spacing: 8) {
-                    TextField("프로젝트 이름 입력 후 + 버튼", text: $newProjectName)
+                HStack(spacing: 6) {
+                    TextField("프로젝트 이름", text: $newProjectName)
                         .textFieldStyle(.roundedBorder)
                         .font(.subheadline)
                         .onSubmit { addProject() }
+
+                    if !areas.isEmpty {
+                        Picker("", selection: $selectedArea) {
+                            Text("도메인 없음").tag("")
+                            ForEach(areas, id: \.self) { area in
+                                Text(area).tag(area)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                        .frame(maxWidth: 120)
+                    }
 
                     Button(action: addProject) {
                         Image(systemName: "plus")
@@ -561,22 +572,6 @@ struct OnboardingView: View {
                     .controlSize(.regular)
                     .disabled(newProjectName.trimmingCharacters(in: .whitespaces).isEmpty)
                     .accessibilityLabel("프로젝트 추가")
-                }
-
-                if !areas.isEmpty {
-                    HStack(spacing: 8) {
-                        Text("Area:")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                        Picker("", selection: $selectedArea) {
-                            Text("없음").tag("")
-                            ForEach(areas, id: \.self) { area in
-                                Text(area).tag(area)
-                            }
-                        }
-                        .pickerStyle(.menu)
-                        .frame(maxWidth: 150)
-                    }
                 }
 
                 if !projects.isEmpty {
