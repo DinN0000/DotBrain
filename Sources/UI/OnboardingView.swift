@@ -119,44 +119,54 @@ struct OnboardingView: View {
         VStack(spacing: 0) {
             Spacer()
 
-            Text("DotBrain에 문서를 넣으세요")
-                .font(.title3)
-                .fontWeight(.semibold)
+            Text("문서를 던지세요")
+                .font(.title2)
+                .fontWeight(.bold)
                 .padding(.bottom, 4)
 
-            Text("AI가 내용을 읽고 적절한 위치로 분류합니다")
+            Text("AI가 읽고, 정리합니다")
                 .font(.subheadline)
                 .foregroundColor(.secondary)
-                .padding(.bottom, 16)
+                .padding(.bottom, 20)
 
-            // Before
-            VStack(alignment: .leading, spacing: 4) {
-                Text("_Inbox")
-                    .font(.system(.caption2, design: .monospaced))
-                    .foregroundColor(.secondary)
-                beforeFileRow("앱출시_기획서_v3.pdf")
-                beforeFileRow("디자인시스템_가이드.md")
-                beforeFileRow("API_레퍼런스.pdf")
+            // Before — chaos
+            VStack(alignment: .leading, spacing: 3) {
+                beforeFileRow("회의록_최종_진짜최종(2).docx")
+                beforeFileRow("스크린샷 2026-01-15 오후 3.42.png")
+                beforeFileRow("Untitled.pdf")
+                beforeFileRow("이름없는 문서.txt")
+                beforeFileRow("메모메모.md")
             }
             .padding(10)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.secondary.opacity(0.06))
+            .background(Color.red.opacity(0.04))
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .strokeBorder(Color.red.opacity(0.1), lineWidth: 1)
+            )
             .cornerRadius(8)
             .padding(.horizontal, 32)
 
-            Image(systemName: "arrow.down")
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundColor(.green)
-                .padding(.vertical, 6)
+            // Sparkle arrow
+            HStack(spacing: 4) {
+                Image(systemName: "sparkles")
+                    .font(.system(size: 10))
+                Image(systemName: "arrow.down")
+                    .font(.system(size: 11, weight: .semibold))
+                Image(systemName: "sparkles")
+                    .font(.system(size: 10))
+            }
+            .foregroundColor(.green)
+            .padding(.vertical, 8)
 
-            // After
-            VStack(alignment: .leading, spacing: 4) {
+            // After — order
+            VStack(alignment: .leading, spacing: 3) {
                 afterFolderRow("Project/앱 출시/")
-                afterFileRow("기획서.pdf", indent: true)
-                afterFolderRow("Area/디자인/")
-                afterFileRow("시스템 가이드.md", indent: true)
+                afterFileRow("회의록.docx", indent: true)
+                afterFolderRow("Area/제품/")
+                afterFileRow("UI 스크린샷.png", indent: true)
                 afterFolderRow("Resource/")
-                afterFileRow("API 레퍼런스.pdf", indent: true)
+                afterFileRow("기획서.pdf", indent: true)
             }
             .padding(10)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -164,7 +174,7 @@ struct OnboardingView: View {
             .cornerRadius(8)
             .overlay(
                 RoundedRectangle(cornerRadius: 8)
-                    .strokeBorder(Color.green.opacity(0.15), lineWidth: 1)
+                    .strokeBorder(Color.green.opacity(0.2), lineWidth: 1)
             )
             .padding(.horizontal, 32)
 
