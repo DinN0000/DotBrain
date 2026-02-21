@@ -42,6 +42,7 @@ struct InboxProcessor {
         let projectNames = contextBuilder.extractProjectNames(from: projectContext)
         let weightedContext = contextBuilder.buildWeightedContext()
         let tagVocabulary = contextBuilder.buildTagVocabulary()
+        let areaContext = contextBuilder.buildAreaContext()
 
         onProgress?(0.1, "프로젝트 컨텍스트 로드 완료")
 
@@ -101,6 +102,7 @@ struct InboxProcessor {
             subfolderContext: subfolderContext,
             projectNames: projectNames,
             weightedContext: weightedContext,
+            areaContext: areaContext,
             tagVocabulary: tagVocabulary,
             onProgress: { [onProgress] progress, status in
                 // Map classifier's 0-1 progress to our 0.3-0.7 range
