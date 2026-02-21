@@ -134,9 +134,9 @@ struct OnboardingView: View {
                 Text("_Inbox")
                     .font(.system(.caption2, design: .monospaced))
                     .foregroundColor(.secondary)
-                beforeFileRow("회의록_최종_진짜최종.pdf")
-                beforeFileRow("경쟁사_분석(2).docx")
-                beforeFileRow("주간메모.md")
+                beforeFileRow("앱출시_기획서_v3.pdf")
+                beforeFileRow("디자인시스템_가이드.md")
+                beforeFileRow("API_레퍼런스.pdf")
             }
             .padding(10)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -151,12 +151,12 @@ struct OnboardingView: View {
 
             // After
             VStack(alignment: .leading, spacing: 4) {
-                afterFolderRow("Project/마케팅 캠페인/")
-                afterFileRow("회의록.pdf", indent: true)
+                afterFolderRow("Project/앱 출시/")
+                afterFileRow("기획서.pdf", indent: true)
+                afterFolderRow("Area/디자인/")
+                afterFileRow("시스템 가이드.md", indent: true)
                 afterFolderRow("Resource/")
-                afterFileRow("경쟁사 분석.docx", indent: true)
-                afterFolderRow("Area/제품/")
-                afterFileRow("주간메모.md", indent: true)
+                afterFileRow("API 레퍼런스.pdf", indent: true)
             }
             .padding(10)
             .frame(maxWidth: .infinity, alignment: .leading)
