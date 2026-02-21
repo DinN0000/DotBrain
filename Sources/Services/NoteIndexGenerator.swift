@@ -73,6 +73,14 @@ struct NoteIndexGenerator: Sendable {
             }
 
             for (notePath, entry) in noteEntries {
+                // Remove stale entries for the same filename in other folders
+                let fileName = (notePath as NSString).lastPathComponent
+                let staleKeys = index.notes.keys.filter { key in
+                    key != notePath && (key as NSString).lastPathComponent == fileName
+                }
+                for key in staleKeys {
+                    index.notes.removeValue(forKey: key)
+                }
                 index.notes[notePath] = entry
             }
 

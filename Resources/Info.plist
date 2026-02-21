@@ -9,9 +9,9 @@
     <key>CFBundleIdentifier</key>
     <string>com.hwaa.dotbrain</string>
     <key>CFBundleVersion</key>
-    <string>2.6.7</string>
+    <string>2.6.8</string>
     <key>CFBundleShortVersionString</key>
-    <string>2.6.7</string>
+    <string>2.6.8</string>
     <key>NSAppTransportSecurity</key>
     <dict>
         <key>NSAllowsArbitraryLoads</key>
