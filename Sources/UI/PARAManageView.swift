@@ -333,7 +333,12 @@ struct PARAManageView: View {
         }
 
         // Show at mouse location
-        menu.popUp(positioning: nil, at: NSEvent.mouseLocation, in: nil)
+        if let event = NSApp.currentEvent,
+           let view = NSApp.keyWindow?.contentView {
+            NSMenu.popUpContextMenu(menu, with: event, for: view)
+        } else {
+            menu.popUp(positioning: nil, at: NSEvent.mouseLocation, in: nil)
+        }
     }
 
     private func addMenuItem(to menu: NSMenu, title: String, icon: String?, action: @escaping () -> Void) {

@@ -179,7 +179,7 @@ struct ResultRow: View {
                     switch result.status {
                     case .success:
                         HStack(spacing: 4) {
-                            Image(systemName: result.para.icon)
+                            Image(systemName: result.isAsset ? "paperclip" : result.para.icon)
                                 .font(.caption2)
                             Text(result.displayTarget)
                                 .font(.caption)
