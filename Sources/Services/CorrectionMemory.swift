@@ -30,20 +30,21 @@ struct CorrectionMemory {
         save(entries, pkmRoot: pkmRoot)
     }
 
-    /// Build prompt context from repeated correction patterns (3+ occurrences)
+    /// Build prompt context from user correction patterns
     static func buildPromptContext(pkmRoot: String) -> String {
         let entries = load(pkmRoot: pkmRoot)
         guard !entries.isEmpty else { return "" }
 
+        let correctionActions: Set<String> = ["confirm", "skip"]
         var patterns: [String] = []
 
-        // Pattern 1: PARA category corrections (AI -> User, 3+ times same direction)
+        // Pattern 1: PARA category corrections (AI -> User, 1+ times)
         var paraCorrectionCounts: [String: Int] = [:]
-        for entry in entries where entry.action == "confirm" && !entry.aiPara.isEmpty && !entry.userPara.isEmpty && entry.aiPara != entry.userPara {
+        for entry in entries where correctionActions.contains(entry.action) && !entry.aiPara.isEmpty && !entry.userPara.isEmpty && entry.aiPara != entry.userPara {
             let key = "\(entry.aiPara) -> \(entry.userPara)"
             paraCorrectionCounts[key, default: 0] += 1
         }
-        for (correction, count) in paraCorrectionCounts where count >= 3 {
+        for (correction, count) in paraCorrectionCounts {
             let parts = correction.split(separator: " -> ")
             if parts.count == 2 {
                 patterns.append("- AI가 \(parts[0])으로 분류한 문서를 사용자가 \(parts[1])로 수정 (\(count)회)")
@@ -52,27 +53,27 @@ struct CorrectionMemory {
 
         // Pattern 2: Tag-based patterns (common tags in corrected entries)
         var tagCorrections: [String: [String: Int]] = [:]  // tag -> (userPara -> count)
-        for entry in entries where entry.action == "confirm" && !entry.userPara.isEmpty && entry.aiPara != entry.userPara {
+        for entry in entries where correctionActions.contains(entry.action) && !entry.userPara.isEmpty && entry.aiPara != entry.userPara {
             for tag in entry.tags {
                 tagCorrections[tag, default: [:]][entry.userPara, default: 0] += 1
             }
         }
         for (tag, paraCounts) in tagCorrections {
-            if let (para, count) = paraCounts.max(by: { $0.value < $1.value }), count >= 3 {
+            if let (para, count) = paraCounts.max(by: { $0.value < $1.value }) {
                 patterns.append("- tags에 \"\(tag)\" 포함 문서: \(para)일 가능성 높음 (\(count)회 수정)")
             }
         }
 
         // Pattern 3: Project reassignment patterns
         var projectCorrectionCounts: [String: Int] = [:]  // "aiProject -> userProject"
-        for entry in entries where entry.action == "confirm" || entry.action == "create-project" {
+        for entry in entries where correctionActions.contains(entry.action) || entry.action == "create-project" {
             let aiProj = entry.aiProject ?? "(없음)"
             let userProj = entry.userProject ?? "(없음)"
             guard aiProj != userProj else { continue }
             let key = "\(aiProj) -> \(userProj)"
             projectCorrectionCounts[key, default: 0] += 1
         }
-        for (correction, count) in projectCorrectionCounts where count >= 2 {
+        for (correction, count) in projectCorrectionCounts {
             let parts = correction.split(separator: " -> ")
             if parts.count == 2 {
                 patterns.append("- 프로젝트 \(parts[0]) -> \(parts[1])로 수정 (\(count)회)")

@@ -167,6 +167,7 @@ struct VaultInspectorView: View {
                     .padding(.top, 4)
             }
 
+            Spacer().frame(height: 8)
             Divider()
 
             // Folder list
@@ -843,6 +844,21 @@ struct VaultInspectorView: View {
         reorgStatus = "실행 준비 중..."
         appState.viewTaskActive = true
         let root = appState.pkmRootPath
+
+        // Record rejected AI suggestions for learning
+        let rejected = analyses.filter { $0.needsMove && !$0.isSelected }
+        for file in rejected {
+            CorrectionMemory.record(CorrectionEntry(
+                date: Date(),
+                fileName: file.fileName,
+                aiPara: file.recommended.para.rawValue,
+                userPara: file.currentCategory.rawValue,
+                aiProject: file.recommended.targetFolder,
+                userProject: file.currentFolder,
+                tags: file.recommended.tags,
+                action: "skip"
+            ), pkmRoot: root)
+        }
 
         reorgTask?.cancel()
         reorgTask = Task {
