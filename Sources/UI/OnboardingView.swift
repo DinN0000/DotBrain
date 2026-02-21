@@ -119,19 +119,19 @@ struct OnboardingView: View {
         VStack(spacing: 0) {
             Spacer()
 
-            Text("DotBrain에 오신 걸 환영합니다")
+            Text("인박스에 넣기만 하세요")
                 .font(.title3)
                 .fontWeight(.semibold)
                 .padding(.bottom, 4)
 
-            Text("파일을 던지면, AI가 알아서 정리합니다")
+            Text("AI가 읽고, 분류하고, 정리합니다")
                 .font(.subheadline)
                 .foregroundColor(.secondary)
                 .padding(.bottom, 16)
 
             // Before box
             VStack(alignment: .leading, spacing: 0) {
-                Text("지금")
+                Text("Before")
                     .font(.caption)
                     .fontWeight(.semibold)
                     .foregroundColor(.secondary)
@@ -159,7 +159,7 @@ struct OnboardingView: View {
 
             // After box
             VStack(alignment: .leading, spacing: 0) {
-                Text("DotBrain으로 정리하면")
+                Text("After")
                     .font(.caption)
                     .fontWeight(.semibold)
                     .foregroundColor(.green)
