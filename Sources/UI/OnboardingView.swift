@@ -129,61 +129,41 @@ struct OnboardingView: View {
                 .foregroundColor(.secondary)
                 .padding(.bottom, 16)
 
-            // Before box
-            VStack(alignment: .leading, spacing: 0) {
-                Text("Before")
-                    .font(.caption)
-                    .fontWeight(.semibold)
-                    .foregroundColor(.secondary)
-                    .padding(.bottom, 6)
+            // Before → After: single compact comparison
+            VStack(spacing: 6) {
+                HStack(spacing: 0) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("_Inbox/")
+                            .font(.system(.caption, design: .monospaced))
+                            .fontWeight(.medium)
+                            .foregroundColor(.secondary)
+                        beforeFileRow("회의록_최종.pdf")
+                        beforeFileRow("분석_보고서.docx")
+                        beforeFileRow("주간메모.md")
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
 
-                VStack(alignment: .leading, spacing: 3) {
-                    beforeFileRow("회의록_최종_진짜최종.pdf")
-                    beforeFileRow("보고서(2).docx")
-                    beforeFileRow("스크린샷 2026-01-15.png")
-                    beforeFileRow("이름없는문서.txt")
-                    beforeFileRow("메모.md")
+                    Image(systemName: "arrow.right")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(.green)
+                        .padding(.horizontal, 8)
+
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("PARA/")
+                            .font(.system(.caption, design: .monospaced))
+                            .fontWeight(.medium)
+                            .foregroundColor(.green)
+                        afterFileRow("Project/캠페인/회의록.pdf", indent: false)
+                        afterFileRow("Resource/참고자료/분석 보고서.docx", indent: false)
+                        afterFileRow("Area/제품/주간메모.md", indent: false)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
+                .padding(12)
+                .background(Color.secondary.opacity(0.06))
+                .cornerRadius(8)
             }
-            .padding(10)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.secondary.opacity(0.08))
-            .cornerRadius(8)
-            .padding(.horizontal, 32)
-
-            // Arrow
-            Image(systemName: "arrow.down")
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundColor(.secondary)
-                .padding(.vertical, 8)
-
-            // After box
-            VStack(alignment: .leading, spacing: 0) {
-                Text("After")
-                    .font(.caption)
-                    .fontWeight(.semibold)
-                    .foregroundColor(.green)
-                    .padding(.bottom, 6)
-
-                VStack(alignment: .leading, spacing: 3) {
-                    afterFolderRow("Project/마케팅 캠페인/")
-                    afterFileRow("회의록.pdf", indent: true)
-                    afterFileRow("보고서.docx", indent: true)
-                    afterFolderRow("Area/제품/")
-                    afterFileRow("메모.md", indent: true)
-                    afterFolderRow("Resource/")
-                    afterFileRow("스크린샷.png", indent: true)
-                }
-            }
-            .padding(10)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.green.opacity(0.06))
-            .cornerRadius(8)
-            .overlay(
-                RoundedRectangle(cornerRadius: 8)
-                    .strokeBorder(Color.green.opacity(0.15), lineWidth: 1)
-            )
-            .padding(.horizontal, 32)
+            .padding(.horizontal, 28)
 
             Spacer()
 
