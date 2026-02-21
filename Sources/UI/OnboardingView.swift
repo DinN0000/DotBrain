@@ -461,7 +461,7 @@ struct OnboardingView: View {
                 if !areas.isEmpty {
                     ScrollView {
                         VStack(spacing: 3) {
-                            ForEach(areas, id: \.self) { name in
+                            ForEach(areas.reversed(), id: \.self) { name in
                                 HStack(spacing: 8) {
                                     Image(systemName: "square.stack.3d.up.fill")
                                         .font(.caption)
@@ -577,7 +577,7 @@ struct OnboardingView: View {
                 if !projects.isEmpty {
                     ScrollView {
                         VStack(spacing: 3) {
-                            ForEach(projects, id: \.self) { name in
+                            ForEach(projects.reversed(), id: \.self) { name in
                                 HStack(spacing: 8) {
                                     Image(systemName: "folder.fill")
                                         .font(.caption)
