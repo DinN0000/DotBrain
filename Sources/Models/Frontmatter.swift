@@ -37,6 +37,8 @@ struct Frontmatter {
     var summary: String?
     var source: NoteSource?
     var project: String?
+    var area: String?
+    var projects: [String]?
     var file: FileMetadata?
 
     static let frontmatterRegex = try! NSRegularExpression(
@@ -169,6 +171,7 @@ struct Frontmatter {
         case "summary": fm.summary = value
         case "source": fm.source = NoteSource(rawValue: value)
         case "project": fm.project = value
+        case "area": fm.area = value
         default: break
         }
     }
@@ -176,6 +179,7 @@ struct Frontmatter {
     private static func applyValue(to fm: inout Frontmatter, key: String, array: [String]) {
         switch key {
         case "tags": fm.tags = array
+        case "projects": fm.projects = array
         default: break
         }
     }
@@ -243,6 +247,13 @@ struct Frontmatter {
         if let project = project {
             lines.append("project: \(Frontmatter.escapeYAML(project))")
         }
+        if let area = area {
+            lines.append("area: \(Frontmatter.escapeYAML(area))")
+        }
+        if let projects = projects, !projects.isEmpty {
+            let escaped = projects.map { "\"\(Frontmatter.escapeYAML($0))\"" }
+            lines.append("projects: [\(escaped.joined(separator: ", "))]")
+        }
         if let file = file {
             lines.append("file:")
             lines.append("  name: \(Frontmatter.escapeYAML(file.name))")
@@ -269,6 +280,8 @@ struct Frontmatter {
         if let s = existing.summary, !s.isEmpty { merged.summary = s }
         if existing.source != nil { merged.source = existing.source }
         if existing.project != nil { merged.project = existing.project }
+        if existing.area != nil { merged.area = existing.area }
+        if let p = existing.projects, !p.isEmpty { merged.projects = p }
         if existing.file != nil { merged.file = existing.file }
 
         return merged.stringify() + "\n" + body
@@ -283,6 +296,8 @@ struct Frontmatter {
         summary: String = "",
         source: NoteSource = .import,
         project: String? = nil,
+        area: String? = nil,
+        projects: [String]? = nil,
         file: FileMetadata? = nil
     ) -> Frontmatter {
         Frontmatter(
@@ -293,6 +308,8 @@ struct Frontmatter {
             summary: summary,
             source: source,
             project: project,
+            area: area,
+            projects: projects,
             file: file
         )
     }
