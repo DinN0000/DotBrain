@@ -33,13 +33,47 @@ struct ProjectContextBuilder {
                 let (frontmatter, _) = Frontmatter.parse(markdown: content)
                 let summary = frontmatter.summary ?? ""
                 let tags = frontmatter.tags.isEmpty ? "" : frontmatter.tags.joined(separator: ", ")
-                lines.append("- \(entry): \(summary) [\(tags)]")
+                let areaStr = frontmatter.area.map { " (Area: \($0))" } ?? ""
+                lines.append("- \(entry): \(summary) [\(tags)]\(areaStr)")
             } else {
                 lines.append("- \(entry)")
             }
         }
 
         return lines.isEmpty ? "활성 프로젝트 없음" : lines.joined(separator: "\n")
+    }
+
+    /// Build Area-Project mapping context for classifier prompts
+    func buildAreaContext() -> String {
+        let areaPath = pathManager.areaPath
+        let fm = FileManager.default
+
+        guard let entries = try? fm.contentsOfDirectory(atPath: areaPath) else {
+            return ""
+        }
+
+        var lines: [String] = []
+
+        for entry in entries.sorted() {
+            guard !entry.hasPrefix("."), !entry.hasPrefix("_") else { continue }
+            let areaDir = (areaPath as NSString).appendingPathComponent(entry)
+            var isDir: ObjCBool = false
+            guard fm.fileExists(atPath: areaDir, isDirectory: &isDir), isDir.boolValue else { continue }
+            guard pathManager.isPathSafe(areaDir) else { continue }
+
+            let indexPath = (areaDir as NSString).appendingPathComponent("\(entry).md")
+            var projectList = ""
+            if let content = try? String(contentsOfFile: indexPath, encoding: .utf8) {
+                let (frontmatter, _) = Frontmatter.parse(markdown: content)
+                if let projects = frontmatter.projects, !projects.isEmpty {
+                    projectList = projects.joined(separator: ", ")
+                }
+            }
+            let detail = projectList.isEmpty ? "(프로젝트 없음)" : projectList
+            lines.append("- \(entry): \(detail)")
+        }
+
+        return lines.isEmpty ? "" : lines.joined(separator: "\n")
     }
 
     /// Build subfolder context as JSON for classifier prompts (prevents folder name hallucination)
