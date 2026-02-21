@@ -79,8 +79,14 @@ struct VaultInspectorView: View {
             }
         }
         .onAppear { loadFolders() }
-        .onChange(of: appState.backgroundTaskCompleted) { completed in
-            if completed { loadFolders() }
+        .onChange(of: appState.vaultCheckResult) { result in
+            if result != nil {
+                // Delay to let SwiftUI settle after batch @Published updates
+                Task { @MainActor in
+                    try? await Task.sleep(nanoseconds: 300_000_000)
+                    loadFolders()
+                }
+            }
         }
         .onDisappear {
             reorgTask?.cancel()
@@ -565,8 +571,14 @@ struct VaultInspectorView: View {
 
     @ViewBuilder
     private func vaultCheckResultCard(_ result: VaultCheckResult) -> some View {
-        let hasIssues = result.auditTotal > 0 || result.untaggedFiles > 0
-        let allClean = !hasIssues && result.enrichCount == 0
+        let anyRowVisible = result.brokenLinks > 0
+            || result.missingFrontmatter > 0
+            || result.missingPARA > 0
+            || result.repairCount > 0
+            || result.enrichCount > 0
+            || result.linksCreated > 0
+            || result.mocUpdated
+        let allClean = !anyRowVisible
 
         VStack(spacing: 6) {
             if result.brokenLinks > 0 {
