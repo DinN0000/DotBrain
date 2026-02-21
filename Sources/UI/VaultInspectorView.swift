@@ -124,7 +124,7 @@ struct VaultInspectorView: View {
                         HStack(spacing: 4) {
                             Image(systemName: "arrow.triangle.2.circlepath")
                                 .font(.caption)
-                            Text("AI 재분류")
+                            Text("위치 제안")
                                 .font(.caption)
                         }
                         Text("파일 위치 재배치")
@@ -136,7 +136,7 @@ struct VaultInspectorView: View {
                 }
                 .buttonStyle(.bordered)
                 .disabled(appState.isAnyTaskRunning)
-                .help("AI가 모든 파일을 분석해서 적절한 폴더로 재배치")
+                .help("AI가 파일을 분석해서 적절한 폴더를 제안")
 
                 Spacer()
             }
@@ -160,7 +160,7 @@ struct VaultInspectorView: View {
 
             if reorgPhase == .scanning || reorgPhase == .executing {
                 taskProgressCard(
-                    title: reorgPhase == .scanning ? "AI 스캔 중" : "재정리 실행 중",
+                    title: reorgPhase == .scanning ? "AI 스캔 중" : "위치 이동 중",
                     progress: reorgProgress,
                     status: reorgStatus,
                     onCancel: { resetReorg() }
@@ -230,22 +230,17 @@ struct VaultInspectorView: View {
         let menu = NSMenu()
         let changedCount = folder.modifiedCount + folder.newCount
 
-        if changedCount > 0 {
-            addMenuItem(
-                to: menu,
-                title: "바뀐 파일만 정리 (\(changedCount)개)",
-                icon: "sparkles"
-            ) {
-                self.startFolderReorg(folder)
-            }
-        }
-
         addMenuItem(
             to: menu,
-            title: "전체 파일 정리",
-            icon: "arrow.2.squarepath"
+            title: "위치 제안",
+            icon: "arrow.triangle.2.circlepath"
         ) {
-            self.startFolderFullReorg(folder)
+            // Smart default: changed files only if any, otherwise full folder
+            if changedCount > 0 {
+                self.startFolderReorg(folder)
+            } else {
+                self.startFolderFullReorg(folder)
+            }
         }
 
         menu.addItem(.separator())
@@ -271,7 +266,7 @@ struct VaultInspectorView: View {
         let menu = NSMenu()
         addMenuItem(
             to: menu,
-            title: "\(category.displayName) 전체 AI 재분류",
+            title: "\(category.displayName) 전체 위치 제안",
             icon: "arrow.triangle.2.circlepath"
         ) {
             self.startCategoryReorg(category)
@@ -528,7 +523,7 @@ struct VaultInspectorView: View {
                         Image(systemName: "checkmark.circle")
                             .font(.caption)
                             .foregroundColor(.green)
-                        Text("\(successCount)개 파일 재정리 완료")
+                        Text("\(successCount)개 파일 이동 완료")
                             .font(.caption)
                             .fontWeight(.medium)
                             .foregroundColor(.green)
