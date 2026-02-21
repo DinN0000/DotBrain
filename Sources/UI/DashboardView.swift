@@ -56,7 +56,7 @@ struct DashboardView: View {
                                 .foregroundColor(.secondary)
                             Spacer()
                             Button("보기") {
-                                appState.currentScreen = .paraManage
+                                appState.currentScreen = .vaultInspector
                             }
                             .font(.caption)
                             .buttonStyle(.plain)

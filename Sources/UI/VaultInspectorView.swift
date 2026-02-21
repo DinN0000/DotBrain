@@ -58,6 +58,8 @@ struct VaultInspectorView: View {
         let modifiedCount: Int
         let newCount: Int
         let summary: String
+        let healthLabel: String
+        let healthIssues: String
 
         var healthRatio: Double {
             guard fileCount > 0 else { return 1.0 }
@@ -712,6 +714,11 @@ struct VaultInspectorView: View {
                     summary = ""
                 }
 
+                let health = FolderHealthAnalyzer.analyze(
+                    folderPath: folderPath, folderName: info.name, category: info.category
+                )
+                let issuesText = health.issues.map(\.localizedDescription).joined(separator: "\n")
+
                 result.append(FolderInfo(
                     name: info.name,
                     path: folderPath,
@@ -719,7 +726,9 @@ struct VaultInspectorView: View {
                     fileCount: fileCount,
                     modifiedCount: modifiedCount,
                     newCount: newCount,
-                    summary: summary
+                    summary: summary,
+                    healthLabel: health.label,
+                    healthIssues: issuesText
                 ))
             }
 
@@ -909,26 +918,39 @@ private struct VaultFolderRow: View {
     let action: () -> Void
     @State private var isHovered = false
 
-    private var healthColor: Color {
+    private var orgHealthColor: Color {
+        switch folder.healthLabel {
+        case "urgent": return .red
+        case "attention": return .orange
+        default: return .green
+        }
+    }
+
+    private var modHealthColor: Color {
         if folder.healthRatio > 0.8 { return .green }
         if folder.healthRatio > 0.5 { return .orange }
         return .red
     }
 
-    private var hasHealthIssue: Bool {
-        folder.healthRatio <= 0.8
+    private var hasIssue: Bool {
+        folder.healthLabel != "good" || folder.healthRatio <= 0.8
     }
 
-    private var healthIssues: String {
+    private var issueText: String {
         var parts: [String] = []
+        if folder.healthLabel != "good" && !folder.healthIssues.isEmpty {
+            parts.append(folder.healthIssues)
+        }
         if folder.modifiedCount > 0 { parts.append("변경 \(folder.modifiedCount)개") }
         if folder.newCount > 0 { parts.append("신규 \(folder.newCount)개") }
-        if folder.healthRatio <= 0.5 {
-            parts.append("정리 필요")
-        } else {
-            parts.append("점검 권장")
-        }
         return parts.joined(separator: " · ")
+    }
+
+    private var dotColor: Color {
+        if folder.healthLabel == "urgent" { return .red }
+        if folder.healthLabel == "attention" || folder.healthRatio <= 0.5 { return .orange }
+        if folder.healthRatio <= 0.8 { return .orange }
+        return .green
     }
 
     var body: some View {
@@ -954,9 +976,9 @@ private struct VaultFolderRow: View {
 
                 Spacer()
 
-                if hasHealthIssue {
+                if hasIssue {
                     Circle()
-                        .fill(healthColor)
+                        .fill(dotColor)
                         .frame(width: 6, height: 6)
                 }
 
@@ -971,10 +993,10 @@ private struct VaultFolderRow: View {
                     )
             }
 
-            if hasHealthIssue {
-                Text(healthIssues)
+            if hasIssue && !issueText.isEmpty {
+                Text(issueText)
                     .font(.caption2)
-                    .foregroundColor(healthColor)
+                    .foregroundColor(dotColor)
                     .opacity(isHovered ? 1.0 : 0.8)
                     .padding(.leading, 24)
                     .padding(.top, 2)
