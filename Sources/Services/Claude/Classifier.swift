@@ -16,6 +16,7 @@ actor Classifier {
         subfolderContext: String,
         projectNames: [String],
         weightedContext: String = "",
+        areaContext: String = "",
         tagVocabulary: String = "[]",
         onProgress: ((Double, String) -> Void)? = nil
     ) async throws -> [ClassifyResult] {
@@ -59,6 +60,7 @@ actor Classifier {
                         projectContext: projectContext,
                         subfolderContext: subfolderContext,
                         weightedContext: weightedContext,
+                        areaContext: areaContext,
                         tagVocabulary: tagVocabulary
                     )
                 }
@@ -110,6 +112,7 @@ actor Classifier {
                             projectContext: projectContext,
                             subfolderContext: subfolderContext,
                             weightedContext: weightedContext,
+                            areaContext: areaContext,
                             tagVocabulary: tagVocabulary
                         )
                         return (file.fileName, result)
@@ -181,6 +184,7 @@ actor Classifier {
         projectContext: String,
         subfolderContext: String,
         weightedContext: String,
+        areaContext: String,
         tagVocabulary: String
     ) async throws -> [String: ClassifyResult.Stage1Item] {
         // Use condensed preview (800 chars) instead of full content (5000 chars) for Stage 1 triage
@@ -188,7 +192,7 @@ actor Classifier {
             (fileName: file.fileName, content: file.preview)
         }
 
-        let prompt = buildStage1Prompt(fileContents, projectContext: projectContext, subfolderContext: subfolderContext, weightedContext: weightedContext, tagVocabulary: tagVocabulary)
+        let prompt = buildStage1Prompt(fileContents, projectContext: projectContext, subfolderContext: subfolderContext, weightedContext: weightedContext, areaContext: areaContext, tagVocabulary: tagVocabulary)
 
         let response = try await aiService.sendFastWithUsage(maxTokens: 4096, message: prompt)
         if let usage = response.usage {
@@ -235,6 +239,7 @@ actor Classifier {
         projectContext: String,
         subfolderContext: String,
         weightedContext: String,
+        areaContext: String,
         tagVocabulary: String
     ) async throws -> ClassifyResult.Stage2Item {
         let prompt = buildStage2Prompt(
@@ -243,6 +248,7 @@ actor Classifier {
             projectContext: projectContext,
             subfolderContext: subfolderContext,
             weightedContext: weightedContext,
+            areaContext: areaContext,
             tagVocabulary: tagVocabulary
         )
 
@@ -281,6 +287,7 @@ actor Classifier {
         projectContext: String,
         subfolderContext: String,
         weightedContext: String,
+        areaContext: String,
         tagVocabulary: String
     ) -> String {
         let fileList = files.enumerated().map { (i, f) in
@@ -308,12 +315,20 @@ actor Classifier {
 
         """
 
+        let areaSection = areaContext.isEmpty ? "" : """
+
+        ## Area(도메인) 목록
+        아래 등록된 도메인과 소속 프로젝트를 참고하세요. Area는 여러 프로젝트를 묶는 상위 영역입니다.
+        \(areaContext)
+
+        """
+
         return """
         당신은 PARA 방법론 기반 문서 분류 전문가입니다.
 
         ## 활성 프로젝트 목록
         \(projectContext)
-
+        \(areaSection)
         ## 기존 하위 폴더 (이 목록의 정확한 이름만 사용)
         \(subfolderContext)
         새 폴더가 필요하면 targetFolder에 "NEW:폴더명"을 사용하세요. 기존 폴더와 비슷한 이름이 있으면 반드시 기존 이름을 사용하세요.
@@ -323,7 +338,7 @@ actor Classifier {
         | para | 조건 | 예시 | project 필드 |
         |------|------|------|-------------|
         | project | 활성 프로젝트의 직접 작업 문서 (마감 있는 작업, 체크리스트, 회의록) | 스프린트 백로그, 회의록, TODO | 필수: 정확한 프로젝트명 |
-        | area | 여러 프로젝트가 속하는 도메인/영역 (지속적 관리 대상) | 도메인 운영, 인프라 관리 | 관련시만 |
+        | area | 등록된 도메인 전반의 관리/운영 문서. 특정 프로젝트에 속하지 않지만 도메인과 관련된 문서 | 도메인 운영, 인프라 관리, 정책 문서 | 관련시만 |
         | resource | 참고/학습/분석 자료 | 기술 가이드, API 레퍼런스, 분석 보고서 | 관련시만 |
         | archive | 완료/비활성/오래된 문서 | 종료된 작업, 과거 회고록 | 관련시만 |
 
@@ -369,6 +384,7 @@ actor Classifier {
         projectContext: String,
         subfolderContext: String,
         weightedContext: String,
+        areaContext: String,
         tagVocabulary: String
     ) -> String {
         let weightedSection = weightedContext.isEmpty ? "" : """
@@ -392,12 +408,20 @@ actor Classifier {
 
         """
 
+        let areaSection = areaContext.isEmpty ? "" : """
+
+        ## Area(도메인) 목록
+        아래 등록된 도메인과 소속 프로젝트를 참고하세요. Area는 여러 프로젝트를 묶는 상위 영역입니다.
+        \(areaContext)
+
+        """
+
         return """
         당신은 PARA 방법론 기반 문서 분류 전문가입니다. 이 문서를 정밀하게 분석해주세요.
 
         ## 활성 프로젝트 목록
         \(projectContext)
-
+        \(areaSection)
         ## 기존 하위 폴더 (이 목록의 정확한 이름만 사용)
         \(subfolderContext)
         새 폴더가 필요하면 targetFolder에 "NEW:폴더명"을 사용하세요. 기존 폴더와 비슷한 이름이 있으면 반드시 기존 이름을 사용하세요.
@@ -407,7 +431,7 @@ actor Classifier {
         | para | 조건 | 예시 | project 필드 |
         |------|------|------|-------------|
         | project | 활성 프로젝트의 직접 작업 문서 (마감 있는 작업, 체크리스트, 회의록) | 스프린트 백로그, 회의록, TODO | 필수: 정확한 프로젝트명 |
-        | area | 여러 프로젝트가 속하는 도메인/영역 (지속적 관리 대상) | 도메인 운영, 인프라 관리 | 관련시만 |
+        | area | 등록된 도메인 전반의 관리/운영 문서. 특정 프로젝트에 속하지 않지만 도메인과 관련된 문서 | 도메인 운영, 인프라 관리, 정책 문서 | 관련시만 |
         | resource | 참고/학습/분석 자료 | 기술 가이드, API 레퍼런스, 분석 보고서 | 관련시만 |
         | archive | 완료/비활성/오래된 문서 | 종료된 작업, 과거 회고록 | 관련시만 |
 
