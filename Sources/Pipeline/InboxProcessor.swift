@@ -272,6 +272,15 @@ struct InboxProcessor {
             onProgress?(0.93, "시맨틱 연결 중...")
             let linker = SemanticLinker(pkmRoot: pkmRoot)
             let _ = await linker.linkNotes(filePaths: successPaths)
+
+            // Register content hashes for processed .md files so vault inspector
+            // does not flag them as "new" on the next check
+            let mdPaths = successPaths.filter { $0.hasSuffix(".md") }
+            if !mdPaths.isEmpty {
+                let cache = ContentHashCache(pkmRoot: pkmRoot)
+                await cache.load()
+                await cache.updateHashes(mdPaths)
+            }
         }
 
         onFileProgress?(allInputs.count, allInputs.count, "")
