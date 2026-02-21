@@ -1,6 +1,6 @@
 # Services
 
-서비스 레이어 레퍼런스. `Sources/Services/` — 43개 파일, 6개 하위 디렉토리.
+서비스 레이어 레퍼런스. `Sources/Services/` — 39개 파일, 6개 하위 디렉토리.
 
 ## AI Services
 
@@ -113,7 +113,7 @@ PARA 경로 관리 및 보안 검증.
 | `initializeStructure()` | 전체 PARA 폴더 + AI 컴패니언 파일 생성 |
 | `existingSubfolders()` | Area/Resource/Archive 서브폴더 목록 |
 
-**경로 속성**: `inboxPath`, `projectsPath`, `areaPath`, `resourcePath`, `archivePath`, `centralAssetsPath`, `documentsAssetsPath`, `imagesAssetsPath`, `metaPath`, `noteIndexPath`
+**경로 속성**: `inboxPath`, `projectsPath`, `areaPath`, `resourcePath`, `archivePath`, `centralAssetsPath`, `documentsAssetsPath`, `imagesAssetsPath`, `videosAssetsPath`, `metaPath`, `noteIndexPath`
 
 ### InboxScanner
 
@@ -255,21 +255,11 @@ PARA 경로 관리 및 보안 검증.
 | `generateAll(pkmRoot:)` | 모든 AI 컴패니언 파일 생성 (첫 설정) |
 | `updateIfNeeded(pkmRoot:)` | 버전 확인 후 필요 시 재생성 |
 
-**버전**: `static let version = 11`. 동작 변경 시 증가 → 볼트 자동 업데이트 트리거.
+**버전**: `static let version = 13`. 동작 변경 시 증가 → 볼트 자동 업데이트 트리거.
 
 **생성 파일**: CLAUDE.md, AGENTS.md, .cursorrules, 11개 에이전트 파일, 5+ 스킬 파일.
 
 **업데이트 전략**: `<!-- DotBrain:start/end -->` 마커로 DotBrain 생성 영역만 교체. 사용자 수정 보존.
-
-### ContextLinker
-
-`Sources/Services/ContextLinker.swift` — **struct: Sendable**
-
-| 메서드 | 설명 |
-|--------|------|
-| `findRelatedNotes(for:contextMap:onProgress:)` | AI로 관련 노트 검색 (배치 5, 병렬 3) |
-
-**의존**: AIService, FileContentExtractor, StatisticsService
 
 ### ContextMapBuilder
 
@@ -496,7 +486,6 @@ AppState
 │   └── NotificationService
 ├── FolderReorganizer
 │   ├── (InboxProcessor 서비스 공유)
-│   └── ContextLinker ← (AIService, FileContentExtractor)
 ├── VaultReorganizer
 │   └── (InboxProcessor 서비스 공유)
 └── VaultAuditor

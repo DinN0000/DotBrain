@@ -80,7 +80,7 @@ macOS 메뉴바 앱. Obsidian 볼트의 `_Inbox/` 폴더에 드롭된 파일을 
 
 ## Service Layer
 
-`Sources/Services/` — 43개 파일, 6개 하위 디렉토리.
+`Sources/Services/` — 39개 파일, 6개 하위 디렉토리.
 
 | 그룹 | 주요 서비스 | 역할 |
 |------|------------|------|

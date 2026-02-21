@@ -30,9 +30,26 @@ struct ResultsView: View {
 
             Divider()
 
+            // Pipeline error banner
+            if let error = appState.pipelineError {
+                HStack(spacing: 8) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundColor(.white)
+                    Text(error)
+                        .font(.caption)
+                        .foregroundColor(.white)
+                        .lineLimit(3)
+                    Spacer()
+                }
+                .padding(10)
+                .background(RoundedRectangle(cornerRadius: 8).fill(Color.red.opacity(0.85)))
+                .padding(.horizontal)
+                .padding(.top, 8)
+            }
+
             // Results list
             ScrollView {
-                if appState.processedResults.isEmpty && appState.pendingConfirmations.isEmpty {
+                if appState.processedResults.isEmpty && appState.pendingConfirmations.isEmpty && appState.pipelineError == nil {
                     VStack(spacing: 8) {
                         Image(systemName: "tray")
                             .font(.title)
@@ -112,10 +129,28 @@ struct ResultsView: View {
     }
 
     private func openInFinder() {
-        if let firstSuccess = appState.processedResults.first(where: \.isSuccess) {
-            let dir = (firstSuccess.targetPath as NSString).deletingLastPathComponent
-            NSWorkspace.shared.selectFile(firstSuccess.targetPath, inFileViewerRootedAtPath: dir)
+        let successPaths = appState.processedResults
+            .filter(\.isSuccess)
+            .map(\.targetPath)
+            .filter { !$0.isEmpty }
+
+        guard !successPaths.isEmpty else { return }
+
+        if successPaths.count == 1 {
+            let dir = (successPaths[0] as NSString).deletingLastPathComponent
+            NSWorkspace.shared.selectFile(successPaths[0], inFileViewerRootedAtPath: dir)
+            return
         }
+
+        // Find common parent folder
+        let folders = successPaths.map { ($0 as NSString).deletingLastPathComponent }
+        var common = folders[0]
+        for folder in folders.dropFirst() {
+            while !folder.hasPrefix(common) {
+                common = (common as NSString).deletingLastPathComponent
+            }
+        }
+        NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: common)
     }
 }
 

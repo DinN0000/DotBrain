@@ -203,6 +203,38 @@ struct FileAnalysis: Identifiable {
 }
 ```
 
+## Vault Check Pipeline
+
+`Sources/Pipeline/VaultCheckPipeline.swift` — 대시보드에서 "전체 점검" 실행 시 동작. Audit, Enrich, Index, SemanticLink를 한 번에 수행.
+
+### 5단계 처리 흐름
+
+```
+볼트 전체
+    │
+    ▼
+1. Audit ── VaultAuditor.audit() (0%→10%)
+    │         깨진 링크, 누락 frontmatter, 누락 PARA, 빈 태그 감지
+    ▼
+2. Repair ── VaultAuditor.repair() (10%→20%)
+    │          자동 복구 (링크, frontmatter, PARA)
+    │          ContentHashCache 업데이트
+    ▼
+3. Enrich ── NoteEnricher (25%→60%)
+    │          변경된 파일만 대상 (ContentHashCache 기반)
+    │          4_Archive/ 제외
+    │          TaskGroup max 3 병렬
+    ▼
+4. Index ── NoteIndexGenerator.updateForFolders() (60%→70%)
+    │         변경된 폴더만 갱신
+    ▼
+5. Link ── SemanticLinker.linkAll() (70%→95%)
+            변경된 파일만 대상
+            해시 캐시 최종 저장
+```
+
+**호출 경로**: `AppState.startVaultCheck()` → `VaultCheckPipeline.run()`. AppState는 progress callback으로 UI만 업데이트.
+
 ## Vault Audit Pipeline
 
 `Sources/Services/VaultAuditor.swift` — 볼트 점검 및 자동 수리.
@@ -324,6 +356,7 @@ struct LinkResult {
 | InboxProcessor | async | max 5 | max 3 (배치) + max 3 (정밀) | Task.isCancelled |
 | FolderReorganizer | async | max 5 | Classifier 재사용 | - |
 | VaultReorganizer | async | max 5 | Classifier 재사용 | Task.isCancelled |
+| VaultCheckPipeline | async | - | max 3 (Enrich) | Task.isCancelled |
 | VaultAuditor | sync | - | - | - |
 | SemanticLinker | async | - | max 3 (AI 필터) | - |
 

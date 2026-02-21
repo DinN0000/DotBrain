@@ -71,7 +71,7 @@ Hardware UUID (IOKit)
         ▼
 HKDF<SHA256>.deriveKey(
     inputKeyMaterial: UUID + salt,
-    salt: "dotbrain-keys-v2",
+    salt: "dotbrain-kdf-salt-v2",
     info: "dotbrain-encryption",
     outputByteCount: 32
 )
@@ -80,7 +80,7 @@ HKDF<SHA256>.deriveKey(
 AES-GCM.seal(keyData, using: derivedKey)
         │
         ▼
-~/.local/share/com.hwaa.dotbrain/keys.enc  (chmod 0o600)
+~/Library/Application Support/com.hwaa.dotbrain/keys.enc  (chmod 0o600)
 ```
 
 | 레이어 | 기술 |

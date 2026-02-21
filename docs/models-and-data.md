@@ -1,6 +1,6 @@
 # Models and Data
 
-데이터 모델, frontmatter 스키마, 상태 관리. `Sources/Models/` — 10개 파일.
+데이터 모델, frontmatter 스키마, 상태 관리. `Sources/Models/` — 9개 파일.
 
 ## AppState Screen Enum
 
@@ -46,6 +46,7 @@ enum Screen {
 | `processingCompletedCount` | `Int` | 완료 파일 수 |
 | `processingTotalCount` | `Int` | 전체 파일 수 |
 | `processedResults` | `[ProcessedFileResult]` | 처리 결과 목록 |
+| `pipelineError` | `String?` | 파이프라인 수준 오류 메시지 |
 | `pendingConfirmations` | `[PendingConfirmation]` | 사용자 확인 대기 |
 | `affectedFolders` | `Set<String>` | 영향받은 폴더 |
 | `processingOrigin` | `Screen` | 처리 시작 화면 |
