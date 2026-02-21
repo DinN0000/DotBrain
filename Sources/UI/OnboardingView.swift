@@ -15,6 +15,8 @@ struct OnboardingView: View {
     @State private var showFolderError = false
     @State private var areas: [String] = []
     @State private var newAreaName: String = ""
+    @State private var selectedArea: String = ""
+    @State private var projectAreas: [String: String] = [:]
 
     private let totalSteps = 6
 
@@ -561,6 +563,22 @@ struct OnboardingView: View {
                     .accessibilityLabel("프로젝트 추가")
                 }
 
+                if !areas.isEmpty {
+                    HStack(spacing: 8) {
+                        Text("Area:")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        Picker("", selection: $selectedArea) {
+                            Text("없음").tag("")
+                            ForEach(areas, id: \.self) { area in
+                                Text(area).tag(area)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                        .frame(maxWidth: 150)
+                    }
+                }
+
                 if !projects.isEmpty {
                     ScrollView {
                         VStack(spacing: 3) {
@@ -571,6 +589,16 @@ struct OnboardingView: View {
                                         .foregroundColor(.secondary)
                                     Text(name)
                                         .font(.subheadline)
+
+                                    if let area = projectAreas[name], !area.isEmpty {
+                                        Text(area)
+                                            .font(.caption2)
+                                            .foregroundColor(.green)
+                                            .padding(.horizontal, 6)
+                                            .padding(.vertical, 1)
+                                            .background(Color.green.opacity(0.1))
+                                            .cornerRadius(4)
+                                    }
 
                                     Spacer()
 
@@ -952,6 +980,8 @@ struct OnboardingView: View {
         guard pathManager.isPathSafe(projectDir) else { return }
         let fm = FileManager.default
 
+        let areaName = selectedArea.isEmpty ? nil : selectedArea
+
         do {
             try fm.createDirectory(atPath: projectDir, withIntermediateDirectories: true)
             let indexPath = (projectDir as NSString).appendingPathComponent("\(name).md")
@@ -959,17 +989,44 @@ struct OnboardingView: View {
                 let content = FrontmatterWriter.createIndexNote(
                     folderName: name,
                     para: .project,
-                    description: "\(name) 프로젝트"
+                    description: "\(name) 프로젝트",
+                    area: areaName
                 )
                 try content.write(toFile: indexPath, atomically: true, encoding: .utf8)
             }
+
+            if let area = areaName {
+                updateAreaProjects(area: area, addProject: name)
+            }
+
             projects.append(name)
             projects.sort()
+            projectAreas[name] = areaName ?? ""
             newProjectName = ""
         } catch {
             NSLog("[OnboardingView] 프로젝트 생성 실패: %@", error.localizedDescription)
             newProjectName = ""
         }
+    }
+
+    private func updateAreaProjects(area: String, addProject projectName: String) {
+        let pathManager = PKMPathManager(root: appState.pkmRootPath)
+        let areaIndexPath = (pathManager.areaPath as NSString)
+            .appendingPathComponent(area)
+            .appending("/\(area).md")
+
+        guard let content = try? String(contentsOfFile: areaIndexPath, encoding: .utf8) else { return }
+        var (fm, body) = Frontmatter.parse(markdown: content)
+
+        var currentProjects = fm.projects ?? []
+        if !currentProjects.contains(projectName) {
+            currentProjects.append(projectName)
+            currentProjects.sort()
+        }
+        fm.projects = currentProjects
+
+        let updated = fm.stringify() + "\n" + body
+        try? updated.write(toFile: areaIndexPath, atomically: true, encoding: .utf8)
     }
 
     private func removeProject(_ name: String) {
