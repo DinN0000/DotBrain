@@ -147,17 +147,10 @@ struct OnboardingView: View {
             .cornerRadius(8)
             .padding(.horizontal, 32)
 
-            // Sparkle arrow
-            HStack(spacing: 4) {
-                Image(systemName: "sparkles")
-                    .font(.system(size: 10))
-                Image(systemName: "arrow.down")
-                    .font(.system(size: 11, weight: .semibold))
-                Image(systemName: "sparkles")
-                    .font(.system(size: 10))
-            }
-            .foregroundColor(.green)
-            .padding(.vertical, 8)
+            Image(systemName: "arrow.down")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundColor(.green)
+                .padding(.vertical, 8)
 
             // After — order
             VStack(alignment: .leading, spacing: 3) {
@@ -165,9 +158,9 @@ struct OnboardingView: View {
                 afterFileRow("킥오프 미팅.md", indent: true)
                 afterFileRow("WBS.md", indent: true)
                 afterFolderRow("Area/전략/")
-                afterFileRow("회의 메모.md", indent: true)
-                afterFolderRow("Resource/")
                 afterFileRow("경쟁사 분석.md", indent: true)
+                afterFolderRow("Resource/")
+                afterFileRow("회의 메모.md", indent: true)
 
                 HStack(spacing: 4) {
                     Image(systemName: "archivebox")
