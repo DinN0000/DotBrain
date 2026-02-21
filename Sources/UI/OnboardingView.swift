@@ -117,17 +117,12 @@ struct OnboardingView: View {
 
     private var welcomeStep: some View {
         VStack(spacing: 0) {
+            stepHeader(
+                title: "DotBrain",
+                desc: "Built for humans. Optimized for AI."
+            )
+
             Spacer()
-
-            Text("DotBrain")
-                .font(.title)
-                .fontWeight(.bold)
-                .padding(.bottom, 2)
-
-            Text("Built for humans. Optimized for AI.")
-                .font(.caption)
-                .foregroundColor(.secondary)
-                .padding(.bottom, 20)
 
             // Before — chaos
             VStack(alignment: .leading, spacing: 3) {
