@@ -526,13 +526,13 @@ struct OnboardingView: View {
 
                     if !areas.isEmpty {
                         Picker("", selection: $selectedArea) {
-                            Text("도메인 없음").tag("")
+                            Text("없음").tag("")
                             ForEach(areas, id: \.self) { area in
                                 Text(area).tag(area)
                             }
                         }
                         .pickerStyle(.menu)
-                        .frame(maxWidth: 120)
+                        .fixedSize()
                     }
 
                     Button(action: addProject) {
@@ -1126,15 +1126,21 @@ struct OnboardingView: View {
 
             Spacer()
 
-            Button(action: completeOnboarding) {
-                Text("시작하기")
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 4)
+            HStack {
+                Button("이전") { goBack() }
+                    .buttonStyle(.bordered)
+                    .controlSize(.regular)
+
+                Spacer()
+
+                Button(action: completeOnboarding) {
+                    Text("시작하기")
+                        .frame(minWidth: 80)
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.regular)
             }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.large)
-            .tint(.primary.opacity(0.85))
-            .padding(.horizontal, 40)
+            .padding(.horizontal, 32)
             .padding(.bottom, 20)
         }
         .padding(.horizontal)
