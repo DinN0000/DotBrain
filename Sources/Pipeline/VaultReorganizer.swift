@@ -90,6 +90,7 @@ struct VaultReorganizer {
         let subfolderContext = contextBuilder.buildSubfolderContext()
         let projectNames = contextBuilder.extractProjectNames(from: projectContext)
         let weightedContext = contextBuilder.buildWeightedContext()
+        let areaContext = contextBuilder.buildAreaContext()
 
         onProgress?(0.2, "프로젝트 컨텍스트 로드 완료")
 
@@ -149,6 +150,7 @@ struct VaultReorganizer {
             subfolderContext: subfolderContext,
             projectNames: projectNames,
             weightedContext: weightedContext,
+            areaContext: areaContext,
             onProgress: { [onProgress] progress, status in
                 let mapped = 0.4 + progress * 0.5
                 onProgress?(mapped, status)
