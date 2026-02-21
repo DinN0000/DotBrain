@@ -144,7 +144,7 @@ struct VaultCheckPipeline {
             untaggedFiles: report.untaggedFiles.count,
             repairCount: repairCount,
             enrichCount: enrichCount,
-            mocUpdated: true,
+            mocUpdated: !dirtyFolders.isEmpty,
             linksCreated: linkResult.linksCreated
         )
     }

@@ -934,7 +934,7 @@ final class AppState: ObservableObject {
     }
 }
 
-struct VaultCheckResult {
+struct VaultCheckResult: Equatable {
     let brokenLinks: Int
     let missingFrontmatter: Int
     let missingPARA: Int
