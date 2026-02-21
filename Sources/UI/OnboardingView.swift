@@ -131,11 +131,11 @@ struct OnboardingView: View {
 
             // Before — chaos
             VStack(alignment: .leading, spacing: 3) {
-                beforeFileRow("회의록_최종_진짜최종(2).docx")
-                beforeFileRow("스크린샷 2026-01-15 오후 3.42.png")
-                beforeFileRow("Untitled.pdf")
-                beforeFileRow("이름없는 문서.txt")
-                beforeFileRow("메모메모.md")
+                beforeFileRow("킥오프_수정_최종_진짜최종(2).docx")
+                beforeFileRow("경쟁사_분석_v3_수정중.xlsx")
+                beforeFileRow("서비스플로우_캡처.png")
+                beforeFileRow("회의_급한메모_0115.md")
+                beforeFileRow("WBS_초안_검토필요.pdf")
             }
             .padding(10)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -161,12 +161,26 @@ struct OnboardingView: View {
 
             // After — order
             VStack(alignment: .leading, spacing: 3) {
-                afterFolderRow("Project/앱 출시/")
-                afterFileRow("회의록.docx", indent: true)
-                afterFolderRow("Area/제품/")
-                afterFileRow("UI 스크린샷.png", indent: true)
+                afterFolderRow("Project/신규 서비스/")
+                afterFileRow("킥오프 미팅.md", indent: true)
+                afterFileRow("WBS.md", indent: true)
+                afterFolderRow("Area/전략/")
+                afterFileRow("회의 메모.md", indent: true)
                 afterFolderRow("Resource/")
-                afterFileRow("기획서.pdf", indent: true)
+                afterFileRow("경쟁사 분석.md", indent: true)
+
+                HStack(spacing: 4) {
+                    Image(systemName: "archivebox")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                    Text("_assets/")
+                        .font(.system(.caption2, design: .monospaced))
+                        .foregroundColor(.secondary)
+                    Text("docx · xlsx · png · pdf")
+                        .font(.caption2)
+                        .foregroundColor(.secondary.opacity(0.7))
+                }
+                .padding(.top, 2)
             }
             .padding(10)
             .frame(maxWidth: .infinity, alignment: .leading)
