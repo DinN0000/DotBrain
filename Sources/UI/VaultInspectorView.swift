@@ -72,8 +72,8 @@ struct VaultInspectorView: View {
             BreadcrumbView(current: .vaultInspector)
             Divider()
 
-            if reorgPhase != .idle {
-                reorgView
+            if reorgPhase == .reviewPlan {
+                reorgPlanReviewView
             } else {
                 folderListView
             }
@@ -137,13 +137,34 @@ struct VaultInspectorView: View {
             .padding(.horizontal)
             .padding(.vertical, 8)
 
-            // Vault check inline progress (from AppState)
+            // Inline progress/result cards
             if appState.backgroundTaskName == "전체 점검" {
-                InlineProgress(message: appState.backgroundTaskPhase)
+                taskProgressCard(
+                    title: "자동 수리",
+                    progress: appState.backgroundTaskProgress,
+                    status: appState.backgroundTaskPhase,
+                    onCancel: { appState.cancelBackgroundTask() }
+                )
+                .padding(.top, 4)
             }
 
             if let result = appState.vaultCheckResult {
                 vaultCheckResultCard(result)
+            }
+
+            if reorgPhase == .scanning || reorgPhase == .executing {
+                taskProgressCard(
+                    title: reorgPhase == .scanning ? "AI 스캔 중" : "재정리 실행 중",
+                    progress: reorgProgress,
+                    status: reorgStatus,
+                    onCancel: { resetReorg() }
+                )
+                .padding(.top, 4)
+            }
+
+            if reorgPhase == .done {
+                reorgResultCard
+                    .padding(.top, 4)
             }
 
             Divider()
@@ -154,6 +175,7 @@ struct VaultInspectorView: View {
                 ProgressView()
                 Spacer()
             } else {
+                let isBusy = reorgPhase == .scanning || reorgPhase == .executing
                 ScrollView {
                     LazyVStack(spacing: 0) {
                         ForEach(flatItems) { item in
@@ -187,6 +209,8 @@ struct VaultInspectorView: View {
                     .padding(.horizontal)
                     .padding(.vertical, 8)
                 }
+                .disabled(isBusy)
+                .opacity(isBusy ? 0.5 : 1.0)
             }
         }
     }
@@ -253,54 +277,7 @@ struct VaultInspectorView: View {
         NSWorkspace.shared.open(safeURL)
     }
 
-    // MARK: - Reorganize View (absorbed from VaultReorganizeView)
-
-    @ViewBuilder
-    private var reorgView: some View {
-        switch reorgPhase {
-        case .idle:
-            EmptyView()
-        case .scanning:
-            reorgScanningView
-        case .reviewPlan:
-            reorgPlanReviewView
-        case .executing:
-            reorgExecutingView
-        case .done:
-            reorgResultsView
-        }
-    }
-
-    private var reorgScanningView: some View {
-        VStack(spacing: 16) {
-            Spacer()
-            Text("AI 스캔 중")
-                .font(.headline)
-            ProgressView()
-                .controlSize(.large)
-            VStack(spacing: 6) {
-                ProgressView(value: reorgProgress)
-                    .progressViewStyle(.linear)
-                    .padding(.horizontal, 40)
-                HStack {
-                    Spacer()
-                    Text("\(Int(reorgProgress * 100))%")
-                        .font(.subheadline)
-                        .fontWeight(.medium)
-                        .monospacedDigit()
-                }
-                .padding(.horizontal, 40)
-            }
-            Text(reorgStatus)
-                .font(.caption)
-                .foregroundColor(.secondary)
-                .lineLimit(2)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal)
-            Spacer()
-        }
-        .padding()
-    }
+    // MARK: - Reorganize Plan Review (full-screen)
 
     private var reorgPlanReviewView: some View {
         let movableCount = analyses.filter(\.needsMove).count
@@ -480,97 +457,107 @@ struct VaultInspectorView: View {
         .padding(.horizontal, 8)
     }
 
-    private var reorgExecutingView: some View {
-        VStack(spacing: 16) {
-            Spacer()
-            Text("재정리 실행 중")
-                .font(.headline)
-            ProgressView()
-                .controlSize(.large)
-            VStack(spacing: 6) {
-                ProgressView(value: reorgProgress)
-                    .progressViewStyle(.linear)
-                    .padding(.horizontal, 40)
-                HStack {
-                    Spacer()
-                    Text("\(Int(reorgProgress * 100))%")
-                        .font(.subheadline)
-                        .fontWeight(.medium)
-                        .monospacedDigit()
-                }
-                .padding(.horizontal, 40)
+    // MARK: - Task Progress Card (inline)
+
+    @ViewBuilder
+    private func taskProgressCard(title: String, progress: Double, status: String, onCancel: @escaping () -> Void) -> some View {
+        VStack(spacing: 6) {
+            HStack {
+                ProgressView()
+                    .controlSize(.small)
+                Text(title)
+                    .font(.caption)
+                    .fontWeight(.medium)
+                Spacer()
+                Button("취소") { onCancel() }
+                    .font(.caption2)
+                    .buttonStyle(.plain)
+                    .foregroundColor(.secondary)
             }
-            Text(reorgStatus)
-                .font(.caption)
-                .foregroundColor(.secondary)
-                .lineLimit(2)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal)
-            Spacer()
+            ProgressView(value: progress)
+                .progressViewStyle(.linear)
+            if !status.isEmpty {
+                HStack {
+                    Text(status)
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
+                    Spacer()
+                    Text("\(Int(progress * 100))%")
+                        .font(.caption2)
+                        .monospacedDigit()
+                        .foregroundColor(.secondary)
+                }
+            }
         }
-        .padding()
+        .padding(10)
+        .background(Color.accentColor.opacity(0.06))
+        .cornerRadius(8)
+        .padding(.horizontal)
     }
 
-    private var reorgResultsView: some View {
-        VStack(spacing: 0) {
-            ScrollView {
-                LazyVStack(spacing: 2) {
-                    let successCount = reorgResults.filter(\.isSuccess).count
-                    let errorCount = reorgResults.filter(\.isError).count
+    // MARK: - Reorg Result Card (inline)
 
-                    if reorgResults.isEmpty {
-                        // No files needed moving
-                        VStack(spacing: 8) {
-                            Image(systemName: "checkmark.circle.fill")
-                                .font(.title2)
-                                .foregroundColor(.green)
-                            Text("모든 파일이 적절한 위치에 있습니다")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 24)
-                    } else if successCount > 0 || errorCount > 0 {
-                        VStack(alignment: .leading, spacing: 6) {
-                            Label("\(successCount)개 파일 재정리 완료", systemImage: "checkmark.circle")
-                                .font(.caption)
-                                .fontWeight(.medium)
-                                .foregroundColor(.green)
-                            if errorCount > 0 {
-                                HStack(spacing: 2) {
-                                    Image(systemName: "xmark.circle")
-                                        .font(.caption2)
-                                        .foregroundColor(.red)
-                                    Text("\(errorCount) 오류")
-                                        .font(.caption2)
-                                        .foregroundColor(.secondary)
-                                }
-                            }
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(10)
-                        .background(RoundedRectangle(cornerRadius: 8).fill(Color.green.opacity(0.08)))
-                        .padding(.bottom, 6)
-                    }
+    @ViewBuilder
+    private var reorgResultCard: some View {
+        let successCount = reorgResults.filter(\.isSuccess).count
+        let errorResults = reorgResults.filter(\.isError)
+        let hasErrors = !errorResults.isEmpty
+        let isEmpty = reorgResults.isEmpty
 
-                    ForEach(reorgResults) { result in
-                        ResultRow(result: result)
+        VStack(alignment: .leading, spacing: 6) {
+            if isEmpty {
+                HStack(spacing: 6) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.caption)
+                        .foregroundColor(.green)
+                    Text("모든 파일이 적절한 위치에 있습니다")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            } else {
+                if successCount > 0 {
+                    HStack(spacing: 6) {
+                        Image(systemName: "checkmark.circle")
+                            .font(.caption)
+                            .foregroundColor(.green)
+                        Text("\(successCount)개 파일 재정리 완료")
+                            .font(.caption)
+                            .fontWeight(.medium)
+                            .foregroundColor(.green)
+                        Spacer()
                     }
                 }
-                .padding(.horizontal)
-                .padding(.vertical, 8)
+                if hasErrors {
+                    HStack(spacing: 6) {
+                        Image(systemName: "xmark.circle")
+                            .font(.caption)
+                            .foregroundColor(.red)
+                        Text("\(errorResults.count)건 오류")
+                            .font(.caption)
+                            .foregroundColor(.red)
+                        Spacer()
+                    }
+                    ForEach(errorResults) { result in
+                        Text("\(result.fileName) — \(result.error ?? "이동 실패")")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                            .padding(.leading, 22)
+                    }
+                }
             }
-
-            Divider()
-
             HStack {
                 Spacer()
                 Button("돌아가기") { resetReorg() }
-                    .font(.caption)
-                    .buttonStyle(.bordered)
+                    .font(.caption2)
+                    .buttonStyle(.plain)
+                    .foregroundColor(.secondary)
             }
-            .padding()
         }
+        .padding(10)
+        .background(hasErrors ? Color.orange.opacity(0.06) : Color.green.opacity(0.06))
+        .cornerRadius(8)
+        .padding(.horizontal)
     }
 
     // MARK: - Vault Check Result Card
