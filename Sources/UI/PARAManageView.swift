@@ -191,9 +191,7 @@ struct PARAManageView: View {
                 name: folder.name,
                 fileCount: folder.fileCount,
                 summary: folder.summary,
-                category: category,
-                healthLabel: folder.healthLabel,
-                healthIssues: folder.healthIssues
+                category: category
             )
             .contentShape(Rectangle())
             .onTapGesture {
@@ -391,10 +389,15 @@ struct PARAManageView: View {
             var isDir: ObjCBool = false
             guard fm.fileExists(atPath: fullPath, isDirectory: &isDir), isDir.boolValue else { continue }
 
-            let health = FolderHealthAnalyzer.analyze(
-                folderPath: fullPath, folderName: entry, category: category
-            )
-            let issuesText = health.issues.map(\.localizedDescription).joined(separator: "\n")
+            // Count .md files
+            var mdCount = 0
+            if let files = try? fm.contentsOfDirectory(atPath: fullPath) {
+                for file in files {
+                    if file.hasSuffix(".md"), !file.hasPrefix("."), !file.hasPrefix("_") {
+                        mdCount += 1
+                    }
+                }
+            }
 
             // Read index note for summary
             let indexPath = (fullPath as NSString).appendingPathComponent("\(entry).md")
@@ -408,10 +411,8 @@ struct PARAManageView: View {
 
             results.append(FolderEntry(
                 name: entry,
-                fileCount: health.fileCount,
-                summary: summary,
-                healthLabel: health.label,
-                healthIssues: issuesText
+                fileCount: mdCount,
+                summary: summary
             ))
         }
         return results
@@ -634,8 +635,6 @@ struct FolderEntry: Identifiable {
     let name: String
     let fileCount: Int
     let summary: String
-    let healthLabel: String
-    let healthIssues: String
 }
 
 // MARK: - Folder Row
@@ -645,68 +644,39 @@ private struct PARAFolderRow: View {
     let fileCount: Int
     let summary: String
     let category: PARACategory
-    let healthLabel: String
-    let healthIssues: String
     @State private var isHovered = false
 
-    private var healthColor: Color {
-        switch healthLabel {
-        case "urgent": return .red
-        case "attention": return .orange
-        default: return .green
-        }
-    }
-
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: 8) {
-                Image(systemName: "folder")
-                    .font(.system(size: 13))
-                    .foregroundColor(categoryColor)
-                    .frame(width: 16)
+        HStack(spacing: 8) {
+            Image(systemName: "folder")
+                .font(.system(size: 13))
+                .foregroundColor(category.color)
+                .frame(width: 16)
 
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(name)
-                        .font(.caption)
-                        .fontWeight(.medium)
-                        .lineLimit(1)
-                    if !summary.isEmpty {
-                        Text(summary)
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
-                            .lineLimit(1)
-                    }
-                }
-
-                Spacer()
-
-                // Health indicator dot
-                if healthLabel != "good" {
-                    Circle()
-                        .fill(healthColor)
-                        .frame(width: 6, height: 6)
-                }
-
-                Text("\(fileCount)")
+            VStack(alignment: .leading, spacing: 1) {
+                Text(name)
                     .font(.caption)
-                    .foregroundColor(.secondary)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .background(
-                        Capsule()
-                            .fill(Color.secondary.opacity(0.12))
-                    )
-
+                    .fontWeight(.medium)
+                    .lineLimit(1)
+                if !summary.isEmpty {
+                    Text(summary)
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
+                }
             }
 
-            if healthLabel != "good" && !healthIssues.isEmpty {
-                Text(healthIssues)
-                    .font(.caption2)
-                    .foregroundColor(healthColor)
-                    .opacity(isHovered ? 1.0 : 0.8)
-                    .padding(.leading, 24)
-                    .padding(.top, 2)
-            }
+            Spacer()
+
+            Text("\(fileCount)")
+                .font(.caption)
+                .foregroundColor(.secondary)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 2)
+                .background(
+                    Capsule()
+                        .fill(Color.secondary.opacity(0.12))
+                )
         }
         .padding(.vertical, 4)
         .padding(.horizontal, 8)
@@ -717,8 +687,6 @@ private struct PARAFolderRow: View {
         .animation(.easeOut(duration: 0.12), value: isHovered)
         .onHover { isHovered = $0 }
     }
-
-    private var categoryColor: Color { category.color }
 }
 
 // MARK: - Category Header
