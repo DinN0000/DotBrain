@@ -279,8 +279,8 @@ struct OnboardingView: View {
                         VStack(alignment: .leading, spacing: 8) {
                             paraExplanationRow(
                                 folder: "Project",
-                                metaphor: "책상 위",
-                                desc: "마감이 있는 진행 중인 작업"
+                                metaphor: "진행 중인 작업",
+                                desc: "마감이 있는 프로젝트 단위 업무"
                             )
                             paraExplanationRow(
                                 folder: "Area",
