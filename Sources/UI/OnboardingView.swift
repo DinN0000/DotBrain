@@ -526,7 +526,7 @@ struct OnboardingView: View {
 
                     if !areas.isEmpty {
                         Picker("", selection: $selectedArea) {
-                            Text("없음").tag("")
+                            Text("선택").tag("")
                             ForEach(areas, id: \.self) { area in
                                 Text(area).tag(area)
                             }
