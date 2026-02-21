@@ -144,12 +144,15 @@ struct FolderReorganizer {
 
         // Classify with AI
         let classifier = Classifier()
+        let correctionContext = CorrectionMemory.buildPromptContext(pkmRoot: pkmRoot)
         let classifications = try await classifier.classifyFiles(
             inputs,
             projectContext: projectContext,
             subfolderContext: subfolderContext,
             projectNames: projectNames,
             weightedContext: weightedContext,
+            correctionContext: correctionContext,
+            pkmRoot: pkmRoot,
             onProgress: { [onProgress] progress, status in
                 let mappedProgress = 0.3 + progress * 0.4
                 onProgress?(mappedProgress, status)

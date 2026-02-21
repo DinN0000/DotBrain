@@ -30,11 +30,13 @@ struct ProjectContextBuilder {
             let indexPath = (projectDir as NSString).appendingPathComponent("\(entry).md")
 
             if let content = try? String(contentsOfFile: indexPath, encoding: .utf8) {
-                let (frontmatter, _) = Frontmatter.parse(markdown: content)
+                let (frontmatter, body) = Frontmatter.parse(markdown: content)
                 let summary = frontmatter.summary ?? ""
                 let tags = frontmatter.tags.isEmpty ? "" : frontmatter.tags.joined(separator: ", ")
                 let areaStr = frontmatter.area.map { " (Area: \($0))" } ?? ""
-                lines.append("- \(entry): \(summary) [\(tags)]\(areaStr)")
+                let scope = extractScope(from: body)
+                let scopeStr = scope.isEmpty ? "" : " (scope: \(scope))"
+                lines.append("- \(entry)\(scopeStr): \(summary) [\(tags)]\(areaStr)")
             } else {
                 lines.append("- \(entry)")
             }
@@ -105,10 +107,11 @@ struct ProjectContextBuilder {
         context.split(separator: "\n").compactMap { line in
             guard line.hasPrefix("- ") else { return nil }
             let rest = line.dropFirst(2)
-            if let colonIdx = rest.firstIndex(of: ":") {
-                return String(rest[..<colonIdx]).trimmingCharacters(in: .whitespaces)
-            }
-            return String(rest).trimmingCharacters(in: .whitespaces)
+            // Find name boundary: first '(' (scope) or ':' (summary), whichever comes first
+            let parenIdx = rest.firstIndex(of: "(")
+            let colonIdx = rest.firstIndex(of: ":")
+            let endIdx = [parenIdx, colonIdx].compactMap { $0 }.min() ?? rest.endIndex
+            return String(rest[..<endIdx]).trimmingCharacters(in: .whitespaces)
         }
     }
 
@@ -269,6 +272,26 @@ struct ProjectContextBuilder {
         }
 
         return lines.joined(separator: "\n")
+    }
+
+    /// Extract scope description from index note body (first non-empty line or blockquote)
+    private func extractScope(from body: String) -> String {
+        let lines = body.components(separatedBy: .newlines)
+        for line in lines {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            if trimmed.isEmpty { continue }
+            // Skip headings and document list sections
+            if trimmed.hasPrefix("#") { continue }
+            if trimmed.hasPrefix("- [[") { continue }
+            // Use blockquote content if present
+            if trimmed.hasPrefix(">") {
+                let content = String(trimmed.dropFirst()).trimmingCharacters(in: .whitespaces)
+                if !content.isEmpty { return String(content.prefix(100)) }
+                continue
+            }
+            return String(trimmed.prefix(100))
+        }
+        return ""
     }
 
     // MARK: - Tag Vocabulary

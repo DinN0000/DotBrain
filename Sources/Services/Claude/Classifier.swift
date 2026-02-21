@@ -18,6 +18,8 @@ actor Classifier {
         weightedContext: String = "",
         areaContext: String = "",
         tagVocabulary: String = "[]",
+        correctionContext: String = "",
+        pkmRoot: String = "",
         onProgress: ((Double, String) -> Void)? = nil
     ) async throws -> [ClassifyResult] {
         guard !files.isEmpty else { return [] }
@@ -61,7 +63,8 @@ actor Classifier {
                         subfolderContext: subfolderContext,
                         weightedContext: weightedContext,
                         areaContext: areaContext,
-                        tagVocabulary: tagVocabulary
+                        tagVocabulary: tagVocabulary,
+                        correctionContext: correctionContext
                     )
                 }
                 activeTasks += 1
@@ -113,7 +116,8 @@ actor Classifier {
                             subfolderContext: subfolderContext,
                             weightedContext: weightedContext,
                             areaContext: areaContext,
-                            tagVocabulary: tagVocabulary
+                            tagVocabulary: tagVocabulary,
+                            correctionContext: correctionContext
                         )
                         return (file.fileName, result)
                     }
@@ -144,7 +148,7 @@ actor Classifier {
                     tags: s2.tags,
                     summary: s2.summary,
                     targetFolder: s2.targetFolder,
-                    project: rawProject.flatMap { fuzzyMatchProject($0, projectNames: projectNames) },
+                    project: rawProject.flatMap { fuzzyMatchProject($0, projectNames: projectNames, pkmRoot: pkmRoot) },
                     confidence: s2.confidence ?? 0.0
                 )
             } else if let s1 = s1 {
@@ -153,7 +157,7 @@ actor Classifier {
                     tags: s1.tags,
                     summary: s1.summary,
                     targetFolder: stripNewPrefix(stripParaPrefix(s1.targetFolder ?? "")),
-                    project: rawProject.flatMap { fuzzyMatchProject($0, projectNames: projectNames) },
+                    project: rawProject.flatMap { fuzzyMatchProject($0, projectNames: projectNames, pkmRoot: pkmRoot) },
                     confidence: s1.confidence
                 )
             } else {
@@ -173,6 +177,10 @@ actor Classifier {
                 result.suggestedProject = rawProject
             }
 
+            // Remove project names from tags (AI hallucination prevention)
+            let projectNameSet = Set(projectNames.map { $0.lowercased() })
+            result.tags = result.tags.filter { !projectNameSet.contains($0.lowercased()) }
+
             return result
         }
     }
@@ -185,14 +193,15 @@ actor Classifier {
         subfolderContext: String,
         weightedContext: String,
         areaContext: String,
-        tagVocabulary: String
+        tagVocabulary: String,
+        correctionContext: String
     ) async throws -> [String: ClassifyResult.Stage1Item] {
         // Use condensed preview (800 chars) instead of full content (5000 chars) for Stage 1 triage
         let fileContents = files.map { file in
             (fileName: file.fileName, content: file.preview)
         }
 
-        let prompt = buildStage1Prompt(fileContents, projectContext: projectContext, subfolderContext: subfolderContext, weightedContext: weightedContext, areaContext: areaContext, tagVocabulary: tagVocabulary)
+        let prompt = buildStage1Prompt(fileContents, projectContext: projectContext, subfolderContext: subfolderContext, weightedContext: weightedContext, areaContext: areaContext, tagVocabulary: tagVocabulary, correctionContext: correctionContext)
 
         let response = try await aiService.sendFastWithUsage(maxTokens: 4096, message: prompt)
         if let usage = response.usage {
@@ -240,7 +249,8 @@ actor Classifier {
         subfolderContext: String,
         weightedContext: String,
         areaContext: String,
-        tagVocabulary: String
+        tagVocabulary: String,
+        correctionContext: String
     ) async throws -> ClassifyResult.Stage2Item {
         let prompt = buildStage2Prompt(
             fileName: file.fileName,
@@ -249,7 +259,8 @@ actor Classifier {
             subfolderContext: subfolderContext,
             weightedContext: weightedContext,
             areaContext: areaContext,
-            tagVocabulary: tagVocabulary
+            tagVocabulary: tagVocabulary,
+            correctionContext: correctionContext
         )
 
         let response = try await aiService.sendPreciseWithUsage(maxTokens: 2048, message: prompt)
@@ -288,7 +299,8 @@ actor Classifier {
         subfolderContext: String,
         weightedContext: String,
         areaContext: String,
-        tagVocabulary: String
+        tagVocabulary: String,
+        correctionContext: String = ""
     ) -> String {
         let fileList = files.enumerated().map { (i, f) in
             return "[\(i)] 파일명: \(f.fileName)\n내용: \(f.content)"
@@ -332,7 +344,7 @@ actor Classifier {
         ## 기존 하위 폴더 (이 목록의 정확한 이름만 사용)
         \(subfolderContext)
         새 폴더가 필요하면 targetFolder에 "NEW:폴더명"을 사용하세요. 기존 폴더와 비슷한 이름이 있으면 반드시 기존 이름을 사용하세요.
-        \(weightedSection)\(tagSection)
+        \(weightedSection)\(tagSection)\(correctionContext.isEmpty ? "" : "\n\(correctionContext)\n")
         ## 분류 규칙
 
         | para | 조건 | 예시 | project 필드 |
@@ -354,6 +366,12 @@ actor Classifier {
         | 도메인 운영/관리 문서 | area | project |
         | project가 아닌데 프로젝트 관련 | project 필드에 프로젝트명 기재 | project 필드 생략 |
         | 목록에 없는 명확한 프로젝트 작업 | project (project: "제안명") | resource |
+
+        ## 프로젝트 경계 규칙
+        - project 필드는 해당 문서가 프로젝트의 **직접 작업물**이거나 **직접 참조 자료**일 때만 기재
+        - 같은 회사/조직의 문서라도 주제가 다르면 다른 프로젝트 (또는 프로젝트 없음)
+        - 확실하지 않으면 project 필드를 생략 (잘못 연결하는 것보다 비워두는 게 나음)
+        - 프로젝트 이름을 태그에 넣지 말 것 (태그는 주제/기술 키워드만)
 
         ## 분류할 파일 목록
         \(fileList)
@@ -385,7 +403,8 @@ actor Classifier {
         subfolderContext: String,
         weightedContext: String,
         areaContext: String,
-        tagVocabulary: String
+        tagVocabulary: String,
+        correctionContext: String = ""
     ) -> String {
         let weightedSection = weightedContext.isEmpty ? "" : """
 
@@ -425,7 +444,7 @@ actor Classifier {
         ## 기존 하위 폴더 (이 목록의 정확한 이름만 사용)
         \(subfolderContext)
         새 폴더가 필요하면 targetFolder에 "NEW:폴더명"을 사용하세요. 기존 폴더와 비슷한 이름이 있으면 반드시 기존 이름을 사용하세요.
-        \(weightedSection)\(tagSection)
+        \(weightedSection)\(tagSection)\(correctionContext.isEmpty ? "" : "\n\(correctionContext)\n")
         ## 분류 규칙
 
         | para | 조건 | 예시 | project 필드 |
@@ -447,6 +466,12 @@ actor Classifier {
         | 도메인 운영/관리 문서 | area | project |
         | project가 아닌데 프로젝트 관련 | project 필드에 프로젝트명 기재 | project 필드 생략 |
         | 목록에 없는 명확한 프로젝트 작업 | project (project: "제안명") | resource |
+
+        ## 프로젝트 경계 규칙
+        - project 필드는 해당 문서가 프로젝트의 **직접 작업물**이거나 **직접 참조 자료**일 때만 기재
+        - 같은 회사/조직의 문서라도 주제가 다르면 다른 프로젝트 (또는 프로젝트 없음)
+        - 확실하지 않으면 project 필드를 생략 (잘못 연결하는 것보다 비워두는 게 나음)
+        - 프로젝트 이름을 태그에 넣지 말 것 (태그는 주제/기술 키워드만)
 
         ## 대상 파일
         파일명: \(fileName)
@@ -570,9 +595,14 @@ actor Classifier {
 
     /// Fuzzy match AI-returned project name against actual folder names.
     /// Returns nil if no match found — prevents creating arbitrary new project folders.
-    private func fuzzyMatchProject(_ aiName: String, projectNames: [String]) -> String? {
+    private func fuzzyMatchProject(_ aiName: String, projectNames: [String], pkmRoot: String = "") -> String? {
         guard !projectNames.isEmpty else { return nil }
         if projectNames.contains(aiName) { return aiName }
+
+        // Phase 0: Alias registry lookup (learned from user corrections)
+        if !pkmRoot.isEmpty, let resolved = ProjectAliasRegistry.resolve(aiName, pkmRoot: pkmRoot) {
+            if projectNames.contains(resolved) { return resolved }
+        }
 
         let normalize = { (s: String) -> String in
             s.lowercased().replacingOccurrences(of: #"[\s\-]+"#, with: "_", options: .regularExpression)
