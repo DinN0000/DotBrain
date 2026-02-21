@@ -166,13 +166,13 @@ struct OnboardingView: View {
                     .padding(.bottom, 6)
 
                 VStack(alignment: .leading, spacing: 3) {
+                    afterFolderRow("Project/마케팅 캠페인/")
+                    afterFileRow("회의록.pdf", indent: true)
+                    afterFileRow("보고서.docx", indent: true)
                     afterFolderRow("Area/제품/")
-                    afterFolderRow("  Project/v2 런칭/")
-                    afterFileRow("회의록.md", indent: true)
-                    afterFolderRow("Resource/마케팅 레퍼런스/")
-                    afterFileRow("경쟁사 분석.md", indent: true)
-                    afterFolderRow("Archive/")
-                    afterFileRow("지난 보고서.md", indent: true)
+                    afterFileRow("메모.md", indent: true)
+                    afterFolderRow("Resource/")
+                    afterFileRow("스크린샷.png", indent: true)
                 }
             }
             .padding(10)
