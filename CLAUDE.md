@@ -7,10 +7,16 @@
 ## Architecture
 - PARA-based PKM organizer: `_Inbox/` → AI classifies → `1_Project/`, `2_Area/`, `3_Resource/`, `4_Archive/`
 - `AppState` (singleton) — central state, `@MainActor`, `ObservableObject`
-- `Sources/Pipeline/` — InboxProcessor, FolderReorganizer, ProjectContextBuilder
+- `Sources/Pipeline/` — InboxProcessor, FolderReorganizer, VaultCheckPipeline, ProjectContextBuilder
 - `Sources/Services/` — AIService, FileMover, PKMPathManager, VaultSearcher, NoteIndexGenerator, StatisticsService
 - `Sources/UI/` — SwiftUI views (menubar popover)
 - `Sources/Models/` — Frontmatter, ClassifyResult, PARACategory
+
+## Code Placement Rules
+- **Pipeline** (`Sources/Pipeline/`): multi-phase processing (for loops, TaskGroup, 5+ phases). Always a separate struct/class.
+- **Services** (`Sources/Services/`): single-responsibility utilities (actor or struct)
+- **AppState**: `@Published` properties, navigation methods, thin pipeline wrappers (guard + create pipeline + call). No for loops, no TaskGroup, no 10+ line business logic.
+- **UI Views**: read AppState, call AppState methods. Never call Services directly.
 
 ## Code Style
 - Korean for UI strings, English for comments and code

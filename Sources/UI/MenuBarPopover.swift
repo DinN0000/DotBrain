@@ -54,7 +54,16 @@ struct MenuBarPopover: View {
                             }
                         }
                         Spacer()
-                        if !appState.backgroundTaskCompleted {
+                        if appState.backgroundTaskCompleted {
+                            Button {
+                                appState.clearBackgroundTaskCompletion()
+                            } label: {
+                                Image(systemName: "xmark.circle.fill")
+                                    .font(.system(size: 14))
+                                    .foregroundColor(.secondary.opacity(0.6))
+                            }
+                            .buttonStyle(.plain)
+                        } else {
                             Button {
                                 appState.cancelBackgroundTask()
                             } label: {
