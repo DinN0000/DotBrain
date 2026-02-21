@@ -72,14 +72,24 @@ actor ContentHashCache {
         guard isPathSafe(filePath) else { return .new }
 
         let relativePath = self.relativePath(for: filePath)
+
+        // Early return if no cache entry exists -- skip reading file content
+        guard let entry = cache[relativePath] else {
+            return .new
+        }
+
+        // File-size pre-check: if size differs, file is modified without needing a full hash
+        if let attrs = try? FileManager.default.attributesOfItem(atPath: filePath),
+           let currentSize = attrs[.size] as? Int,
+           currentSize != entry.fileSize {
+            return .modified
+        }
+
+        // Sizes match -- fall back to full content hash comparison
         guard let content = try? String(contentsOfFile: filePath, encoding: .utf8) else {
             return .new
         }
         let currentHash = computeSHA256(content)
-
-        guard let entry = cache[relativePath] else {
-            return .new
-        }
         return entry.hash == currentHash ? .unchanged : .modified
     }
 

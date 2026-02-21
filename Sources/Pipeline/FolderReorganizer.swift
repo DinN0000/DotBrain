@@ -11,8 +11,23 @@ struct FolderReorganizer {
     let onFileProgress: ((Int, Int, String) -> Void)?
     let onPhaseChange: ((ProcessingPhase) -> Void)?
 
-    private var pathManager: PKMPathManager {
-        PKMPathManager(root: pkmRoot)
+    let pathManager: PKMPathManager
+
+    init(
+        pkmRoot: String,
+        category: PARACategory,
+        subfolder: String,
+        onProgress: ((Double, String) -> Void)? = nil,
+        onFileProgress: ((Int, Int, String) -> Void)? = nil,
+        onPhaseChange: ((ProcessingPhase) -> Void)? = nil
+    ) {
+        self.pkmRoot = pkmRoot
+        self.category = category
+        self.subfolder = subfolder
+        self.onProgress = onProgress
+        self.onFileProgress = onFileProgress
+        self.onPhaseChange = onPhaseChange
+        self.pathManager = PKMPathManager(root: pkmRoot)
     }
 
     struct Result {
@@ -209,10 +224,13 @@ struct FolderReorganizer {
             }
         }
 
+        // Compute successes once to avoid repeated filtering
+        let successes = processed.filter(\.isSuccess)
+
         // Update MOCs for affected folders (source + all targets)
         onPhaseChange?(.finishing)
         var foldersToUpdate: Set<String> = [folderPath]
-        let additionalFolders = Set(processed.filter(\.isSuccess).compactMap { result -> String? in
+        let additionalFolders = Set(successes.compactMap { result -> String? in
             let dir = (result.targetPath as NSString).deletingLastPathComponent
             return dir.isEmpty || dir == folderPath ? nil : dir
         })
@@ -221,12 +239,12 @@ struct FolderReorganizer {
         await indexGenerator.updateForFolders(foldersToUpdate)
 
         // Semantic link: connect processed files with vault (post-move)
-        let allSuccessPaths = processed.filter(\.isSuccess).map(\.targetPath)
-        if !allSuccessPaths.isEmpty {
+        let successPaths = successes.map(\.targetPath)
+        if !successPaths.isEmpty {
             onPhaseChange?(.linking)
             onProgress?(0.9, "시맨틱 연결 중...")
             let linker = SemanticLinker(pkmRoot: pkmRoot)
-            let _ = await linker.linkNotes(filePaths: allSuccessPaths)
+            let _ = await linker.linkNotes(filePaths: successPaths)
         }
 
         onFileProgress?(inputs.count, inputs.count, "")
@@ -234,19 +252,18 @@ struct FolderReorganizer {
 
         let failedCount = processed.filter { if case .error = $0.status { return true }; return false }.count
         NotificationService.sendProcessingComplete(
-            classified: processed.filter(\.isSuccess).count,
+            classified: successes.count,
             total: files.count,
             failed: failedCount
         )
 
         onProgress?(1.0, "완료!")
 
-        let successCount = processed.filter(\.isSuccess).count
         StatisticsService.recordActivity(
             fileName: "폴더 정리",
             category: "system",
             action: "completed",
-            detail: "\(subfolder) — \(successCount)/\(files.count)개 완료"
+            detail: "\(subfolder) — \(successes.count)/\(files.count)개 완료"
         )
 
         return Result(
@@ -437,7 +454,7 @@ struct FolderReorganizer {
     private func fileBodyHash(_ filePath: String) -> String {
         if filePath.hasSuffix(".md"),
            let content = try? String(contentsOfFile: filePath, encoding: .utf8) {
-            let body = stripFrontmatter(content)
+            let (_, body) = Frontmatter.parse(markdown: content)
             let hash = SHA256.hash(data: Data(body.utf8))
             return hash.map { String(format: "%02x", $0) }.joined()
         }
@@ -459,16 +476,6 @@ struct FolderReorganizer {
         }
         let digest = hasher.finalize()
         return digest.map { String(format: "%02x", $0) }.joined()
-    }
-
-    private func stripFrontmatter(_ text: String) -> String {
-        var body = text
-        if body.hasPrefix("---") {
-            if let endRange = body.range(of: "---", range: body.index(body.startIndex, offsetBy: 3)..<body.endIndex) {
-                body = String(body[endRange.upperBound...])
-            }
-        }
-        return body.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     /// Merge tags from source file into target file's frontmatter

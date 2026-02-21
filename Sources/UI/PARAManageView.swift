@@ -74,7 +74,8 @@ struct PARAManageView: View {
                     }
                     .onAppear {
                         if let target = appState.paraManageInitialCategory {
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                            Task { @MainActor in
+                                try? await Task.sleep(nanoseconds: 100_000_000)
                                 withAnimation {
                                     proxy.scrollTo(target, anchor: .top)
                                 }
@@ -342,7 +343,7 @@ struct PARAManageView: View {
     }
 
     private func addMenuItem(to menu: NSMenu, title: String, icon: String?, action: @escaping () -> Void) {
-        let item = FolderMenuItem(title: title, action: #selector(FolderMenuItem.invoke), keyEquivalent: "")
+        let item = ClosureMenuItem(title: title, action: #selector(ClosureMenuItem.invoke), keyEquivalent: "")
         item.target = item
         item.callback = action
         if let icon {
@@ -756,12 +757,3 @@ private struct CategoryHeaderView: View {
     }
 }
 
-// MARK: - NSMenuItem with Closure
-
-private class FolderMenuItem: NSMenuItem {
-    var callback: (() -> Void)?
-
-    @objc func invoke() {
-        callback?()
-    }
-}

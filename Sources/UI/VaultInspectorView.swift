@@ -225,7 +225,7 @@ struct VaultInspectorView: View {
     }
 
     private func addMenuItem(to menu: NSMenu, title: String, icon: String?, action: @escaping () -> Void) {
-        let item = VaultMenuItem(title: title, action: #selector(VaultMenuItem.invoke), keyEquivalent: "")
+        let item = ClosureMenuItem(title: title, action: #selector(ClosureMenuItem.invoke), keyEquivalent: "")
         item.target = item
         item.callback = action
         if let icon {
@@ -993,12 +993,3 @@ private struct VaultFolderRow: View {
     }
 }
 
-// MARK: - NSMenuItem with Closure
-
-private class VaultMenuItem: NSMenuItem {
-    var callback: (() -> Void)?
-
-    @objc func invoke() {
-        callback?()
-    }
-}
