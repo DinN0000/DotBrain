@@ -119,12 +119,12 @@ struct OnboardingView: View {
         VStack(spacing: 0) {
             Spacer()
 
-            Text("인박스에 넣기만 하세요")
+            Text("DotBrain에 문서를 넣으세요")
                 .font(.title3)
                 .fontWeight(.semibold)
                 .padding(.bottom, 4)
 
-            Text("AI가 읽고, 분류하고, 정리합니다")
+            Text("AI가 내용을 읽고 적절한 위치로 분류합니다")
                 .font(.subheadline)
                 .foregroundColor(.secondary)
                 .padding(.bottom, 16)
@@ -166,12 +166,13 @@ struct OnboardingView: View {
                     .padding(.bottom, 6)
 
                 VStack(alignment: .leading, spacing: 3) {
-                    afterFolderRow("Project/마케팅 캠페인/")
-                    afterFileRow("회의록.pdf", indent: true)
-                    afterFolderRow("Resource/")
-                    afterFileRow("보고서.docx", indent: true)
-                    afterFolderRow("Area/업무 관리/")
-                    afterFileRow("메모.md", indent: true)
+                    afterFolderRow("Area/제품/")
+                    afterFolderRow("  Project/v2 런칭/")
+                    afterFileRow("회의록.md", indent: true)
+                    afterFolderRow("Resource/마케팅 레퍼런스/")
+                    afterFileRow("경쟁사 분석.md", indent: true)
+                    afterFolderRow("Archive/")
+                    afterFileRow("지난 보고서.md", indent: true)
                 }
             }
             .padding(10)
