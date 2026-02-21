@@ -244,10 +244,6 @@ struct VaultInspectorView: View {
 
         menu.addItem(.separator())
 
-        addMenuItem(to: menu, title: "내가 정리함", icon: "hand.thumbsup") {
-            self.recordManualOrganize(folder)
-        }
-
         addMenuItem(to: menu, title: "Finder에서 열기", icon: "folder") {
             self.openInFinder(folder)
         }
@@ -280,80 +276,6 @@ struct VaultInspectorView: View {
     private func openInFinder(_ folder: FolderInfo) {
         let safeURL = URL(fileURLWithPath: folder.path).resolvingSymlinksInPath()
         NSWorkspace.shared.open(safeURL)
-    }
-
-    /// Record that the user manually organized this folder.
-    /// Compares current files against note-index.json to find moves, then records them.
-    private func recordManualOrganize(_ folder: FolderInfo) {
-        let root = appState.pkmRootPath
-        let fm = FileManager.default
-
-        // Build old location map from note-index.json: filename -> (para, folder)
-        var oldLocations: [String: (para: String, folder: String)] = [:]
-        if let index = loadNoteIndex(pkmRoot: root) {
-            for (_, entry) in index.notes {
-                let name = (entry.path as NSString).lastPathComponent
-                oldLocations[name] = (para: entry.para, folder: entry.folder)
-            }
-        }
-
-        // Scan current files in this folder
-        guard let files = try? fm.contentsOfDirectory(atPath: folder.path) else { return }
-        var recorded = 0
-        for file in files {
-            guard file.hasSuffix(".md"), !file.hasPrefix("."), !file.hasPrefix("_") else { continue }
-            guard file != "\(folder.name).md" else { continue }  // skip index note
-
-            let filePath = (folder.path as NSString).appendingPathComponent(file)
-            let content = try? String(contentsOfFile: filePath, encoding: .utf8)
-            let tags = content.map { Frontmatter.parse(markdown: $0).0.tags } ?? []
-
-            if let old = oldLocations[file], (old.para != folder.category.rawValue || old.folder != relativeFolderPath(folder.path, pkmRoot: root)) {
-                // File moved from somewhere else — record the move
-                CorrectionMemory.record(CorrectionEntry(
-                    date: Date(),
-                    fileName: file,
-                    aiPara: old.para,
-                    userPara: folder.category.rawValue,
-                    aiProject: old.folder,
-                    userProject: relativeFolderPath(folder.path, pkmRoot: root),
-                    tags: tags,
-                    action: "manual-move"
-                ), pkmRoot: root)
-                recorded += 1
-            } else if oldLocations[file] == nil {
-                // New file in this folder (not in index) — record current location as user intent
-                CorrectionMemory.record(CorrectionEntry(
-                    date: Date(),
-                    fileName: file,
-                    aiPara: "",
-                    userPara: folder.category.rawValue,
-                    aiProject: "",
-                    userProject: relativeFolderPath(folder.path, pkmRoot: root),
-                    tags: tags,
-                    action: "manual-move"
-                ), pkmRoot: root)
-                recorded += 1
-            }
-        }
-
-        NSLog("[VaultInspector] Recorded %d manual moves for folder: %@", recorded, folder.name)
-        // Refresh hash cache so health dots update
-        loadFolders()
-    }
-
-    private func loadNoteIndex(pkmRoot: String) -> NoteIndex? {
-        let path = (pkmRoot as NSString).appendingPathComponent(".meta/note-index.json")
-        guard let data = FileManager.default.contents(atPath: path) else { return nil }
-        return try? JSONDecoder().decode(NoteIndex.self, from: data)
-    }
-
-    private func relativeFolderPath(_ absolutePath: String, pkmRoot: String) -> String {
-        let root = URL(fileURLWithPath: pkmRoot).resolvingSymlinksInPath().path
-        let canonical = URL(fileURLWithPath: absolutePath).resolvingSymlinksInPath().path
-        let prefix = root.hasSuffix("/") ? root : root + "/"
-        guard canonical.hasPrefix(prefix) else { return absolutePath }
-        return String(canonical.dropFirst(prefix.count))
     }
 
     // MARK: - Reorganize Plan Review (full-screen)

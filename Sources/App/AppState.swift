@@ -227,13 +227,17 @@ final class AppState: ObservableObject {
         }
 
         backgroundTaskName = "전체 점검"
-        backgroundTaskPhase = "오류 검사 중..."
+        backgroundTaskPhase = "수동 정리 감지 중..."
         backgroundTaskProgress = 0
         backgroundTaskCompleted = false
         vaultCheckResult = nil
 
-        let pipeline = VaultCheckPipeline(pkmRoot: pkmRootPath)
+        let root = pkmRootPath
+        let pipeline = VaultCheckPipeline(pkmRoot: root)
         backgroundTask = Task.detached(priority: .utility) {
+            // Detect manual file moves before any DotBrain operations
+            Self.detectManualMoves(pkmRoot: root)
+
             let result = await pipeline.run { progress in
                 Task { @MainActor in
                     AppState.shared.backgroundTaskPhase = progress.phase
@@ -258,6 +262,76 @@ final class AppState: ObservableObject {
         backgroundTaskPhase = ""
         backgroundTaskProgress = 0
         backgroundTaskCompleted = false
+    }
+
+    /// Compare current vault file locations against note-index.json.
+    /// Any file in a different para/folder than the index = user moved it manually.
+    /// Called at vault check start, before DotBrain modifies anything.
+    private nonisolated static func detectManualMoves(pkmRoot: String) {
+        let indexPath = (pkmRoot as NSString).appendingPathComponent(".meta/note-index.json")
+        guard let data = FileManager.default.contents(atPath: indexPath),
+              let index = try? JSONDecoder().decode(NoteIndex.self, from: data) else { return }
+
+        // Build filename -> old location map
+        var oldLocations: [String: (para: String, folder: String, tags: [String])] = [:]
+        for (_, entry) in index.notes {
+            let name = (entry.path as NSString).lastPathComponent
+            oldLocations[name] = (para: entry.para, folder: entry.folder, tags: entry.tags)
+        }
+
+        // Scan current vault files
+        let fm = FileManager.default
+        let pathManager = PKMPathManager(root: pkmRoot)
+        let canonicalRoot = URL(fileURLWithPath: pkmRoot).resolvingSymlinksInPath().path
+        let rootPrefix = canonicalRoot.hasSuffix("/") ? canonicalRoot : canonicalRoot + "/"
+        var recorded = 0
+
+        for category in PARACategory.allCases {
+            let basePath = pathManager.paraPath(for: category)
+            guard let folders = try? fm.contentsOfDirectory(atPath: basePath) else { continue }
+            for folderName in folders {
+                guard !folderName.hasPrefix("."), !folderName.hasPrefix("_") else { continue }
+                let folderPath = (basePath as NSString).appendingPathComponent(folderName)
+                var isDir: ObjCBool = false
+                guard fm.fileExists(atPath: folderPath, isDirectory: &isDir), isDir.boolValue else { continue }
+
+                let relFolder: String = {
+                    let canonical = URL(fileURLWithPath: folderPath).resolvingSymlinksInPath().path
+                    guard canonical.hasPrefix(rootPrefix) else { return folderPath }
+                    return String(canonical.dropFirst(rootPrefix.count))
+                }()
+
+                guard let files = try? fm.contentsOfDirectory(atPath: folderPath) else { continue }
+                for file in files {
+                    guard file.hasSuffix(".md"), !file.hasPrefix("."), !file.hasPrefix("_"),
+                          file != "\(folderName).md" else { continue }
+
+                    guard let old = oldLocations[file],
+                          old.para != category.rawValue || old.folder != relFolder else { continue }
+
+                    // File was somewhere else in the index — user moved it
+                    let filePath = (folderPath as NSString).appendingPathComponent(file)
+                    let content = try? String(contentsOfFile: filePath, encoding: .utf8)
+                    let tags = content.map { Frontmatter.parse(markdown: $0).0.tags } ?? old.tags
+
+                    CorrectionMemory.record(CorrectionEntry(
+                        date: Date(),
+                        fileName: file,
+                        aiPara: old.para,
+                        userPara: category.rawValue,
+                        aiProject: old.folder,
+                        userProject: relFolder,
+                        tags: tags,
+                        action: "manual-move"
+                    ), pkmRoot: pkmRoot)
+                    recorded += 1
+                }
+            }
+        }
+
+        if recorded > 0 {
+            NSLog("[AppState] Detected %d manual file moves", recorded)
+        }
     }
 
     func clearBackgroundTaskCompletion() {
