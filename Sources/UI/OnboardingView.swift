@@ -304,15 +304,9 @@ struct OnboardingView: View {
 
                     // Live folder preview
                     VStack(alignment: .leading, spacing: 6) {
-                        if isStructureReady {
-                            Label("PARA 구조 확인됨", systemImage: "checkmark.circle.fill")
-                                .font(.caption)
-                                .foregroundColor(.green)
-                        } else {
-                            Text("선택한 경로 아래에 이렇게 만들어집니다:")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
+                        Text("선택한 경로 아래에 이렇게 만들어집니다:")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
 
                         VStack(alignment: .leading, spacing: 1) {
                             Text(abbreviatedPath(appState.pkmRootPath))
