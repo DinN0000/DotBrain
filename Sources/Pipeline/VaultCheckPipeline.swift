@@ -47,6 +47,13 @@ struct VaultCheckPipeline {
         if Task.isCancelled { return .empty }
         onProgress(Progress(phase: "자동 복구 중...", fraction: 0.20))
 
+        // Phase 2.5: Create missing index notes for folders that lack them
+        let createdIndexNotes = Self.createMissingIndexNotes(pkmRoot: pkmRoot)
+        repairCount += createdIndexNotes.count
+        if !createdIndexNotes.isEmpty {
+            await cache.updateHashes(createdIndexNotes)
+        }
+
         // Check all .md files for changes (single batch actor call)
         onProgress(Progress(phase: "변경 파일 확인 중...", fraction: 0.20))
         let pm = PKMPathManager(root: pkmRoot)
@@ -157,6 +164,48 @@ struct VaultCheckPipeline {
             files.insert(path)
         }
         return Array(files)
+    }
+
+    /// Create missing index notes for subfolders that lack them, returning created file paths
+    private static func createMissingIndexNotes(pkmRoot: String) -> [String] {
+        let fm = FileManager.default
+        let pm = PKMPathManager(root: pkmRoot)
+        var created: [String] = []
+
+        let paraPaths: [(String, PARACategory)] = [
+            (pm.projectsPath, .project),
+            (pm.areaPath, .area),
+            (pm.resourcePath, .resource),
+            (pm.archivePath, .archive),
+        ]
+
+        for (basePath, category) in paraPaths {
+            guard let entries = try? fm.contentsOfDirectory(atPath: basePath) else { continue }
+            for entry in entries {
+                guard !entry.hasPrefix("."), !entry.hasPrefix("_") else { continue }
+                let folderPath = (basePath as NSString).appendingPathComponent(entry)
+                var isDir: ObjCBool = false
+                guard fm.fileExists(atPath: folderPath, isDirectory: &isDir), isDir.boolValue else { continue }
+
+                let indexPath = (folderPath as NSString).appendingPathComponent("\(entry).md")
+                guard !fm.fileExists(atPath: indexPath) else { continue }
+
+                let content = FrontmatterWriter.createIndexNote(
+                    folderName: entry,
+                    para: category,
+                    description: "\(entry) 관련 자료"
+                )
+                do {
+                    try content.write(toFile: indexPath, atomically: true, encoding: .utf8)
+                    created.append(indexPath)
+                    NSLog("[VaultCheck] Created missing index note: %@", (indexPath as NSString).lastPathComponent)
+                } catch {
+                    NSLog("[VaultCheck] Failed to create index note %@: %@", entry, error.localizedDescription)
+                }
+            }
+        }
+
+        return created
     }
 
     /// Collect all .md files across PARA folders

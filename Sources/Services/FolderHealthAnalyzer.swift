@@ -175,7 +175,7 @@ struct FolderHealthAnalyzer {
             case .lowTagDiversity:
                 score -= 0.15
             case .noIndexNote:
-                score -= 0.1
+                score -= 0.25
             }
         }
 
