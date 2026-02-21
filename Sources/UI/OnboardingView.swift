@@ -1140,5 +1140,26 @@ struct OnboardingView: View {
         AICompanionService.updateIfNeeded(pkmRoot: appState.pkmRootPath)
         appState.setupWatchdog()
         appState.currentScreen = .inbox
+
+        // Register all onboarding-created files in hash cache so vault inspector starts clean
+        let root = appState.pkmRootPath
+        Task.detached(priority: .utility) {
+            let cache = ContentHashCache(pkmRoot: root)
+            await cache.load()
+            let pathManager = PKMPathManager(root: root)
+            let fm = FileManager.default
+            var allFiles: [String] = []
+            for category in PARACategory.allCases {
+                let basePath = pathManager.paraPath(for: category)
+                guard let enumerator = fm.enumerator(atPath: basePath) else { continue }
+                while let element = enumerator.nextObject() as? String {
+                    guard element.hasSuffix(".md"), !element.hasPrefix("."), !element.hasPrefix("_") else { continue }
+                    allFiles.append((basePath as NSString).appendingPathComponent(element))
+                }
+            }
+            if !allFiles.isEmpty {
+                await cache.updateHashes(allFiles)
+            }
+        }
     }
 }
