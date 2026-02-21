@@ -29,10 +29,10 @@
 - AI companion files use marker-based updates (`<!-- DotBrain:start/end -->`) to preserve user content
 - `StatisticsService` calls (addApiCost, incrementDuplicates, recordActivity) must be wired manually at each call site
 - Wiki-links `[[note]]` in `## Related Notes` sections enable cross-note navigation for both humans and AI
-- `_meta/note-index.json` — vault metadata index for AI navigation (NoteIndexGenerator)
+- `.meta/note-index.json` — vault metadata index for AI navigation (NoteIndexGenerator)
 
 ## Vault Navigation (for Claude Code)
-- Read `_meta/note-index.json` first for vault structure overview
+- Read `.meta/note-index.json` first for vault structure overview
 - Use tags, summary, project fields from index to identify relevant notes
 - Prioritize `status: active` notes when gathering context
 - Follow `[[wiki-links]]` in `## Related Notes` for context expansion

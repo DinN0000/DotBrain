@@ -8,11 +8,17 @@ enum BinaryExtractor {
     static let binaryExtensions: Set<String> = [
         "pdf", "pptx", "xlsx", "docx",
         "jpg", "jpeg", "png", "gif", "bmp", "webp", "heic",
+        "mov", "mp4", "avi", "mkv", "wmv", "flv", "webm", "m4v",
     ]
 
     /// Image file extensions
     static let imageExtensions: Set<String> = [
         "jpg", "jpeg", "png", "gif", "bmp", "webp", "heic",
+    ]
+
+    /// Video file extensions
+    static let videoExtensions: Set<String> = [
+        "mov", "mp4", "avi", "mkv", "wmv", "flv", "webm", "m4v",
     ]
 
     /// Check if a file is binary
@@ -37,6 +43,16 @@ enum BinaryExtractor {
             return DOCXExtractor.extract(at: path)
         case "jpg", "jpeg", "png", "gif", "bmp", "webp", "heic":
             return ImageExtractor.extract(at: path)
+        case "mov", "mp4", "avi", "mkv", "wmv", "flv", "webm", "m4v":
+            let fileSize = (try? FileManager.default.attributesOfItem(atPath: path)[.size] as? Int) ?? 0
+            let sizeKB = Double(fileSize) / 1024.0
+            return ExtractResult(
+                success: true,
+                file: ExtractResult.FileInfo(name: url.lastPathComponent, format: ext, sizeKB: round(sizeKB * 10) / 10),
+                metadata: ["type": "video"],
+                text: nil,
+                error: nil
+            )
         default:
             // Try reading as text
             return extractAsText(at: path)

@@ -247,11 +247,11 @@ struct FileMover {
         let resolvedAssetPath = resolveConflict(assetPath)
         try fm.moveItem(atPath: filePath, toPath: resolvedAssetPath)
 
-        // Skip companion .md for image files — EXIF-only data is not useful as standalone notes
-        let isImage = BinaryExtractor.imageExtensions.contains(
-            URL(fileURLWithPath: fileName).pathExtension.lowercased()
-        )
-        if isImage {
+        // Skip companion .md for image/video files — no useful text to summarize
+        let ext = URL(fileURLWithPath: fileName).pathExtension.lowercased()
+        let isImage = BinaryExtractor.imageExtensions.contains(ext)
+        let isVideo = BinaryExtractor.videoExtensions.contains(ext)
+        if isImage || isVideo {
             return ProcessedFileResult(
                 fileName: fileName,
                 para: classification.para,

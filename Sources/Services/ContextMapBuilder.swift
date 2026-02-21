@@ -5,7 +5,7 @@ struct ContextMapBuilder: Sendable {
     let pkmRoot: String
 
     private var indexPath: String {
-        ((pkmRoot as NSString).appendingPathComponent("_meta") as NSString)
+        ((pkmRoot as NSString).appendingPathComponent(".meta") as NSString)
             .appendingPathComponent("note-index.json")
     }
 

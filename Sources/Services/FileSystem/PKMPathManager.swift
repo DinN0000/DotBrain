@@ -8,11 +8,12 @@ struct PKMPathManager {
     var centralAssetsPath: String { (root as NSString).appendingPathComponent("_Assets") }
     var documentsAssetsPath: String { (centralAssetsPath as NSString).appendingPathComponent("documents") }
     var imagesAssetsPath: String { (centralAssetsPath as NSString).appendingPathComponent("images") }
+    var videosAssetsPath: String { (centralAssetsPath as NSString).appendingPathComponent("videos") }
     var projectsPath: String { (root as NSString).appendingPathComponent("1_Project") }
     var areaPath: String { (root as NSString).appendingPathComponent("2_Area") }
     var resourcePath: String { (root as NSString).appendingPathComponent("3_Resource") }
     var archivePath: String { (root as NSString).appendingPathComponent("4_Archive") }
-    var metaPath: String { (root as NSString).appendingPathComponent("_meta") }
+    var metaPath: String { (root as NSString).appendingPathComponent(".meta") }
     var noteIndexPath: String { (metaPath as NSString).appendingPathComponent("note-index.json") }
 
     /// Get the base path for a PARA category
@@ -88,6 +89,9 @@ struct PKMPathManager {
         if BinaryExtractor.imageExtensions.contains(ext) {
             return imagesAssetsPath
         }
+        if BinaryExtractor.videoExtensions.contains(ext) {
+            return videosAssetsPath
+        }
         return documentsAssetsPath
     }
 
@@ -123,11 +127,18 @@ struct PKMPathManager {
     func initializeStructure() throws {
         let fm = FileManager.default
         let folders = [inboxPath, projectsPath, areaPath, resourcePath, archivePath,
-                       documentsAssetsPath, imagesAssetsPath, metaPath]
+                       documentsAssetsPath, imagesAssetsPath, videosAssetsPath, metaPath]
         for folder in folders {
             try fm.createDirectory(atPath: folder, withIntermediateDirectories: true)
         }
-        
+
+        // Create .obsidianignore to hide internal folders from Obsidian
+        let obsidianIgnorePath = (root as NSString).appendingPathComponent(".obsidianignore")
+        if !fm.fileExists(atPath: obsidianIgnorePath) {
+            let ignoreContent = "_Assets\n.meta\n.dotbrain-companion-version\n"
+            try ignoreContent.write(toFile: obsidianIgnorePath, atomically: true, encoding: .utf8)
+        }
+
         // Generate AI companion files (CLAUDE.md, AGENTS.md, .cursorrules, agents, skills)
         try AICompanionService.generateAll(pkmRoot: root)
 
