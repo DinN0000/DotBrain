@@ -243,9 +243,10 @@ final class AppState: ObservableObject {
 
             await MainActor.run {
                 AppState.shared.vaultCheckResult = result
-                AppState.shared.backgroundTaskPhase = "완료"
-                AppState.shared.backgroundTaskProgress = 1.0
-                AppState.shared.backgroundTaskCompleted = true
+                AppState.shared.backgroundTaskName = nil
+                AppState.shared.backgroundTaskPhase = ""
+                AppState.shared.backgroundTaskProgress = 0
+                AppState.shared.backgroundTaskCompleted = false
             }
         }
     }
