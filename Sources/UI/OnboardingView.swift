@@ -392,7 +392,7 @@ struct OnboardingView: View {
         VStack(spacing: 0) {
             stepHeader(
                 title: "도메인 등록",
-                desc: "지속적으로 관리하는 영역입니다.\n프로젝트들을 묶는 상위 카테고리 역할을 합니다."
+                desc: "지속적으로 관리하는 책임 영역을 등록합니다."
             )
 
             Spacer()
@@ -402,7 +402,7 @@ struct OnboardingView: View {
                     Image(systemName: "lightbulb.fill")
                         .font(.caption)
                         .foregroundColor(.blue)
-                    Text("예: 제품명, 사업 도메인, 팀 이름 등. 여러 프로젝트가 속하는 상위 영역을 등록하세요.")
+                    Text("예: 제품명, 사업 도메인, 팀 이름 등")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
@@ -1069,60 +1069,37 @@ struct OnboardingView: View {
 
     private var trialStep: some View {
         VStack(spacing: 0) {
+            stepHeader(
+                title: appState.hasAPIKey
+                    ? (isReOnboarding ? "볼트 설정 완료!" : "준비 완료!")
+                    : "거의 다 됐어요!",
+                desc: appState.hasAPIKey
+                    ? (isReOnboarding
+                        ? "새 볼트가 준비되었습니다.\n인박스에 파일을 넣어 정리를 시작하세요."
+                        : "이제 인박스에 파일을 넣으면\nAI가 자동으로 정리합니다.")
+                    : "API 키 없이도 폴더 구조를 활용할 수 있습니다."
+            )
+
             Spacer()
 
-            if appState.hasAPIKey {
-                Text("·‿·")
-                    .font(.system(size: 36, design: .monospaced))
-                    .padding(.bottom, 12)
+            Text(appState.hasAPIKey ? "·‿·" : "·_·")
+                .font(.system(size: 36, design: .monospaced))
+                .padding(.bottom, 16)
 
-                Text(isReOnboarding ? "볼트 설정 완료!" : "준비 완료!")
-                    .font(.title3)
-                    .fontWeight(.semibold)
-                    .padding(.bottom, 6)
-
-                Text(isReOnboarding
-                    ? "새 볼트가 준비되었습니다.\n인박스에 파일을 넣어 정리를 시작하세요."
-                    : "이제 인박스에 파일을 넣으면\nAI가 자동으로 정리합니다.")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-                    .multilineTextAlignment(.center)
-                    .padding(.bottom, 20)
-
-                VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 8) {
+                if appState.hasAPIKey {
                     guideRow(icon: "1.circle.fill", text: "메뉴바에서 DotBrain을 클릭")
                     guideRow(icon: "2.circle.fill", text: "파일을 드래그하거나 Cmd+V로 붙여넣기")
                     guideRow(icon: "3.circle.fill", text: "\"정리하기\" 버튼을 누르면 AI가 분류")
-                }
-                .padding(14)
-                .background(Color.secondary.opacity(0.05))
-                .cornerRadius(8)
-                .padding(.horizontal, 32)
-            } else {
-                Text("·_·")
-                    .font(.system(size: 36, design: .monospaced))
-                    .padding(.bottom, 12)
-
-                Text("거의 다 됐어요!")
-                    .font(.title3)
-                    .fontWeight(.semibold)
-                    .padding(.bottom, 6)
-
-                Text("API 키 없이도 폴더 구조를 활용할 수 있습니다.")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-                    .multilineTextAlignment(.center)
-                    .padding(.bottom, 20)
-
-                VStack(alignment: .leading, spacing: 8) {
+                } else {
                     guideRow(icon: "terminal", text: "Claude Code로 폴더에 연결해서 사용")
                     guideRow(icon: "gearshape", text: "설정에서 언제든 API 키를 추가 가능")
                 }
-                .padding(14)
-                .background(Color.secondary.opacity(0.05))
-                .cornerRadius(8)
-                .padding(.horizontal, 32)
             }
+            .padding(14)
+            .background(Color.secondary.opacity(0.05))
+            .cornerRadius(8)
+            .padding(.horizontal, 24)
 
             Spacer()
 
