@@ -18,7 +18,8 @@ enum AICompanionService {
         try writeVersion(pkmRoot: pkmRoot)
     }
 
-    /// Check version and regenerate if outdated — call on every app launch
+    /// Check version and regenerate if outdated — call on every app launch.
+    /// Heavy file I/O is offloaded to a background thread via Task.detached.
     static func updateIfNeeded(pkmRoot: String) {
         // Skip if PKM root doesn't exist yet
         guard FileManager.default.fileExists(atPath: pkmRoot) else { return }
@@ -31,20 +32,30 @@ enum AICompanionService {
 
         guard currentVersion < version else { return }
 
-        // Force-regenerate all companion files
-        do {
-            try forceGenerateAll(pkmRoot: pkmRoot)
-            try writeVersion(pkmRoot: pkmRoot)
-        } catch {
-            NSLog("[AICompanionService] 컴패니언 파일 업데이트 실패: %@", error.localizedDescription)
+        // Offload heavy file I/O to background thread
+        Task.detached(priority: .utility) {
+            // Force-regenerate all companion files; each step is individually
+            // wrapped in do/catch inside forceGenerateAll so partial failures
+            // do not prevent remaining steps or version write.
+            forceGenerateAll(pkmRoot: pkmRoot)
+
+            // Always write version even if some generation steps failed,
+            // to prevent infinite regeneration loop on every app launch.
+            do {
+                try writeVersion(pkmRoot: pkmRoot)
+            } catch {
+                NSLog("[AICompanionService] 버전 파일 쓰기 실패: %@", error.localizedDescription)
+            }
         }
     }
 
     private static let markerStart = "<!-- DotBrain:start -->"
     private static let markerEnd = "<!-- DotBrain:end -->"
 
-    /// Update all AI guide files, preserving user content outside markers
-    private static func forceGenerateAll(pkmRoot: String) throws {
+    /// Update all AI guide files, preserving user content outside markers.
+    /// Each step is individually wrapped in do/catch so partial failures
+    /// do not prevent the remaining steps from executing.
+    private static func forceGenerateAll(pkmRoot: String) {
         let fm = FileManager.default
 
         // Root-level files: marker-based safe update
@@ -55,40 +66,52 @@ enum AICompanionService {
         ]
 
         for (fileName, content) in files {
-            let path = (pkmRoot as NSString).appendingPathComponent(fileName)
-            let wrapped = "\(markerStart)\n\(content)\n\(markerEnd)"
+            do {
+                let path = (pkmRoot as NSString).appendingPathComponent(fileName)
+                let wrapped = "\(markerStart)\n\(content)\n\(markerEnd)"
 
-            if fm.fileExists(atPath: path) {
-                try replaceMarkerSection(at: path, with: wrapped)
-            } else {
-                let withUserSection = wrapped + "\n\n<!-- 아래에 자유롭게 추가하세요 -->\n"
-                try withUserSection.write(toFile: path, atomically: true, encoding: .utf8)
+                if fm.fileExists(atPath: path) {
+                    try replaceMarkerSection(at: path, with: wrapped)
+                } else {
+                    let withUserSection = wrapped + "\n\n<!-- 아래에 자유롭게 추가하세요 -->\n"
+                    try withUserSection.write(toFile: path, atomically: true, encoding: .utf8)
+                }
+            } catch {
+                NSLog("[AICompanionService] %@ 생성 실패: %@", fileName, error.localizedDescription)
             }
         }
 
         // .claude/agents/ — marker-based safe update
-        let agentsDir = (pkmRoot as NSString).appendingPathComponent(".claude/agents")
-        try fm.createDirectory(atPath: agentsDir, withIntermediateDirectories: true)
-        for (name, content) in [
-            ("inbox-agent", inboxAgentContent),
-            ("project-agent", projectAgentContent),
-            ("search-agent", searchAgentContent),
-            ("synthesis-agent", synthesisAgentContent),
-            ("review-agent", reviewAgentContent),
-            ("note-agent", noteAgentContent),
-            ("link-health-agent", linkHealthAgentContent),
-            ("tag-cleanup-agent", tagCleanupAgentContent),
-            ("stale-review-agent", staleReviewAgentContent),
-            ("para-move-agent", paraMoveAgentContent),
-            ("vault-audit-agent", vaultAuditAgentContent),
-        ] {
-            let path = (agentsDir as NSString).appendingPathComponent("\(name).md")
-            let wrapped = "\(markerStart)\n\(content)\n\(markerEnd)"
-            if fm.fileExists(atPath: path) {
-                try replaceMarkerSection(at: path, with: wrapped)
-            } else {
-                try wrapped.write(toFile: path, atomically: true, encoding: .utf8)
+        do {
+            let agentsDir = (pkmRoot as NSString).appendingPathComponent(".claude/agents")
+            try fm.createDirectory(atPath: agentsDir, withIntermediateDirectories: true)
+            for (name, content) in [
+                ("inbox-agent", inboxAgentContent),
+                ("project-agent", projectAgentContent),
+                ("search-agent", searchAgentContent),
+                ("synthesis-agent", synthesisAgentContent),
+                ("review-agent", reviewAgentContent),
+                ("note-agent", noteAgentContent),
+                ("link-health-agent", linkHealthAgentContent),
+                ("tag-cleanup-agent", tagCleanupAgentContent),
+                ("stale-review-agent", staleReviewAgentContent),
+                ("para-move-agent", paraMoveAgentContent),
+                ("vault-audit-agent", vaultAuditAgentContent),
+            ] {
+                do {
+                    let path = (agentsDir as NSString).appendingPathComponent("\(name).md")
+                    let wrapped = "\(markerStart)\n\(content)\n\(markerEnd)"
+                    if fm.fileExists(atPath: path) {
+                        try replaceMarkerSection(at: path, with: wrapped)
+                    } else {
+                        try wrapped.write(toFile: path, atomically: true, encoding: .utf8)
+                    }
+                } catch {
+                    NSLog("[AICompanionService] 에이전트 %@ 생성 실패: %@", name, error.localizedDescription)
+                }
             }
+        } catch {
+            NSLog("[AICompanionService] 에이전트 디렉토리 생성 실패: %@", error.localizedDescription)
         }
 
         // .claude/skills/ — marker-based safe update
@@ -102,27 +125,39 @@ enum AICompanionService {
             ("index-integrity", indexIntegritySkillContent),
         ]
         for (skillName, skillBody) in allSkills {
-            let skillsDir = (pkmRoot as NSString).appendingPathComponent(".claude/skills/\(skillName)")
-            try fm.createDirectory(atPath: skillsDir, withIntermediateDirectories: true)
-            let skillPath = (skillsDir as NSString).appendingPathComponent("SKILL.md")
-            let wrappedSkill = "\(markerStart)\n\(skillBody)\n\(markerEnd)"
-            if fm.fileExists(atPath: skillPath) {
-                try replaceMarkerSection(at: skillPath, with: wrappedSkill)
-            } else {
-                try wrappedSkill.write(toFile: skillPath, atomically: true, encoding: .utf8)
+            do {
+                let skillsDir = (pkmRoot as NSString).appendingPathComponent(".claude/skills/\(skillName)")
+                try fm.createDirectory(atPath: skillsDir, withIntermediateDirectories: true)
+                let skillPath = (skillsDir as NSString).appendingPathComponent("SKILL.md")
+                let wrappedSkill = "\(markerStart)\n\(skillBody)\n\(markerEnd)"
+                if fm.fileExists(atPath: skillPath) {
+                    try replaceMarkerSection(at: skillPath, with: wrappedSkill)
+                } else {
+                    try wrappedSkill.write(toFile: skillPath, atomically: true, encoding: .utf8)
+                }
+            } catch {
+                NSLog("[AICompanionService] 스킬 %@ 생성 실패: %@", skillName, error.localizedDescription)
             }
         }
 
         // Create .obsidianignore to hide internal folders from Obsidian
-        let obsidianIgnorePath = (pkmRoot as NSString).appendingPathComponent(".obsidianignore")
-        if !fm.fileExists(atPath: obsidianIgnorePath) {
-            let ignoreContent = "_Assets\n.meta\n.dotbrain-companion-version\n"
-            try ignoreContent.write(toFile: obsidianIgnorePath, atomically: true, encoding: .utf8)
+        do {
+            let obsidianIgnorePath = (pkmRoot as NSString).appendingPathComponent(".obsidianignore")
+            if !fm.fileExists(atPath: obsidianIgnorePath) {
+                let ignoreContent = "_Assets\n.meta\n.dotbrain-companion-version\n"
+                try ignoreContent.write(toFile: obsidianIgnorePath, atomically: true, encoding: .utf8)
+            }
+        } catch {
+            NSLog("[AICompanionService] .obsidianignore 생성 실패: %@", error.localizedDescription)
         }
 
         // Create _Assets/videos directory for existing vaults
-        let videosDir = (pkmRoot as NSString).appendingPathComponent("_Assets/videos")
-        try fm.createDirectory(atPath: videosDir, withIntermediateDirectories: true)
+        do {
+            let videosDir = (pkmRoot as NSString).appendingPathComponent("_Assets/videos")
+            try fm.createDirectory(atPath: videosDir, withIntermediateDirectories: true)
+        } catch {
+            NSLog("[AICompanionService] _Assets/videos 생성 실패: %@", error.localizedDescription)
+        }
     }
 
     /// Replace content between DotBrain markers, keep everything else
@@ -613,7 +648,7 @@ enum AICompanionService {
     - **Vault Reorganization**: Cross-category AI scan → compare current vs recommended location → selective execution (Dashboard → 전체 재정리, max 200 files)
     - **Vault Audit**: Detect broken WikiLinks, missing frontmatter/tags/PARA → auto-repair with Levenshtein matching
 
-    ## AI Agents (10 agents in `.claude/agents/`)
+    ## AI Agents (11 agents in `.claude/agents/`)
     - inbox-agent: Inbox classification and processing
     - project-agent: Project lifecycle management
     - search-agent: Vault-wide knowledge search

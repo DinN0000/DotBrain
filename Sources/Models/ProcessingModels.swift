@@ -43,10 +43,20 @@ struct ProcessedFileResult: Identifiable {
         return nil
     }
 
+    var isAsset: Bool {
+        targetPath.contains("/_Assets/")
+    }
+
     var displayTarget: String {
         let url = URL(fileURLWithPath: targetPath)
         let components = url.pathComponents
         let meaningful = components.filter { $0 != "/" }
+
+        // _Assets files: show subfolder (e.g. "_Assets/images")
+        if let idx = meaningful.firstIndex(of: "_Assets"), idx + 1 < meaningful.count {
+            return "_Assets/\(meaningful[idx + 1])"
+        }
+
         if meaningful.count >= 2 {
             return meaningful.suffix(2).joined(separator: "/")
         }

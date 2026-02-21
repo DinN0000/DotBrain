@@ -257,7 +257,16 @@ struct SemanticLinker: Sendable {
             }
         }
 
-        // Write links + reverse links
+        // Collect reverse links into a dictionary so each target file is written only once
+        var reverseLinks: [String: [(name: String, context: String, relation: String)]] = [:]
+        for entry in allLinks {
+            for link in entry.links {
+                let reverseContext = Self.reverseRelationContext[link.relation] ?? "관련 문서"
+                reverseLinks[link.name, default: []].append((name: entry.noteName, context: reverseContext, relation: link.relation))
+            }
+        }
+
+        // Write forward links
         var notesLinked = 0
         var linksCreated = 0
 
@@ -266,16 +275,20 @@ struct SemanticLinker: Sendable {
                 try writer.writeRelatedNotes(filePath: entry.filePath, newLinks: entry.links, noteNames: noteNames)
                 notesLinked += 1
                 linksCreated += entry.links.count
-
-                for link in entry.links {
-                    guard let targetPath = notePathMap[link.name] else { continue }
-                    let reverseContext = Self.reverseRelationContext[link.relation] ?? "관련 문서"
-                    let reverseLink = LinkAIFilter.FilteredLink(name: entry.noteName, context: reverseContext, relation: link.relation)
-                    try writer.writeRelatedNotes(filePath: targetPath, newLinks: [reverseLink], noteNames: noteNames)
-                    linksCreated += 1
-                }
             } catch {
                 NSLog("[SemanticLinker] 노트 링크 실패: %@ — %@", entry.noteName, error.localizedDescription)
+            }
+        }
+
+        // Write reverse links (batched per target file)
+        for (targetName, sources) in reverseLinks {
+            guard let targetPath = notePathMap[targetName] else { continue }
+            let reverseFilteredLinks = sources.map { LinkAIFilter.FilteredLink(name: $0.name, context: $0.context, relation: $0.relation) }
+            do {
+                try writer.writeRelatedNotes(filePath: targetPath, newLinks: reverseFilteredLinks, noteNames: noteNames)
+                linksCreated += reverseFilteredLinks.count
+            } catch {
+                NSLog("[SemanticLinker] 역방향 링크 기록 실패: %@ — %@", targetName, error.localizedDescription)
             }
         }
 

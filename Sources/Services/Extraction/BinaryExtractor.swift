@@ -32,18 +32,12 @@ enum BinaryExtractor {
         let url = URL(fileURLWithPath: path)
         let ext = url.pathExtension.lowercased()
 
-        switch ext {
-        case "pdf":
-            return PDFExtractor.extract(at: path)
-        case "pptx":
-            return PPTXExtractor.extract(at: path)
-        case "xlsx":
-            return XLSXExtractor.extract(at: path)
-        case "docx":
-            return DOCXExtractor.extract(at: path)
-        case "jpg", "jpeg", "png", "gif", "bmp", "webp", "heic":
+        // Use static Sets for image/video to avoid duplicating extension lists
+        if Self.imageExtensions.contains(ext) {
             return ImageExtractor.extract(at: path)
-        case "mov", "mp4", "avi", "mkv", "wmv", "flv", "webm", "m4v":
+        }
+
+        if Self.videoExtensions.contains(ext) {
             let fileSize = (try? FileManager.default.attributesOfItem(atPath: path)[.size] as? Int) ?? 0
             let sizeKB = Double(fileSize) / 1024.0
             return ExtractResult(
@@ -53,6 +47,18 @@ enum BinaryExtractor {
                 text: nil,
                 error: nil
             )
+        }
+
+        // Document types
+        switch ext {
+        case "pdf":
+            return PDFExtractor.extract(at: path)
+        case "pptx":
+            return PPTXExtractor.extract(at: path)
+        case "xlsx":
+            return XLSXExtractor.extract(at: path)
+        case "docx":
+            return DOCXExtractor.extract(at: path)
         default:
             // Try reading as text
             return extractAsText(at: path)
