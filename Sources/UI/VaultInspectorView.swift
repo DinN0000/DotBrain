@@ -817,12 +817,13 @@ struct VaultInspectorView: View {
                 let result = try await reorganizer.scan()
                 if Task.isCancelled { return }
 
-                // Update hash cache for scanned files so health dots refresh
-                let scannedPaths = result.files.map { $0.filePath }
-                if !scannedPaths.isEmpty {
+                // Update hash cache for ALL files in scope so health dots refresh
+                // (includes index notes which reorg scan skips)
+                let allScopePaths = Self.collectAllMdFiles(scope: currentScope, pkmRoot: root)
+                if !allScopePaths.isEmpty {
                     let cache = ContentHashCache(pkmRoot: root)
                     await cache.load()
-                    await cache.updateHashes(scannedPaths)
+                    await cache.updateHashes(allScopePaths)
                     await cache.save()
                 }
 
@@ -873,12 +874,13 @@ struct VaultInspectorView: View {
                 let executionResults = try await reorganizer.execute(plan: selected)
                 if Task.isCancelled { return }
 
-                // Update hash cache for moved files (new paths)
-                let movedPaths = executionResults.filter(\.isSuccess).map { $0.targetPath }
-                if !movedPaths.isEmpty {
+                // Update hash cache for ALL files in affected folders
+                // (reorg may modify other files via SemanticLinker/NoteIndexGenerator)
+                let allScopePaths = Self.collectAllMdFiles(scope: reorgScope, pkmRoot: root)
+                if !allScopePaths.isEmpty {
                     let cache = ContentHashCache(pkmRoot: root)
                     await cache.load()
-                    await cache.updateHashes(movedPaths)
+                    await cache.updateHashes(allScopePaths)
                     await cache.save()
                 }
 
@@ -895,6 +897,49 @@ struct VaultInspectorView: View {
                 }
             }
         }
+    }
+
+    /// Collect all .md file paths within a reorg scope (including index notes).
+    private nonisolated static func collectAllMdFiles(scope: VaultReorganizer.Scope, pkmRoot: String) -> [String] {
+        let fm = FileManager.default
+        let pathManager = PKMPathManager(root: pkmRoot)
+        var paths: [String] = []
+
+        func collectFromFolder(_ folderPath: String) {
+            guard let entries = try? fm.contentsOfDirectory(atPath: folderPath) else { return }
+            for entry in entries {
+                guard entry.hasSuffix(".md"), !entry.hasPrefix("."), !entry.hasPrefix("_") else { continue }
+                paths.append((folderPath as NSString).appendingPathComponent(entry))
+            }
+        }
+
+        switch scope {
+        case .folder(let folderPath):
+            collectFromFolder(folderPath)
+        case .category(let category):
+            let basePath = pathManager.paraPath(for: category)
+            guard let folders = try? fm.contentsOfDirectory(atPath: basePath) else { return paths }
+            for folder in folders {
+                guard !folder.hasPrefix("."), !folder.hasPrefix("_") else { continue }
+                let folderPath = (basePath as NSString).appendingPathComponent(folder)
+                var isDir: ObjCBool = false
+                guard fm.fileExists(atPath: folderPath, isDirectory: &isDir), isDir.boolValue else { continue }
+                collectFromFolder(folderPath)
+            }
+        case .all:
+            for category in PARACategory.allCases {
+                let basePath = pathManager.paraPath(for: category)
+                guard let folders = try? fm.contentsOfDirectory(atPath: basePath) else { continue }
+                for folder in folders {
+                    guard !folder.hasPrefix("."), !folder.hasPrefix("_") else { continue }
+                    let folderPath = (basePath as NSString).appendingPathComponent(folder)
+                    var isDir: ObjCBool = false
+                    guard fm.fileExists(atPath: folderPath, isDirectory: &isDir), isDir.boolValue else { continue }
+                    collectFromFolder(folderPath)
+                }
+            }
+        }
+        return paths
     }
 
     private func resetReorg() {
