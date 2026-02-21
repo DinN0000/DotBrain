@@ -300,30 +300,6 @@ struct OnboardingView: View {
                         }
                     }
 
-                    Divider()
-
-                    // Live folder preview
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("선택한 경로 아래에 이렇게 만들어집니다:")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-
-                        VStack(alignment: .leading, spacing: 1) {
-                            Text(abbreviatedPath(appState.pkmRootPath))
-                                .font(.system(.caption2, design: .monospaced))
-                                .fontWeight(.medium)
-                                .foregroundColor(.primary)
-                            folderTreeRow(prefix: "\u{251C}\u{2500}", name: "_Inbox/")
-                            folderTreeRow(prefix: "\u{251C}\u{2500}", name: "1_Project/")
-                            folderTreeRow(prefix: "\u{251C}\u{2500}", name: "2_Area/")
-                            folderTreeRow(prefix: "\u{251C}\u{2500}", name: "3_Resource/")
-                            folderTreeRow(prefix: "\u{2514}\u{2500}", name: "4_Archive/")
-                        }
-                        .padding(8)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(Color.secondary.opacity(0.03))
-                        .cornerRadius(6)
-                    }
                 }
                 .padding(14)
                 .background(Color.secondary.opacity(0.05))
