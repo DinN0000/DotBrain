@@ -48,10 +48,6 @@ struct ResultsView: View {
                         // Summary card
                         ResultsSummaryCard()
 
-                        ForEach(appState.processedResults) { result in
-                            ResultRow(result: result)
-                        }
-
                         // Batch actions for pending confirmations
                         if appState.pendingConfirmations.count > 1 {
                             HStack(spacing: 12) {
@@ -77,6 +73,10 @@ struct ResultsView: View {
 
                         ForEach(appState.pendingConfirmations) { confirmation in
                             ConfirmationRow(confirmation: confirmation)
+                        }
+
+                        ForEach(appState.processedResults) { result in
+                            ResultRow(result: result)
                         }
 
                         // Affected folders & next steps (inbox processing only)

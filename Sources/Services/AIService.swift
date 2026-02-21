@@ -99,6 +99,7 @@ actor AIService {
                     await rateLimiter.recordFailure(for: provider, isRateLimit: is429)
                 }
 
+                NSLog("[AIService] 주 제공자 오류: %@", error.localizedDescription)
                 // Don't retry on non-retryable errors
                 if !isRetryable(error) { break }
 

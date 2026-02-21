@@ -6,7 +6,7 @@ import Foundation
 enum AICompanionService {
 
     /// Bump this when companion file content changes — triggers overwrite on existing vaults
-    static let version = 12
+    static let version = 13
 
     /// Generate all AI companion files in the PKM root (first-time only)
     static func generateAll(pkmRoot: String) throws {
@@ -112,6 +112,17 @@ enum AICompanionService {
                 try wrappedSkill.write(toFile: skillPath, atomically: true, encoding: .utf8)
             }
         }
+
+        // Create .obsidianignore to hide internal folders from Obsidian
+        let obsidianIgnorePath = (pkmRoot as NSString).appendingPathComponent(".obsidianignore")
+        if !fm.fileExists(atPath: obsidianIgnorePath) {
+            let ignoreContent = "_Assets\n.meta\n.dotbrain-companion-version\n"
+            try ignoreContent.write(toFile: obsidianIgnorePath, atomically: true, encoding: .utf8)
+        }
+
+        // Create _Assets/videos directory for existing vaults
+        let videosDir = (pkmRoot as NSString).appendingPathComponent("_Assets/videos")
+        try fm.createDirectory(atPath: videosDir, withIntermediateDirectories: true)
     }
 
     /// Replace content between DotBrain markers, keep everything else
@@ -165,12 +176,12 @@ enum AICompanionService {
     이 볼트를 탐색할 때 다음 순서를 따르세요:
 
     1. **이 파일(CLAUDE.md)** 을 먼저 읽어 구조와 규칙을 파악
-    2. **`_meta/note-index.json`** 읽기: 전체 볼트 구조, 노트 메타데이터(태그, 요약, 프로젝트, 상태) 조회
+    2. **`.meta/note-index.json`** 읽기: 전체 볼트 구조, 노트 메타데이터(태그, 요약, 프로젝트, 상태) 조회
     3. **프론트매터 필드**로 필터링: `project`, `status: active`, `para` 등
     4. **`## Related Notes` 링크** 따라가기: 관계 유형(prerequisite > project > reference > related) 우선순위로 탐색
     5. **Grep 검색**으로 태그/키워드 기반 탐색 (아래 검색 패턴 참조)
 
-    ### 노트 인덱스 (`_meta/note-index.json`)
+    ### 노트 인덱스 (`.meta/note-index.json`)
 
     DotBrain이 자동 생성/갱신하는 볼트 메타데이터 인덱스입니다.
     - 모든 노트의 경로, 태그, 요약, 프로젝트, 상태 정보 포함
@@ -401,7 +412,7 @@ enum AICompanionService {
        - `status:` 필드를 이동 유형에 맞게 변경
        - Archive 이동 시: `para: archive`, `status: completed`
        - `project:` 필드가 있으면 새 상위 프로젝트명으로 갱신
-    3. **노트 인덱스 자동 갱신** — DotBrain이 다음 실행 시 `_meta/note-index.json` 자동 갱신
+    3. **노트 인덱스 자동 갱신** — DotBrain이 다음 실행 시 `.meta/note-index.json` 자동 갱신
        - AI 에이전트가 직접 인덱스를 수정할 필요 없음
     4. **하위 파일 일괄 처리** — 폴더 이동인 경우:
        - 폴더 내 모든 `.md` 파일의 프론트매터도 동일하게 갱신
@@ -418,7 +429,7 @@ enum AICompanionService {
     ## 관련 노트 링크
 
     DotBrain은 **AI 시맨틱 분석**으로 관련 노트를 연결합니다:
-    - `_meta/note-index.json`을 파싱하여 **VaultContextMap**을 구축
+    - `.meta/note-index.json`을 파싱하여 **VaultContextMap**을 구축
     - 단순 태그 일치가 아닌 **맥락적 연관성** 기반 추천
     - 같은 폴더뿐 아니라 **다른 카테고리의 노트도** 적극 연결
     - 문서당 최대 **5개** 관련 노트
@@ -553,7 +564,7 @@ enum AICompanionService {
     ## 관련 노트 링크 규칙
 
     DotBrain은 **AI 시맨틱 분석**으로 관련 노트를 찾습니다:
-    - `_meta/note-index.json`을 파싱하여 VaultContextMap 구축
+    - `.meta/note-index.json`을 파싱하여 VaultContextMap 구축
     - 단순 태그 일치가 아닌 **맥락적 연관성** 기반 추천
     - 같은 폴더뿐 아니라 **다른 카테고리의 노트도** 적극 연결
     - 문서당 최대 **5개** 관련 노트
@@ -624,7 +635,7 @@ enum AICompanionService {
     - index-integrity: note-index.json ↔ folder/file synchronization check
 
     ## Navigation Priority
-    1. Read `_meta/note-index.json` for vault structure overview (tags, summary, project, status per note)
+    1. Read `.meta/note-index.json` for vault structure overview (tags, summary, project, status per note)
     2. Read `CLAUDE.md` for detailed structure, frontmatter schema, and classification rules
     3. Follow `[[wikilinks]]` in `## Related Notes` sections — relation priority: prerequisite > project > reference > related
     4. Search by frontmatter fields using grep patterns
@@ -663,7 +674,7 @@ enum AICompanionService {
 
     ## Related Notes
     - DotBrain uses **AI semantic analysis** (not tag matching) to find related notes
-    - Based on VaultContextMap built from _meta/note-index.json
+    - Based on VaultContextMap built from .meta/note-index.json
     - Cross-category linking encouraged
     - No artificial limit — all genuinely related notes are connected
     - Context format: "~하려면", "~할 때", "~와 비교할 때"
@@ -759,7 +770,7 @@ enum AICompanionService {
 
     ### Step 5: AI 시맨틱 관련 노트 링크
 
-    - `_meta/note-index.json`을 파싱하여 VaultContextMap 구축
+    - `.meta/note-index.json`을 파싱하여 VaultContextMap 구축
     - 맥락적 연관성 기반으로 관련 노트 추천
     - 같은 폴더뿐 아니라 다른 카테고리 노트도 적극 연결
     - context 형식: `"~하려면"`, `"~할 때"`, `"~와 비교할 때"`
@@ -1424,7 +1435,7 @@ enum AICompanionService {
     - **폴더 내 이동**: para/status 유지, `project:` 필드만 갱신
 
     ### Step 4: 인덱스 자동 갱신
-    - DotBrain이 `_meta/note-index.json`을 자동 갱신
+    - DotBrain이 `.meta/note-index.json`을 자동 갱신
     - AI 에이전트가 직접 인덱스를 수정할 필요 없음
 
     ### Step 5: 결과 보고
@@ -2100,14 +2111,14 @@ enum AICompanionService {
 
     ## 용도
 
-    `_meta/note-index.json`이 실제 볼트 내용과 동기화되어 있는지 검증하고, 불일치를 보고합니다.
+    `.meta/note-index.json`이 실제 볼트 내용과 동기화되어 있는지 검증하고, 불일치를 보고합니다.
     `vault-audit-agent`의 하위 검사로 호출되거나, 단독으로 "인덱스 점검해줘"로 실행할 수 있습니다.
 
     ## 인덱스 파일
 
     | 파일 | 역할 |
     |------|------|
-    | `_meta/note-index.json` | 전체 볼트 노트/폴더 메타데이터 인덱스 |
+    | `.meta/note-index.json` | 전체 볼트 노트/폴더 메타데이터 인덱스 |
 
     DotBrain이 자동 생성/갱신합니다. 구조:
     - `notes`: 노트명 → {path, folder, para, tags, summary, project, status}
@@ -2119,7 +2130,7 @@ enum AICompanionService {
     ### Step 1: 인덱스 파일 존재 확인
 
     ```
-    Read("_meta/note-index.json")
+    Read(".meta/note-index.json")
     ```
 
     **누락 시**: DotBrain에서 "볼트 점검" 실행을 안내

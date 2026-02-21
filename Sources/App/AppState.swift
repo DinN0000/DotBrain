@@ -188,6 +188,14 @@ final class AppState: ObservableObject {
             AICompanionService.updateIfNeeded(pkmRoot: pkmRootPath)
             StatisticsService.sharedPkmRoot = pkmRootPath
 
+            // One-time migration: rename _meta/ to .meta/ (hidden from Finder/Obsidian)
+            let oldMeta = (pkmRootPath as NSString).appendingPathComponent("_meta")
+            let newMeta = (pkmRootPath as NSString).appendingPathComponent(".meta")
+            if FileManager.default.fileExists(atPath: oldMeta),
+               !FileManager.default.fileExists(atPath: newMeta) {
+                try? FileManager.default.moveItem(atPath: oldMeta, toPath: newMeta)
+            }
+
             // One-time migration: consolidate scattered _Assets/ to central _Assets/{documents,images}/
             let migrationKey = "assetMigrationV1Completed"
             if !UserDefaults.standard.bool(forKey: migrationKey) {

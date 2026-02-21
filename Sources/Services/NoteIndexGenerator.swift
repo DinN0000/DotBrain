@@ -21,7 +21,7 @@ struct FolderIndexEntry: Codable, Sendable {
     let tags: [String]
 }
 
-/// Root structure for _meta/note-index.json
+/// Root structure for .meta/note-index.json
 struct NoteIndex: Codable, Sendable {
     let version: Int
     let updated: String
@@ -31,7 +31,7 @@ struct NoteIndex: Codable, Sendable {
 
 // MARK: - Generator
 
-/// Generates and maintains _meta/note-index.json for AI vault navigation.
+/// Generates and maintains .meta/note-index.json for AI vault navigation.
 /// Replaces MOCGenerator with a single JSON index that AI tools can read efficiently.
 struct NoteIndexGenerator: Sendable {
     let pkmRoot: String
@@ -239,18 +239,18 @@ struct NoteIndexGenerator: Sendable {
         }
     }
 
-    /// Save index to _meta/note-index.json with prettyPrinted + sortedKeys
+    /// Save index to .meta/note-index.json with prettyPrinted + sortedKeys
     private func save(_ index: NoteIndex) {
         let fm = FileManager.default
-        let metaDir = (pkmRoot as NSString).appendingPathComponent("_meta")
+        let metaDir = (pkmRoot as NSString).appendingPathComponent(".meta")
         let indexPath = metaIndexPath()
 
-        // Create _meta/ directory if needed
+        // Create .meta/ directory if needed
         if !fm.fileExists(atPath: metaDir) {
             do {
                 try fm.createDirectory(atPath: metaDir, withIntermediateDirectories: true)
             } catch {
-                NSLog("[NoteIndexGenerator] Failed to create _meta directory: %@", error.localizedDescription)
+                NSLog("[NoteIndexGenerator] Failed to create .meta directory: %@", error.localizedDescription)
                 return
             }
         }
@@ -266,10 +266,10 @@ struct NoteIndexGenerator: Sendable {
         }
     }
 
-    /// Path to _meta/note-index.json
+    /// Path to .meta/note-index.json
     private func metaIndexPath() -> String {
         (pkmRoot as NSString)
-            .appendingPathComponent("_meta")
+            .appendingPathComponent(".meta")
             .appending("/note-index.json")
     }
 

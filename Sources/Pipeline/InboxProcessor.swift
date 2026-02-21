@@ -91,29 +91,64 @@ struct InboxProcessor {
 
         onProgress?(0.3, "\(inputs.count)개 파일 내용 추출 완료")
 
+        // Separate media files (image+video) from text files — media skips AI classification
+        let mediaExtensions = BinaryExtractor.imageExtensions.union(BinaryExtractor.videoExtensions)
+        var mediaInputs: [ClassifyInput] = []
+        var textInputs: [ClassifyInput] = []
+        for input in inputs {
+            let ext = URL(fileURLWithPath: input.filePath).pathExtension.lowercased()
+            if mediaExtensions.contains(ext) {
+                mediaInputs.append(input)
+            } else {
+                textInputs.append(input)
+            }
+        }
+
         onProgress?(0.3, "AI 분류 시작...")
         onPhaseChange?(.classifying)
 
-        // Classify with 2-stage AI
+        // Classify only text files with AI
         let classifier = Classifier()
-        let classifications = try await classifier.classifyFiles(
-            inputs,
-            projectContext: projectContext,
-            subfolderContext: subfolderContext,
-            projectNames: projectNames,
-            weightedContext: weightedContext,
-            areaContext: areaContext,
-            tagVocabulary: tagVocabulary,
-            onProgress: { [onProgress] progress, status in
-                // Map classifier's 0-1 progress to our 0.3-0.7 range
-                let mappedProgress = 0.3 + progress * 0.4
-                onProgress?(mappedProgress, status)
-            }
-        )
+        let textClassifications: [ClassifyResult]
+        if textInputs.isEmpty {
+            textClassifications = []
+        } else {
+            textClassifications = try await classifier.classifyFiles(
+                textInputs,
+                projectContext: projectContext,
+                subfolderContext: subfolderContext,
+                projectNames: projectNames,
+                weightedContext: weightedContext,
+                areaContext: areaContext,
+                tagVocabulary: tagVocabulary,
+                onProgress: { [onProgress] progress, status in
+                    // Map classifier's 0-1 progress to our 0.3-0.7 range
+                    let mappedProgress = 0.3 + progress * 0.4
+                    onProgress?(mappedProgress, status)
+                }
+            )
+        }
+
+        // Media files get a default classification — route directly to _Assets
+        let mediaClassifications = mediaInputs.map { _ in
+            ClassifyResult(
+                para: .resource,
+                tags: [],
+                summary: "",
+                targetFolder: "",
+                project: nil,
+                confidence: 1.0,
+                relatedNotes: []
+            )
+        }
+
+        // Merge: media first, then text (preserves pairing with inputs)
+        let allInputs = mediaInputs + textInputs
+        let allClassifications = mediaClassifications + textClassifications
 
         // Classifications ready for move (semantic linking happens post-move)
         onPhaseChange?(.linking)
-        let enrichedClassifications = classifications
+        let enrichedClassifications = allClassifications
         onProgress?(0.7, "파일 이동 준비 중...")
 
         // Move files
@@ -123,11 +158,11 @@ struct InboxProcessor {
         var needsConfirmation: [PendingConfirmation] = []
         var failed = 0
 
-        for (i, (classification, input)) in zip(enrichedClassifications, inputs).enumerated() {
+        for (i, (classification, input)) in zip(enrichedClassifications, allInputs).enumerated() {
             if Task.isCancelled { throw CancellationError() }
             let progress = 0.7 + Double(i) / Double(max(enrichedClassifications.count, 1)) * 0.25
             onProgress?(progress, "\(input.fileName) 이동 중...")
-            onFileProgress?(i, inputs.count, input.fileName)
+            onFileProgress?(i, allInputs.count, input.fileName)
 
             // Low confidence: ask user
             if classification.confidence < 0.5 {
@@ -239,7 +274,7 @@ struct InboxProcessor {
             let _ = await linker.linkNotes(filePaths: successPaths)
         }
 
-        onFileProgress?(inputs.count, inputs.count, "")
+        onFileProgress?(allInputs.count, allInputs.count, "")
         onProgress?(0.95, "완료 정리 중...")
 
         // Send notification
@@ -274,16 +309,19 @@ struct InboxProcessor {
     static func friendlyErrorMessage(_ error: Error) -> String {
         let desc = error.localizedDescription
 
-        // API key errors
+        // API key / quota errors
         if error is ClaudeAPIError || error is GeminiAPIError {
             if desc.contains("API 키") || desc.contains("noAPIKey") {
                 return "API 키를 확인해주세요. 설정에서 올바른 키를 입력하세요."
+            }
+            if desc.contains("usage limit") || desc.contains("exceeded your current quota") {
+                return "API 월간 사용 한도에 도달했습니다. API 제공자 콘솔에서 한도를 확인해주세요."
             }
             if desc.contains("429") || desc.contains("rate") {
                 return "API 요청 한도 초과. 잠시 후 다시 시도해주세요."
             }
             if desc.contains("credit") || desc.contains("balance") || desc.contains("400") {
-                return "API 크레딧이 부족합니다. Anthropic 콘솔에서 잔액을 확인해주세요."
+                return "API 크레딧이 부족합니다. API 제공자 콘솔에서 잔액을 확인해주세요."
             }
             if desc.contains("401") || desc.contains("403") || desc.contains("authentication") {
                 return "API 키가 유효하지 않습니다. 설정에서 확인해주세요."

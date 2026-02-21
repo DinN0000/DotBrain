@@ -117,12 +117,16 @@ struct OnboardingView: View {
 
     private var welcomeStep: some View {
         VStack(spacing: 0) {
-            stepHeader(
-                title: "DotBrain",
-                desc: "Built for humans. Optimized for AI."
-            )
+            Text("DotBrain")
+                .font(.title)
+                .fontWeight(.bold)
+                .padding(.top, 16)
+                .padding(.bottom, 2)
 
-            Spacer()
+            Text("Built for humans. Optimized for AI.")
+                .font(.caption)
+                .foregroundColor(.secondary)
+                .padding(.bottom, 20)
 
             // Before — chaos
             VStack(alignment: .leading, spacing: 3) {
@@ -391,8 +395,6 @@ struct OnboardingView: View {
                 desc: "지속적으로 관리하는 책임 영역을 등록합니다."
             )
 
-            Spacer()
-
             VStack(alignment: .leading, spacing: 10) {
                 HStack(alignment: .top, spacing: 8) {
                     Image(systemName: "lightbulb.fill")
@@ -451,7 +453,7 @@ struct OnboardingView: View {
                             }
                         }
                     }
-                    .frame(maxHeight: 90)
+                    .frame(maxHeight: 200)
                 } else {
                     Text("건너뛰어도 됩니다. 나중에 추가할 수 있어요.")
                         .font(.caption)
@@ -494,8 +496,6 @@ struct OnboardingView: View {
                 title: "프로젝트 등록",
                 desc: "지금 진행 중인 일에 이름을 붙여주세요."
             )
-
-            Spacer()
 
             VStack(alignment: .leading, spacing: 10) {
                 HStack(alignment: .top, spacing: 8) {
@@ -580,7 +580,7 @@ struct OnboardingView: View {
                             }
                         }
                     }
-                    .frame(maxHeight: 90)
+                    .frame(maxHeight: 200)
                 } else {
                     Text("최소 1개의 프로젝트를 등록해주세요")
                         .font(.caption)
@@ -640,15 +640,13 @@ struct OnboardingView: View {
                         providerCard(
                             provider: .gemini,
                             badge: "무료로 시작 가능",
-                            badgeColor: .green,
-                            details: "빠른 모델(Flash) → 정밀 모델(Pro)\n무료 티어: 분당 15회, 일 1,500회"
+                            badgeColor: .green
                         )
 
                         providerCard(
                             provider: .claude,
                             badge: "API 결제 필요",
-                            badgeColor: .orange,
-                            details: "빠른 모델(Haiku) → 정밀 모델(Sonnet)\n파일당 약 $0.002~$0.01"
+                            badgeColor: .orange
                         )
                     }
 
@@ -790,7 +788,7 @@ struct OnboardingView: View {
         }
     }
 
-    private func providerCard(provider: AIProvider, badge: String, badgeColor: Color, details: String) -> some View {
+    private func providerCard(provider: AIProvider, badge: String, badgeColor: Color) -> some View {
         let isSelected = appState.selectedProvider == provider
 
         return Button(action: {
@@ -817,27 +815,20 @@ struct OnboardingView: View {
                 }
                 .padding(.top, 2)
 
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack(spacing: 8) {
-                        Text(provider.displayName)
-                            .font(.subheadline)
-                            .fontWeight(.medium)
-                            .foregroundColor(.primary)
+                HStack(spacing: 8) {
+                    Text(provider.displayName)
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                        .foregroundColor(.primary)
 
-                        Text(badge)
-                            .font(.caption2)
-                            .fontWeight(.medium)
-                            .foregroundColor(badgeColor)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(badgeColor.opacity(0.12))
-                            .cornerRadius(4)
-                    }
-
-                    Text(details)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .lineSpacing(2)
+                    Text(badge)
+                        .font(.caption2)
+                        .fontWeight(.medium)
+                        .foregroundColor(badgeColor)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(badgeColor.opacity(0.12))
+                        .cornerRadius(4)
                 }
 
                 Spacer()
@@ -871,7 +862,7 @@ struct OnboardingView: View {
                 .lineSpacing(2)
         }
         .padding(.horizontal, 24)
-        .padding(.bottom, 8)
+        .padding(.bottom, 20)
     }
 
     private func instructionRow(num: String, text: String) -> some View {
@@ -1075,8 +1066,6 @@ struct OnboardingView: View {
                         : "이제 인박스에 파일을 넣으면\nAI가 자동으로 정리합니다.")
                     : "API 키 없이도 폴더 구조를 활용할 수 있습니다."
             )
-
-            Spacer()
 
             Text(appState.hasAPIKey ? "·‿·" : "·_·")
                 .font(.system(size: 36, design: .monospaced))
