@@ -119,17 +119,15 @@ struct OnboardingView: View {
         VStack(spacing: 0) {
             Spacer()
 
-            Text("Built for humans.\nOptimized for AI.")
-                .font(.system(.title3, design: .monospaced))
+            Text("DotBrain")
+                .font(.title)
                 .fontWeight(.bold)
-                .multilineTextAlignment(.center)
-                .lineSpacing(2)
-                .padding(.bottom, 6)
+                .padding(.bottom, 2)
 
-            Text("문서를 넣으면 AI가 읽고 정리합니다")
+            Text("Built for humans. Optimized for AI.")
                 .font(.caption)
                 .foregroundColor(.secondary)
-                .padding(.bottom, 16)
+                .padding(.bottom, 20)
 
             // Before — chaos
             VStack(alignment: .leading, spacing: 3) {
