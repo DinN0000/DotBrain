@@ -12,8 +12,13 @@ struct VaultReorganizer {
 
     private static let maxFilesPerScan = 200
 
-    private var pathManager: PKMPathManager {
-        PKMPathManager(root: pkmRoot)
+    private let pathManager: PKMPathManager
+
+    init(pkmRoot: String, scope: Scope, onProgress: ((Double, String) -> Void)? = nil) {
+        self.pkmRoot = pkmRoot
+        self.scope = scope
+        self.onProgress = onProgress
+        self.pathManager = PKMPathManager(root: pkmRoot)
     }
 
     enum Scope {
@@ -265,8 +270,10 @@ struct VaultReorganizer {
             }
         }
 
+        let successes = results.filter(\.isSuccess)
+
         // Update MOCs for affected folders (both source and target) after file moves
-        var affectedFolders = Set(results.filter(\.isSuccess).compactMap { result -> String? in
+        var affectedFolders = Set(successes.compactMap { result -> String? in
             let dir = (result.targetPath as NSString).deletingLastPathComponent
             return dir.isEmpty ? nil : dir
         })
@@ -284,7 +291,7 @@ struct VaultReorganizer {
         }
 
         // Semantic link: reconnect moved files with vault
-        let successPaths = results.filter(\.isSuccess).map(\.targetPath)
+        let successPaths = successes.map(\.targetPath)
         if !successPaths.isEmpty {
             onProgress?(0.97, "시맨틱 연결 중...")
             let linker = SemanticLinker(pkmRoot: pkmRoot)
@@ -293,7 +300,7 @@ struct VaultReorganizer {
 
         let failedCount = results.filter { if case .error = $0.status { return true }; return false }.count
         NotificationService.sendProcessingComplete(
-            classified: results.filter(\.isSuccess).count,
+            classified: successes.count,
             total: selected.count,
             failed: failedCount
         )

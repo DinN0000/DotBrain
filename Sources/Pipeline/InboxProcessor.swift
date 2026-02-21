@@ -255,9 +255,12 @@ struct InboxProcessor {
             }
         }
 
+        // Compute success list once and reuse
+        let successes = processed.filter(\.isSuccess)
+
         // Update MOCs for affected folders
         onPhaseChange?(.finishing)
-        let affectedFolders = Set(processed.filter(\.isSuccess).compactMap { result -> String? in
+        let affectedFolders = Set(successes.compactMap { result -> String? in
             let dir = (result.targetPath as NSString).deletingLastPathComponent
             return dir.isEmpty ? nil : dir
         })
@@ -267,7 +270,7 @@ struct InboxProcessor {
         }
 
         // Semantic link: connect newly moved files with vault
-        let successPaths = processed.filter(\.isSuccess).map(\.targetPath)
+        let successPaths = successes.map(\.targetPath)
         if !successPaths.isEmpty {
             onProgress?(0.93, "시맨틱 연결 중...")
             let linker = SemanticLinker(pkmRoot: pkmRoot)
@@ -288,14 +291,14 @@ struct InboxProcessor {
 
         // Send notification
         NotificationService.sendProcessingComplete(
-            classified: processed.filter(\.isSuccess).count,
+            classified: successes.count,
             total: files.count,
             failed: failed
         )
 
         onProgress?(1.0, "완료!")
 
-        let successCount = processed.filter(\.isSuccess).count
+        let successCount = successes.count
         StatisticsService.recordActivity(
             fileName: "인박스 처리",
             category: "system",

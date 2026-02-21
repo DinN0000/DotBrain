@@ -4,9 +4,20 @@ import CryptoKit
 /// Moves files to PARA folders with conflict resolution and index note creation
 struct FileMover {
     let pkmRoot: String
+    private let pathManager: PKMPathManager
 
-    private var pathManager: PKMPathManager {
-        PKMPathManager(root: pkmRoot)
+    /// Per-directory body hash cache to avoid rescanning the same folder repeatedly.
+    /// Maps dirPath -> [bodyHash -> filePath].
+    private let bodyHashCache = BodyHashCache()
+
+    init(pkmRoot: String) {
+        self.pkmRoot = pkmRoot
+        self.pathManager = PKMPathManager(root: pkmRoot)
+    }
+
+    /// Reference-type wrapper so the cache is mutable without requiring mutating methods.
+    private final class BodyHashCache {
+        var storage: [String: [String: String]] = [:]
     }
 
     /// Check if moving this file would conflict with the index note
@@ -137,13 +148,7 @@ struct FileMover {
             return ""
         }
 
-        // Strip frontmatter (--- ... ---)
-        var body = content
-        if body.hasPrefix("---") {
-            if let endRange = body.range(of: "---", range: body.index(body.startIndex, offsetBy: 3)..<body.endIndex) {
-                body = String(body[endRange.upperBound...])
-            }
-        }
+        let (_, body) = Frontmatter.parse(markdown: content)
 
         // Find first meaningful line (skip blank lines and headings)
         let lines = body.components(separatedBy: .newlines)
@@ -318,7 +323,8 @@ struct FileMover {
 
         // Read source content body (strip frontmatter for comparison)
         let content = try String(contentsOfFile: filePath, encoding: .utf8)
-        let sourceBody = stripFrontmatter(content)
+        let (_, parsedBody) = Frontmatter.parse(markdown: content)
+        let sourceBody = parsedBody.trimmingCharacters(in: .whitespacesAndNewlines)
 
         // Duplicate check: compare body against existing .md files in target
         if let dupPath = findDuplicateByBody(sourceBody, in: targetDir) {
@@ -398,38 +404,35 @@ struct FileMover {
 
     // MARK: - Duplicate Detection
 
-    /// Strip frontmatter and whitespace for content comparison
-    private func stripFrontmatter(_ text: String) -> String {
-        var body = text
-        if body.hasPrefix("---") {
-            if let endRange = body.range(of: "---", range: body.index(body.startIndex, offsetBy: 3)..<body.endIndex) {
-                body = String(body[endRange.upperBound...])
-            }
-        }
-        return body.trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
-    /// Find a duplicate text file by comparing body content (ignoring frontmatter)
+    /// Find a duplicate text file by comparing body content (ignoring frontmatter).
+    /// Uses a per-directory hash cache so the directory is scanned at most once per FileMover instance.
     private func findDuplicateByBody(_ sourceBody: String, in dirPath: String) -> String? {
         let fm = FileManager.default
         guard !sourceBody.isEmpty else { return nil }
-        guard let entries = try? fm.contentsOfDirectory(atPath: dirPath) else { return nil }
 
-        let sourceHash = SHA256.hash(data: Data(sourceBody.utf8))
+        let sourceHashDigest = SHA256.hash(data: Data(sourceBody.utf8))
+        let sourceHash = sourceHashDigest.map { String(format: "%02x", $0) }.joined()
 
-        for entry in entries {
-            guard entry.hasSuffix(".md") else { continue }
-            let filePath = (dirPath as NSString).appendingPathComponent(entry)
-
-            guard let content = try? String(contentsOfFile: filePath, encoding: .utf8) else { continue }
-            let existingBody = stripFrontmatter(content)
-            let existingHash = SHA256.hash(data: Data(existingBody.utf8))
-
-            if sourceHash == existingHash {
-                return filePath
+        // Build cache for this directory if not yet populated
+        if bodyHashCache.storage[dirPath] == nil {
+            var dirCache: [String: String] = [:]
+            if let entries = try? fm.contentsOfDirectory(atPath: dirPath) {
+                for entry in entries {
+                    guard entry.hasSuffix(".md") else { continue }
+                    let filePath = (dirPath as NSString).appendingPathComponent(entry)
+                    guard let content = try? String(contentsOfFile: filePath, encoding: .utf8) else { continue }
+                    let (_, existingBody) = Frontmatter.parse(markdown: content)
+                    let trimmedBody = existingBody.trimmingCharacters(in: .whitespacesAndNewlines)
+                    guard !trimmedBody.isEmpty else { continue }
+                    let hashDigest = SHA256.hash(data: Data(trimmedBody.utf8))
+                    let hashString = hashDigest.map { String(format: "%02x", $0) }.joined()
+                    dirCache[hashString] = filePath
+                }
             }
+            bodyHashCache.storage[dirPath] = dirCache
         }
-        return nil
+
+        return bodyHashCache.storage[dirPath]?[sourceHash]
     }
 
     /// Find a duplicate large binary file by comparing size + modification date
