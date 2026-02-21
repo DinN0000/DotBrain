@@ -13,8 +13,10 @@ struct OnboardingView: View {
     @State private var direction: Int = 1
     @State private var folderError: String?
     @State private var showFolderError = false
+    @State private var areas: [String] = []
+    @State private var newAreaName: String = ""
 
-    private let totalSteps = 5
+    private let totalSteps = 6
 
     init() {
         let saved = UserDefaults.standard.integer(forKey: "onboardingStep")
@@ -31,9 +33,10 @@ struct OnboardingView: View {
                 switch step {
                 case 0: welcomeStep
                 case 1: folderStep
-                case 2: projectStep
-                case 3: providerAndKeyStep
-                case 4: trialStep
+                case 2: areaStep
+                case 3: projectStep
+                case 4: providerAndKeyStep
+                case 5: trialStep
                 default: trialStep
                 }
             }
@@ -352,7 +355,7 @@ struct OnboardingView: View {
                     if !isStructureReady {
                         if !validateAndCreateFolder() { return }
                     }
-                    loadExistingProjects()
+                    loadExistingAreas()
                     goNext()
                 }) {
                     Text("다음")
@@ -411,7 +414,111 @@ struct OnboardingView: View {
         return path + "/"
     }
 
-    // MARK: - Step 2: Project Registration
+    // MARK: - Step 2: Area (Domain) Registration
+
+    private var areaStep: some View {
+        VStack(spacing: 0) {
+            stepHeader(
+                title: "도메인 등록",
+                desc: "지속적으로 관리하는 영역입니다.\n프로젝트들을 묶는 상위 카테고리 역할을 합니다."
+            )
+
+            Spacer()
+
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(alignment: .top, spacing: 8) {
+                    Image(systemName: "lightbulb.fill")
+                        .font(.caption)
+                        .foregroundColor(.blue)
+                    Text("예: 제품명, 사업 도메인, 팀 이름 등. 여러 프로젝트가 속하는 상위 영역을 등록하세요.")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                .padding(10)
+                .background(Color.blue.opacity(0.05))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 6)
+                        .stroke(Color.blue.opacity(0.15), lineWidth: 1)
+                )
+                .cornerRadius(6)
+
+                HStack(spacing: 8) {
+                    TextField("도메인 이름 입력 후 + 버튼", text: $newAreaName)
+                        .textFieldStyle(.roundedBorder)
+                        .font(.subheadline)
+                        .onSubmit { addArea() }
+
+                    Button(action: addArea) {
+                        Image(systemName: "plus")
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.regular)
+                    .disabled(newAreaName.trimmingCharacters(in: .whitespaces).isEmpty)
+                }
+
+                if !areas.isEmpty {
+                    ScrollView {
+                        VStack(spacing: 3) {
+                            ForEach(areas, id: \.self) { name in
+                                HStack(spacing: 8) {
+                                    Image(systemName: "square.stack.3d.up.fill")
+                                        .font(.caption)
+                                        .foregroundColor(.green)
+                                    Text(name)
+                                        .font(.subheadline)
+
+                                    Spacer()
+
+                                    Button(action: { removeArea(name) }) {
+                                        Image(systemName: "xmark")
+                                            .font(.caption2)
+                                            .foregroundColor(.secondary)
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 6)
+                                .background(Color.secondary.opacity(0.05))
+                                .cornerRadius(6)
+                            }
+                        }
+                    }
+                    .frame(maxHeight: 90)
+                } else {
+                    Text("건너뛰어도 됩니다. 나중에 추가할 수 있어요.")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .padding(.vertical, 4)
+                }
+            }
+            .padding(.horizontal, 24)
+
+            Spacer()
+
+            HStack {
+                Button("이전") { goBack() }
+                    .buttonStyle(.bordered)
+                    .controlSize(.regular)
+
+                Spacer()
+
+                Button(action: {
+                    loadExistingProjects()
+                    goNext()
+                }) {
+                    Text("다음")
+                        .frame(minWidth: 80)
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.regular)
+            }
+            .padding(.horizontal, 32)
+            .padding(.bottom, 20)
+        }
+        .padding(.horizontal)
+    }
+
+    // MARK: - Step 3: Project Registration
 
     private var projectStep: some View {
         VStack(spacing: 0) {
@@ -505,7 +612,7 @@ struct OnboardingView: View {
                     if appState.hasAPIKey {
                         // Skip API key step, go to final
                         direction = 1
-                        step = 4
+                        step = 5
                         UserDefaults.standard.set(step, forKey: "onboardingStep")
                     } else {
                         goNext()
@@ -870,6 +977,56 @@ struct OnboardingView: View {
         let projectDir = (pathManager.projectsPath as NSString).appendingPathComponent(name)
         try? FileManager.default.trashItem(at: URL(fileURLWithPath: projectDir), resultingItemURL: nil)
         projects.removeAll { $0 == name }
+    }
+
+    private func loadExistingAreas() {
+        let pathManager = PKMPathManager(root: appState.pkmRootPath)
+        let fm = FileManager.default
+        guard let entries = try? fm.contentsOfDirectory(atPath: pathManager.areaPath) else { return }
+
+        areas = entries.filter { name in
+            guard !name.hasPrefix("."), !name.hasPrefix("_") else { return false }
+            let fullPath = (pathManager.areaPath as NSString).appendingPathComponent(name)
+            var isDir: ObjCBool = false
+            return fm.fileExists(atPath: fullPath, isDirectory: &isDir) && isDir.boolValue
+        }.sorted()
+    }
+
+    private func addArea() {
+        let raw = newAreaName.trimmingCharacters(in: .whitespaces)
+        let name = sanitizeProjectName(raw)
+        guard !name.isEmpty, !areas.contains(name) else { return }
+
+        let pathManager = PKMPathManager(root: appState.pkmRootPath)
+        let areaDir = (pathManager.areaPath as NSString).appendingPathComponent(name)
+        guard pathManager.isPathSafe(areaDir) else { return }
+        let fm = FileManager.default
+
+        do {
+            try fm.createDirectory(atPath: areaDir, withIntermediateDirectories: true)
+            let indexPath = (areaDir as NSString).appendingPathComponent("\(name).md")
+            if !fm.fileExists(atPath: indexPath) {
+                let content = FrontmatterWriter.createIndexNote(
+                    folderName: name,
+                    para: .area,
+                    description: "\(name) 도메인"
+                )
+                try content.write(toFile: indexPath, atomically: true, encoding: .utf8)
+            }
+            areas.append(name)
+            areas.sort()
+            newAreaName = ""
+        } catch {
+            NSLog("[OnboardingView] Area 생성 실패: %@", error.localizedDescription)
+            newAreaName = ""
+        }
+    }
+
+    private func removeArea(_ name: String) {
+        let pathManager = PKMPathManager(root: appState.pkmRootPath)
+        let areaDir = (pathManager.areaPath as NSString).appendingPathComponent(name)
+        try? FileManager.default.trashItem(at: URL(fileURLWithPath: areaDir), resultingItemURL: nil)
+        areas.removeAll { $0 == name }
     }
 
     private func saveAPIKey(provider: AIProvider) {
