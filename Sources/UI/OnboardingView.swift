@@ -532,7 +532,9 @@ struct OnboardingView: View {
                             }
                         }
                         .pickerStyle(.menu)
-                        .fixedSize()
+                        .frame(maxWidth: 100)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
                     }
 
                     Button(action: addProject) {
@@ -965,7 +967,6 @@ struct OnboardingView: View {
             }
 
             projects.append(name)
-            projects.sort()
             projectAreas[name] = areaName ?? ""
             newProjectName = ""
         } catch {
@@ -1036,7 +1037,6 @@ struct OnboardingView: View {
                 try content.write(toFile: indexPath, atomically: true, encoding: .utf8)
             }
             areas.append(name)
-            areas.sort()
             newAreaName = ""
         } catch {
             NSLog("[OnboardingView] Area 생성 실패: %@", error.localizedDescription)
