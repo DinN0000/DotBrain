@@ -549,7 +549,7 @@ struct VaultInspectorView: View {
             }
             HStack {
                 Spacer()
-                Button("돌아가기") { resetReorg() }
+                Button("닫기") { resetReorg() }
                     .font(.caption2)
                     .buttonStyle(.plain)
                     .foregroundColor(.secondary)
