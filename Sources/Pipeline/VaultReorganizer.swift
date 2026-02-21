@@ -149,6 +149,7 @@ struct VaultReorganizer {
         // 0.4-0.9: Classify with AI
         onProgress?(0.4, "AI 분류 시작...")
         let classifier = Classifier()
+        let correctionContext = CorrectionMemory.buildPromptContext(pkmRoot: pkmRoot)
         let classifications = try await classifier.classifyFiles(
             inputs,
             projectContext: projectContext,
@@ -156,6 +157,8 @@ struct VaultReorganizer {
             projectNames: projectNames,
             weightedContext: weightedContext,
             areaContext: areaContext,
+            correctionContext: correctionContext,
+            pkmRoot: pkmRoot,
             onProgress: { [onProgress] progress, status in
                 let mapped = 0.4 + progress * 0.5
                 onProgress?(mapped, status)

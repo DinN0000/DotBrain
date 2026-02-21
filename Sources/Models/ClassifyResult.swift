@@ -9,7 +9,7 @@ struct RelatedNote: Codable, Equatable {
 /// Result of AI classification for a single file
 struct ClassifyResult: Codable {
     var para: PARACategory
-    let tags: [String]
+    var tags: [String]
     let summary: String
     var targetFolder: String
     var project: String?

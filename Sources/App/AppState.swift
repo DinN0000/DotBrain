@@ -547,6 +547,20 @@ final class AppState: ObservableObject {
     /// Skip a pending confirmation — file stays where it is
     func skipConfirmation(_ confirmation: PendingConfirmation) {
         pendingConfirmations.removeAll { $0.id == confirmation.id }
+
+        // Record skip for learning
+        let aiOption = confirmation.options.first
+        CorrectionMemory.record(CorrectionEntry(
+            date: Date(),
+            fileName: confirmation.fileName,
+            aiPara: aiOption?.para.rawValue ?? "",
+            userPara: "",
+            aiProject: aiOption?.project ?? confirmation.suggestedProjectName,
+            userProject: nil,
+            tags: aiOption?.tags ?? [],
+            action: "skip"
+        ), pkmRoot: pkmRootPath)
+
         let message = confirmation.reason == .misclassified
             ? "건너뜀 — 현재 위치 유지"
             : "건너뜀 — 인박스에 유지"
@@ -563,6 +577,20 @@ final class AppState: ObservableObject {
     /// Delete a pending file — move to macOS Trash
     func deleteConfirmation(_ confirmation: PendingConfirmation) {
         pendingConfirmations.removeAll { $0.id == confirmation.id }
+
+        // Record deletion for learning
+        let aiOption = confirmation.options.first
+        CorrectionMemory.record(CorrectionEntry(
+            date: Date(),
+            fileName: confirmation.fileName,
+            aiPara: aiOption?.para.rawValue ?? "",
+            userPara: "",
+            aiProject: aiOption?.project ?? confirmation.suggestedProjectName,
+            userProject: nil,
+            tags: aiOption?.tags ?? [],
+            action: "delete"
+        ), pkmRoot: pkmRootPath)
+
         do {
             let fileURL = URL(fileURLWithPath: confirmation.filePath)
             try FileManager.default.trashItem(at: fileURL, resultingItemURL: nil)
@@ -588,6 +616,25 @@ final class AppState: ObservableObject {
     func confirmClassification(_ confirmation: PendingConfirmation, choice: ClassifyResult) async {
         pendingConfirmations.removeAll { $0.id == confirmation.id }
 
+        // Register project alias if user selected a project different from AI suggestion
+        if let suggestedName = confirmation.suggestedProjectName,
+           let chosenProject = choice.project {
+            ProjectAliasRegistry.register(aiName: suggestedName, actualName: chosenProject, pkmRoot: pkmRootPath)
+        }
+
+        // Record correction for learning
+        let aiOption = confirmation.options.first
+        CorrectionMemory.record(CorrectionEntry(
+            date: Date(),
+            fileName: confirmation.fileName,
+            aiPara: aiOption?.para.rawValue ?? "",
+            userPara: choice.para.rawValue,
+            aiProject: aiOption?.project ?? confirmation.suggestedProjectName,
+            userProject: choice.project,
+            tags: choice.tags,
+            action: "confirm"
+        ), pkmRoot: pkmRootPath)
+
         let mover = FileMover(pkmRoot: pkmRootPath)
         do {
             let result = try await mover.moveFile(
@@ -610,6 +657,24 @@ final class AppState: ObservableObject {
     /// Create a new project and move the file into it
     func createProjectAndClassify(_ confirmation: PendingConfirmation, projectName: String) async {
         pendingConfirmations.removeAll { $0.id == confirmation.id }
+
+        // Register alias if AI suggested a different name
+        if let suggestedName = confirmation.suggestedProjectName {
+            ProjectAliasRegistry.register(aiName: suggestedName, actualName: projectName, pkmRoot: pkmRootPath)
+        }
+
+        // Record correction for learning
+        let aiOption = confirmation.options.first
+        CorrectionMemory.record(CorrectionEntry(
+            date: Date(),
+            fileName: confirmation.fileName,
+            aiPara: aiOption?.para.rawValue ?? "project",
+            userPara: "project",
+            aiProject: confirmation.suggestedProjectName,
+            userProject: projectName,
+            tags: aiOption?.tags ?? [],
+            action: "create-project"
+        ), pkmRoot: pkmRootPath)
 
         let pm = ProjectManager(pkmRoot: pkmRootPath)
         do {

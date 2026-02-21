@@ -43,6 +43,7 @@ struct InboxProcessor {
         let weightedContext = contextBuilder.buildWeightedContext()
         let tagVocabulary = contextBuilder.buildTagVocabulary()
         let areaContext = contextBuilder.buildAreaContext()
+        let correctionContext = CorrectionMemory.buildPromptContext(pkmRoot: pkmRoot)
 
         onProgress?(0.1, "프로젝트 컨텍스트 로드 완료")
 
@@ -121,6 +122,8 @@ struct InboxProcessor {
                 weightedContext: weightedContext,
                 areaContext: areaContext,
                 tagVocabulary: tagVocabulary,
+                correctionContext: correctionContext,
+                pkmRoot: pkmRoot,
                 onProgress: { [onProgress] progress, status in
                     // Map classifier's 0-1 progress to our 0.3-0.7 range
                     let mappedProgress = 0.3 + progress * 0.4
