@@ -131,14 +131,18 @@ enum FrontmatterWriter {
     static func createIndexNote(
         folderName: String,
         para: PARACategory,
-        description: String = ""
+        description: String = "",
+        area: String? = nil,
+        projects: [String]? = nil
     ) -> String {
-        let fm = Frontmatter.createDefault(
+        var fm = Frontmatter.createDefault(
             para: para,
             tags: [],
             summary: description,
             source: .original
         )
+        fm.area = area
+        fm.projects = projects
 
         return """
         \(fm.stringify())
