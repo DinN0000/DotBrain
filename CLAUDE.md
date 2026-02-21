@@ -44,6 +44,8 @@
 - GitHub: `DinN0000/DotBrain`
 - Release assets: `DotBrain` (universal binary) + `AppIcon.icns` — naming must be exact
 - Use `/release` command for guided release process
+- **Every release:** bump `Resources/Info.plist` (CFBundleVersion + CFBundleShortVersionString) to match release tag
+- **Deploy:** copy both binary and Info.plist → `cp Resources/Info.plist /Applications/DotBrain.app/Contents/Info.plist`
 - `AICompanionService.swift` version must be bumped when behavior changes (triggers vault auto-update)
 
 ## Branch Rules
