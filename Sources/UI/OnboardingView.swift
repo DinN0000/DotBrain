@@ -285,7 +285,7 @@ struct OnboardingView: View {
                             paraExplanationRow(
                                 folder: "Area",
                                 metaphor: "도메인",
-                                desc: "프로젝트를 묶는 상위 영역. 제품, 사업, 팀"
+                                desc: "지속적으로 관리하는 책임 영역. 제품, 사업, 팀"
                             )
                             paraExplanationRow(
                                 folder: "Resource",
