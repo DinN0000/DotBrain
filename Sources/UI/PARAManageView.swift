@@ -75,7 +75,7 @@ struct PARAManageView: View {
                     .onAppear {
                         if let target = appState.paraManageInitialCategory {
                             Task { @MainActor in
-                                try? await Task.sleep(nanoseconds: 100_000_000)
+                                try? await Task.sleep(for: .milliseconds(100))
                                 withAnimation {
                                     proxy.scrollTo(target, anchor: .top)
                                 }
@@ -621,7 +621,7 @@ struct PARAManageView: View {
     private func clearStatusAfterDelay() {
         statusClearTask?.cancel()
         statusClearTask = Task {
-            try? await Task.sleep(nanoseconds: 3_000_000_000)
+            try? await Task.sleep(for: .seconds(3))
             guard !Task.isCancelled else { return }
             statusMessage = ""
         }

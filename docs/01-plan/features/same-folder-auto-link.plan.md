@@ -6,7 +6,7 @@
 > **Version**: 2.1.12
 > **Author**: hwaa
 > **Date**: 2026-02-20
-> **Status**: Draft
+> **Status**: Closed (2026-02-22) — 이미 구현 완료 (LinkCandidateGenerator PARA 인식, SemanticLinker 자동 연결, LinkAIFilter 맥락 전용 생성 모두 반영됨)
 
 ---
 

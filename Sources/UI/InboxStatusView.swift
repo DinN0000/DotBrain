@@ -419,7 +419,8 @@ struct InboxStatusView: View {
         withAnimation {
             dropFeedback = message
         }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(2))
             withAnimation {
                 dropFeedback = nil
             }

@@ -83,7 +83,7 @@ struct VaultInspectorView: View {
             if result != nil {
                 // Delay to let SwiftUI settle after batch @Published updates
                 Task { @MainActor in
-                    try? await Task.sleep(nanoseconds: 300_000_000)
+                    try? await Task.sleep(for: .milliseconds(300))
                     loadFolders()
                 }
             }

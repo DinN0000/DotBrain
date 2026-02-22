@@ -31,7 +31,8 @@ struct TagNormalizer: Sendable {
                     guard file != "\(project).md" else { continue }
 
                     let filePath = (projectPath as NSString).appendingPathComponent(file)
-                    if try addTagIfMissing(filePath: filePath, tag: project) {
+                    guard let content = try? String(contentsOfFile: filePath, encoding: .utf8) else { continue }
+                    if try addTagIfMissing(filePath: filePath, content: content, tag: project) {
                         result.filesModified += 1
                         result.tagsAdded += 1
                     }
@@ -60,7 +61,7 @@ struct TagNormalizer: Sendable {
 
                     guard let projectName = frontmatter.project, !projectName.isEmpty else { continue }
 
-                    if try addTagIfMissing(filePath: filePath, tag: projectName) {
+                    if try addTagIfMissing(filePath: filePath, content: content, tag: projectName) {
                         result.filesModified += 1
                         result.tagsAdded += 1
                     }
@@ -72,8 +73,7 @@ struct TagNormalizer: Sendable {
     }
 
     @discardableResult
-    private func addTagIfMissing(filePath: String, tag: String) throws -> Bool {
-        guard let content = try? String(contentsOfFile: filePath, encoding: .utf8) else { return false }
+    private func addTagIfMissing(filePath: String, content: String, tag: String) throws -> Bool {
         let (frontmatter, body) = Frontmatter.parse(markdown: content)
 
         let normalizedTag = tag.trimmingCharacters(in: .whitespaces)
