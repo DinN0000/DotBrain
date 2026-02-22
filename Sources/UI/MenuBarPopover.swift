@@ -95,6 +95,7 @@ struct MenuBarPopover: View {
                 HStack(spacing: 0) {
                     footerTab(icon: "tray.and.arrow.down", screen: .inbox)
                     footerTab(icon: "square.grid.2x2", screen: .dashboard)
+                    footerTab(icon: "arrow.triangle.swap", screen: .folderRelationExplorer)
                     footerTab(icon: "gearshape", screen: .settings)
                 }
                 .padding(.horizontal, 8)

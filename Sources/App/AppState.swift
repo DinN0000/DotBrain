@@ -29,7 +29,7 @@ final class AppState: ObservableObject {
 
         var parent: Screen? {
             switch self {
-            case .paraManage, .search, .vaultInspector, .aiStatistics, .folderRelationExplorer:
+            case .paraManage, .search, .vaultInspector, .aiStatistics:
                 return .dashboard
             default:
                 return nil
@@ -46,7 +46,7 @@ final class AppState: ObservableObject {
             case .vaultInspector: return "볼트 점검"
             case .aiStatistics: return "AI 통계"
             case .results: return "정리 결과"
-            case .folderRelationExplorer: return "폴더 관계 탐색"
+            case .folderRelationExplorer: return "폴더 짝 매칭"
             default: return ""
             }
         }
