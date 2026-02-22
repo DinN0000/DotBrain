@@ -306,7 +306,6 @@ struct FolderRelationExplorer: View {
     }
 
     private func stampOverlay(_ direction: SwipeDirection) -> some View {
-        let isExisting = currentIndex < candidates.count && candidates[currentIndex].isExisting
         let (text, color, rotation): (String, Color, Double) = {
             switch direction {
             case .right: return ("DOT IT!", .green, -15)
