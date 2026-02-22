@@ -286,6 +286,7 @@ struct InboxProcessor {
                 let cache = ContentHashCache(pkmRoot: pkmRoot)
                 await cache.load()
                 await cache.updateHashes(mdPaths)
+                await cache.save()
             }
         }
 

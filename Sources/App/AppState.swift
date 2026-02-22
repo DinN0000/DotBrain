@@ -930,7 +930,7 @@ final class AppState: ObservableObject {
         autoNavigateTask?.cancel()
         autoNavigateTask = Task { @MainActor in
             defer { isAutoNavigating = false }
-            try? await Task.sleep(nanoseconds: 1_500_000_000)
+            try? await Task.sleep(for: .seconds(1.5))
             guard !Task.isCancelled else { return }
             guard pendingConfirmations.isEmpty else { return }
             navigateBack()

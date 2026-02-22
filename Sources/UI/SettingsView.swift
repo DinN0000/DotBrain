@@ -479,7 +479,7 @@ struct SettingsView: View {
             process.arguments = ["-c", "nohup bash \(scriptPath) > /tmp/dotbrain_update.log 2>&1 &"]
             try process.run()
             Task { @MainActor in
-                try? await Task.sleep(nanoseconds: 500_000_000)
+                try? await Task.sleep(for: .milliseconds(500))
                 NSApplication.shared.terminate(nil)
             }
         } catch {
@@ -579,7 +579,8 @@ struct SettingsView: View {
     private func openExternal(_ urlString: String) {
         guard let url = URL(string: urlString) else { return }
         // Delay so the popover doesn't swallow the URL open
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(300))
             NSWorkspace.shared.open(url)
         }
     }
@@ -688,7 +689,7 @@ struct SettingsView: View {
 
     private func clearMessageAfterDelay() {
         Task {
-            try? await Task.sleep(nanoseconds: 3_000_000_000)
+            try? await Task.sleep(for: .seconds(3))
             await MainActor.run { saveMessage = nil }
         }
     }

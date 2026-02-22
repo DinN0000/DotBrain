@@ -150,10 +150,13 @@ struct LinkAIFilter: Sendable {
         [{"noteIndex": 0, "links": [{"index": 0, "context": "~할 때 참고", "relation": "project"}]}]
         """
 
-        let response = try await aiService.sendFast(maxTokens: 2048, message: prompt)
-        StatisticsService.addApiCost(Double(notes.count) * 0.0003)
+        let response = try await aiService.sendFastWithUsage(maxTokens: 2048, message: prompt)
+        if let usage = response.usage {
+            let model = await aiService.fastModel
+            StatisticsService.logTokenUsage(operation: "semantic-link-context", model: model, usage: usage)
+        }
 
-        return parseContextOnlyResponse(response, notes: notes)
+        return parseContextOnlyResponse(response.text, notes: notes)
     }
 
     // MARK: - Parsing

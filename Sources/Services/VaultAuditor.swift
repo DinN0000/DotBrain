@@ -324,7 +324,8 @@ struct VaultAuditor {
 
                 let fullPath = (folder as NSString).appendingPathComponent(element)
                 var isDir: ObjCBool = false
-                if fm.fileExists(atPath: fullPath, isDirectory: &isDir), !isDir.boolValue {
+                if fm.fileExists(atPath: fullPath, isDirectory: &isDir), !isDir.boolValue,
+                   pathManager.isPathSafe(fullPath) {
                     results.append(fullPath)
                 }
             }

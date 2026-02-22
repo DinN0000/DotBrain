@@ -118,7 +118,7 @@ enum FrontmatterWriter {
     }
 
     /// Sanitize a string for use inside [[wikilink]] — remove brackets and path traversal
-    private static func sanitizeWikilink(_ name: String) -> String {
+    static func sanitizeWikilink(_ name: String) -> String {
         name.replacingOccurrences(of: "[[", with: "")
             .replacingOccurrences(of: "]]", with: "")
             .replacingOccurrences(of: "/", with: "-")

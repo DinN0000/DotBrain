@@ -250,6 +250,15 @@ struct FolderReorganizer {
             let _ = await linker.linkNotes(filePaths: successPaths)
         }
 
+        // Update content hash cache so vault check skips these files
+        let mdPaths = successPaths.filter { $0.hasSuffix(".md") }
+        if !mdPaths.isEmpty {
+            let cache = ContentHashCache(pkmRoot: pkmRoot)
+            await cache.load()
+            await cache.updateHashes(mdPaths)
+            await cache.save()
+        }
+
         onFileProgress?(inputs.count, inputs.count, "")
         onProgress?(0.95, "완료 정리 중...")
 
@@ -539,10 +548,12 @@ struct FolderReorganizer {
         var relatedBody = body
         var lines: [String] = []
         if let project = classification.project, !project.isEmpty, !relatedBody.contains("[[\(project)]]") {
-            lines.append("- [[\(project)]] — 소속 프로젝트")
+            let safeProject = FrontmatterWriter.sanitizeWikilink(project)
+            lines.append("- [[\(safeProject)]] — 소속 프로젝트")
         }
         for note in classification.relatedNotes where !relatedBody.contains("[[\(note.name)]]") {
-            lines.append("- [[\(note.name)]] — \(note.context)")
+            let safeName = FrontmatterWriter.sanitizeWikilink(note.name)
+            lines.append("- [[\(safeName)]] — \(note.context)")
         }
         if !lines.isEmpty {
             relatedBody += "\n\n## Related Notes\n" + lines.joined(separator: "\n") + "\n"

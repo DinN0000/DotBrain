@@ -251,7 +251,7 @@ struct Frontmatter {
             lines.append("area: \(Frontmatter.escapeYAML(area))")
         }
         if let projects = projects, !projects.isEmpty {
-            let escaped = projects.map { "\"\(Frontmatter.escapeYAML($0))\"" }
+            let escaped = projects.map { Frontmatter.escapeYAML($0) }
             lines.append("projects: [\(escaped.joined(separator: ", "))]")
         }
         if let file = file {

@@ -348,7 +348,7 @@ struct OnboardingView: View {
     private func paraExplanationRow(folder: String, metaphor: String, desc: String) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             HStack(spacing: 4) {
-                Text("\u{1F4C1}")
+                Image(systemName: "folder")
                     .font(.caption2)
                 Text(folder)
                     .font(.caption)

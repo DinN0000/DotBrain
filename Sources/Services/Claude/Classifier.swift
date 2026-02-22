@@ -7,6 +7,15 @@ actor Classifier {
     private let batchSize = 5
     private let confidenceThreshold = 0.8
 
+    private static let numericPrefixRegex = try? NSRegularExpression(
+        pattern: #"^[1-4][\s_\-]?(?:Project|Area|Resource|Archive)/?"#,
+        options: .caseInsensitive
+    )
+    private static let barePrefixRegex = try? NSRegularExpression(
+        pattern: #"^(?:Project|Area|Resource|Archive|_?Inbox)/"#,
+        options: .caseInsensitive
+    )
+
     // MARK: - Main Classification
 
     /// Classify files using 2-stage approach
@@ -211,6 +220,9 @@ actor Classifier {
 
         var results: [String: ClassifyResult.Stage1Item] = [:]
         if let items = parseJSONSafe([Stage1RawItem].self, from: response.text) {
+            if items.isEmpty {
+                NSLog("[Classifier] Stage1 JSON parsed but empty array — response: %@", String(response.text.prefix(200)))
+            }
             for item in items {
                 guard let para = PARACategory(rawValue: item.para), !item.fileName.isEmpty else { continue }
                 results[item.fileName] = ClassifyResult.Stage1Item(
@@ -223,6 +235,8 @@ actor Classifier {
                     targetFolder: item.targetFolder.map { stripNewPrefix(stripParaPrefix($0)) }
                 )
             }
+        } else {
+            NSLog("[Classifier] Stage1 JSON parse failed — response: %@", String(response.text.prefix(200)))
         }
 
         // Fill missing with default
@@ -560,15 +574,13 @@ actor Classifier {
         guard !trimmed.isEmpty else { return "" }
 
         // Phase 1: "2_Area/DevOps" → "DevOps" (숫자 접두사 포함된 경우)
-        let numericPrefixPattern = #"^[1-4][\s_\-]?(?:Project|Area|Resource|Archive)/?"#
         var result = trimmed
-        if let regex = try? NSRegularExpression(pattern: numericPrefixPattern, options: .caseInsensitive) {
+        if let regex = Self.numericPrefixRegex {
             result = regex.stringByReplacingMatches(in: result, range: NSRange(result.startIndex..., in: result), withTemplate: "")
         }
 
         // Phase 2: "Area/DevOps" → "DevOps" (bare 카테고리명이 경로 앞에 올 때)
-        let barePrefixPattern = #"^(?:Project|Area|Resource|Archive|_?Inbox)/"#
-        if let regex = try? NSRegularExpression(pattern: barePrefixPattern, options: .caseInsensitive) {
+        if let regex = Self.barePrefixRegex {
             result = regex.stringByReplacingMatches(in: result, range: NSRange(result.startIndex..., in: result), withTemplate: "")
         }
 
