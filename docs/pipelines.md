@@ -23,7 +23,9 @@ _Inbox/ 파일
     ▼
 3. Classify ── Classifier 2단계 AI 분류
     │           ProjectContextBuilder로 볼트 컨텍스트 구성
+    │           + buildAreaContext()로 Area 컨텍스트
     │           + buildTagVocabulary()로 상위 50 태그 어휘 주입
+    │           + CorrectionMemory.buildPromptContext()로 사용자 수정 이력
     │           Stage 1: Haiku/Flash 배치 (5파일/요청, 3병렬)
     │           Stage 2: Sonnet/Pro 정밀 (confidence < 0.8만, 3병렬)
     ▼
@@ -31,9 +33,10 @@ _Inbox/ 파일
     │           충돌 없으면 자동 이동
     │           충돌 있으면 PendingConfirmation 생성
     ▼
-5. Link ── SemanticLinker.linkNotes() (이동 완료된 파일만)
+5. Finish ── NoteIndexGenerator.updateForFolders()
     ▼
-6. Finish ── NoteIndexGenerator.updateForFolders()
+6. Link ── SemanticLinker.linkNotes() (이동 완료된 파일만)
+              + ContentHashCache.updateHashes()
               NotificationService 알림
 ```
 
@@ -298,17 +301,11 @@ AuditReport
     │         모든 PARA .md 파일 인덱싱
     │         NoteInfo: name, tags, summary, project, folderName, para, existingRelated
     ▼
-3. PARA 분기 ── 카테고리별 연결 전략 분기
-    │
-    ├── Project/Area ── processAutoLinks()
-    │   │                같은 폴더 sibling 자동 연결 (AI 필터 없이)
-    │   │                generateContextOnly()로 맥락 설명만 AI 생성
-    │   │                + processAIFilteredLinks() (다른 폴더 후보)
-    │   │                  excludeSameFolder=true, folderBonus=1.0
-    │   │
-    │   └── Resource/Archive ── processAIFilteredLinks()
-    │                           folderBonus=2.5 (같은 폴더 가산점 상향)
-    │                           excludeSameFolder=false
+3. Candidate ── LinkCandidateGenerator.generateCandidates()
+    │              PreparedIndex (reverse indices)로 O(1) tag/project lookup
+    │              태그 겹침 >= 2, 같은 프로젝트, MOC 폴더 공유 → 후보
+    │              suppress/boost sets 사전구축 (FolderRelationStore 디스크 I/O 회피)
+    │              최소 점수 >= 3.0
     ▼
 4. AI Filter ── LinkAIFilter.filterBatch()
     │             배치: 5 노트/요청, 3 병렬
@@ -371,6 +368,7 @@ struct LinkResult {
 | `extractProjectNames(from:)` | 프로젝트 컨텍스트에서 프로젝트명 추출 |
 | `buildWeightedContext()` | 루트 인덱스 노트 기반 가중 컨텍스트 구성 (카테고리별: Project 높음, Archive 낮음) |
 | `buildTagVocabulary()` | 볼트 전체 상위 50개 태그를 빈도순 JSON 배열로 반환 |
+| `buildAreaContext()` | `2_Area/` 폴더 목록 + 설명을 텍스트로 구성 |
 
 **사용처**: InboxProcessor, FolderReorganizer, VaultReorganizer.
 

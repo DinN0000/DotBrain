@@ -7,9 +7,9 @@
 ## Architecture
 - PARA-based PKM organizer: `_Inbox/` → AI classifies → `1_Project/`, `2_Area/`, `3_Resource/`, `4_Archive/`
 - `AppState` (singleton) — central state, `@MainActor`, `ObservableObject`
-- `Sources/Pipeline/` — InboxProcessor, FolderReorganizer, VaultCheckPipeline, ProjectContextBuilder
+- `Sources/Pipeline/` — InboxProcessor, FolderReorganizer, VaultReorganizer, VaultCheckPipeline, ProjectContextBuilder
 - `Sources/Services/` — AIService, FileMover, PKMPathManager, VaultSearcher, NoteIndexGenerator, StatisticsService
-- `Sources/Services/SemanticLinker/` — FolderRelationStore, FolderRelationAnalyzer, LinkFeedbackStore, LinkStateDetector
+- `Sources/Services/SemanticLinker/` — SemanticLinker, TagNormalizer, LinkCandidateGenerator, LinkAIFilter, RelatedNotesWriter, FolderRelationStore, FolderRelationAnalyzer, LinkFeedbackStore, LinkStateDetector
 - `Sources/UI/` — SwiftUI views (menubar popover)
 - `Sources/Models/` — Frontmatter, ClassifyResult, PARACategory
 
@@ -25,7 +25,8 @@
 - `Task.detached(priority:)` for background work, never `DispatchQueue.global`
 - `@MainActor` + `await MainActor.run` for UI updates from detached tasks
 - `TaskGroup` with concurrency limit (max 3) for batch AI calls
-- Streaming file I/O (1MB chunks via FileHandle) for large files, never load entire file
+- File I/O: 4KB partial reads (FileHandle) for frontmatter extraction (NoteIndexGenerator, VaultSearcher); 1MB streaming for large binaries
+- Index-first search patterns: load `.meta/note-index.json` first, fallback to directory scan only if needed (zero file I/O when possible)
 
 ## Security
 - Path traversal: always canonicalize with `URL.resolvingSymlinksInPath()` before `hasPrefix` checks

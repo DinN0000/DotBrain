@@ -80,15 +80,16 @@ macOS 메뉴바 앱. Obsidian 볼트의 `_Inbox/` 폴더에 드롭된 파일을 
 
 ## Service Layer
 
-`Sources/Services/` — 39개 파일, 6개 하위 디렉토리.
+`Sources/Services/` — 45개 파일, 5개 하위 디렉토리.
 
 | 그룹 | 주요 서비스 | 역할 |
 |------|------------|------|
 | **AI** | AIService(actor), Classifier(actor), RateLimiter(actor), ClaudeAPIClient(actor), GeminiAPIClient(actor) | AI 호출, 2단계 분류, 적응형 rate limiting |
 | **FileSystem** | FileMover, PKMPathManager, InboxScanner, InboxWatchdog, FrontmatterWriter, AssetMigrator | 파일 이동, 경로 관리, 볼트 감시, frontmatter 주입 |
 | **Extraction** | FileContentExtractor, BinaryExtractor, PDF/PPTX/XLSX/DOCX/ImageExtractor | 텍스트/바이너리 콘텐츠 추출 |
-| **SemanticLinker** | SemanticLinker, TagNormalizer, LinkCandidateGenerator, LinkAIFilter, RelatedNotesWriter | 태그 정규화, 후보 생성, AI 필터링, wikilink 작성 (index-first 최적화) |
-| **Knowledge Mgmt** | NoteIndexGenerator, VaultAuditor, VaultSearcher, NoteEnricher, AICompanionService | 노트 인덱스 생성 (4KB partial reads), 검색 (2단계: index+fallback), 감사, AI 컴패니언 |
+| **SemanticLinker** | SemanticLinker, TagNormalizer, LinkCandidateGenerator, LinkAIFilter, RelatedNotesWriter, FolderRelationStore, FolderRelationAnalyzer, LinkFeedbackStore, LinkStateDetector | 태그 정규화, 후보 생성, AI 필터링, wikilink 작성, 폴더 관계, 링크 피드백 (index-first 최적화) |
+| **Knowledge Mgmt** | NoteIndexGenerator, VaultAuditor, VaultSearcher, NoteEnricher, AICompanionService, ContextMapBuilder | 노트 인덱스 생성 (4KB partial reads), 검색 (2단계: index+fallback), 감사, AI 컴패니언 |
+| **Learning** | ProjectAliasRegistry, CorrectionMemory | AI 프로젝트명 별칭 학습, 분류 수정 이력 기반 few-shot 학습 |
 | **Project/Folder** | ProjectManager, PARAMover, FolderHealthAnalyzer | 프로젝트 생명주기, PARA 이동, 폴더 건강 분석 |
 | **Utility** | StatisticsService, KeychainService, TemplateService, NotificationService | 통계, 암호화 키 저장, 템플릿, 알림 |
 | **Data/Cache** | ContentHashCache(actor), APIUsageLogger(actor) | SHA256 파일 변경 감지, 실제 토큰 기반 API 비용 추적 |
@@ -97,7 +98,7 @@ macOS 메뉴바 앱. Obsidian 볼트의 `_Inbox/` 폴더에 드롭된 파일을 
 
 ## UI Layer
 
-`Sources/UI/` — 11개 화면 + 3개 재사용 컴포넌트.
+`Sources/UI/` — 12개 화면 + 3개 재사용 컴포넌트.
 
 ```
 MenuBarPopover (root, 화면 전환)

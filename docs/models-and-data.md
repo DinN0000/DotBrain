@@ -18,6 +18,7 @@ enum Screen {
     case paraManage       // PARA 폴더 관리
     case vaultInspector   // 볼트 점검 + AI 재분류 (통합)
     case aiStatistics     // AI 사용량 통계
+    case folderRelationExplorer  // 폴더 짝 매칭
 }
 ```
 
@@ -28,7 +29,8 @@ enum Screen {
 - `.search.parent = .dashboard`
 - `.vaultInspector.parent = .dashboard`
 - `.aiStatistics.parent = .dashboard`
-- `.results.parent` = `processingOrigin` (inbox 또는 paraManage)
+- `.folderRelationExplorer.parent` = nil (독립 화면)
+- `.results.parent` = nil (별도 `processingOrigin` 속성으로 추적)
 
 ## AppState Published Properties
 
@@ -59,6 +61,15 @@ enum Screen {
 | `reorganizeCategory` | `PARACategory?` | 재정리 대상 카테고리 |
 | `reorganizeSubfolder` | `String?` | 재정리 대상 하위 폴더 |
 | `paraManageInitialCategory` | `PARACategory?` | PARA 관리 초기 카테고리 |
+| `backgroundTaskName` | `String?` | 백그라운드 작업 이름 |
+| `backgroundTaskPhase` | `String` | 백그라운드 작업 단계 |
+| `backgroundTaskProgress` | `Double` | 백그라운드 작업 진행률 |
+| `backgroundTaskCompleted` | `Bool` | 백그라운드 작업 완료 여부 |
+| `vaultCheckResult` | `VaultCheckResult?` | 볼트 점검 결과 |
+| `taskBlockedAlert` | `String?` | 작업 충돌 알림 메시지 |
+| `viewTaskActive` | `Bool` | 뷰 수준 작업 진행 중 |
+
+**Computed**: `isAnyTaskRunning: Bool` — `isProcessing || backgroundTask active || viewTaskActive`
 
 ## PARACategory
 
@@ -157,6 +168,8 @@ status: active          # NoteStatus
 summary: "요약 텍스트"   # AI 생성 요약
 source: import          # NoteSource
 project: "MyProject"    # 소속 프로젝트 (optional)
+area: "SwiftUI"         # 소속 Area (optional)
+projects: ["A", "B"]    # 관련 프로젝트 목록 (optional)
 file:                   # 바이너리 파일 메타데이터 (optional)
   name: "report.pdf"
   format: "pdf"

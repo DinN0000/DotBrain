@@ -22,8 +22,8 @@ DotBrain v1.5.5는 기능적으로 완성도가 높으나, 에지 케이스에�
 
 ### 1.3 Related Documents
 
-- Architecture: [architecture.design.md](../../02-design/architecture.design.md)
-- Security Spec: [security-spec.md](../../02-design/security-spec.md)
+- Architecture: [architecture.md](../../design/architecture.md)
+- Security Spec: [security-review.md](../../design/security-review.md)
 
 ---
 

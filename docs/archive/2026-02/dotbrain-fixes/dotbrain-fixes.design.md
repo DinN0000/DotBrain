@@ -7,7 +7,7 @@
 > **Author**: hwai
 > **Date**: 2026-02-15
 > **Status**: Draft
-> **Planning Doc**: [dotbrain-fixes.plan.md](../../01-plan/features/dotbrain-fixes.plan.md)
+> **Planning Doc**: [dotbrain-fixes.plan.md](./dotbrain-fixes.plan.md)
 
 ---
 

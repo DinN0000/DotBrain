@@ -45,9 +45,9 @@
 
 | Phase | Document | Status |
 |-------|----------|--------|
-| Plan | [moc-lifecycle.plan.md](../../01-plan/features/moc-lifecycle.plan.md) | Finalized |
-| Design | [moc-lifecycle.design.md](../../02-design/features/moc-lifecycle.design.md) | Finalized |
-| Check | [moc-lifecycle.analysis.md](../../03-analysis/moc-lifecycle.analysis.md) | Complete |
+| Plan | [moc-lifecycle.plan.md](./moc-lifecycle.plan.md) | Finalized |
+| Design | [moc-lifecycle.design.md](./moc-lifecycle.design.md) | Finalized |
+| Check | [moc-lifecycle.analysis.md](./moc-lifecycle.analysis.md) | Complete |
 | Report | Current document | Complete |
 
 ---

@@ -192,9 +192,9 @@ Design 반영: 14건 (CR-02 삭제)
 
 ## Related Documents
 
-- Plan: [dotbrain-fixes.plan.md](../../01-plan/features/dotbrain-fixes.plan.md)
-- Design: [dotbrain-fixes.design.md](../../02-design/features/dotbrain-fixes.design.md)
-- Analysis: [dotbrain-fixes.analysis.md](../../03-analysis/dotbrain-fixes.analysis.md)
+- Plan: [dotbrain-fixes.plan.md](./dotbrain-fixes.plan.md)
+- Design: [dotbrain-fixes.design.md](./dotbrain-fixes.design.md)
+- Analysis: [dotbrain-fixes.analysis.md](./dotbrain-fixes.analysis.md)
 
 ---
 

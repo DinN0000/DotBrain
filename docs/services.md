@@ -1,6 +1,6 @@
 # Services
 
-서비스 레이어 레퍼런스. `Sources/Services/` — 39개 파일, 6개 하위 디렉토리.
+서비스 레이어 레퍼런스. `Sources/Services/` — 45개 파일, 5개 하위 디렉토리.
 
 ## AI Services
 
@@ -32,7 +32,7 @@
 
 | 메서드 | 설명 |
 |--------|------|
-| `classifyFiles(_:projectContext:subfolderContext:projectNames:weightedContext:onProgress:)` | 파일 목록을 2단계로 분류 |
+| `classifyFiles(_:projectContext:subfolderContext:projectNames:weightedContext:areaContext:tagVocabulary:correctionContext:pkmRoot:onProgress:)` | 파일 목록을 2단계로 분류 |
 
 **내부 흐름**:
 1. `classifyBatchStage1()` — Haiku/Flash, 5파일/배치, 3병렬
@@ -201,7 +201,7 @@ PARA 경로 관리 및 보안 검증.
 
 `Sources/Services/NoteIndexGenerator.swift` — **struct: Sendable**
 
-`_meta/note-index.json` 생성. 볼트 전체 노트/폴더를 단일 JSON 인덱스로 관리.
+`.meta/note-index.json` 생성. 볼트 전체 노트/폴더를 단일 JSON 인덱스로 관리.
 
 | 메서드 | 설명 |
 |--------|------|
@@ -271,7 +271,7 @@ PARA 경로 관리 및 보안 검증.
 
 | 메서드 | 설명 |
 |--------|------|
-| `build()` | `_meta/note-index.json` 읽기 → VaultContextMap |
+| `build()` | `.meta/note-index.json` 읽기 → VaultContextMap |
 
 **의존**: PKMPathManager
 
@@ -290,7 +290,7 @@ PARA 경로 관리 및 보안 검증.
 
 **성능 최적화**: buildNoteIndex()는 index-first 전략 사용 (note-index.json 로드 후 existingRelated만 파일 읽기, fallback은 전체 디렉토리 스캔). FolderRelationStore 호출 최소화: suppress/boost sets를 사전구축하여 LinkCandidateGenerator에 전달.
 
-**의존**: TagNormalizer, ContextMapBuilder, LinkCandidateGenerator, LinkAIFilter, RelatedNotesWriter, PKMPathManager
+**의존**: TagNormalizer, ContextMapBuilder, LinkCandidateGenerator, LinkAIFilter, RelatedNotesWriter, LinkFeedbackStore, FolderRelationStore, PKMPathManager
 
 ### TagNormalizer
 
@@ -373,6 +373,68 @@ AI를 이용한 폴더 쌍 관계 후보 생성. FolderRelationExplorer UI에서
 **AI 분석**: hint("~할 때" 형식, 한국어 20자 이내), relationType(비교/대조|적용|확장|관련), confidence(0.0~1.0) 생성. confidence > 0.1만 반환.
 
 **의존**: AIService, SemanticLinker (NoteInfo), StatisticsService
+
+### LinkFeedbackStore
+
+`Sources/Services/SemanticLinker/LinkFeedbackStore.swift` — **struct: Sendable**
+
+사용자 링크 삭제 피드백 저장소. `.meta/link-feedback.json`에 영속화 (FIFO, 500 entries max).
+
+| 메서드 | 설명 |
+|--------|------|
+| `load()` | JSON에서 피드백 로드 → `LinkFeedback` |
+| `save(_:)` | 피드백을 JSON으로 저장 |
+| `recordRemoval(sourceNote:targetNote:sourceFolder:targetFolder:)` | 링크 삭제 기록 추가 |
+| `buildPromptContext()` | 폴더 쌍별 삭제 패턴 요약 → AI 프롬프트 컨텍스트 |
+
+**모델**: `LinkFeedbackEntry` (date, sourceNote, targetNote, sourceFolder, targetFolder, action), `LinkFeedback` (version, entries).
+
+### LinkStateDetector
+
+`Sources/Services/SemanticLinker/LinkStateDetector.swift` — **struct: Sendable**
+
+볼트체크 간 Related Notes 스냅샷을 비교하여 사용자 링크 삭제를 감지.
+
+| 메서드 | 설명 |
+|--------|------|
+| `loadSnapshot()` | `.meta/link-snapshot.json`에서 이전 스냅샷 로드 |
+| `saveSnapshot(_:)` | 현재 스냅샷 저장 |
+| `buildCurrentSnapshot(allNotes:)` | 현재 볼트의 Related Notes 파싱 → `LinkSnapshot` |
+| `detectRemovals(previous:current:noteInfoMap:)` | 이전 vs 현재 스냅샷 diff → 삭제된 링크 목록 |
+
+**모델**: `LinkSnapshot` (noteLinks: `[String: [String]]`).
+
+**의존**: LinkCandidateGenerator.NoteInfo
+
+## Learning Services
+
+### ProjectAliasRegistry
+
+`Sources/Services/ProjectAliasRegistry.swift` — **struct** (static methods)
+
+AI가 생성한 프로젝트 이름 변형을 실제 폴더명으로 매핑. `.meta/project-aliases.json`에 영속화.
+
+| 메서드 | 설명 |
+|--------|------|
+| `resolve(_:pkmRoot:)` | AI 반환 프로젝트명 → 실제 폴더명 조회 (없으면 nil) |
+| `register(aiName:actualName:pkmRoot:)` | 새 별칭 등록 (동일 이름이면 스킵) |
+
+**사용처**: InboxProcessor (PendingConfirmation 처리 시 사용자가 수정한 프로젝트명 학습)
+
+### CorrectionMemory
+
+`Sources/Services/CorrectionMemory.swift` — **struct** (static methods)
+
+사용자의 AI 분류 수정 이력을 기록하고, 반복 패턴을 few-shot 프롬프트로 구성. `.meta/correction-memory.json`에 영속화 (FIFO, 200 entries max).
+
+| 메서드 | 설명 |
+|--------|------|
+| `record(_:pkmRoot:)` | CorrectionEntry 기록 (PARA/프로젝트 수정 이력) |
+| `buildPromptContext(pkmRoot:)` | 수정 패턴 → AI 프롬프트 컨텍스트 (카테고리/태그/프로젝트 패턴) |
+
+**모델**: `CorrectionEntry` (date, fileName, aiPara, userPara, aiProject, userProject, tags, action).
+
+**사용처**: InboxProcessor의 Classify 단계에서 `correctionContext`로 주입
 
 ## Project / Folder Management
 

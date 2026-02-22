@@ -20,7 +20,7 @@ func isPathSafe(_ path: String) -> Bool {
 
 **규칙**: 심볼릭 링크를 먼저 해석한 후 `hasPrefix`로 비교. 슬래시 정규화 포함.
 
-**호출 위치**: `FileMover.moveFile()`, `FileMover.moveFolder()`, `FolderReorganizer.process()`, `ProjectManager.createProject()`, `PARAMover.moveFolder()`, `ContentHashCache.checkFile()`, `ContentHashCache.checkFolder()`, `VaultReorganizer.collectFiles()`
+**호출 위치**: `FileMover.moveFile()`, `FileMover.moveFolder()`, `FolderReorganizer.process()`, `ProjectManager.createProject()`, `PARAMover.moveFolder()`, `ContentHashCache.checkFile()`, `ContentHashCache.checkFolder()`, `VaultReorganizer.collectFiles()`, `NoteIndexGenerator.regenerateAll()`, `VaultSearcher.searchBodies()`
 
 ### sanitizeFolderName()
 

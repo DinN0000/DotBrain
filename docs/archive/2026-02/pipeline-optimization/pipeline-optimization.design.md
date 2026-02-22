@@ -6,7 +6,7 @@
 > **Author**: hwai
 > **Date**: 2026-02-18
 > **Status**: Draft
-> **Planning Doc**: [pipeline-optimization.plan.md](../../01-plan/features/pipeline-optimization.plan.md)
+> **Planning Doc**: [pipeline-optimization.plan.md](./pipeline-optimization.plan.md)
 
 ---
 
