@@ -16,16 +16,16 @@
 ## Code Placement Rules
 - **Pipeline** (`Sources/Pipeline/`): multi-phase processing (for loops, TaskGroup, 5+ phases). Always a separate struct/class.
 - **Services** (`Sources/Services/`): single-responsibility utilities (actor or struct)
-- **AppState**: `@Published` properties, navigation methods, thin pipeline wrappers (guard + create pipeline + call). No for loops, no TaskGroup, no 10+ line business logic.
+- **AppState**: `@Published` properties, navigation methods, thin pipeline wrappers (guard + create pipeline + call). No TaskGroup, no 10+ line business logic. Simple iteration (for loops for UI state updates) is allowed.
 - **UI Views**: read AppState, call AppState methods. Never call Services directly.
 
 ## Code Style
 - Korean for UI strings, English for comments and code
 - No emojis in code
-- `Task.detached(priority:)` for background work, never `DispatchQueue.global`
+- `Task.detached(priority:)` for background work, never `DispatchQueue.global` (exception: `DispatchSource` for file system events)
 - `@MainActor` + `await MainActor.run` for UI updates from detached tasks
-- `TaskGroup` with concurrency limit (max 3) for batch AI calls
-- File I/O: 4KB partial reads (FileHandle) for frontmatter extraction (NoteIndexGenerator, VaultSearcher); 1MB streaming for large binaries
+- `TaskGroup` with concurrency limit (max 3 for AI calls, max 5 for file extraction) for batch processing
+- File I/O: 4KB partial reads (FileHandle) for frontmatter extraction (NoteIndexGenerator); 64KB for body search (VaultSearcher); 1MB streaming for large binaries
 - Index-first search patterns: load `.meta/note-index.json` first, fallback to directory scan only if needed (zero file I/O when possible)
 
 ## Security
@@ -54,7 +54,7 @@
 - Release assets: `DotBrain` (universal binary) + `AppIcon.icns` + `Info.plist` — naming must be exact
 - Use `/release` command for guided release process
 - **Every release:** bump `Resources/Info.plist` (CFBundleVersion + CFBundleShortVersionString) to match release tag
-- **Deploy:** copy both binary and Info.plist → `cp Resources/Info.plist /Applications/DotBrain.app/Contents/Info.plist`
+- **Deploy:** copy both binary and Info.plist → `cp Resources/Info.plist ~/Applications/DotBrain.app/Contents/Info.plist`
 - `AICompanionService.swift` version must be bumped when behavior changes (triggers vault auto-update)
 
 ## Branch Rules
