@@ -224,7 +224,7 @@ struct FolderRelationExplorer: View {
             // Action buttons with labels + keyboard hints
             HStack(spacing: 24) {
                 VStack(spacing: 4) {
-                    circleButton(icon: "link.badge.plus", color: .red, size: 48) {
+                    circleButton(icon: "xmark.circle", color: .red.opacity(0.6), size: 48) {
                         handleAction(.left)
                     }
                     HStack(spacing: 3) {
@@ -310,7 +310,7 @@ struct FolderRelationExplorer: View {
         let (text, color, rotation): (String, Color, Double) = {
             switch direction {
             case .right: return ("DOT IT!", .green, -15)
-            case .left: return ("UNMATCH", .red, 15)
+            case .left: return ("UNMATCH", .red.opacity(0.6), 15)
             case .down: return ("SKIP", .secondary, 0)
             case .none: return ("", .clear, 0)
             }
