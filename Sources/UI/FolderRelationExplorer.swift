@@ -31,7 +31,7 @@ struct FolderRelationExplorer: View {
 
             // Description
             if isLoading || (!candidates.isEmpty && currentIndex < candidates.count) {
-                Text("관련 있어 보이는 폴더 쌍이에요. 연결할지 말지 골라주세요.")
+                Text("관련 있어 보이는 폴더 짝이에요. 연결할지 말지 골라주세요.")
                     .font(.caption2)
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
@@ -126,21 +126,19 @@ struct FolderRelationExplorer: View {
             ZStack(alignment: .top) {
                 // Card
                 VStack(spacing: 14) {
-                    // Existing relation badge
-                    if candidate.isExisting {
-                        HStack(spacing: 4) {
-                            Image(systemName: "link.circle.fill")
-                                .font(.caption2)
-                            Text("기존 연결")
-                                .font(.caption2)
-                                .fontWeight(.medium)
-                        }
-                        .foregroundColor(.blue)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 3)
-                        .background(Color.blue.opacity(0.1))
-                        .cornerRadius(4)
+                    // Card type badge
+                    HStack(spacing: 4) {
+                        Image(systemName: candidate.isExisting ? "link.circle.fill" : "sparkles")
+                            .font(.caption2)
+                        Text(candidate.isExisting ? "기존 연결" : "새 추천")
+                            .font(.caption2)
+                            .fontWeight(.medium)
                     }
+                    .foregroundColor(candidate.isExisting ? .blue : .orange)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background((candidate.isExisting ? Color.blue : Color.orange).opacity(0.1))
+                    .cornerRadius(4)
 
                     // Source folder
                     folderBadge(
@@ -226,14 +224,14 @@ struct FolderRelationExplorer: View {
             // Action buttons with labels + keyboard hints
             HStack(spacing: 24) {
                 VStack(spacing: 4) {
-                    circleButton(icon: "xmark", color: .red, size: 48) {
+                    circleButton(icon: "link.badge.plus", color: .red, size: 48) {
                         handleAction(.left)
                     }
                     HStack(spacing: 3) {
                         Image(systemName: "arrow.left")
                             .font(.system(size: 9, weight: .medium))
                             .foregroundStyle(.tertiary)
-                        Text(candidate.isExisting ? "Remove" : "Suppress")
+                        Text("Unmatch")
                             .font(.caption2)
                             .foregroundStyle(.tertiary)
                     }
@@ -252,12 +250,13 @@ struct FolderRelationExplorer: View {
                     }
                 }
                 VStack(spacing: 4) {
-                    circleButton(icon: candidate.isExisting ? "checkmark" : "bolt.heart.fill", color: .green, size: 48) {
+                    circleButton(icon: "brain.head.profile.fill", color: .green, size: 48) {
                         handleAction(.right)
                     }
                     HStack(spacing: 3) {
-                        Text(candidate.isExisting ? "Keep" : "Boost")
+                        Text("Dot it!")
                             .font(.caption2)
+                            .fontWeight(.medium)
                             .foregroundStyle(.tertiary)
                         Image(systemName: "arrow.right")
                             .font(.system(size: 9, weight: .medium))
@@ -310,8 +309,8 @@ struct FolderRelationExplorer: View {
         let isExisting = currentIndex < candidates.count && candidates[currentIndex].isExisting
         let (text, color, rotation): (String, Color, Double) = {
             switch direction {
-            case .right: return (isExisting ? "KEEP" : "BOOST", .green, -15)
-            case .left: return (isExisting ? "REMOVE" : "NOPE", .red, 15)
+            case .right: return ("DOT IT!", .green, -15)
+            case .left: return ("UNMATCH", .red, 15)
             case .down: return ("SKIP", .secondary, 0)
             case .none: return ("", .clear, 0)
             }
