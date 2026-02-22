@@ -42,10 +42,11 @@ struct SemanticLinker: Sendable {
             return LinkResult(tagsNormalized: tagResult, notesLinked: 0, linksCreated: 0)
         }
 
-        // Load folder relations for scoring
+        // Load folder relations for scoring (pre-compute sets to avoid per-note disk I/O)
         let folderRelationStore = FolderRelationStore(pkmRoot: pkmRoot)
         let folderRelations = folderRelationStore.load()
-        let storeForCandidates: FolderRelationStore? = folderRelations.relations.isEmpty ? nil : folderRelationStore
+        let suppressSet = folderRelations.relations.isEmpty ? Set<String>() : folderRelationStore.suppressPairs()
+        let boostSet = folderRelations.relations.isEmpty ? Set<String>() : folderRelationStore.boostPairKeys()
 
         // Build folder hint context for AI filter
         let folderHintContext = Self.buildFolderHintSection(folderRelations)
@@ -73,13 +74,15 @@ struct SemanticLinker: Sendable {
         }
 
         let candidateGen = LinkCandidateGenerator()
+        let preparedIndex = candidateGen.prepareIndex(allNotes: allNotes, mocEntries: contextMap.entries)
         var notesWithCandidates: [(note: LinkCandidateGenerator.NoteInfo, candidates: [LinkCandidateGenerator.Candidate])] = []
         for note in targetNotes {
             let candidates = candidateGen.generateCandidates(
                 for: note,
                 allNotes: allNotes,
-                mocEntries: contextMap.entries,
-                folderRelations: storeForCandidates
+                preparedIndex: preparedIndex,
+                suppressSet: suppressSet,
+                boostSet: boostSet
             )
             if !candidates.isEmpty {
                 notesWithCandidates.append((note: note, candidates: candidates))
@@ -202,6 +205,7 @@ struct SemanticLinker: Sendable {
         }
 
         let candidateGen = LinkCandidateGenerator()
+        let preparedIndex = candidateGen.prepareIndex(allNotes: allNotes, mocEntries: contextMap.entries)
         let aiFilter = LinkAIFilter()
         let writer = RelatedNotesWriter()
         let notePathMap = Dictionary(uniqueKeysWithValues: allNotes.map { ($0.name, $0.filePath) })
@@ -212,7 +216,7 @@ struct SemanticLinker: Sendable {
             let candidates = candidateGen.generateCandidates(
                 for: note,
                 allNotes: allNotes,
-                mocEntries: contextMap.entries
+                preparedIndex: preparedIndex
             )
             if !candidates.isEmpty {
                 notesWithCandidates.append((note: note, candidates: candidates))
@@ -343,6 +347,62 @@ struct SemanticLinker: Sendable {
     // MARK: - Private
 
     func buildNoteIndex() -> [LinkCandidateGenerator.NoteInfo] {
+        // Try index-first: load note-index.json, only read files for existingRelated
+        if let notes = buildNoteIndexFromIndex() {
+            return notes
+        }
+        // Fallback: full directory scan
+        return buildNoteIndexFromDisk()
+    }
+
+    private func buildNoteIndexFromIndex() -> [LinkCandidateGenerator.NoteInfo]? {
+        let indexPath = pathManager.noteIndexPath
+        guard let data = FileManager.default.contents(atPath: indexPath),
+              let index = try? JSONDecoder().decode(NoteIndex.self, from: data) else {
+            return nil
+        }
+
+        let canonicalRoot = URL(fileURLWithPath: pkmRoot).resolvingSymlinksInPath().path
+        let rootPrefix = canonicalRoot.hasSuffix("/") ? canonicalRoot : canonicalRoot + "/"
+
+        var notes: [LinkCandidateGenerator.NoteInfo] = []
+
+        for (_, entry) in index.notes {
+            let baseName = ((entry.path as NSString).lastPathComponent as NSString).deletingPathExtension
+            let folderName = (entry.folder as NSString).lastPathComponent
+
+            // Skip index notes (folder-name.md)
+            guard baseName != folderName else { continue }
+
+            let filePath = rootPrefix + entry.path
+            let para = PARACategory(rawValue: entry.para) ?? .archive
+
+            // Only read file for existingRelated parsing
+            let existingRelated: Set<String>
+            if let content = try? String(contentsOfFile: filePath, encoding: .utf8) {
+                let (_, body) = Frontmatter.parse(markdown: content)
+                existingRelated = parseExistingRelatedNames(body)
+            } else {
+                existingRelated = []
+            }
+
+            notes.append(LinkCandidateGenerator.NoteInfo(
+                name: baseName,
+                filePath: filePath,
+                tags: entry.tags,
+                summary: entry.summary,
+                project: entry.project,
+                folderName: folderName,
+                folderRelPath: entry.folder,
+                para: para,
+                existingRelated: existingRelated
+            ))
+        }
+
+        return notes
+    }
+
+    private func buildNoteIndexFromDisk() -> [LinkCandidateGenerator.NoteInfo] {
         let fm = FileManager.default
         var notes: [LinkCandidateGenerator.NoteInfo] = []
 

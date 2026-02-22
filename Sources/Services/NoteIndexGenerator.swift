@@ -121,6 +121,7 @@ struct NoteIndexGenerator: Sendable {
                 let folderPath = (basePath as NSString).appendingPathComponent(entry)
                 var isDir: ObjCBool = false
                 guard fm.fileExists(atPath: folderPath, isDirectory: &isDir), isDir.boolValue else { continue }
+                guard pathManager.isPathSafe(folderPath) else { continue }
 
                 let (folderEntry, noteEntries) = scanFolder(
                     folderPath: folderPath,
@@ -174,7 +175,19 @@ struct NoteIndexGenerator: Sendable {
                   entry != "\(folderName).md" else { continue }
 
             let filePath = (folderPath as NSString).appendingPathComponent(entry)
-            guard let content = try? String(contentsOfFile: filePath, encoding: .utf8) else { continue }
+            guard let handle = FileHandle(forReadingAtPath: filePath) else { continue }
+            let data = handle.readData(ofLength: 4096)
+            handle.closeFile()
+            // readData may cut in the middle of a multi-byte UTF-8 character;
+            // try trimming up to 3 trailing bytes to recover a valid string
+            var content: String?
+            for trim in 0...min(3, data.count) {
+                if let s = String(data: data.dropLast(trim), encoding: .utf8) {
+                    content = s
+                    break
+                }
+            }
+            guard let content else { continue }
 
             let (frontmatter, _) = Frontmatter.parse(markdown: content)
             let relNotePath = relativePath(filePath)
