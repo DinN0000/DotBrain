@@ -2,30 +2,30 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <key>LSUIElement</key>
-    <true/>
-    <key>CFBundleName</key>
-    <string>DotBrain</string>
-    <key>CFBundleIdentifier</key>
-    <string>com.hwaa.dotbrain</string>
-    <key>CFBundleVersion</key>
-    <string>2.6.8</string>
-    <key>CFBundleShortVersionString</key>
-    <string>2.6.8</string>
-    <key>NSAppTransportSecurity</key>
-    <dict>
-        <key>NSAllowsArbitraryLoads</key>
-        <false/>
-        <key>NSExceptionDomains</key>
-        <dict>
-            <key>api.anthropic.com</key>
-            <dict>
-                <key>NSExceptionAllowsInsecureHTTPLoads</key>
-                <false/>
-                <key>NSIncludesSubdomains</key>
-                <true/>
-            </dict>
-        </dict>
-    </dict>
+	<key>CFBundleIdentifier</key>
+	<string>com.hwaa.dotbrain</string>
+	<key>CFBundleName</key>
+	<string>DotBrain</string>
+	<key>CFBundleShortVersionString</key>
+	<string>2.7.0</string>
+	<key>CFBundleVersion</key>
+	<string>2.7.0</string>
+	<key>LSUIElement</key>
+	<true/>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsArbitraryLoads</key>
+		<false/>
+		<key>NSExceptionDomains</key>
+		<dict>
+			<key>api.anthropic.com</key>
+			<dict>
+				<key>NSExceptionAllowsInsecureHTTPLoads</key>
+				<false/>
+				<key>NSIncludesSubdomains</key>
+				<true/>
+			</dict>
+		</dict>
+	</dict>
 </dict>
 </plist>

@@ -20,7 +20,7 @@ struct SemanticLinker: Sendable {
     /// Link notes semantically using AI filtering.
     /// - Parameter changedFiles: If provided, only generate candidates and AI-filter for
     ///   changed notes and their existing Related Notes neighbors. Pass nil for full scan.
-    func linkAll(changedFiles: Set<String>? = nil, onProgress: ((Double, String) -> Void)? = nil) async -> LinkResult {
+    func linkAll(changedFiles: Set<String>? = nil, prebuiltIndex: [LinkCandidateGenerator.NoteInfo]? = nil, onProgress: ((Double, String) -> Void)? = nil) async -> LinkResult {
         onProgress?(0.0, "태그 정규화 중...")
         let tagResult: TagNormalizer.Result
         do {
@@ -33,7 +33,7 @@ struct SemanticLinker: Sendable {
         onProgress?(0.1, "태그 정규화 완료")
 
         onProgress?(0.1, "볼트 인덱스 구축 중...")
-        let allNotes = buildNoteIndex()
+        let allNotes = prebuiltIndex ?? buildNoteIndex()
         let contextMap = await ContextMapBuilder(pkmRoot: pkmRoot).build()
         let noteNames = Set(allNotes.map { $0.name })
         onProgress?(0.2, "\(allNotes.count)개 노트 인덱스 완료")
@@ -41,6 +41,20 @@ struct SemanticLinker: Sendable {
         guard !allNotes.isEmpty else {
             return LinkResult(tagsNormalized: tagResult, notesLinked: 0, linksCreated: 0)
         }
+
+        // Load folder relations for scoring
+        let folderRelationStore = FolderRelationStore(pkmRoot: pkmRoot)
+        let folderRelations = folderRelationStore.load()
+        let storeForCandidates: FolderRelationStore? = folderRelations.relations.isEmpty ? nil : folderRelationStore
+
+        // Build folder hint context for AI filter
+        let folderHintContext = Self.buildFolderHintSection(folderRelations)
+
+        // Build link feedback context for AI filter
+        let feedbackContext = LinkFeedbackStore(pkmRoot: pkmRoot).buildPromptContext()
+        let combinedHintContext = [folderHintContext, feedbackContext]
+            .filter { !$0.isEmpty }
+            .joined(separator: "\n\n")
 
         // Determine which notes to process
         let targetNotes: [LinkCandidateGenerator.NoteInfo]
@@ -64,7 +78,8 @@ struct SemanticLinker: Sendable {
             let candidates = candidateGen.generateCandidates(
                 for: note,
                 allNotes: allNotes,
-                mocEntries: contextMap.entries
+                mocEntries: contextMap.entries,
+                folderRelations: storeForCandidates
             )
             if !candidates.isEmpty {
                 notesWithCandidates.append((note: note, candidates: candidates))
@@ -106,7 +121,7 @@ struct SemanticLinker: Sendable {
                     }
 
                     do {
-                        let results = try await aiFilter.filterBatch(notes: batchInput)
+                        let results = try await aiFilter.filterBatch(notes: batchInput, folderHintContext: combinedHintContext)
                         return zip(batch, results).map { (item, links) in
                             (filePath: item.note.filePath, noteName: item.note.name, links: links)
                         }
@@ -297,6 +312,25 @@ struct SemanticLinker: Sendable {
         return LinkResult(tagsNormalized: tagResult, notesLinked: notesLinked, linksCreated: linksCreated)
     }
 
+    // MARK: - Folder Hint
+
+    private static func buildFolderHintSection(_ relations: FolderRelations) -> String {
+        let boosts = relations.relations.filter { $0.type == "boost" && $0.hint != nil }
+        guard !boosts.isEmpty else { return "" }
+
+        let lines = boosts.prefix(10).map { rel in
+            let src = (rel.source as NSString).lastPathComponent
+            let tgt = (rel.target as NSString).lastPathComponent
+            return "- \(src) <> \(tgt): \(rel.hint ?? "관련 관계")"
+        }
+
+        return """
+        ## 폴더 관계 가이드
+        \(lines.joined(separator: "\n"))
+        위 폴더 쌍의 노트는 연결 가능성이 높습니다.
+        """
+    }
+
     // MARK: - Constants
 
     private static let reverseRelationContext: [String: String] = [
@@ -308,7 +342,7 @@ struct SemanticLinker: Sendable {
 
     // MARK: - Private
 
-    private func buildNoteIndex() -> [LinkCandidateGenerator.NoteInfo] {
+    func buildNoteIndex() -> [LinkCandidateGenerator.NoteInfo] {
         let fm = FileManager.default
         var notes: [LinkCandidateGenerator.NoteInfo] = []
 
@@ -319,6 +353,9 @@ struct SemanticLinker: Sendable {
             (.archive, pathManager.archivePath),
         ]
 
+        let canonicalRoot = URL(fileURLWithPath: pkmRoot).resolvingSymlinksInPath().path
+        let rootPrefix = canonicalRoot.hasSuffix("/") ? canonicalRoot : canonicalRoot + "/"
+
         for (para, basePath) in categories {
             guard let folders = try? fm.contentsOfDirectory(atPath: basePath) else { continue }
             for folder in folders {
@@ -326,6 +363,12 @@ struct SemanticLinker: Sendable {
                 let folderPath = (basePath as NSString).appendingPathComponent(folder)
                 var isDir: ObjCBool = false
                 guard fm.fileExists(atPath: folderPath, isDirectory: &isDir), isDir.boolValue else { continue }
+
+                // Compute relative folder path e.g. "2_Area/SwiftUI-패턴"
+                let canonicalFolder = URL(fileURLWithPath: folderPath).resolvingSymlinksInPath().path
+                let folderRelPath = canonicalFolder.hasPrefix(rootPrefix)
+                    ? String(canonicalFolder.dropFirst(rootPrefix.count))
+                    : folder
 
                 guard let files = try? fm.contentsOfDirectory(atPath: folderPath) else { continue }
                 for file in files {
@@ -347,6 +390,7 @@ struct SemanticLinker: Sendable {
                         summary: frontmatter.summary ?? "",
                         project: frontmatter.project,
                         folderName: folder,
+                        folderRelPath: folderRelPath,
                         para: para,
                         existingRelated: existingRelated
                     ))

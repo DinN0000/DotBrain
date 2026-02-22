@@ -9,6 +9,7 @@ struct LinkCandidateGenerator: Sendable {
         let summary: String
         let project: String?
         let folderName: String
+        let folderRelPath: String  // e.g. "2_Area/SwiftUI-패턴"
         let para: PARACategory
         let existingRelated: Set<String>
     }
@@ -25,7 +26,8 @@ struct LinkCandidateGenerator: Sendable {
         allNotes: [NoteInfo],
         mocEntries: [ContextMapEntry],
         folderBonus: Double = 1.0,
-        excludeSameFolder: Bool = false
+        excludeSameFolder: Bool = false,
+        folderRelations: FolderRelationStore? = nil
     ) -> [Candidate] {
         var mocFolders: [String: Set<String>] = [:]
         for entry in mocEntries {
@@ -35,12 +37,24 @@ struct LinkCandidateGenerator: Sendable {
         let noteFolders = mocFolders[note.name] ?? []
         let noteTags = Set(note.tags.map { $0.lowercased() })
 
+        // Pre-load suppress/boost sets for fast lookup (avoid per-candidate disk I/O)
+        let suppressSet = folderRelations?.suppressPairs() ?? []
+        let boostSet = folderRelations?.boostPairKeys() ?? []
+
         var candidates: [Candidate] = []
 
         for other in allNotes {
             guard other.name != note.name else { continue }
             guard !note.existingRelated.contains(other.name) else { continue }
             if excludeSameFolder && other.folderName == note.folderName { continue }
+
+            // Folder relation checks (suppress/boost) using pre-loaded sets
+            var folderBoostApplied = false
+            if let store = folderRelations {
+                let key = store.pairKey(note.folderRelPath, other.folderRelPath)
+                if suppressSet.contains(key) { continue }
+                folderBoostApplied = boostSet.contains(key)
+            }
 
             var score: Double = 0
 
@@ -60,6 +74,11 @@ struct LinkCandidateGenerator: Sendable {
             if let noteProject = note.project, !noteProject.isEmpty,
                let otherProject = other.project, !otherProject.isEmpty,
                noteProject.lowercased() == otherProject.lowercased() {
+                score += 2.0
+            }
+
+            // Folder relation: boost +2.0
+            if folderBoostApplied {
                 score += 2.0
             }
 
