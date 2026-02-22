@@ -214,34 +214,33 @@ struct FolderRelationExplorer: View {
 
             Spacer()
 
-            // Action buttons — circular icons
-            HStack(spacing: 20) {
-                circleButton(icon: "xmark", color: .red, size: 48) {
-                    handleAction(.left)
+            // Action buttons with labels
+            HStack(spacing: 24) {
+                VStack(spacing: 4) {
+                    circleButton(icon: "xmark", color: .red, size: 48) {
+                        handleAction(.left)
+                    }
+                    Text("Suppress")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
                 }
-                circleButton(icon: "forward.fill", color: .secondary, size: 38) {
-                    handleAction(.down)
+                VStack(spacing: 4) {
+                    circleButton(icon: "forward.fill", color: .secondary, size: 38) {
+                        handleAction(.down)
+                    }
+                    Text("Skip")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
                 }
-                circleButton(icon: "bolt.heart.fill", color: .green, size: 48) {
-                    handleAction(.right)
+                VStack(spacing: 4) {
+                    circleButton(icon: "bolt.heart.fill", color: .green, size: 48) {
+                        handleAction(.right)
+                    }
+                    Text("Boost")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
                 }
             }
-            .padding(.bottom, 4)
-
-            // Labels
-            HStack(spacing: 0) {
-                Text("Suppress")
-                    .frame(maxWidth: .infinity)
-                Spacer().frame(width: 20)
-                Text("Skip")
-                    .frame(maxWidth: .infinity)
-                Spacer().frame(width: 20)
-                Text("Boost")
-                    .frame(maxWidth: .infinity)
-            }
-            .font(.caption2)
-            .foregroundStyle(.tertiary)
-            .padding(.horizontal, 24)
             .padding(.bottom, 8)
         }
         .onAppear { setupKeyMonitor() }
@@ -361,10 +360,9 @@ struct FolderRelationExplorer: View {
         let candidate = candidates[currentIndex]
 
         dismissDirection = direction
-        dismissed = true
 
         withAnimation(.easeIn(duration: 0.3)) {
-            // triggers offset/rotation/opacity via dismissed state
+            dismissed = true
         }
 
         Task { @MainActor in
