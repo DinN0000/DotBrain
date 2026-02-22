@@ -34,6 +34,10 @@ struct VaultCheckPipeline {
         if Task.isCancelled { return .empty }
         onProgress(Progress(phase: "오류 검사 중...", fraction: 0.10))
 
+        // Prune stale folder relations (folders that no longer exist)
+        let existingFolders = Self.collectExistingFolders(pm: PKMPathManager(root: pkmRoot))
+        FolderRelationStore(pkmRoot: pkmRoot).pruneStale(existingFolders: existingFolders)
+
         // Phase 2: Repair (10% -> 20%)
         var repairedFiles: [String] = []
         if report.totalIssues > 0 {
@@ -119,12 +123,44 @@ struct VaultCheckPipeline {
         await indexGenerator.updateForFolders(dirtyFolders)
         if Task.isCancelled { return .empty }
 
-        // Phase 5: Semantic Link (changed notes only) (70% -> 95%)
-        onProgress(Progress(phase: "노트 간 시맨틱 연결 중...", fraction: 0.70))
+        // Phase 4.5: Link State Diff — detect user link removals BEFORE writing new links
+        onProgress(Progress(phase: "링크 변경 감지 중...", fraction: 0.70))
         let linker = SemanticLinker(pkmRoot: pkmRoot)
-        let linkResult = await linker.linkAll(changedFiles: allChangedFiles) { progress, status in
-            onProgress(Progress(phase: status, fraction: 0.70 + progress * 0.25))
+        let linkDetector = LinkStateDetector(pkmRoot: pkmRoot)
+        let allNotesForSnapshot = linker.buildNoteIndex()
+        let previousSnapshot = linkDetector.loadSnapshot()
+        let currentSnapshot = linkDetector.buildCurrentSnapshot(allNotes: allNotesForSnapshot)
+
+        if let prev = previousSnapshot {
+            let noteInfoMap = Dictionary(uniqueKeysWithValues: allNotesForSnapshot.map { ($0.name, $0) })
+            let removals = linkDetector.detectRemovals(
+                previous: prev, current: currentSnapshot, noteInfoMap: noteInfoMap
+            )
+            if !removals.isEmpty {
+                let feedbackStore = LinkFeedbackStore(pkmRoot: pkmRoot)
+                for removal in removals {
+                    feedbackStore.recordRemoval(
+                        sourceNote: removal.sourceNote,
+                        targetNote: removal.targetNote,
+                        sourceFolder: removal.sourceFolder,
+                        targetFolder: removal.targetFolder
+                    )
+                }
+                NSLog("[VaultCheck] %d link removals detected", removals.count)
+            }
         }
+        if Task.isCancelled { return .empty }
+
+        // Phase 5: Semantic Link (changed notes only) (72% -> 95%)
+        // Reuse allNotesForSnapshot — file paths/names unchanged, avoids redundant vault scan
+        onProgress(Progress(phase: "노트 간 시맨틱 연결 중...", fraction: 0.72))
+        let linkResult = await linker.linkAll(changedFiles: allChangedFiles, prebuiltIndex: allNotesForSnapshot) { progress, status in
+            onProgress(Progress(phase: status, fraction: 0.72 + progress * 0.23))
+        }
+
+        // Save post-link snapshot (reads file content fresh — captures newly written links)
+        let finalSnapshot = linkDetector.buildCurrentSnapshot(allNotes: allNotesForSnapshot)
+        linkDetector.saveSnapshot(finalSnapshot)
 
         // Update hashes for all changed files (including index/SemanticLinker modifications) and save
         await cache.updateHashes(Array(allChangedFiles))
@@ -206,6 +242,29 @@ struct VaultCheckPipeline {
         }
 
         return created
+    }
+
+    /// Collect all existing folder relative paths (for pruning stale relations)
+    private static func collectExistingFolders(pm: PKMPathManager) -> Set<String> {
+        let fm = FileManager.default
+        let canonicalRoot = URL(fileURLWithPath: pm.root).resolvingSymlinksInPath().path
+        let rootPrefix = canonicalRoot.hasSuffix("/") ? canonicalRoot : canonicalRoot + "/"
+        var folders = Set<String>()
+
+        for basePath in [pm.projectsPath, pm.areaPath, pm.resourcePath, pm.archivePath] {
+            guard let entries = try? fm.contentsOfDirectory(atPath: basePath) else { continue }
+            for entry in entries {
+                guard !entry.hasPrefix("."), !entry.hasPrefix("_") else { continue }
+                let folderPath = (basePath as NSString).appendingPathComponent(entry)
+                var isDir: ObjCBool = false
+                guard fm.fileExists(atPath: folderPath, isDirectory: &isDir), isDir.boolValue else { continue }
+                let canonical = URL(fileURLWithPath: folderPath).resolvingSymlinksInPath().path
+                if canonical.hasPrefix(rootPrefix) {
+                    folders.insert(String(canonical.dropFirst(rootPrefix.count)))
+                }
+            }
+        }
+        return folders
     }
 
     /// Collect all .md files across PARA folders

@@ -25,10 +25,11 @@ final class AppState: ObservableObject {
         case paraManage
         case vaultInspector    // replaces vaultReorganize
         case aiStatistics      // new
+        case folderRelationExplorer
 
         var parent: Screen? {
             switch self {
-            case .paraManage, .search, .vaultInspector, .aiStatistics:
+            case .paraManage, .search, .vaultInspector, .aiStatistics, .folderRelationExplorer:
                 return .dashboard
             default:
                 return nil
@@ -45,6 +46,7 @@ final class AppState: ObservableObject {
             case .vaultInspector: return "볼트 점검"
             case .aiStatistics: return "AI 통계"
             case .results: return "정리 결과"
+            case .folderRelationExplorer: return "폴더 관계 탐색"
             default: return ""
             }
         }
@@ -153,6 +155,8 @@ final class AppState: ObservableObject {
         case .vaultInspector:
             return "·_·…"
         case .aiStatistics:
+            return "·_·"
+        case .folderRelationExplorer:
             return "·_·"
         }
     }

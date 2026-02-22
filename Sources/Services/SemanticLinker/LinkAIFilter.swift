@@ -11,7 +11,8 @@ struct LinkAIFilter: Sendable {
 
     func filterBatch(
         notes: [(name: String, summary: String, tags: [String], candidates: [LinkCandidateGenerator.Candidate])],
-        maxResultsPerNote: Int = 15
+        maxResultsPerNote: Int = 15,
+        folderHintContext: String = ""
     ) async throws -> [[FilteredLink]] {
         guard !notes.isEmpty else { return [] }
 
@@ -29,11 +30,13 @@ struct LinkAIFilter: Sendable {
             """
         }.joined(separator: "\n\n")
 
+        let folderHintSection = folderHintContext.isEmpty ? "" : "\n\(folderHintContext)\n"
+
         let prompt = """
         각 노트에 대해 진짜 관련있는 후보를 모두 선택하세요.
 
         \(noteDescriptions)
-
+        \(folderHintSection)
         ## 규칙
         1. 핵심 기준: "이 연결을 따라가면 새로운 인사이트를 얻을 수 있는가?"
         2. 단순히 같은 주제라서가 아니라, 실제로 함께 읽을 가치가 있는 문서만 선택

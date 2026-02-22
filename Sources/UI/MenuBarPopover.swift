@@ -27,6 +27,8 @@ struct MenuBarPopover: View {
                 VaultInspectorView()
             case .aiStatistics:
                 AIStatisticsView()
+            case .folderRelationExplorer:
+                FolderRelationExplorer()
             }
 
             // Background task indicator (hidden when VaultInspector shows its own inline card)

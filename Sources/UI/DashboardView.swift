@@ -107,6 +107,14 @@ struct DashboardView: View {
                             appState.currentScreen = .vaultInspector
                         }
                         DashboardHubCard(
+                            icon: "arrow.triangle.swap",
+                            title: "폴더 관계 탐색",
+                            subtitle: "폴더 쌍 관계 가이드",
+                            tint: .accentColor
+                        ) {
+                            appState.currentScreen = .folderRelationExplorer
+                        }
+                        DashboardHubCard(
                             icon: "chart.bar.xaxis",
                             title: "AI 통계",
                             subtitle: "비용 · 사용량 · 이력",
