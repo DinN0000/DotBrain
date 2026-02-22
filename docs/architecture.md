@@ -30,7 +30,7 @@ macOS 메뉴바 앱. Obsidian 볼트의 `_Inbox/` 폴더에 드롭된 파일을 
 │  DotBrainApp → AppDelegate → AppState (singleton)│
 ├─────────────────────────────────────────────────┤
 │  UI Layer                         Pipeline Layer │
-│  SwiftUI Views (9 screens)       InboxProcessor  │
+│  SwiftUI Views (11 screens)      InboxProcessor  │
 │  MenuBarPopover (root)           FolderReorganizer│
 │  BreadcrumbView, etc.            VaultReorganizer │
 │                                  VaultAuditor     │
@@ -58,7 +58,7 @@ macOS 메뉴바 앱. Obsidian 볼트의 `_Inbox/` 폴더에 드롭된 파일을 
 | `AppIconGenerator.swift` | Core Graphics로 `·_·` 얼굴 아이콘 렌더링 |
 
 **AppState**는 모든 UI와 파이프라인을 연결하는 중심 허브:
-- `Screen` enum으로 화면 라우팅 (9개 화면)
+- `Screen` enum으로 화면 라우팅 (11개 화면)
 - `@Published` 속성으로 처리 진행률, 결과, 설정을 UI에 전파
 - 파이프라인 실행(`startProcessing`, `startReorganizing`)과 사용자 확인(`confirmClassification`)을 조율
 
@@ -97,7 +97,7 @@ macOS 메뉴바 앱. Obsidian 볼트의 `_Inbox/` 폴더에 드롭된 파일을 
 
 ## UI Layer
 
-`Sources/UI/` — 10개 화면 + 3개 재사용 컴포넌트.
+`Sources/UI/` — 11개 화면 + 3개 재사용 컴포넌트.
 
 ```
 MenuBarPopover (root, 화면 전환)
@@ -110,14 +110,17 @@ MenuBarPopover (root, 화면 전환)
 │   ├── SearchView       (.search)          — 볼트 검색
 │   ├── VaultInspectorView (.vaultInspector) — 볼트 점검 + AI 재분류 (통합)
 │   └── AIStatisticsView (.aiStatistics)    — AI 사용량 통계, 토큰 비용
+├── FolderRelationExplorer (.folderRelationExplorer) — 폴더 관계 탐색 (Tinder-style 카드)
 └── SettingsView         (.settings)        — AI 프로바이더, 키, 경로
 ```
+
+**FolderRelationExplorer 추가**: 폴더 간 관계를 Tinder-style 카드 UI로 탐색. 기존 boost 관계(파란 배지)와 새 AI 추천(주황 배지)을 2:1 비율로 인터리브. 스와이프/키보드로 Dot it!(연결) / Unmatch(해제) / Skip(건너뛰기) 액션.
 
 **VaultReorganizeView 제거**: 기존 `.vaultReorganize` 화면은 `VaultInspectorView`에 흡수됨. VaultInspectorView는 Level 1 폴더 목록 + Level 2 폴더 상세 + 재분류 기능을 통합 제공.
 
 **AIStatisticsView 추가**: 실제 토큰 사용량 기반 API 비용 통계. APIUsageLogger에서 데이터를 읽어 operation별 비용, 최근 API 호출 내역을 표시.
 
-**네비게이션 모델**: `NavigationStack` 미사용. `AppState.currentScreen` (Screen enum)으로 화면 전환. 각 Screen은 optional `parent` 속성으로 계층 구성. 하단 3탭 (Inbox, Dashboard, Settings).
+**네비게이션 모델**: `NavigationStack` 미사용. `AppState.currentScreen` (Screen enum)으로 화면 전환. 각 Screen은 optional `parent` 속성으로 계층 구성. 하단 4탭 (Inbox, Dashboard, Explore, Settings).
 
 **재사용 컴포넌트**: `BreadcrumbView` (뒤로가기 + 제목), `APIKeyInputView` (Claude/Gemini 키 입력), `FileThumbnailView` (QuickLook 썸네일).
 

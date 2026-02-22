@@ -327,6 +327,43 @@ PARA 경로 관리 및 보안 검증.
 
 **Wikilink Sanitization**: `[[`, `]]`, `/`, `\`, `..` 제거. 노트 이름 존재 검증.
 
+### FolderRelationStore
+
+`Sources/Services/SemanticLinker/FolderRelationStore.swift` — **struct: Sendable**
+
+폴더 간 관계(boost/suppress) 저장소. `.meta/folder-relations.json`에 영속화.
+
+| 메서드 | 설명 |
+|--------|------|
+| `load()` | JSON에서 전체 관계 로드 → `FolderRelations` |
+| `save(_:)` | 관계를 JSON으로 저장 |
+| `addRelation(_:)` | 관계 추가 (기존 동일 쌍은 교체) |
+| `removeRelation(source:target:)` | 관계 제거 |
+| `boostPairs()` | boost 타입 관계 목록 |
+| `suppressPairs()` | suppress 타입 쌍 키 Set |
+| `renamePath(from:to:)` | 폴더 경로 변경 시 관계 경로 업데이트 |
+| `pruneStale(existingFolders:)` | 삭제된 폴더의 관계 정리 |
+
+**양방향 매칭**: (A,B)와 (B,A)를 동일하게 취급. `pairKey()`로 정렬된 키 생성.
+
+**모델**: `FolderRelation` (source, target, type, hint, relationType, origin, created), `FolderRelations` (version, updated, relations).
+
+### FolderRelationAnalyzer
+
+`Sources/Services/SemanticLinker/FolderRelationAnalyzer.swift` — **struct: Sendable**
+
+AI를 이용한 폴더 쌍 관계 후보 생성. FolderRelationExplorer UI에서 사용.
+
+| 메서드 | 설명 |
+|--------|------|
+| `generateCandidates(allNotes:existingRelations:)` | 폴더 쌍 후보 생성 (기존 관계 제외, AI 분석 포함) |
+
+**스코어링**: 폴더 간 기존 링크 수 x3.0 + 공유 태그 수. 상위 20개 선택 후 AI 배치 분석.
+
+**AI 분석**: hint("~할 때" 형식, 한국어 20자 이내), relationType(비교/대조|적용|확장|관련), confidence(0.0~1.0) 생성. confidence > 0.1만 반환.
+
+**의존**: AIService, SemanticLinker (NoteInfo), StatisticsService
+
 ## Project / Folder Management
 
 ### ProjectManager

@@ -9,6 +9,7 @@
 - `AppState` (singleton) — central state, `@MainActor`, `ObservableObject`
 - `Sources/Pipeline/` — InboxProcessor, FolderReorganizer, VaultCheckPipeline, ProjectContextBuilder
 - `Sources/Services/` — AIService, FileMover, PKMPathManager, VaultSearcher, NoteIndexGenerator, StatisticsService
+- `Sources/Services/SemanticLinker/` — FolderRelationStore, FolderRelationAnalyzer, LinkFeedbackStore, LinkStateDetector
 - `Sources/UI/` — SwiftUI views (menubar popover)
 - `Sources/Models/` — Frontmatter, ClassifyResult, PARACategory
 
@@ -36,6 +37,7 @@
 - `StatisticsService` calls (addApiCost, incrementDuplicates, recordActivity) must be wired manually at each call site
 - Wiki-links `[[note]]` in `## Related Notes` sections enable cross-note navigation for both humans and AI
 - `.meta/note-index.json` — vault metadata index for AI navigation (NoteIndexGenerator)
+- `.meta/folder-relations.json` — folder pair relations (boost/suppress) managed by FolderRelationStore
 
 ## Vault Navigation (for Claude Code)
 - Read `.meta/note-index.json` first for vault structure overview
@@ -48,7 +50,7 @@
 
 ## Release Workflow
 - GitHub: `DinN0000/DotBrain`
-- Release assets: `DotBrain` (universal binary) + `AppIcon.icns` — naming must be exact
+- Release assets: `DotBrain` (universal binary) + `AppIcon.icns` + `Info.plist` — naming must be exact
 - Use `/release` command for guided release process
 - **Every release:** bump `Resources/Info.plist` (CFBundleVersion + CFBundleShortVersionString) to match release tag
 - **Deploy:** copy both binary and Info.plist → `cp Resources/Info.plist /Applications/DotBrain.app/Contents/Info.plist`
@@ -78,3 +80,5 @@
 - `/check` — quick project status (build, git, release)
 - `/release` — guided release workflow
 - `/status` — DotBrain app status
+- `/deploy` — build → install → run (clean build with `rm -rf .build`)
+- `/wrap` — session wrap-up (4 parallel agents → consolidate → apply)
