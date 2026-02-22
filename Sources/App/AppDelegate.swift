@@ -86,11 +86,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             .foregroundColor: NSColor.controlTextColor
         ]
         let size = (text as NSString).size(withAttributes: attrs)
-        let imageSize = NSSize(width: ceil(size.width) + 2, height: 22)
+        let imageSize = NSSize(width: ceil(size.width), height: 22)
 
         let image = NSImage(size: imageSize, flipped: false) { rect in
-            let y = (rect.height - size.height) / 2 + 2
-            (text as NSString).draw(at: NSPoint(x: 1, y: y), withAttributes: attrs)
+            let y = (rect.height - size.height) / 2 + 1
+            (text as NSString).draw(at: NSPoint(x: 0, y: y), withAttributes: attrs)
             return true
         }
         image.isTemplate = true
