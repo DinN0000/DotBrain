@@ -55,14 +55,7 @@ struct FolderRelationExplorer: View {
     // MARK: - Counter
 
     private var counterView: some View {
-        Group {
-            if !isLoading && !candidates.isEmpty && currentIndex < candidates.count {
-                Text("\(currentIndex + 1) / \(candidates.count)")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                    .monospacedDigit()
-            }
-        }
+        EmptyView()
     }
 
     // MARK: - Loading
@@ -156,23 +149,13 @@ struct FolderRelationExplorer: View {
                         noteCount: candidate.sourceNoteCount
                     )
 
-                    // Hint + relation type
-                    VStack(spacing: 6) {
-                        if let hint = candidate.hint {
-                            Text("\"\(hint)\"")
-                                .font(.subheadline)
-                                .italic()
-                                .foregroundColor(.primary.opacity(0.8))
-                                .multilineTextAlignment(.center)
-                        }
-                        if let relType = candidate.relationType {
-                            Text(relType)
-                                .font(.caption)
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 2)
-                                .background(Color.accentColor.opacity(0.1))
-                                .cornerRadius(4)
-                        }
+                    // Hint
+                    if let hint = candidate.hint {
+                        Text("\"\(hint)\"")
+                            .font(.subheadline)
+                            .italic()
+                            .foregroundColor(.primary.opacity(0.8))
+                            .multilineTextAlignment(.center)
                     }
 
                     // Target folder
@@ -240,44 +223,49 @@ struct FolderRelationExplorer: View {
 
             Spacer()
 
-            // Action buttons with labels
+            // Action buttons with labels + keyboard hints
             HStack(spacing: 24) {
                 VStack(spacing: 4) {
                     circleButton(icon: "xmark", color: .red, size: 48) {
                         handleAction(.left)
                     }
-                    Text(candidate.isExisting ? "Remove" : "Suppress")
-                        .font(.caption2)
-                        .foregroundStyle(.tertiary)
+                    HStack(spacing: 3) {
+                        Image(systemName: "arrow.left")
+                            .font(.system(size: 9, weight: .medium))
+                            .foregroundStyle(.tertiary)
+                        Text(candidate.isExisting ? "Remove" : "Suppress")
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                    }
                 }
                 VStack(spacing: 4) {
                     circleButton(icon: "forward.fill", color: .secondary, size: 38) {
                         handleAction(.down)
                     }
-                    Text("Skip")
-                        .font(.caption2)
-                        .foregroundStyle(.tertiary)
+                    HStack(spacing: 3) {
+                        Image(systemName: "arrow.down")
+                            .font(.system(size: 9, weight: .medium))
+                            .foregroundStyle(.tertiary)
+                        Text("Skip")
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                    }
                 }
                 VStack(spacing: 4) {
                     circleButton(icon: candidate.isExisting ? "checkmark" : "bolt.heart.fill", color: .green, size: 48) {
                         handleAction(.right)
                     }
-                    Text(candidate.isExisting ? "Keep" : "Boost")
-                        .font(.caption2)
-                        .foregroundStyle(.tertiary)
+                    HStack(spacing: 3) {
+                        Text(candidate.isExisting ? "Keep" : "Boost")
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                        Image(systemName: "arrow.right")
+                            .font(.system(size: 9, weight: .medium))
+                            .foregroundStyle(.tertiary)
+                    }
                 }
             }
-            .padding(.bottom, 4)
-
-            // Keyboard hint
-            HStack(spacing: 4) {
-                Image(systemName: "arrow.left")
-                Image(systemName: "arrow.down")
-                Image(systemName: "arrow.right")
-            }
-            .font(.system(size: 9))
-            .foregroundStyle(.quaternary)
-            .padding(.bottom, 6)
+            .padding(.bottom, 8)
         }
         .onAppear { setupKeyMonitor() }
         .onDisappear { removeKeyMonitor() }
@@ -535,8 +523,18 @@ struct FolderRelationExplorer: View {
         )
 
         await MainActor.run {
-            // Existing boost first, then new suggestions
-            candidates = existingCards + newCards
+            // Interleave: 2 existing, 1 new, repeat. Remainder appended at end.
+            var merged: [FolderPairCandidate] = []
+            var ei = 0, ni = 0
+            while ei < existingCards.count || ni < newCards.count {
+                // 2 existing
+                for _ in 0..<2 {
+                    if ei < existingCards.count { merged.append(existingCards[ei]); ei += 1 }
+                }
+                // 1 new
+                if ni < newCards.count { merged.append(newCards[ni]); ni += 1 }
+            }
+            candidates = merged
             isLoading = false
         }
     }
