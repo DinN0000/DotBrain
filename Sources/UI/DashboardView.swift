@@ -108,7 +108,7 @@ struct DashboardView: View {
                         }
                         DashboardHubCard(
                             icon: "arrow.triangle.swap",
-                            title: "폴더 관계 탐색",
+                            title: "폴더 짝 매칭",
                             subtitle: "폴더 쌍 관계 가이드",
                             tint: .accentColor
                         ) {
