@@ -5,7 +5,7 @@
 > **Project**: DotBrain
 > **Version**: 2.5.1
 > **Date**: 2026-02-21
-> **Status**: Approved
+> **Status**: Completed
 
 ---
 
@@ -62,9 +62,9 @@ DotBrain의 캐치프레이즈 "Built for humans. Optimized for AI."에서 "Opti
 
 | ID | Requirement | Priority | Status | Source |
 |----|-------------|----------|--------|--------|
-| FR-02 | 백그라운드 작업 완료 표시를 자동 소멸(3초) 대신 유지. 팝오버 열 때 확인 가능하도록. | High | Pending | UX Agent |
-| FR-07 | "Finder에서 열기"가 첫 파일 폴더 대신 모든 성공 파일의 공통 상위 폴더를 열기 | Medium | Pending | UX Agent |
-| FR-08 | 파이프라인 수준 오류(API 실패, 네트워크 등)를 결과 리스트 위 별도 빨간 배너로 표시 | Medium | Pending | UX Agent |
+| FR-02 | 백그라운드 작업 완료 표시를 자동 소멸(3초) 대신 유지. 팝오버 열 때 확인 가능하도록. | High | Done | UX Agent |
+| FR-07 | "Finder에서 열기"가 첫 파일 폴더 대신 모든 성공 파일의 공통 상위 폴더를 열기 | Medium | Done | UX Agent |
+| FR-08 | 파이프라인 수준 오류(API 실패, 네트워크 등)를 결과 리스트 위 별도 빨간 배너로 표시 | Medium | Done | UX Agent |
 
 ### 3.2 Non-Functional Requirements
 
@@ -79,15 +79,15 @@ DotBrain의 캐치프레이즈 "Built for humans. Optimized for AI."에서 "Opti
 
 ### 4.1 Definition of Done
 
-- [ ] 3개 FR 구현 완료
-- [ ] `swift build` 0 warnings
-- [ ] 수동 테스트: 인박스 처리 플로우 정상 동작
-- [ ] 수동 테스트: 볼트 점검 완료 표시 유지 확인
+- [x] 3개 FR 구현 완료
+- [x] `swift build` 0 warnings
+- [x] 수동 테스트: 인박스 처리 플로우 정상 동작
+- [x] 수동 테스트: 볼트 점검 완료 표시 유지 확인
 
 ### 4.2 Quality Criteria
 
-- [ ] Zero build warnings
-- [ ] CLAUDE.md Code Placement Rules 준수
+- [x] Zero build warnings
+- [x] CLAUDE.md Code Placement Rules 준수
 
 ---
 
@@ -139,9 +139,9 @@ DotBrain의 캐치프레이즈 "Built for humans. Optimized for AI."에서 "Opti
 ## 8. Next Steps
 
 1. [x] Plan 문서 작성 + 사용자 승인
-2. [ ] 구현 (3건 모두 소규모, Design 스킵 가능)
-3. [ ] Build 확인
-4. [ ] Gap Analysis
+2. [x] 구현 (3건 모두 소규모, Design 스킵)
+3. [x] Build 확인
+4. [x] Gap Analysis — code review로 대체
 
 ---
 
@@ -151,3 +151,4 @@ DotBrain의 캐치프레이즈 "Built for humans. Optimized for AI."에서 "Opti
 |---------|------|---------|--------|
 | 0.1 | 2026-02-21 | 5-agent review 기반 초안 (8 FR) | Claude |
 | 1.0 | 2026-02-21 | 사용자 검토 후 3 FR로 확정 | Claude |
+| 1.1 | 2026-02-22 | All FRs implemented, status updated to Completed | Claude |
