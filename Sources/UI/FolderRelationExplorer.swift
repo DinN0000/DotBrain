@@ -7,12 +7,19 @@ struct FolderRelationExplorer: View {
     @State private var candidates: [FolderPairCandidate] = []
     @State private var currentIndex: Int = 0
     @State private var isLoading: Bool = true
-    @State private var cardOffset: CGFloat = 0
-    @State private var cardOpacity: Double = 1
     @State private var keyMonitor: Any?
 
+    // Drag state
+    @State private var dragOffset: CGSize = .zero
+    @State private var isDragging: Bool = false
+
+    // Dismiss animation
+    @State private var dismissed: Bool = false
+    @State private var dismissDirection: SwipeDirection = .none
+
     private enum SwipeDirection { case none, left, right, down }
-    @State private var swipeDirection: SwipeDirection = .none
+
+    private let dragThreshold: CGFloat = 80
 
     var body: some View {
         VStack(spacing: 0) {
@@ -108,95 +115,134 @@ struct FolderRelationExplorer: View {
 
     private var cardView: some View {
         let candidate = candidates[currentIndex]
+        let dragDirection = currentDragDirection
 
         return VStack(spacing: 0) {
             Spacer()
 
-            VStack(spacing: 16) {
-                // Source folder
-                folderBadge(
-                    name: (candidate.sourceFolder as NSString).lastPathComponent,
-                    para: candidate.sourcePara,
-                    noteCount: candidate.sourceNoteCount
-                )
+            ZStack(alignment: .top) {
+                // Card
+                VStack(spacing: 14) {
+                    // Source folder
+                    folderBadge(
+                        name: (candidate.sourceFolder as NSString).lastPathComponent,
+                        para: candidate.sourcePara,
+                        noteCount: candidate.sourceNoteCount
+                    )
 
-                // Arrow + Hint + relation type
-                VStack(spacing: 4) {
-                    Image(systemName: "arrow.down")
-                        .font(.caption)
-                        .foregroundStyle(.quaternary)
-                    if let hint = candidate.hint {
-                        Text("\"\(hint)\"")
-                            .font(.subheadline)
-                            .italic()
-                            .foregroundColor(.primary.opacity(0.8))
+                    // Hint + relation type
+                    VStack(spacing: 6) {
+                        if let hint = candidate.hint {
+                            Text("\"\(hint)\"")
+                                .font(.subheadline)
+                                .italic()
+                                .foregroundColor(.primary.opacity(0.8))
+                                .multilineTextAlignment(.center)
+                        }
+                        if let relType = candidate.relationType {
+                            Text(relType)
+                                .font(.caption)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 2)
+                                .background(Color.accentColor.opacity(0.1))
+                                .cornerRadius(4)
+                        }
                     }
-                    if let relType = candidate.relationType {
-                        Text(relType)
-                            .font(.caption)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 2)
-                            .background(Color.accentColor.opacity(0.1))
-                            .cornerRadius(4)
+
+                    // Target folder
+                    folderBadge(
+                        name: (candidate.targetFolder as NSString).lastPathComponent,
+                        para: candidate.targetPara,
+                        noteCount: candidate.targetNoteCount
+                    )
+
+                    // Evidence
+                    HStack(spacing: 12) {
+                        if !candidate.topSharedTags.isEmpty {
+                            Label("\(candidate.sharedTagCount) tags", systemImage: "tag")
+                        }
+                        if candidate.existingLinkCount > 0 {
+                            Label("\(candidate.existingLinkCount) links", systemImage: "link")
+                        }
                     }
-                    Image(systemName: "arrow.down")
-                        .font(.caption)
-                        .foregroundStyle(.quaternary)
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
                 }
-
-                // Target folder
-                folderBadge(
-                    name: (candidate.targetFolder as NSString).lastPathComponent,
-                    para: candidate.targetPara,
-                    noteCount: candidate.targetNoteCount
+                .padding(20)
+                .frame(maxWidth: .infinity)
+                .background(.ultraThinMaterial)
+                .cornerRadius(16)
+                .shadow(color: .black.opacity(0.08), radius: 8, y: 4)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(dragBorderColor.opacity(dragBorderOpacity), lineWidth: 2.5)
                 )
+
+                // Stamp overlay
+                if dragDirection != .none {
+                    stampOverlay(dragDirection)
+                }
             }
-            .padding(20)
-            .frame(maxWidth: .infinity)
-            .background(Color.primary.opacity(0.03))
-            .cornerRadius(12)
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(swipeBorderColor, lineWidth: swipeDirection == .none ? 0 : 2)
-            )
-            .offset(x: cardOffset, y: swipeDirection == .down ? cardOffset / 3 : 0)
-            .opacity(cardOpacity)
+            .offset(x: dismissed ? dismissOffset.width : dragOffset.width,
+                    y: dismissed ? dismissOffset.height : min(dragOffset.height, 0) * 0.3)
+            .rotationEffect(.degrees(dismissed ? dismissRotation : Double(dragOffset.width / 25)))
+            .opacity(dismissed ? 0 : 1)
             .padding(.horizontal, 16)
-
-            // Evidence
-            HStack(spacing: 12) {
-                if !candidate.topSharedTags.isEmpty {
-                    Label("공유 태그 \(candidate.sharedTagCount)개", systemImage: "tag")
-                }
-                if candidate.existingLinkCount > 0 {
-                    Label("기존 연결 \(candidate.existingLinkCount)개", systemImage: "link")
-                }
-            }
-            .font(.caption)
-            .foregroundColor(.secondary)
-            .padding(.top, 8)
+            .gesture(
+                DragGesture()
+                    .onChanged { value in
+                        isDragging = true
+                        dragOffset = value.translation
+                    }
+                    .onEnded { value in
+                        isDragging = false
+                        let h = value.translation.width
+                        let v = value.translation.height
+                        if h < -dragThreshold {
+                            handleAction(.left)
+                        } else if h > dragThreshold {
+                            handleAction(.right)
+                        } else if v > dragThreshold {
+                            handleAction(.down)
+                        } else {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                dragOffset = .zero
+                            }
+                        }
+                    }
+            )
 
             Spacer()
 
-            // Action buttons
-            HStack(spacing: 12) {
-                actionButton(label: "Suppress", icon: "arrow.left", color: .red) {
+            // Action buttons — circular icons
+            HStack(spacing: 20) {
+                circleButton(icon: "xmark", color: .red, size: 48) {
                     handleAction(.left)
                 }
-                actionButton(label: "Skip", icon: "arrow.down", color: .secondary) {
+                circleButton(icon: "forward.fill", color: .secondary, size: 38) {
                     handleAction(.down)
                 }
-                actionButton(label: "Boost", icon: "arrow.right", color: .green) {
+                circleButton(icon: "bolt.heart.fill", color: .green, size: 48) {
                     handleAction(.right)
                 }
             }
-            .padding(.horizontal, 16)
-            .padding(.bottom, 8)
+            .padding(.bottom, 4)
 
-            Text("<- -> (arrow keys)")
-                .font(.caption2)
-                .foregroundStyle(.quaternary)
-                .padding(.bottom, 8)
+            // Labels
+            HStack(spacing: 0) {
+                Text("Suppress")
+                    .frame(maxWidth: .infinity)
+                Spacer().frame(width: 20)
+                Text("Skip")
+                    .frame(maxWidth: .infinity)
+                Spacer().frame(width: 20)
+                Text("Boost")
+                    .frame(maxWidth: .infinity)
+            }
+            .font(.caption2)
+            .foregroundStyle(.tertiary)
+            .padding(.horizontal, 24)
+            .padding(.bottom, 8)
         }
         .onAppear { setupKeyMonitor() }
         .onDisappear { removeKeyMonitor() }
@@ -220,29 +266,60 @@ struct FolderRelationExplorer: View {
             Spacer()
         }
         .padding(10)
-        .background(Color.primary.opacity(0.02))
+        .background(Color.primary.opacity(0.03))
         .cornerRadius(8)
     }
 
-    private func actionButton(label: String, icon: String, color: Color, action: @escaping () -> Void) -> some View {
+    private func circleButton(icon: String, color: Color, size: CGFloat, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            HStack(spacing: 4) {
-                Image(systemName: icon)
-                    .font(.caption)
-                Text(label)
-                    .font(.caption)
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 8)
-            .background(color.opacity(0.08))
-            .foregroundColor(color)
-            .cornerRadius(8)
+            Image(systemName: icon)
+                .font(.system(size: size * 0.36, weight: .bold))
+                .foregroundColor(color)
+                .frame(width: size, height: size)
+                .background(color.opacity(0.1))
+                .clipShape(Circle())
+                .overlay(Circle().stroke(color.opacity(0.2), lineWidth: 1))
         }
         .buttonStyle(.plain)
     }
 
-    private var swipeBorderColor: Color {
-        switch swipeDirection {
+    private func stampOverlay(_ direction: SwipeDirection) -> some View {
+        let (text, color, rotation): (String, Color, Double) = {
+            switch direction {
+            case .right: return ("BOOST", .green, -15)
+            case .left: return ("NOPE", .red, 15)
+            case .down: return ("SKIP", .secondary, 0)
+            case .none: return ("", .clear, 0)
+            }
+        }()
+
+        return Text(text)
+            .font(.system(size: 28, weight: .heavy))
+            .foregroundColor(color)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 4)
+            .overlay(
+                RoundedRectangle(cornerRadius: 6)
+                    .stroke(color, lineWidth: 3)
+            )
+            .rotationEffect(.degrees(rotation))
+            .opacity(stampOpacity)
+            .padding(.top, 24)
+    }
+
+    // MARK: - Drag Visuals
+
+    private var currentDragDirection: SwipeDirection {
+        if dismissed { return dismissDirection }
+        let h = dragOffset.width
+        let v = dragOffset.height
+        if abs(h) > 30 { return h > 0 ? .right : .left }
+        if v > 30 { return .down }
+        return .none
+    }
+
+    private var dragBorderColor: Color {
+        switch currentDragDirection {
         case .left: return .red
         case .right: return .green
         case .down: return .secondary
@@ -250,34 +327,48 @@ struct FolderRelationExplorer: View {
         }
     }
 
+    private var dragBorderOpacity: Double {
+        let progress = max(abs(dragOffset.width), dragOffset.height) / dragThreshold
+        return min(progress, 1.0)
+    }
+
+    private var stampOpacity: Double {
+        let progress = max(abs(dragOffset.width), dragOffset.height) / dragThreshold
+        return min(progress * 0.8, 0.8)
+    }
+
+    private var dismissOffset: CGSize {
+        switch dismissDirection {
+        case .left: return CGSize(width: -400, height: 0)
+        case .right: return CGSize(width: 400, height: 0)
+        case .down: return CGSize(width: 0, height: 300)
+        case .none: return .zero
+        }
+    }
+
+    private var dismissRotation: Double {
+        switch dismissDirection {
+        case .left: return -20
+        case .right: return 20
+        default: return 0
+        }
+    }
+
     // MARK: - Actions
 
     private func handleAction(_ direction: SwipeDirection) {
-        guard currentIndex < candidates.count else { return }
+        guard currentIndex < candidates.count, !dismissed else { return }
         let candidate = candidates[currentIndex]
 
-        swipeDirection = direction
+        dismissDirection = direction
+        dismissed = true
 
-        // Animate card out
-        withAnimation(.easeIn(duration: 0.25)) {
-            switch direction {
-            case .left:
-                cardOffset = -300
-                cardOpacity = 0
-            case .right:
-                cardOffset = 300
-                cardOpacity = 0
-            case .down:
-                cardOffset = 200
-                cardOpacity = 0
-            case .none:
-                break
-            }
+        withAnimation(.easeIn(duration: 0.3)) {
+            // triggers offset/rotation/opacity via dismissed state
         }
 
-        // Save result and advance after animation completes
         Task { @MainActor in
-            try? await Task.sleep(for: .seconds(0.25))
+            try? await Task.sleep(for: .seconds(0.3))
 
             switch direction {
             case .right:
@@ -285,13 +376,13 @@ struct FolderRelationExplorer: View {
             case .left:
                 saveRelation(candidate, type: "suppress")
             case .down, .none:
-                break  // skip — no save
+                break
             }
 
             currentIndex += 1
-            cardOffset = 0
-            cardOpacity = 1
-            swipeDirection = .none
+            dragOffset = .zero
+            dismissed = false
+            dismissDirection = .none
         }
     }
 
