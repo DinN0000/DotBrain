@@ -16,6 +16,9 @@ struct FolderPairCandidate: Sendable {
     var hint: String?
     var relationType: String?
     var confidence: Double
+
+    // Existing relation flag
+    var isExisting: Bool = false
 }
 
 /// Generates folder pair candidates and requests AI analysis for hints/relation types

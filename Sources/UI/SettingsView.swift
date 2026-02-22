@@ -48,6 +48,9 @@ struct SettingsView: View {
 
                     // MARK: - App Info
                     appInfoSection
+
+                    // MARK: - Onboarding
+                    onboardingSection
                 }
                 .padding(.horizontal, 14)
                 .padding(.vertical, 10)
@@ -482,6 +485,43 @@ struct SettingsView: View {
         } catch {
             updateError = "업데이트 실패: \(error.localizedDescription)"
         }
+    }
+
+    // MARK: - Onboarding Section
+
+    private var onboardingSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 6) {
+                Image(systemName: "arrow.counterclockwise")
+                    .font(.caption)
+                    .foregroundColor(.accentColor)
+                    .frame(width: 16)
+                Text("온보딩")
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                Spacer()
+            }
+
+            Button(action: {
+                UserDefaults.standard.set(0, forKey: "onboardingStep")
+                UserDefaults.standard.set(false, forKey: "onboardingCompleted")
+                appState.currentScreen = .onboarding
+            }) {
+                HStack(spacing: 4) {
+                    Image(systemName: "arrow.triangle.2.circlepath")
+                        .font(.caption)
+                    Text("온보딩 다시 시작")
+                        .font(.caption)
+                }
+                .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.primary.opacity(0.03))
+        .cornerRadius(8)
     }
 
     // MARK: - Footer Bar

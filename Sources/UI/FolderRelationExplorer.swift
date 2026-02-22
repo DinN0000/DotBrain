@@ -29,6 +29,16 @@ struct FolderRelationExplorer: View {
             )
             Divider()
 
+            // Description
+            if isLoading || (!candidates.isEmpty && currentIndex < candidates.count) {
+                Text("관련 있어 보이는 폴더 쌍이에요. 연결할지 말지 골라주세요.")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 8)
+            }
+
             if isLoading {
                 loadingView
             } else if candidates.isEmpty {
@@ -123,6 +133,22 @@ struct FolderRelationExplorer: View {
             ZStack(alignment: .top) {
                 // Card
                 VStack(spacing: 14) {
+                    // Existing relation badge
+                    if candidate.isExisting {
+                        HStack(spacing: 4) {
+                            Image(systemName: "link.circle.fill")
+                                .font(.caption2)
+                            Text("기존 연결")
+                                .font(.caption2)
+                                .fontWeight(.medium)
+                        }
+                        .foregroundColor(.blue)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(Color.blue.opacity(0.1))
+                        .cornerRadius(4)
+                    }
+
                     // Source folder
                     folderBadge(
                         name: (candidate.sourceFolder as NSString).lastPathComponent,
@@ -220,7 +246,7 @@ struct FolderRelationExplorer: View {
                     circleButton(icon: "xmark", color: .red, size: 48) {
                         handleAction(.left)
                     }
-                    Text("Suppress")
+                    Text(candidate.isExisting ? "Remove" : "Suppress")
                         .font(.caption2)
                         .foregroundStyle(.tertiary)
                 }
@@ -233,10 +259,10 @@ struct FolderRelationExplorer: View {
                         .foregroundStyle(.tertiary)
                 }
                 VStack(spacing: 4) {
-                    circleButton(icon: "bolt.heart.fill", color: .green, size: 48) {
+                    circleButton(icon: candidate.isExisting ? "checkmark" : "bolt.heart.fill", color: .green, size: 48) {
                         handleAction(.right)
                     }
-                    Text("Boost")
+                    Text(candidate.isExisting ? "Keep" : "Boost")
                         .font(.caption2)
                         .foregroundStyle(.tertiary)
                 }
@@ -293,10 +319,11 @@ struct FolderRelationExplorer: View {
     }
 
     private func stampOverlay(_ direction: SwipeDirection) -> some View {
+        let isExisting = currentIndex < candidates.count && candidates[currentIndex].isExisting
         let (text, color, rotation): (String, Color, Double) = {
             switch direction {
-            case .right: return ("BOOST", .green, -15)
-            case .left: return ("NOPE", .red, 15)
+            case .right: return (isExisting ? "KEEP" : "BOOST", .green, -15)
+            case .left: return (isExisting ? "REMOVE" : "NOPE", .red, 15)
             case .down: return ("SKIP", .secondary, 0)
             case .none: return ("", .clear, 0)
             }
@@ -380,9 +407,26 @@ struct FolderRelationExplorer: View {
 
             switch direction {
             case .right:
-                saveRelation(candidate, type: "boost")
+                if !candidate.isExisting {
+                    saveRelation(candidate, type: "boost")
+                }
+                // Existing + right = keep (no-op)
             case .left:
-                saveRelation(candidate, type: "suppress")
+                if candidate.isExisting {
+                    // Remove existing boost relation
+                    let store = FolderRelationStore(pkmRoot: appState.pkmRootPath)
+                    store.removeRelation(source: candidate.sourceFolder, target: candidate.targetFolder)
+                    let src = (candidate.sourceFolder as NSString).lastPathComponent
+                    let tgt = (candidate.targetFolder as NSString).lastPathComponent
+                    StatisticsService.recordActivity(
+                        fileName: "\(src) <> \(tgt)",
+                        category: "folder-relation",
+                        action: "remove",
+                        detail: candidate.hint ?? ""
+                    )
+                } else {
+                    saveRelation(candidate, type: "suppress")
+                }
             case .down, .none:
                 break
             }
@@ -451,17 +495,48 @@ struct FolderRelationExplorer: View {
         let linker = SemanticLinker(pkmRoot: root)
         let allNotes = linker.buildNoteIndex()
 
+        // Group notes by folder for note count lookup
+        var folderNotes: [String: [LinkCandidateGenerator.NoteInfo]] = [:]
+        for note in allNotes {
+            folderNotes[note.folderRelPath, default: []].append(note)
+        }
+
         let relationStore = FolderRelationStore(pkmRoot: root)
         let existingRelations = relationStore.load()
 
+        // Build cards from existing boost relations
+        let existingCards: [FolderPairCandidate] = existingRelations.relations
+            .filter { $0.type == "boost" }
+            .map { rel in
+                let sNotes = folderNotes[rel.source] ?? []
+                let tNotes = folderNotes[rel.target] ?? []
+                return FolderPairCandidate(
+                    sourceFolder: rel.source,
+                    targetFolder: rel.target,
+                    sourcePara: sNotes.first?.para ?? .archive,
+                    targetPara: tNotes.first?.para ?? .archive,
+                    sourceNoteCount: sNotes.count,
+                    targetNoteCount: tNotes.count,
+                    existingLinkCount: 0,
+                    sharedTagCount: 0,
+                    topSharedTags: [],
+                    hint: rel.hint,
+                    relationType: rel.relationType,
+                    confidence: 1.0,
+                    isExisting: true
+                )
+            }
+
+        // Generate new AI candidates
         let analyzer = FolderRelationAnalyzer(pkmRoot: root)
-        let result = await analyzer.generateCandidates(
+        let newCards = await analyzer.generateCandidates(
             allNotes: allNotes,
             existingRelations: existingRelations
         )
 
         await MainActor.run {
-            candidates = result
+            // Existing boost first, then new suggestions
+            candidates = existingCards + newCards
             isLoading = false
         }
     }
