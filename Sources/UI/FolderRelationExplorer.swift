@@ -241,7 +241,17 @@ struct FolderRelationExplorer: View {
                         .foregroundStyle(.tertiary)
                 }
             }
-            .padding(.bottom, 8)
+            .padding(.bottom, 4)
+
+            // Keyboard hint
+            HStack(spacing: 4) {
+                Image(systemName: "arrow.left")
+                Image(systemName: "arrow.down")
+                Image(systemName: "arrow.right")
+            }
+            .font(.system(size: 9))
+            .foregroundStyle(.quaternary)
+            .padding(.bottom, 6)
         }
         .onAppear { setupKeyMonitor() }
         .onDisappear { removeKeyMonitor() }
