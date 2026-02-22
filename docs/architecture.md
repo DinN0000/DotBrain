@@ -87,8 +87,8 @@ macOS 메뉴바 앱. Obsidian 볼트의 `_Inbox/` 폴더에 드롭된 파일을 
 | **AI** | AIService(actor), Classifier(actor), RateLimiter(actor), ClaudeAPIClient(actor), GeminiAPIClient(actor) | AI 호출, 2단계 분류, 적응형 rate limiting |
 | **FileSystem** | FileMover, PKMPathManager, InboxScanner, InboxWatchdog, FrontmatterWriter, AssetMigrator | 파일 이동, 경로 관리, 볼트 감시, frontmatter 주입 |
 | **Extraction** | FileContentExtractor, BinaryExtractor, PDF/PPTX/XLSX/DOCX/ImageExtractor | 텍스트/바이너리 콘텐츠 추출 |
-| **SemanticLinker** | SemanticLinker, TagNormalizer, LinkCandidateGenerator, LinkAIFilter, RelatedNotesWriter | 태그 정규화, 후보 생성, AI 필터링, wikilink 작성 |
-| **Knowledge Mgmt** | NoteIndexGenerator, VaultAuditor, VaultSearcher, NoteEnricher, AICompanionService | 노트 인덱스 생성, 볼트 감사, 검색, AI 컴패니언 파일 |
+| **SemanticLinker** | SemanticLinker, TagNormalizer, LinkCandidateGenerator, LinkAIFilter, RelatedNotesWriter | 태그 정규화, 후보 생성, AI 필터링, wikilink 작성 (index-first 최적화) |
+| **Knowledge Mgmt** | NoteIndexGenerator, VaultAuditor, VaultSearcher, NoteEnricher, AICompanionService | 노트 인덱스 생성 (4KB partial reads), 검색 (2단계: index+fallback), 감사, AI 컴패니언 |
 | **Project/Folder** | ProjectManager, PARAMover, FolderHealthAnalyzer | 프로젝트 생명주기, PARA 이동, 폴더 건강 분석 |
 | **Utility** | StatisticsService, KeychainService, TemplateService, NotificationService | 통계, 암호화 키 저장, 템플릿, 알림 |
 | **Data/Cache** | ContentHashCache(actor), APIUsageLogger(actor) | SHA256 파일 변경 감지, 실제 토큰 기반 API 비용 추적 |

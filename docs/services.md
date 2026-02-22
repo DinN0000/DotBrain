@@ -210,6 +210,8 @@ PARA 경로 관리 및 보안 검증.
 
 **인덱스 구조**: `NoteIndex` (version, updated, folders: `[String: FolderIndexEntry]`, notes: `[String: NoteIndexEntry]`). 각 노트는 path, folder, para, tags, summary, project, status를 포함.
 
+**파일 I/O 최적화**: FileHandle 4KB partial read로 프론트매터만 추출 (MultiByteUTF-8 safe). 대용량 바이너리가 아닌 메타데이터 추출에 최적화.
+
 **의존**: PKMPathManager (AI 호출 없음 — 프론트매터 파싱으로 구축)
 
 ### VaultAuditor
@@ -232,6 +234,8 @@ PARA 경로 관리 및 보안 검증.
 | `search(query:)` | 다층 검색 (제목→태그→요약→본문), 최대 200결과 |
 
 **검색 우선순위**: title(1.0) > summary(0.6) > tag(0.5–0.9) > body(0.3)
+
+**검색 전략** (2단계): Phase 1: note-index.json에서 제목/태그/요약 매칭 (zero file I/O). Phase 2: 결과 < 10개일 때만 디렉토리 스캔 fallback으로 본문 검색. FileHandle 64KB partial read로 메모리 효율화.
 
 ### NoteEnricher
 
@@ -281,8 +285,10 @@ PARA 경로 관리 및 보안 검증.
 
 | 메서드 | 설명 |
 |--------|------|
-| `linkAll(onProgress:)` | 전체 볼트 링킹 (6단계) |
+| `linkAll(changedFiles:prebuiltIndex:onProgress:)` | 전체 또는 증분 링킹 (6단계) |
 | `linkNotes(filePaths:onProgress:)` | 특정 파일만 링킹 |
+
+**성능 최적화**: buildNoteIndex()는 index-first 전략 사용 (note-index.json 로드 후 existingRelated만 파일 읽기, fallback은 전체 디렉토리 스캔). FolderRelationStore 호출 최소화: suppress/boost sets를 사전구축하여 LinkCandidateGenerator에 전달.
 
 **의존**: TagNormalizer, ContextMapBuilder, LinkCandidateGenerator, LinkAIFilter, RelatedNotesWriter, PKMPathManager
 
@@ -300,9 +306,13 @@ PARA 경로 관리 및 보안 검증.
 
 | 메서드 | 설명 |
 |--------|------|
-| `generateCandidates(for:allNotes:mocEntries:folderBonus:excludeSameFolder:)` | 노트별 링크 후보 생성 (인위적 제한 없음) |
+| `generateCandidates(for:allNotes:mocEntries:folderBonus:excludeSameFolder:folderRelations:)` | 노트별 링크 후보 생성 (인위적 제한 없음) |
+| `prepareIndex(allNotes:mocEntries:)` | 역인덱스 사전구축 (tagIndex, projectIndex, mocFolders) |
+| `generateCandidates(for:allNotes:preparedIndex:...suppressSet:boostSet:)` | 인덱스 기반 후보 생성 (pre-computed suppress/boost sets) |
 
 **스코어링**: 태그 겹침 >= 2 (+1.5/태그), 공유 인덱스 폴더 (+folderBonus/폴더), 같은 프로젝트 (+2.0). 최소 점수 >= 3.0. 단일 태그 겹침은 무시.
+
+**성능 최적화**: `PreparedIndex` struct로 reverse indices (O(1) tag/project lookup) 사전구축. 오버로드된 generateCandidates()는 suppress/boost sets을 입력받아 FolderRelationStore 디스크 I/O 회피.
 
 ### LinkAIFilter
 
