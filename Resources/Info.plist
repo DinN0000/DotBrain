@@ -7,9 +7,9 @@
 	<key>CFBundleName</key>
 	<string>DotBrain</string>
 	<key>CFBundleShortVersionString</key>
-	<string>2.7.3</string>
+	<string>2.7.4</string>
 	<key>CFBundleVersion</key>
-	<string>2.7.3</string>
+	<string>2.7.4</string>
 	<key>LSUIElement</key>
 	<true/>
 	<key>NSAppTransportSecurity</key>
