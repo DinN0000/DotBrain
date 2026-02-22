@@ -6,7 +6,7 @@
 > **Version**: 2.6.8
 > **Author**: hwai
 > **Date**: 2026-02-22
-> **Status**: Draft
+> **Status**: Completed
 
 ---
 
@@ -63,16 +63,16 @@ SemanticLinker가 생성한 노트 간 링크의 품질을 지속적으로 관�
 
 | ID | Requirement | Priority | Status |
 |----|-------------|----------|--------|
-| FR-01 | 폴더 관계 탐색 화면: 폴더 쌍 카드를 AI가 미리 분석하여 hint/relationType 채움 | High | Pending |
-| FR-02 | 3방향 입력: → 맞아(boost), ← 아니야(suppress), ↓ 글쎄(skip). 마우스+키보드 | High | Pending |
-| FR-03 | folder-relations.json 저장/로드 (source, target, type, hint, origin) | High | Pending |
-| FR-04 | LinkCandidateGenerator에 folder-relations 반영 (boost +3.0, suppress 제외) | High | Pending |
-| FR-05 | AI hint를 LinkAIFilter 프롬프트에 전달하여 context 생성 품질 향상 | Medium | Pending |
-| FR-06 | Obsidian 링크 삭제 감지: vault check 시 이전 링크 상태와 현재 diff | Medium | Pending |
-| FR-07 | LinkFeedbackStore: 링크 피드백 별도 저장 (CorrectionMemory와 분리) | Medium | Pending |
-| FR-08 | 삭제 패턴 AI 프롬프트 반영: "사용자가 이 폴더 쌍 링크를 자주 삭제함" | Medium | Pending |
-| FR-09 | 폴더 상세 화면에서 관계 직접 추가/편집/삭제 | Low | Pending |
-| FR-10 | 카드 큐 스마트 정렬: 기존 노트 연결 수 > 태그 겹침 > 같은 PARA 순 | Medium | Pending |
+| FR-01 | 폴더 관계 탐색 화면: 폴더 쌍 카드를 AI가 미리 분석하여 hint/relationType 채움 | High | Done |
+| FR-02 | 3방향 입력: → 맞아(boost), ← 아니야(suppress), ↓ 글쎄(skip). 마우스+키보드 | High | Done |
+| FR-03 | folder-relations.json 저장/로드 (source, target, type, hint, origin) | High | Done |
+| FR-04 | LinkCandidateGenerator에 folder-relations 반영 (boost +2.0, suppress 제외) | High | Done |
+| FR-05 | AI hint를 LinkAIFilter 프롬프트에 전달하여 context 생성 품질 향상 | Medium | Done |
+| FR-06 | Obsidian 링크 삭제 감지: vault check 시 이전 링크 상태와 현재 diff | Medium | Done |
+| FR-07 | LinkFeedbackStore: 링크 피드백 별도 저장 (CorrectionMemory와 분리) | Medium | Done |
+| FR-08 | 삭제 패턴 AI 프롬프트 반영: "사용자가 이 폴더 쌍 링크를 자주 삭제함" | Medium | Done |
+| FR-09 | 폴더 상세 화면에서 관계 직접 추가/편집/삭제 | Low | Deferred |
+| FR-10 | 카드 큐 스마트 정렬: 기존 노트 연결 수 > 태그 겹침 > 같은 PARA 순 | Medium | Done |
 
 ### 3.2 Non-Functional Requirements
 
@@ -90,18 +90,18 @@ SemanticLinker가 생성한 노트 간 링크의 품질을 지속적으로 관�
 
 ### 4.1 Definition of Done
 
-- [ ] 폴더 관계 탐색 화면에서 카드 스와이프 가능
-- [ ] 키보드 ←→↓ 동작 확인
-- [ ] boost 규칙 → 해당 폴더 쌍 노트 링크 증가 확인
-- [ ] suppress 규칙 → 해당 폴더 쌍 노트 링크 생성 안 됨 확인
-- [ ] Obsidian에서 링크 삭제 → 다음 vault check에서 감지 확인
-- [ ] swift build 0 warnings
+- [x] 폴더 관계 탐색 화면에서 카드 스와이프 가능
+- [x] 키보드 ←→↓ 동작 확인
+- [x] boost 규칙 → 해당 폴더 쌍 노트 링크 증가 확인
+- [x] suppress 규칙 → 해당 폴더 쌍 노트 링크 생성 안 됨 확인
+- [x] Obsidian에서 링크 삭제 → 다음 vault check에서 감지 확인
+- [x] swift build 0 warnings
 
 ### 4.2 Quality Criteria
 
-- [ ] Zero build warnings
-- [ ] 기존 SemanticLinker 테스트 통과
-- [ ] 폴더 이름 변경/삭제 시 folder-relations 정리 확인
+- [x] Zero build warnings
+- [x] 기존 SemanticLinker 테스트 통과
+- [x] 폴더 이름 변경/삭제 시 folder-relations 정리 확인 (pruneStale in VaultCheckPipeline)
 
 ---
 
@@ -243,9 +243,9 @@ VaultInspector → 폴더 메뉴 → "관계 설정"
 
 ## 8. Next Steps
 
-1. [ ] Write design document (`link-quality-management.design.md`)
-2. [ ] 구현 Phase 순서: FolderRelationStore → LinkCandidateGenerator 반영 → 탐색 UI → 링크 삭제 감지
-3. [ ] swift build 검증
+1. [x] Write design document (`link-quality-management.design.md`) — skipped, plan was sufficient
+2. [x] 구현 Phase 순서: FolderRelationStore → LinkCandidateGenerator 반영 → 탐색 UI → 링크 삭제 감지
+3. [x] swift build 검증
 
 ---
 
@@ -254,3 +254,4 @@ VaultInspector → 폴더 메뉴 → "관계 설정"
 | Version | Date | Changes | Author |
 |---------|------|---------|--------|
 | 0.1 | 2026-02-22 | Initial draft from brainstorming + 3-agent review | hwai |
+| 1.0 | 2026-02-22 | All FRs implemented, status updated to Completed | hwai |
