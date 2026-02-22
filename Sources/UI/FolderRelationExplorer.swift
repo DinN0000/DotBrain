@@ -120,8 +120,11 @@ struct FolderRelationExplorer: View {
                     noteCount: candidate.sourceNoteCount
                 )
 
-                // Hint + relation type
+                // Arrow + Hint + relation type
                 VStack(spacing: 4) {
+                    Image(systemName: "arrow.down")
+                        .font(.caption)
+                        .foregroundStyle(.quaternary)
                     if let hint = candidate.hint {
                         Text("\"\(hint)\"")
                             .font(.subheadline)
@@ -136,6 +139,9 @@ struct FolderRelationExplorer: View {
                             .background(Color.accentColor.opacity(0.1))
                             .cornerRadius(4)
                     }
+                    Image(systemName: "arrow.down")
+                        .font(.caption)
+                        .foregroundStyle(.quaternary)
                 }
 
                 // Target folder
@@ -174,20 +180,20 @@ struct FolderRelationExplorer: View {
 
             // Action buttons
             HStack(spacing: 12) {
-                actionButton(label: "아니야", icon: "arrow.left", color: .red) {
+                actionButton(label: "Suppress", icon: "arrow.left", color: .red) {
                     handleAction(.left)
                 }
-                actionButton(label: "글쎄", icon: "arrow.down", color: .secondary) {
+                actionButton(label: "Skip", icon: "arrow.down", color: .secondary) {
                     handleAction(.down)
                 }
-                actionButton(label: "맞아!", icon: "arrow.right", color: .green) {
+                actionButton(label: "Boost", icon: "arrow.right", color: .green) {
                     handleAction(.right)
                 }
             }
             .padding(.horizontal, 16)
             .padding(.bottom, 8)
 
-            Text("키보드: <- -> (화살표)")
+            Text("<- -> (arrow keys)")
                 .font(.caption2)
                 .foregroundStyle(.quaternary)
                 .padding(.bottom, 8)
