@@ -1,0 +1,33 @@
+{
+  "name": "dotbrain",
+  "version": "2.8.0",
+  "description": "DotBrain - AI-powered PKM organizer for macOS",
+  "type": "module",
+  "bin": {
+    "dotbrain": "bin/cli.mjs"
+  },
+  "os": [
+    "darwin"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "files": [
+    "bin/cli.mjs",
+    "README.md"
+  ],
+  "keywords": [
+    "pkm",
+    "obsidian",
+    "macos",
+    "ai",
+    "para",
+    "knowledge-management"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/DinN0000/DotBrain"
+  },
+  "license": "MIT",
+  "author": "DinN0000"
+}

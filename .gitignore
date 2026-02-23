@@ -13,3 +13,5 @@ docs/.pdca-snapshots/
 run.sh
 .claude/
 Package.resolved
+*.dmg
+npm/node_modules/

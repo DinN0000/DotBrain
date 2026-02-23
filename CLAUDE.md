@@ -51,9 +51,13 @@
 
 ## Release Workflow
 - GitHub: `DinN0000/DotBrain`
-- Release assets: `DotBrain` (universal binary) + `AppIcon.icns` + `Info.plist` — naming must be exact
+- Release assets: `DotBrain-{VERSION}.dmg` (primary) + `DotBrain` (binary, backward compat) + `AppIcon.icns` + `Info.plist`
 - Use `/release` command for guided release process
-- **Every release:** bump `Resources/Info.plist` (CFBundleVersion + CFBundleShortVersionString) to match release tag
+- **DMG build:** `scripts/build-dmg.sh` — reads version from Info.plist, assembles .app, creates DMG
+- **npm install:** `npx dotbrain` — downloads DMG from GitHub Releases, installs to ~/Applications
+- **npm uninstall:** `npx dotbrain --uninstall`
+- **Version sync:** Info.plist, npm/package.json, git tag must all match
+- **Every release:** bump `Resources/Info.plist` + `npm/package.json` version to match release tag
 - **Deploy:** copy both binary and Info.plist → `cp Resources/Info.plist ~/Applications/DotBrain.app/Contents/Info.plist`
 - `AICompanionService.swift` version must be bumped when behavior changes (triggers vault auto-update)
 
