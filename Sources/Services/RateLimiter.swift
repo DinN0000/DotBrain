@@ -20,18 +20,21 @@ actor RateLimiter {
     private let defaults: [AIProvider: Duration] = [
         .gemini: .milliseconds(4200),   // ~14 RPM (free tier: 15 RPM)
         .claude: .milliseconds(500),    // ~120 RPM
+        .claudeCLI: .milliseconds(100), // Minimal — CLI manages its own pacing
     ]
 
     /// Minimum allowed interval (50% of default) — acceleration floor
     private let minFloor: [AIProvider: Duration] = [
         .gemini: .milliseconds(2100),
         .claude: .milliseconds(250),
+        .claudeCLI: .milliseconds(50),
     ]
 
     /// Number of concurrent slots per provider
     private let defaultSlots: [AIProvider: Int] = [
         .claude: 3,   // 120 RPM allows comfortable concurrent requests
         .gemini: 1,   // Free tier 15 RPM — keep sequential to avoid 429
+        .claudeCLI: 2, // CLI has process overhead, limit concurrency
     ]
 
     private var state: [AIProvider: ProviderState] = [:]
