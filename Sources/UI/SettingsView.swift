@@ -2,7 +2,7 @@ import SwiftUI
 
 struct SettingsView: View {
     @EnvironmentObject var appState: AppState
-    @State private var showFolderPicker = false
+    // Folder picker: uses NSOpenPanel directly (pickVaultFolder) to avoid TCC dialogs
     @State private var isStructureReady = false
     @State private var showHelp = false
 
@@ -83,19 +83,7 @@ struct SettingsView: View {
         .onChange(of: appState.pkmRootPath) { _ in
             isStructureReady = PKMPathManager(root: appState.pkmRootPath).isInitialized()
         }
-        .fileImporter(isPresented: $showFolderPicker, allowedContentTypes: [.folder]) { result in
-            if case .success(let url) = result {
-                let newPath = url.resolvingSymlinksInPath().path
-                appState.pkmRootPath = newPath
-
-                // If folder lacks PARA structure, trigger re-onboarding (skip welcome)
-                let pm = PKMPathManager(root: newPath)
-                if !pm.isInitialized() {
-                    UserDefaults.standard.set(1, forKey: "onboardingStep")
-                    appState.currentScreen = .onboarding
-                }
-            }
-        }
+        // Folder picker uses NSOpenPanel directly (pickVaultFolder) to avoid TCC dialogs
     }
 
     @State private var isEditingKey = false
@@ -314,6 +302,29 @@ struct SettingsView: View {
 
     // MARK: - PKM Folder Section
 
+    private func pickVaultFolder() {
+        let panel = NSOpenPanel()
+        panel.title = "PKM 볼트 폴더 선택"
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.allowsMultipleSelection = false
+        panel.canCreateDirectories = true
+        panel.directoryURL = URL(fileURLWithPath: appState.pkmRootPath)
+
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        let resolved = url.resolvingSymlinksInPath()
+        let newPath = resolved.path
+
+        appState.pkmRootPath = newPath
+        appState.saveVaultBookmark(url: resolved)
+
+        let pm = PKMPathManager(root: newPath)
+        if !pm.isInitialized() {
+            UserDefaults.standard.set(2, forKey: "onboardingStep")
+            appState.currentScreen = .onboarding
+        }
+    }
+
     private var pkmFolderSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 6) {
@@ -349,7 +360,7 @@ struct SettingsView: View {
 
                 Spacer()
 
-                Button("변경") { showFolderPicker = true }
+                Button("변경") { pickVaultFolder() }
                     .buttonStyle(.bordered)
                     .controlSize(.mini)
             }

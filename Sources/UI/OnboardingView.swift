@@ -3,7 +3,7 @@ import SwiftUI
 struct OnboardingView: View {
     @EnvironmentObject var appState: AppState
     @State private var step: Int
-    @State private var showFolderPicker = false
+    // Folder picker: uses NSOpenPanel directly (pickVaultFolder) to avoid TCC dialogs
     @State private var newProjectName: String = ""
     @State private var projects: [String] = []
     @State private var isStructureReady = false
@@ -17,8 +17,10 @@ struct OnboardingView: View {
     @State private var newAreaName: String = ""
     @State private var selectedArea: String = ""
     @State private var projectAreas: [String: String] = [:]
+    @State private var fdaGranted = false
 
-    private let totalSteps = 6
+    private let totalSteps = 7
+
 
     init() {
         let saved = UserDefaults.standard.integer(forKey: "onboardingStep")
@@ -34,11 +36,12 @@ struct OnboardingView: View {
             Group {
                 switch step {
                 case 0: welcomeStep
-                case 1: folderStep
-                case 2: areaStep
-                case 3: projectStep
-                case 4: providerAndKeyStep
-                case 5: trialStep
+                case 1: permissionStep
+                case 2: folderStep
+                case 3: areaStep
+                case 4: projectStep
+                case 5: providerAndKeyStep
+                case 6: trialStep
                 default: trialStep
                 }
             }
@@ -53,11 +56,6 @@ struct OnboardingView: View {
         .onChange(of: appState.pkmRootPath) { _ in
             isStructureReady = PKMPathManager(root: appState.pkmRootPath).isInitialized()
             projects = []
-        }
-        .fileImporter(isPresented: $showFolderPicker, allowedContentTypes: [.folder]) { result in
-            if case .success(let url) = result {
-                appState.pkmRootPath = url.path
-            }
         }
         .alert("폴더 생성 실패", isPresented: $showFolderError) {
             Button("확인") {}
@@ -231,7 +229,123 @@ struct OnboardingView: View {
         .padding(.leading, indent ? 20 : 0)
     }
 
-    // MARK: - Step 1: Folder Setup
+    // MARK: - Step 1: Permission (Full Disk Access)
+
+    private var permissionStep: some View {
+        VStack(spacing: 0) {
+            stepHeader(
+                title: "파일 접근 권한",
+                desc: "DotBrain이 모든 폴더의 파일을 읽고 정리하려면\n\"전체 디스크 접근\" 권한이 필요합니다."
+            )
+
+            VStack(spacing: 16) {
+                // Status indicator
+                HStack(spacing: 10) {
+                    Image(systemName: fdaGranted ? "checkmark.circle.fill" : "lock.shield")
+                        .font(.title2)
+                        .foregroundColor(fdaGranted ? .green : .orange)
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(fdaGranted ? "권한이 허용되었습니다" : "권한이 필요합니다")
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+                        Text(fdaGranted
+                            ? "파일 접근 준비 완료"
+                            : "허용하지 않으면 파일마다 개별 권한을 요청합니다")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(12)
+                .background(
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(fdaGranted ? Color.green.opacity(0.05) : Color.orange.opacity(0.05))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .strokeBorder(fdaGranted ? Color.green.opacity(0.2) : Color.orange.opacity(0.2), lineWidth: 1)
+                )
+
+                if !fdaGranted {
+                    // Instructions
+                    VStack(alignment: .leading, spacing: 8) {
+                        instructionRow(num: "1", text: "아래 버튼을 눌러 시스템 설정을 엽니다")
+                        instructionRow(num: "2", text: "목록에서 DotBrain을 찾아 토글을 켭니다")
+                        instructionRow(num: "3", text: "이 화면이 자동으로 업데이트됩니다")
+                    }
+                    .padding(12)
+                    .background(Color.secondary.opacity(0.05))
+                    .cornerRadius(8)
+
+                    Button(action: { Self.openFullDiskAccessSettings() }) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "gearshape")
+                                .font(.system(size: 12))
+                            Text("시스템 설정 열기")
+                                .fontWeight(.medium)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 6)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.regular)
+                }
+            }
+            .padding(.horizontal, 24)
+
+            Spacer()
+
+            HStack {
+                Button("이전") { goBack() }
+                    .buttonStyle(.bordered)
+                    .controlSize(.regular)
+
+                Spacer()
+
+                if fdaGranted {
+                    Button(action: { goNext() }) {
+                        Text("다음")
+                            .frame(minWidth: 80)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.regular)
+                } else {
+                    Button(action: { goNext() }) {
+                        Text("건너뛰기")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, 32)
+            .padding(.bottom, 20)
+        }
+        .padding(.horizontal)
+        .task(id: step) {
+            guard step == 1 else { return }
+            fdaGranted = Self.hasFullDiskAccess()
+            while !fdaGranted && step == 1 {
+                try? await Task.sleep(for: .seconds(1))
+                fdaGranted = Self.hasFullDiskAccess()
+            }
+        }
+    }
+
+    static func hasFullDiskAccess() -> Bool {
+        // ~/Library/Safari is TCC-protected; readable only with Full Disk Access
+        let testPath = NSHomeDirectory() + "/Library/Safari"
+        return (try? FileManager.default.contentsOfDirectory(atPath: testPath)) != nil
+    }
+
+    private static func openFullDiskAccessSettings() {
+        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles") {
+            NSWorkspace.shared.open(url)
+        }
+    }
+
+    // MARK: - Step 2: Folder Setup
 
     private var folderStep: some View {
         VStack(spacing: 0) {
@@ -261,7 +375,7 @@ struct OnboardingView: View {
                             Spacer()
 
                             Button("변경") {
-                                showFolderPicker = true
+                                pickVaultFolder()
                             }
                             .buttonStyle(.bordered)
                             .controlSize(.mini)
@@ -386,7 +500,7 @@ struct OnboardingView: View {
         return path + "/"
     }
 
-    // MARK: - Step 2: Area (Domain) Registration
+    // MARK: - Step 3: Area (Domain) Registration
 
     private var areaStep: some View {
         VStack(spacing: 0) {
@@ -400,11 +514,17 @@ struct OnboardingView: View {
                     Image(systemName: "lightbulb.fill")
                         .font(.caption)
                         .foregroundColor(.blue)
-                    Text("예: 제품명, 사업 도메인, 팀 이름 등")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("여러 도메인을 등록하면 DotBrain이 파일을 더 정확하게 분류합니다")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        Text("예: Nodit, WLV, Clair, FLAP, SCOPE, AX")
+                            .font(.caption2)
+                            .foregroundColor(.secondary.opacity(0.7))
+                    }
                 }
                 .padding(10)
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .background(Color.blue.opacity(0.05))
                 .overlay(
                     RoundedRectangle(cornerRadius: 6)
@@ -455,13 +575,13 @@ struct OnboardingView: View {
                     }
                     .frame(maxHeight: 200)
                 } else {
-                    Text("건너뛰어도 됩니다. 나중에 추가할 수 있어요.")
+                    Text("최소 1개의 도메인을 등록해주세요")
                         .font(.caption)
-                        .foregroundColor(.secondary)
+                        .foregroundColor(.orange)
                         .padding(.vertical, 4)
                 }
             }
-            .padding(.horizontal, 24)
+            .padding(.horizontal, 16)
 
             Spacer()
 
@@ -481,6 +601,7 @@ struct OnboardingView: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .controlSize(.regular)
+                .disabled(areas.isEmpty)
             }
             .padding(.horizontal, 32)
             .padding(.bottom, 20)
@@ -488,7 +609,7 @@ struct OnboardingView: View {
         .padding(.horizontal)
     }
 
-    // MARK: - Step 3: Project Registration
+    // MARK: - Step 4: Project Registration
 
     private var projectStep: some View {
         VStack(spacing: 0) {
@@ -502,11 +623,17 @@ struct OnboardingView: View {
                     Image(systemName: "lightbulb.fill")
                         .font(.caption)
                         .foregroundColor(.blue)
-                    Text("AI는 여기 등록된 프로젝트 안에서만 파일을 분류합니다. 새 프로젝트가 필요하면 언제든 추가할 수 있습니다.")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("진행 중인 프로젝트를 모두 등록하세요.\nDotBrain이 파일을 더 정확하게 분류합니다.")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        Text("예: PoC-oo은행, SI-물류, 런칭-DotBrain")
+                            .font(.caption2)
+                            .foregroundColor(.secondary.opacity(0.7))
+                    }
                 }
                 .padding(10)
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .background(Color.blue.opacity(0.05))
                 .overlay(
                     RoundedRectangle(cornerRadius: 6)
@@ -518,7 +645,7 @@ struct OnboardingView: View {
                     TextField("프로젝트 이름", text: $newProjectName)
                         .textFieldStyle(.roundedBorder)
                         .font(.subheadline)
-                        .onSubmit { addProject() }
+                        .onSubmit { if !selectedArea.isEmpty { addProject() } }
 
                     if !areas.isEmpty {
                         Picker("", selection: $selectedArea) {
@@ -538,7 +665,7 @@ struct OnboardingView: View {
                     }
                     .buttonStyle(.bordered)
                     .controlSize(.regular)
-                    .disabled(newProjectName.trimmingCharacters(in: .whitespaces).isEmpty)
+                    .disabled(newProjectName.trimmingCharacters(in: .whitespaces).isEmpty || selectedArea.isEmpty)
                     .accessibilityLabel("프로젝트 추가")
                 }
 
@@ -588,7 +715,7 @@ struct OnboardingView: View {
                         .padding(.vertical, 4)
                 }
             }
-            .padding(.horizontal, 24)
+            .padding(.horizontal, 16)
 
             Spacer()
 
@@ -603,7 +730,7 @@ struct OnboardingView: View {
                     if appState.hasAPIKey {
                         // Skip API key step, go to final
                         direction = 1
-                        step = 5
+                        step = 6
                         UserDefaults.standard.set(step, forKey: "onboardingStep")
                     } else {
                         goNext()
@@ -622,7 +749,7 @@ struct OnboardingView: View {
         .padding(.horizontal)
     }
 
-    // MARK: - Step 3: Provider + API Key (Combined)
+    // MARK: - Step 5: Provider + API Key (Combined)
 
     private var providerAndKeyStep: some View {
         let provider = appState.selectedProvider
@@ -639,7 +766,7 @@ struct OnboardingView: View {
                     VStack(spacing: 8) {
                         providerCard(
                             provider: .claudeCLI,
-                            badge: "구독 포함",
+                            badge: "구독 사용 (추천)",
                             badgeColor: .blue
                         )
 
@@ -898,6 +1025,23 @@ struct OnboardingView: View {
 
     // MARK: - Actions
 
+    /// Open NSOpenPanel to select vault folder.
+    /// NSOpenPanel grants implicit file access via user selection, avoiding TCC permission dialogs.
+    private func pickVaultFolder() {
+        let panel = NSOpenPanel()
+        panel.title = "DotBrain 볼트 폴더 선택"
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.allowsMultipleSelection = false
+        panel.canCreateDirectories = true
+        panel.directoryURL = URL(fileURLWithPath: (appState.pkmRootPath as NSString).deletingLastPathComponent)
+
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        let resolved = url.resolvingSymlinksInPath()
+        appState.pkmRootPath = resolved.path
+        appState.saveVaultBookmark(url: resolved)
+    }
+
     private func validateAndCreateFolder() -> Bool {
         let path = appState.pkmRootPath
         let fm = FileManager.default
@@ -914,6 +1058,7 @@ struct OnboardingView: View {
         do {
             try pathManager.initializeStructure()
             isStructureReady = pathManager.isInitialized()
+            appState.saveVaultBookmark(url: URL(fileURLWithPath: path))
             return true
         } catch {
             folderError = "폴더 생성에 실패했습니다: \(error.localizedDescription)\n다른 경로를 선택해주세요."
@@ -945,7 +1090,7 @@ struct OnboardingView: View {
     private func addProject() {
         let raw = newProjectName.trimmingCharacters(in: .whitespaces)
         let name = sanitizeProjectName(raw)
-        guard !name.isEmpty, !projects.contains(name) else { return }
+        guard !name.isEmpty, !projects.contains(name), !selectedArea.isEmpty else { return }
 
         let pathManager = PKMPathManager(root: appState.pkmRootPath)
         let projectDir = (pathManager.projectsPath as NSString).appendingPathComponent(name)
@@ -1056,6 +1201,7 @@ struct OnboardingView: View {
         areas.removeAll { $0 == name }
     }
 
+
     private func saveAPIKey(provider: AIProvider) {
         if keyInput.hasPrefix(provider.keyPrefix) {
             let saved = provider.saveAPIKey(keyInput)
@@ -1066,7 +1212,7 @@ struct OnboardingView: View {
         }
     }
 
-    // MARK: - Step 4: Quick Start Guide
+    // MARK: - Step 6: Quick Start Guide
 
     private var isReOnboarding: Bool {
         UserDefaults.standard.bool(forKey: "onboardingCompleted")

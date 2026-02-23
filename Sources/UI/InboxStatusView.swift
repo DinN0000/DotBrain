@@ -303,14 +303,16 @@ struct InboxStatusView: View {
         panel.canCreateDirectories = true
 
         guard panel.runModal() == .OK, let url = panel.url else { return }
-        let newPath = url.resolvingSymlinksInPath().path
+        let resolved = url.resolvingSymlinksInPath()
+        let newPath = resolved.path
 
         appState.pkmRootPath = newPath
+        appState.saveVaultBookmark(url: resolved)
 
         // If folder lacks PARA structure, trigger re-onboarding (skip welcome)
         let pm = PKMPathManager(root: newPath)
         if !pm.isInitialized() {
-            UserDefaults.standard.set(1, forKey: "onboardingStep")
+            UserDefaults.standard.set(2, forKey: "onboardingStep")
             appState.currentScreen = .onboarding
             return
         }
