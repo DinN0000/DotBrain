@@ -25,11 +25,19 @@ struct SettingsView: View {
     private var activeProvider: AIProvider { appState.selectedProvider }
 
     private var activeHasKey: Bool {
-        activeProvider == .claude ? appState.hasClaudeKey : appState.hasGeminiKey
+        switch activeProvider {
+        case .claude: return appState.hasClaudeKey
+        case .gemini: return appState.hasGeminiKey
+        case .claudeCLI: return appState.hasClaudeCLI
+        }
     }
 
     private var viewingHasKey: Bool {
-        viewingProvider == .claude ? appState.hasClaudeKey : appState.hasGeminiKey
+        switch viewingProvider {
+        case .claude: return appState.hasClaudeKey
+        case .gemini: return appState.hasGeminiKey
+        case .claudeCLI: return appState.hasClaudeCLI
+        }
     }
 
     var body: some View {
@@ -133,8 +141,10 @@ struct SettingsView: View {
                     .foregroundColor(.secondary)
             }
 
-            // Key section: collapsed when key exists, expanded when editing or no key
-            if viewingHasKey && !isEditingKey {
+            // Key section: CLI shows status, API providers show key input
+            if viewingProvider == .claudeCLI {
+                cliStatusSection
+            } else if viewingHasKey && !isEditingKey {
                 HStack {
                     Button("API 키 변경") {
                         isEditingKey = true
@@ -213,6 +223,15 @@ struct SettingsView: View {
                         .background(Color.secondary.opacity(0.12))
                         .cornerRadius(2)
                 }
+                if provider == .claudeCLI {
+                    Text("구독")
+                        .font(.system(size: 8, weight: .semibold))
+                        .foregroundColor(.secondary)
+                        .padding(.horizontal, 4)
+                        .padding(.vertical, 1)
+                        .background(Color.secondary.opacity(0.12))
+                        .cornerRadius(2)
+                }
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 6)
@@ -223,6 +242,26 @@ struct SettingsView: View {
             .foregroundColor(isViewing ? accent : .secondary)
         }
         .buttonStyle(.plain)
+    }
+
+    private var cliStatusSection: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            if appState.hasClaudeCLI {
+                Label("Claude CLI 설치됨", systemImage: "checkmark.circle.fill")
+                    .font(.caption)
+                    .foregroundColor(.green)
+                Text("claude -p 파이프 모드로 AI 호출")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+            } else {
+                Label("Claude CLI를 찾을 수 없습니다", systemImage: "xmark.circle.fill")
+                    .font(.caption)
+                    .foregroundColor(.red)
+                Text("설치: https://claude.com/download")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+            }
+        }
     }
 
     @ViewBuilder
@@ -652,11 +691,16 @@ struct SettingsView: View {
     // MARK: - Key Actions
 
     private func loadKeyForProvider(_ provider: AIProvider) {
+        if provider == .claudeCLI {
+            keyInput = ""
+            return
+        }
         let hasKey = provider == .claude ? appState.hasClaudeKey : appState.hasGeminiKey
         keyInput = hasKey ? "••••••••" : ""
     }
 
     private func toggleKeyVisibility() {
+        guard viewingProvider.needsAPIKey else { return }
         showingKey.toggle()
         if showingKey, keyInput == "••••••••", viewingHasKey {
             if let key = viewingProvider == .claude ? KeychainService.getAPIKey() : KeychainService.getGeminiAPIKey() {

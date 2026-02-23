@@ -630,13 +630,19 @@ struct OnboardingView: View {
         return VStack(spacing: 0) {
             stepHeader(
                 title: "AI 연결",
-                desc: "AI가 파일을 읽고 분류합니다. API 키가 필요합니다."
+                desc: "AI가 파일을 읽고 분류합니다.\n제공자를 선택하세요."
             )
 
             ScrollView {
                 VStack(spacing: 14) {
                     // Provider selection
                     VStack(spacing: 8) {
+                        providerCard(
+                            provider: .claudeCLI,
+                            badge: "구독 포함",
+                            badgeColor: .blue
+                        )
+
                         providerCard(
                             provider: .gemini,
                             badge: "무료로 시작 가능",
@@ -652,99 +658,111 @@ struct OnboardingView: View {
 
                     Divider()
 
-                    // API key input inline
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack(spacing: 6) {
-                            Text("\(provider.displayName) API 키")
-                                .font(.caption)
-                                .fontWeight(.semibold)
-
-                            Button(action: {
-                                let url: URL
-                                if provider == .gemini {
-                                    url = URL(string: "https://aistudio.google.com/apikey")!
-                                } else {
-                                    url = URL(string: "https://console.anthropic.com/settings/keys")!
-                                }
-                                NSWorkspace.shared.open(url)
-                            }) {
-                                HStack(spacing: 2) {
-                                    Image(systemName: "arrow.up.right.square")
-                                        .font(.caption2)
-                                    Text("키 발급")
-                                        .font(.caption2)
-                                }
-                            }
-                            .buttonStyle(.bordered)
-                            .controlSize(.mini)
-                        }
-
-                        HStack {
-                            if showingKey {
-                                TextField(provider.keyPlaceholder, text: $keyInput)
-                                    .textFieldStyle(.roundedBorder)
-                                    .font(.system(.caption, design: .monospaced))
-                            } else {
-                                SecureField(provider.keyPlaceholder, text: $keyInput)
-                                    .textFieldStyle(.roundedBorder)
-                                    .font(.caption)
-                            }
-
-                            Button(action: {
-                                showingKey.toggle()
-                                if showingKey, keyInput == "••••••••", provider.hasAPIKey() {
-                                    if let key = provider == .claude ? KeychainService.getAPIKey() : KeychainService.getGeminiAPIKey() {
-                                        keyInput = key
-                                    }
-                                } else if !showingKey, provider.hasAPIKey(), keyInput.hasPrefix(provider.keyPrefix) {
-                                    keyInput = "••••••••"
-                                }
-                            }) {
-                                Image(systemName: showingKey ? "eye.slash" : "eye")
-                            }
-                            .buttonStyle(.plain)
-                            .font(.caption)
-                        }
-
-                        HStack(spacing: 8) {
-                            Button("저장") {
-                                saveAPIKey(provider: provider)
-                            }
-                            .buttonStyle(.bordered)
-                            .controlSize(.small)
-                            .disabled(keyInput.isEmpty || keyInput == "••••••••")
-
-                            if let msg = keySaveMessage {
-                                Text(msg)
-                                    .font(.caption2)
-                                    .foregroundColor(msg == "저장 완료" ? .green : .orange)
-                            }
-
-                            Spacer()
-
-                            if appState.hasAPIKey {
-                                Label("준비됨", systemImage: "checkmark.circle.fill")
+                    if provider == .claudeCLI {
+                        // CLI status section (no API key needed)
+                        VStack(alignment: .leading, spacing: 8) {
+                            if ClaudeCLIClient.isAvailable() {
+                                Label("Claude CLI 설치됨", systemImage: "checkmark.circle.fill")
                                     .font(.caption)
                                     .foregroundColor(.green)
+                                Text("claude -p 파이프 모드로 AI 호출")
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                            } else {
+                                Label("Claude CLI를 찾을 수 없습니다", systemImage: "xmark.circle.fill")
+                                    .font(.caption)
+                                    .foregroundColor(.red)
+                                Text("설치: https://claude.com/download")
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
                             }
                         }
-                    }
-                    .padding(12)
-                    .background(Color.secondary.opacity(0.05))
-                    .cornerRadius(8)
+                        .padding(12)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(Color.secondary.opacity(0.05))
+                        .cornerRadius(8)
+                    } else {
+                        // API key input inline
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack(spacing: 6) {
+                                Text("\(provider.displayName) API 키")
+                                    .font(.caption)
+                                    .fontWeight(.semibold)
 
-                    // Claude Code 안내
-                    HStack(alignment: .top, spacing: 8) {
-                        Image(systemName: "terminal")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                        Text("API 키 없이도, 만들어진 폴더에 Claude Code를 연결해서 사용할 수 있습니다.")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
+                                Button(action: {
+                                    let url: URL
+                                    if provider == .gemini {
+                                        url = URL(string: "https://aistudio.google.com/apikey")!
+                                    } else {
+                                        url = URL(string: "https://console.anthropic.com/settings/keys")!
+                                    }
+                                    NSWorkspace.shared.open(url)
+                                }) {
+                                    HStack(spacing: 2) {
+                                        Image(systemName: "arrow.up.right.square")
+                                            .font(.caption2)
+                                        Text("키 발급")
+                                            .font(.caption2)
+                                    }
+                                }
+                                .buttonStyle(.bordered)
+                                .controlSize(.mini)
+                            }
+
+                            HStack {
+                                if showingKey {
+                                    TextField(provider.keyPlaceholder, text: $keyInput)
+                                        .textFieldStyle(.roundedBorder)
+                                        .font(.system(.caption, design: .monospaced))
+                                } else {
+                                    SecureField(provider.keyPlaceholder, text: $keyInput)
+                                        .textFieldStyle(.roundedBorder)
+                                        .font(.caption)
+                                }
+
+                                Button(action: {
+                                    showingKey.toggle()
+                                    if showingKey, keyInput == "••••••••", provider.hasAPIKey() {
+                                        if let key = provider == .claude ? KeychainService.getAPIKey() : KeychainService.getGeminiAPIKey() {
+                                            keyInput = key
+                                        }
+                                    } else if !showingKey, provider.hasAPIKey(), keyInput.hasPrefix(provider.keyPrefix) {
+                                        keyInput = "••••••••"
+                                    }
+                                }) {
+                                    Image(systemName: showingKey ? "eye.slash" : "eye")
+                                }
+                                .buttonStyle(.plain)
+                                .font(.caption)
+                            }
+
+                            HStack(spacing: 8) {
+                                Button("저장") {
+                                    saveAPIKey(provider: provider)
+                                }
+                                .buttonStyle(.bordered)
+                                .controlSize(.small)
+                                .disabled(keyInput.isEmpty || keyInput == "••••••••")
+
+                                if let msg = keySaveMessage {
+                                    Text(msg)
+                                        .font(.caption2)
+                                        .foregroundColor(msg == "저장 완료" ? .green : .orange)
+                                }
+
+                                Spacer()
+
+                                if appState.hasAPIKey {
+                                    Label("준비됨", systemImage: "checkmark.circle.fill")
+                                        .font(.caption)
+                                        .foregroundColor(.green)
+                                }
+                            }
+                        }
+                        .padding(12)
+                        .background(Color.secondary.opacity(0.05))
+                        .cornerRadius(8)
                     }
-                    .padding(10)
-                    .background(Color.secondary.opacity(0.05))
-                    .cornerRadius(6)
                 }
                 .padding(.horizontal, 24)
             }
@@ -1077,7 +1095,7 @@ struct OnboardingView: View {
                     guideRow(icon: "2.circle.fill", text: "파일을 드래그하거나 Cmd+V로 붙여넣기")
                     guideRow(icon: "3.circle.fill", text: "\"정리하기\" 버튼을 누르면 AI가 분류")
                 } else {
-                    guideRow(icon: "terminal", text: "Claude Code로 폴더에 연결해서 사용")
+                    guideRow(icon: "terminal", text: "Claude CLI로 폴더에 연결해서 사용")
                     guideRow(icon: "gearshape", text: "설정에서 언제든 API 키를 추가 가능")
                 }
             }

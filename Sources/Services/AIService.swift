@@ -1,12 +1,13 @@
 import Foundation
 
-/// Provider-agnostic AI service that routes to Claude or Gemini
+/// Provider-agnostic AI service that routes to Claude, Gemini, or Claude CLI
 /// with adaptive rate limiting, retry logic, and provider fallback
 actor AIService {
     static let shared = AIService()
 
     private let claudeClient = ClaudeAPIClient()
     private let geminiClient = GeminiAPIClient()
+    private let claudeCLIClient = ClaudeCLIClient()
     private let rateLimiter = RateLimiter.shared
     private let maxRetries = 3
 
@@ -24,8 +25,16 @@ actor AIService {
     /// Alternate provider for fallback
     private var fallbackProvider: AIProvider? {
         let primary = currentProvider
-        let alternate: AIProvider = primary == .claude ? .gemini : .claude
-        return alternate.hasAPIKey() ? alternate : nil
+        let candidates: [AIProvider]
+        switch primary {
+        case .claude:
+            candidates = [.gemini, .claudeCLI]
+        case .gemini:
+            candidates = [.claude, .claudeCLI]
+        case .claudeCLI:
+            candidates = [.claude, .gemini]
+        }
+        return candidates.first { $0.hasAPIKey() }
     }
 
     // MARK: - Model Names
@@ -37,6 +46,7 @@ actor AIService {
         switch provider {
         case .claude: return ClaudeAPIClient.haikuModel
         case .gemini: return GeminiAPIClient.flashModel
+        case .claudeCLI: return ClaudeCLIClient.fastModel
         }
     }
 
@@ -44,6 +54,7 @@ actor AIService {
         switch provider {
         case .claude: return ClaudeAPIClient.sonnetModel
         case .gemini: return GeminiAPIClient.proModel
+        case .claudeCLI: return ClaudeCLIClient.preciseModel
         }
     }
 
@@ -70,7 +81,8 @@ actor AIService {
         userMessage: String
     ) async throws -> (String, TokenUsage?) {
         var lastError: Error?
-        let deadline = ContinuousClock.now + .seconds(120)
+        // CLI gets longer deadline due to process startup overhead
+        let deadline = ContinuousClock.now + .seconds(provider == .claudeCLI ? 180 : 120)
 
         for _ in 0..<maxRetries {
             if ContinuousClock.now >= deadline {
@@ -78,6 +90,7 @@ actor AIService {
             }
 
             // Rate limiter controls pacing — waits if needed
+            // CLI has minimal rate limiting (handles its own pacing)
             await rateLimiter.acquire(for: provider)
 
             let start = ContinuousClock.now
@@ -152,6 +165,12 @@ actor AIService {
                 maxTokens: maxTokens,
                 userMessage: userMessage
             )
+        case .claudeCLI:
+            return try await claudeCLIClient.sendMessage(
+                model: model,
+                maxTokens: maxTokens,
+                userMessage: userMessage
+            )
         }
     }
 
@@ -221,6 +240,14 @@ actor AIService {
                 return false
             }
         }
+        if let cliError = error as? ClaudeCLIError {
+            switch cliError {
+            case .claudeNotFound:
+                return false
+            case .processError, .emptyResponse:
+                return true
+            }
+        }
         // Network errors are retryable
         let nsError = error as NSError
         if nsError.domain == NSURLErrorDomain {
@@ -258,7 +285,7 @@ enum AIServiceError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .timeout:
-            return "AI 요청 시간이 초과되었습니다 (120초). 잠시 후 다시 시도해주세요."
+            return "AI 요청 시간이 초과되었습니다. 잠시 후 다시 시도해주세요."
         }
     }
 }

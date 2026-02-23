@@ -116,12 +116,14 @@ final class AppState: ObservableObject {
     @Published var hasAPIKey: Bool = false
     @Published var hasClaudeKey: Bool = false
     @Published var hasGeminiKey: Bool = false
+    @Published var hasClaudeCLI: Bool = false
 
     private var inboxWatchdog: InboxWatchdog?
 
     func updateAPIKeyStatus() {
         hasClaudeKey = KeychainService.getAPIKey() != nil
         hasGeminiKey = KeychainService.getGeminiAPIKey() != nil
+        hasClaudeCLI = ClaudeCLIClient.isAvailable()
         hasAPIKey = selectedProvider.hasAPIKey()
     }
 
@@ -167,16 +169,23 @@ final class AppState: ObservableObject {
         self.pkmRootPath = UserDefaults.standard.string(forKey: "pkmRootPath")
             ?? (NSHomeDirectory() + "/Documents/DotBrain")
 
-        // Load saved provider or default to Gemini (free tier available)
-        if let savedProvider = UserDefaults.standard.string(forKey: "selectedProvider"),
-           let provider = AIProvider(rawValue: savedProvider) {
-            self.selectedProvider = provider
+        // Load saved provider (migrate "Claude Code" → "Claude CLI")
+        if let savedProvider = UserDefaults.standard.string(forKey: "selectedProvider") {
+            if let provider = AIProvider(rawValue: savedProvider) {
+                self.selectedProvider = provider
+            } else if savedProvider == "Claude Code" {
+                self.selectedProvider = .claudeCLI
+                UserDefaults.standard.set(AIProvider.claudeCLI.rawValue, forKey: "selectedProvider")
+            } else {
+                self.selectedProvider = .gemini
+            }
         } else {
             self.selectedProvider = .gemini
         }
 
         self.hasClaudeKey = KeychainService.getAPIKey() != nil
         self.hasGeminiKey = KeychainService.getGeminiAPIKey() != nil
+        self.hasClaudeCLI = ClaudeCLIClient.isAvailable()
         self.hasAPIKey = selectedProvider.hasAPIKey()
 
         if !UserDefaults.standard.bool(forKey: "onboardingCompleted") {

@@ -16,6 +16,8 @@ struct APIKeyInputView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
+            cliProviderSection
+
             providerSection(
                 provider: .claude,
                 keyInput: $claudeKeyInput,
@@ -40,12 +42,88 @@ struct APIKeyInputView: View {
         }
     }
 
+    // MARK: - Claude CLI Section
+
+    private var cliProviderSection: some View {
+        let isActive = appState.selectedProvider == .claudeCLI
+        let accent = providerAccentColor(.claudeCLI)
+
+        return VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 6) {
+                Circle()
+                    .fill(isActive ? accent : Color.secondary.opacity(0.3))
+                    .frame(width: 8, height: 8)
+
+                Text(AIProvider.claudeCLI.displayName)
+                    .font(.subheadline)
+                    .fontWeight(isActive ? .bold : .medium)
+                    .foregroundColor(isActive ? .primary : .secondary)
+
+                Text("구독")
+                    .font(.system(size: 9, weight: .semibold))
+                    .foregroundColor(.secondary)
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 1)
+                    .background(Color.secondary.opacity(0.12))
+                    .cornerRadius(3)
+
+                Spacer()
+
+                if isActive {
+                    Text("사용 중")
+                        .font(.caption2)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 2)
+                        .background(Capsule().fill(accent))
+                } else if appState.hasClaudeCLI {
+                    Button("활성화") {
+                        withAnimation(.easeOut(duration: 0.15)) {
+                            appState.selectedProvider = .claudeCLI
+                        }
+                    }
+                    .font(.caption2)
+                    .buttonStyle(.bordered)
+                    .controlSize(.mini)
+                }
+            }
+
+            if isActive {
+                Text(AIProvider.claudeCLI.modelPipeline)
+                    .font(.caption2)
+                    .foregroundColor(accent)
+                    .padding(.leading, 14)
+            }
+
+            if appState.hasClaudeCLI {
+                Label("Claude CLI 설치됨", systemImage: "checkmark.circle.fill")
+                    .font(.caption)
+                    .foregroundColor(.green)
+            } else {
+                Label("Claude CLI를 찾을 수 없습니다", systemImage: "xmark.circle.fill")
+                    .font(.caption)
+                    .foregroundColor(.red)
+            }
+        }
+        .padding(10)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(isActive ? accent.opacity(0.06) : Color.clear)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .strokeBorder(isActive ? accent.opacity(0.3) : Color.clear, lineWidth: 1.5)
+        )
+    }
+
     // MARK: - Provider Section
 
     private func providerAccentColor(_ provider: AIProvider) -> Color {
         switch provider {
-        case .claude: return Color(red: 0.85, green: 0.45, blue: 0.25) // Anthropic orange-brown
-        case .gemini: return Color(red: 0.25, green: 0.52, blue: 0.96) // Google blue
+        case .claude: return Color(red: 0.85, green: 0.45, blue: 0.25)
+        case .gemini: return Color(red: 0.25, green: 0.52, blue: 0.96)
+        case .claudeCLI: return Color(red: 0.85, green: 0.45, blue: 0.25)
         }
     }
 
