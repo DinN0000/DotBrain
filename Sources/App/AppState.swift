@@ -119,6 +119,48 @@ final class AppState: ObservableObject {
     @Published var hasClaudeCLI: Bool = false
 
     private var inboxWatchdog: InboxWatchdog?
+    private var securityScopedURL: URL?
+
+    // MARK: - Vault Bookmark
+
+    private static let vaultBookmarkKey = "vaultFolderBookmark"
+
+    /// Save a URL bookmark for persistent vault folder access.
+    /// Call after the user selects a folder via NSOpenPanel.
+    func saveVaultBookmark(url: URL) {
+        do {
+            let bookmarkData = try url.bookmarkData(
+                options: [],
+                includingResourceValuesForKeys: nil,
+                relativeTo: nil
+            )
+            UserDefaults.standard.set(bookmarkData, forKey: Self.vaultBookmarkKey)
+        } catch {
+            NSLog("[AppState] 북마크 저장 실패: %@", error.localizedDescription)
+        }
+    }
+
+    /// Resolve the saved vault bookmark. Starts security-scoped access if available.
+    private func resolveVaultBookmark() {
+        guard let data = UserDefaults.standard.data(forKey: Self.vaultBookmarkKey) else { return }
+        do {
+            var isStale = false
+            let url = try URL(
+                resolvingBookmarkData: data,
+                options: [],
+                relativeTo: nil,
+                bookmarkDataIsStale: &isStale
+            )
+            if isStale {
+                saveVaultBookmark(url: url)
+            }
+            if url.startAccessingSecurityScopedResource() {
+                securityScopedURL = url
+            }
+        } catch {
+            NSLog("[AppState] 북마크 리졸브 실패: %@", error.localizedDescription)
+        }
+    }
 
     func updateAPIKeyStatus() {
         hasClaudeKey = KeychainService.getAPIKey() != nil
@@ -177,10 +219,10 @@ final class AppState: ObservableObject {
                 self.selectedProvider = .claudeCLI
                 UserDefaults.standard.set(AIProvider.claudeCLI.rawValue, forKey: "selectedProvider")
             } else {
-                self.selectedProvider = .gemini
+                self.selectedProvider = .claudeCLI
             }
         } else {
-            self.selectedProvider = .gemini
+            self.selectedProvider = .claudeCLI
         }
 
         self.hasClaudeKey = KeychainService.getAPIKey() != nil
@@ -196,6 +238,9 @@ final class AppState: ObservableObject {
         } else if !self.hasAPIKey {
             self.currentScreen = .settings
         }
+
+        // Resolve vault bookmark for persistent folder access
+        resolveVaultBookmark()
 
         // Only start services if onboarding is already completed
         if UserDefaults.standard.bool(forKey: "onboardingCompleted") {
@@ -384,6 +429,16 @@ final class AppState: ObservableObject {
         }
         guard hasAPIKey else {
             currentScreen = .settings
+            return
+        }
+
+        // Pre-flight: verify vault folder is accessible
+        let inboxPath = PKMPathManager(root: pkmRootPath).inboxPath
+        if !FileManager.default.isReadableFile(atPath: inboxPath) {
+            pipelineError = "인박스 폴더에 접근할 수 없습니다.\n\n" +
+                "시스템 설정 > 개인정보 보호 및 보안 > 파일 및 폴더에서 DotBrain의 접근 권한을 확인하거나, " +
+                "하단 경로를 클릭해 볼트 폴더를 다시 선택해주세요."
+            currentScreen = .results
             return
         }
 
