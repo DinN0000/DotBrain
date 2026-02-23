@@ -198,6 +198,9 @@ struct DashboardView: View {
                 refreshStats()
             }
         }
+        .onChange(of: appState.vaultCheckResult) { _ in
+            scanHealthSummary()
+        }
     }
 
     private func refreshStats() {

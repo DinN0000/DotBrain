@@ -155,7 +155,21 @@ struct VaultInspectorView: View {
             }
 
             if let result = appState.vaultCheckResult {
+                let hasIssues = result.brokenLinks > 0
+                    || result.missingFrontmatter > 0
+                    || result.missingPARA > 0
                 vaultCheckResultCard(result)
+                    .transition(.opacity)
+                    .onAppear {
+                        guard !hasIssues else { return }
+                        Task { @MainActor in
+                            try? await Task.sleep(for: .seconds(4))
+                            guard appState.vaultCheckResult != nil else { return }
+                            withAnimation(.easeOut(duration: 0.3)) {
+                                appState.vaultCheckResult = nil
+                            }
+                        }
+                    }
             }
 
             if reorgPhase == .scanning || reorgPhase == .executing {
@@ -169,8 +183,20 @@ struct VaultInspectorView: View {
             }
 
             if reorgPhase == .done {
+                let hasErrors = reorgResults.contains(where: \.isError)
                 reorgResultCard
                     .padding(.top, 4)
+                    .transition(.opacity)
+                    .onAppear {
+                        guard !hasErrors else { return }
+                        Task { @MainActor in
+                            try? await Task.sleep(for: .seconds(4))
+                            guard reorgPhase == .done else { return }
+                            withAnimation(.easeOut(duration: 0.3)) {
+                                resetReorg()
+                            }
+                        }
+                    }
             }
 
             Spacer().frame(height: 8)
