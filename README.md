@@ -56,11 +56,6 @@ DotBrain은 이 '정리의 병목'을 AI에게 위임합니다.
 npx dotbrain
 ```
 
-또는 curl로 직접 설치:
-```bash
-curl -sL https://raw.githubusercontent.com/DinN0000/DotBrain/main/install.sh | bash
-```
-
 메뉴바에 `·‿·` 가 나타나면 설치 완료입니다. 아이콘을 클릭하여 온보딩을 시작하세요.
 
 > **필요한 것:** macOS 13 (Ventura) 이상 / Node.js 18+ (npx 사용 시) / [Gemini API 키](https://aistudio.google.com/apikey) 또는 [Claude API 키](https://console.anthropic.com/settings/keys)

@@ -727,14 +727,7 @@ struct OnboardingView: View {
                 Spacer()
 
                 Button(action: {
-                    if appState.hasAPIKey {
-                        // Skip API key step, go to final
-                        direction = 1
-                        step = 6
-                        UserDefaults.standard.set(step, forKey: "onboardingStep")
-                    } else {
-                        goNext()
-                    }
+                    goNext()
                 }) {
                     Text("다음")
                         .frame(minWidth: 80)
