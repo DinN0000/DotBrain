@@ -47,9 +47,25 @@ function httpsGet(url, maxRedirects = 5) {
         reject(new Error("Too many redirects"));
         return;
       }
-      https.get(reqUrl, { headers: { "User-Agent": "dotbrain-cli" } }, (res) => {
+      const headers = { "User-Agent": "dotbrain-cli" };
+      // GitHub API requires Accept header; helps avoid 403 rate-limit errors
+      if (reqUrl.includes("api.github.com")) {
+        headers["Accept"] = "application/vnd.github.v3+json";
+      }
+      https.get(reqUrl, { headers }, (res) => {
         if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
           request(res.headers.location, remaining - 1);
+          return;
+        }
+        if (res.statusCode === 403) {
+          const resetHeader = res.headers["x-ratelimit-reset"];
+          const retryMsg = resetHeader
+            ? `Rate limit resets at ${new Date(resetHeader * 1000).toLocaleTimeString()}.`
+            : "Please wait a few minutes and try again.";
+          reject(new Error(
+            `GitHub API rate limit exceeded (HTTP 403).\n${retryMsg}\n` +
+            `Or download directly: https://github.com/${REPO}/releases/latest`
+          ));
           return;
         }
         if (res.statusCode !== 200) {
