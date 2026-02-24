@@ -60,6 +60,12 @@
 - **Every release:** bump `Resources/Info.plist` + `npm/package.json` version to match release tag
 - **Deploy:** copy both binary and Info.plist → `cp Resources/Info.plist ~/Applications/DotBrain.app/Contents/Info.plist`
 - `AICompanionService.swift` version must be bumped when behavior changes (triggers vault auto-update)
+- **CRITICAL release order (never skip):**
+  1. `swift build -c release` (MUST be release build, NOT debug)
+  2. `scripts/build-dmg.sh` (uses `.build/release/` binary)
+  3. `gh release create` with DMG + binary + icon + plist
+  4. `npm publish` (npm/package.json version must match)
+  5. Verify: `npx dotbrain` on clean machine or `gh release view` to confirm assets
 
 ## Branch Rules
 - `main` — stable, release-ready
