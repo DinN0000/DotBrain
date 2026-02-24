@@ -93,6 +93,31 @@ final class AppState: ObservableObject {
         return ""
     }
 
+    // MARK: - Reorg State (Vault Inspector)
+
+    enum ReorgPhase {
+        case idle, scanning, reviewPlan, executing, done
+    }
+
+    @Published var reorgPhase: ReorgPhase = .idle
+    @Published var reorgScope: VaultReorganizer.Scope = .all
+    @Published var reorgAnalyses: [VaultReorganizer.FileAnalysis] = []
+    @Published var reorgResults: [ProcessedFileResult] = []
+    @Published var reorgProgress: Double = 0
+    @Published var reorgStatus: String = ""
+    var reorgTask: Task<Void, Never>?
+
+    func resetReorg() {
+        reorgTask?.cancel()
+        viewTaskActive = false
+        reorgTask = nil
+        reorgPhase = .idle
+        reorgAnalyses = []
+        reorgResults = []
+        reorgProgress = 0
+        reorgStatus = ""
+    }
+
     // MARK: - Settings
 
     @Published var pkmRootPath: String {

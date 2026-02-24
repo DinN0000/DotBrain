@@ -8,23 +8,7 @@ struct VaultInspectorView: View {
 
     // Vault check state managed by AppState
 
-    // Reorganize state (absorbed from VaultReorganizeView)
-    @State private var reorgPhase: ReorgPhase = .idle
-    @State private var reorgScope: VaultReorganizer.Scope = .all
-    @State private var analyses: [VaultReorganizer.FileAnalysis] = []
-    @State private var reorgResults: [ProcessedFileResult] = []
-    @State private var reorgProgress: Double = 0
-    @State private var reorgStatus: String = ""
-    @State private var reorgTask: Task<Void, Never>?
     @State private var reorgChangedOnly = false
-
-    enum ReorgPhase {
-        case idle
-        case scanning
-        case reviewPlan
-        case executing
-        case done
-    }
 
     private enum FlatItemKind {
         case header(PARACategory, Int)
@@ -72,7 +56,7 @@ struct VaultInspectorView: View {
             BreadcrumbView(current: .vaultInspector)
             Divider()
 
-            if reorgPhase == .reviewPlan {
+            if appState.reorgPhase == .reviewPlan {
                 reorgPlanReviewView
             } else {
                 folderListView
@@ -89,8 +73,7 @@ struct VaultInspectorView: View {
             }
         }
         .onDisappear {
-            reorgTask?.cancel()
-            appState.viewTaskActive = false
+            // Reorg task continues in background — results persist in AppState
         }
     }
 
@@ -172,18 +155,18 @@ struct VaultInspectorView: View {
                     }
             }
 
-            if reorgPhase == .scanning || reorgPhase == .executing {
+            if appState.reorgPhase == .scanning || appState.reorgPhase == .executing {
                 taskProgressCard(
-                    title: reorgPhase == .scanning ? "AI 스캔 중" : "위치 이동 중",
-                    progress: reorgProgress,
-                    status: reorgStatus,
+                    title: appState.reorgPhase == .scanning ? "AI 스캔 중" : "위치 이동 중",
+                    progress: appState.reorgProgress,
+                    status: appState.reorgStatus,
                     onCancel: { resetReorg() }
                 )
                 .padding(.top, 4)
             }
 
-            if reorgPhase == .done {
-                let hasErrors = reorgResults.contains(where: \.isError)
+            if appState.reorgPhase == .done {
+                let hasErrors = appState.reorgResults.contains(where: \.isError)
                 reorgResultCard
                     .padding(.top, 4)
                     .transition(.opacity)
@@ -191,7 +174,7 @@ struct VaultInspectorView: View {
                         guard !hasErrors else { return }
                         Task { @MainActor in
                             try? await Task.sleep(for: .seconds(4))
-                            guard reorgPhase == .done else { return }
+                            guard appState.reorgPhase == .done else { return }
                             withAnimation(.easeOut(duration: 0.3)) {
                                 resetReorg()
                             }
@@ -208,7 +191,7 @@ struct VaultInspectorView: View {
                 ProgressView()
                 Spacer()
             } else {
-                let isBusy = reorgPhase == .scanning || reorgPhase == .executing
+                let isBusy = appState.reorgPhase == .scanning || appState.reorgPhase == .executing
                 ScrollView {
                     LazyVStack(spacing: 0) {
                         ForEach(flatItems) { item in
@@ -308,10 +291,10 @@ struct VaultInspectorView: View {
     // MARK: - Reorganize Plan Review (full-screen)
 
     private var reorgPlanReviewView: some View {
-        let movableCount = analyses.filter(\.needsMove).count
-        let selectedCount = analyses.filter { $0.isSelected && $0.needsMove }.count
+        let movableCount = appState.reorgAnalyses.filter(\.needsMove).count
+        let selectedCount = appState.reorgAnalyses.filter { $0.isSelected && $0.needsMove }.count
         let allSelected: Bool = {
-            let movable = analyses.filter(\.needsMove)
+            let movable = appState.reorgAnalyses.filter(\.needsMove)
             return !movable.isEmpty && movable.allSatisfy(\.isSelected)
         }()
 
@@ -334,7 +317,7 @@ struct VaultInspectorView: View {
             ScrollView {
                 LazyVStack(spacing: 0) {
                     ForEach(PARACategory.allCases, id: \.self) { category in
-                        let categoryFiles = analyses.filter {
+                        let categoryFiles = appState.reorgAnalyses.filter {
                             $0.needsMove && $0.recommended.para == category
                         }
                         if !categoryFiles.isEmpty {
@@ -342,7 +325,7 @@ struct VaultInspectorView: View {
                         }
                     }
 
-                    let unchangedCount = analyses.filter { !$0.needsMove }.count
+                    let unchangedCount = appState.reorgAnalyses.filter { !$0.needsMove }.count
                     if unchangedCount > 0 {
                         HStack(spacing: 4) {
                             Image(systemName: "checkmark.circle")
@@ -366,8 +349,8 @@ struct VaultInspectorView: View {
                 Toggle(isOn: Binding(
                     get: { allSelected },
                     set: { newValue in
-                        for i in analyses.indices where analyses[i].needsMove {
-                            analyses[i].isSelected = newValue
+                        for i in appState.reorgAnalyses.indices where appState.reorgAnalyses[i].needsMove {
+                            appState.reorgAnalyses[i].isSelected = newValue
                         }
                     }
                 )) {
@@ -421,7 +404,7 @@ struct VaultInspectorView: View {
             .padding(.horizontal, 4)
 
             ForEach(files.indices, id: \.self) { idx in
-                if let analysisIndex = analyses.firstIndex(where: {
+                if let analysisIndex = appState.reorgAnalyses.firstIndex(where: {
                     $0.fileName == files[idx].fileName
                         && $0.currentCategory == files[idx].currentCategory
                         && $0.currentFolder == files[idx].currentFolder
@@ -434,45 +417,45 @@ struct VaultInspectorView: View {
 
     private func reorgFileRow(index: Int) -> some View {
         HStack(spacing: 8) {
-            Toggle(isOn: $analyses[index].isSelected) {
+            Toggle(isOn: $appState.reorgAnalyses[index].isSelected) {
                 EmptyView()
             }
             .toggleStyle(.checkbox)
             .labelsHidden()
 
             VStack(alignment: .leading, spacing: 3) {
-                Text(analyses[index].fileName)
+                Text(appState.reorgAnalyses[index].fileName)
                     .font(.system(.body, design: .monospaced))
                     .lineLimit(1)
 
-                if !analyses[index].recommended.summary.isEmpty {
-                    Text(analyses[index].recommended.summary)
+                if !appState.reorgAnalyses[index].recommended.summary.isEmpty {
+                    Text(appState.reorgAnalyses[index].recommended.summary)
                         .font(.caption)
                         .foregroundColor(.secondary)
                         .lineLimit(1)
                 }
 
                 HStack(spacing: 3) {
-                    Text(analyses[index].currentCategory.displayName)
+                    Text(appState.reorgAnalyses[index].currentCategory.displayName)
                         .font(.caption2)
                         .foregroundColor(.secondary)
                     Text("/")
                         .font(.caption2)
                         .foregroundColor(.secondary.opacity(0.5))
-                    Text(analyses[index].currentFolder)
+                    Text(appState.reorgAnalyses[index].currentFolder)
                         .font(.caption2)
                         .foregroundColor(.secondary)
                     Image(systemName: "arrow.right")
                         .font(.system(size: 8))
                         .foregroundColor(.accentColor)
-                    Text(analyses[index].recommended.para.displayName)
+                    Text(appState.reorgAnalyses[index].recommended.para.displayName)
                         .font(.caption2)
                         .fontWeight(.medium)
                         .foregroundColor(.accentColor)
                     Text("/")
                         .font(.caption2)
                         .foregroundColor(.accentColor.opacity(0.5))
-                    Text(analyses[index].recommended.targetFolder)
+                    Text(appState.reorgAnalyses[index].recommended.targetFolder)
                         .font(.caption2)
                         .fontWeight(.medium)
                         .foregroundColor(.accentColor)
@@ -528,10 +511,10 @@ struct VaultInspectorView: View {
 
     @ViewBuilder
     private var reorgResultCard: some View {
-        let successCount = reorgResults.filter(\.isSuccess).count
-        let errorResults = reorgResults.filter(\.isError)
+        let successCount = appState.reorgResults.filter(\.isSuccess).count
+        let errorResults = appState.reorgResults.filter(\.isError)
         let hasErrors = !errorResults.isEmpty
-        let isEmpty = reorgResults.isEmpty
+        let isEmpty = appState.reorgResults.isEmpty
 
         VStack(alignment: .leading, spacing: 6) {
             if isEmpty {
@@ -762,42 +745,42 @@ struct VaultInspectorView: View {
     }
 
     private func startFullReorg() {
-        reorgScope = .all
-        reorgPhase = .scanning
+        appState.reorgScope = .all
+        appState.reorgPhase = .scanning
         startReorgScan()
     }
 
     private func startFolderReorg(_ folder: FolderInfo) {
-        reorgScope = .folder(folder.path)
+        appState.reorgScope = .folder(folder.path)
         reorgChangedOnly = true
-        reorgPhase = .scanning
+        appState.reorgPhase = .scanning
         startReorgScan()
     }
 
     private func startFolderFullReorg(_ folder: FolderInfo) {
-        reorgScope = .folder(folder.path)
-        reorgPhase = .scanning
+        appState.reorgScope = .folder(folder.path)
+        appState.reorgPhase = .scanning
         startReorgScan()
     }
 
     private func startCategoryReorg(_ category: PARACategory) {
-        reorgScope = .category(category)
-        reorgPhase = .scanning
+        appState.reorgScope = .category(category)
+        appState.reorgPhase = .scanning
         startReorgScan()
     }
 
     private func startReorgScan() {
-        reorgProgress = 0
-        reorgStatus = "스캔 준비 중..."
+        appState.reorgProgress = 0
+        appState.reorgStatus = "스캔 준비 중..."
         appState.viewTaskActive = true
         let root = appState.pkmRootPath
-        let currentScope = reorgScope
+        let currentScope = appState.reorgScope
 
         let changedOnly = reorgChangedOnly
         reorgChangedOnly = false
 
-        reorgTask?.cancel()
-        reorgTask = Task {
+        appState.reorgTask?.cancel()
+        appState.reorgTask = Task {
             // When filtering changed files only, load hash cache and collect non-unchanged paths
             var changedFileSet: Set<String>?
             if changedOnly, case .folder(let folderPath) = currentScope {
@@ -812,11 +795,11 @@ struct VaultInspectorView: View {
                 } else {
                     // Nothing changed — skip scan
                     await MainActor.run {
-                        analyses = []
-                        appState.viewTaskActive = false
-                        reorgResults = []
-                        reorgPhase = .done
-                        reorgStatus = "변경된 파일이 없습니다"
+                        AppState.shared.reorgAnalyses = []
+                        AppState.shared.viewTaskActive = false
+                        AppState.shared.reorgResults = []
+                        AppState.shared.reorgPhase = .done
+                        AppState.shared.reorgStatus = "변경된 파일이 없습니다"
                     }
                     return
                 }
@@ -827,8 +810,8 @@ struct VaultInspectorView: View {
                 scope: currentScope,
                 onProgress: { value, status in
                     Task { @MainActor in
-                        reorgProgress = value
-                        reorgStatus = status
+                        AppState.shared.reorgProgress = value
+                        AppState.shared.reorgStatus = status
                     }
                 }
             )
@@ -849,37 +832,38 @@ struct VaultInspectorView: View {
                 }
 
                 await MainActor.run {
-                    analyses = result.files
-                    appState.viewTaskActive = false
-                    if analyses.contains(where: \.needsMove) {
-                        reorgPhase = .reviewPlan
+                    AppState.shared.reorgAnalyses = result.files
+                    AppState.shared.viewTaskActive = false
+                    if AppState.shared.reorgAnalyses.contains(where: \.needsMove) {
+                        AppState.shared.reorgPhase = .reviewPlan
                     } else {
-                        reorgResults = []
-                        reorgPhase = .done
+                        AppState.shared.reorgResults = []
+                        AppState.shared.reorgPhase = .done
                     }
                 }
             } catch {
                 await MainActor.run {
-                    appState.viewTaskActive = false
-                    reorgStatus = "오류: \(error.localizedDescription)"
-                    reorgPhase = .idle
+                    AppState.shared.viewTaskActive = false
+                    AppState.shared.reorgStatus = "오류: \(error.localizedDescription)"
+                    AppState.shared.reorgPhase = .idle
                 }
             }
         }
     }
 
     private func executeReorgPlan() {
-        let selected = analyses.filter { $0.isSelected && $0.needsMove }
+        let selected = appState.reorgAnalyses.filter { $0.isSelected && $0.needsMove }
         guard !selected.isEmpty else { return }
 
-        reorgPhase = .executing
-        reorgProgress = 0
-        reorgStatus = "실행 준비 중..."
+        appState.reorgPhase = .executing
+        appState.reorgProgress = 0
+        appState.reorgStatus = "실행 준비 중..."
         appState.viewTaskActive = true
         let root = appState.pkmRootPath
+        let currentScope = appState.reorgScope
 
         // Record rejected AI suggestions for learning
-        let rejected = analyses.filter { $0.needsMove && !$0.isSelected }
+        let rejected = appState.reorgAnalyses.filter { $0.needsMove && !$0.isSelected }
         for file in rejected {
             CorrectionMemory.record(CorrectionEntry(
                 date: Date(),
@@ -893,15 +877,15 @@ struct VaultInspectorView: View {
             ), pkmRoot: root)
         }
 
-        reorgTask?.cancel()
-        reorgTask = Task {
+        appState.reorgTask?.cancel()
+        appState.reorgTask = Task {
             let reorganizer = VaultReorganizer(
                 pkmRoot: root,
-                scope: reorgScope,
+                scope: currentScope,
                 onProgress: { value, status in
                     Task { @MainActor in
-                        reorgProgress = value
-                        reorgStatus = status
+                        AppState.shared.reorgProgress = value
+                        AppState.shared.reorgStatus = status
                     }
                 }
             )
@@ -912,7 +896,7 @@ struct VaultInspectorView: View {
 
                 // Update hash cache for ALL files in affected folders
                 // (reorg may modify other files via SemanticLinker/NoteIndexGenerator)
-                let allScopePaths = Self.collectAllMdFiles(scope: reorgScope, pkmRoot: root)
+                let allScopePaths = Self.collectAllMdFiles(scope: currentScope, pkmRoot: root)
                 if !allScopePaths.isEmpty {
                     let cache = ContentHashCache(pkmRoot: root)
                     await cache.load()
@@ -921,15 +905,15 @@ struct VaultInspectorView: View {
                 }
 
                 await MainActor.run {
-                    appState.viewTaskActive = false
-                    reorgResults = executionResults
-                    reorgPhase = .done
+                    AppState.shared.viewTaskActive = false
+                    AppState.shared.reorgResults = executionResults
+                    AppState.shared.reorgPhase = .done
                 }
             } catch {
                 await MainActor.run {
-                    appState.viewTaskActive = false
-                    reorgStatus = "오류: \(error.localizedDescription)"
-                    reorgPhase = .done
+                    AppState.shared.viewTaskActive = false
+                    AppState.shared.reorgStatus = "오류: \(error.localizedDescription)"
+                    AppState.shared.reorgPhase = .done
                 }
             }
         }
@@ -979,15 +963,8 @@ struct VaultInspectorView: View {
     }
 
     private func resetReorg() {
-        reorgTask?.cancel()
-        appState.viewTaskActive = false
-        reorgTask = nil
-        reorgPhase = .idle
+        appState.resetReorg()
         reorgChangedOnly = false
-        analyses = []
-        reorgResults = []
-        reorgProgress = 0
-        reorgStatus = ""
         loadFolders()
     }
 }
