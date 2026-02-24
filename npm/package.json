@@ -1,6 +1,6 @@
 {
   "name": "dotbrain",
-  "version": "2.11.4",
+  "version": "2.11.5",
   "description": "DotBrain - AI-powered PKM organizer for macOS",
   "type": "module",
   "bin": {
