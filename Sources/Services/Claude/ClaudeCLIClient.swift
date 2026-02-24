@@ -16,6 +16,12 @@ actor ClaudeCLIClient {
     }
 
     private static func findClaudePath() -> String? {
+        // 1. Resolve via user's login shell (loads .zshenv, .zprofile, .zshrc)
+        if let path = resolveViaLoginShell() {
+            return path
+        }
+
+        // 2. Fallback to well-known paths
         let homeDir = NSHomeDirectory()
         let candidates = [
             "\(homeDir)/.local/bin/claude",
@@ -28,6 +34,70 @@ actor ClaudeCLIClient {
             }
         }
         return nil
+    }
+
+    /// Load environment variables from user's login shell.
+    /// Captures PATH, proxy settings, SSL certs, etc. that GUI apps miss.
+    private static func loadUserShellEnvironment() -> [String: String] {
+        let baseEnv = ProcessInfo.processInfo.environment
+        let userShell = baseEnv["SHELL"] ?? "/bin/zsh"
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: userShell)
+        process.arguments = ["-l", "-c", "env"]
+
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = FileHandle.nullDevice
+
+        do {
+            try process.run()
+            process.waitUntilExit()
+
+            guard process.terminationStatus == 0 else { return baseEnv }
+
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            let output = String(data: data, encoding: .utf8) ?? ""
+
+            var env = baseEnv
+            for line in output.split(separator: "\n") {
+                guard let eqIndex = line.firstIndex(of: "=") else { continue }
+                let key = String(line[line.startIndex..<eqIndex])
+                let value = String(line[line.index(after: eqIndex)...])
+                env[key] = value
+            }
+            return env
+        } catch {
+            return baseEnv
+        }
+    }
+
+    /// Run user's login shell to resolve claude path via `which`
+    private static func resolveViaLoginShell() -> String? {
+        let userShell = ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh"
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: userShell)
+        process.arguments = ["-l", "-c", "which claude"]
+
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = FileHandle.nullDevice
+
+        do {
+            try process.run()
+            process.waitUntilExit()
+
+            guard process.terminationStatus == 0 else { return nil }
+
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            let path = String(data: data, encoding: .utf8)?
+                .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+
+            guard !path.isEmpty,
+                  FileManager.default.isExecutableFile(atPath: path) else { return nil }
+            return path
+        } catch {
+            return nil
+        }
     }
 
     // MARK: - Send Message
@@ -67,11 +137,8 @@ actor ClaudeCLIClient {
             process.executableURL = URL(fileURLWithPath: executablePath)
             process.arguments = arguments
 
-            // Ensure PATH includes common binary locations for claude's dependencies
-            var env = ProcessInfo.processInfo.environment
-            let homeDir = NSHomeDirectory()
-            let existingPath = env["PATH"] ?? ""
-            env["PATH"] = "\(homeDir)/.local/bin:/usr/local/bin:/opt/homebrew/bin:\(existingPath)"
+            // Load user's shell environment (proxy, SSL certs, PATH, etc.)
+            let env = Self.loadUserShellEnvironment()
             process.environment = env
 
             let inputPipe = Pipe()
