@@ -5,7 +5,6 @@ struct AIStatisticsView: View {
     @State private var totalCost: Double = 0
     @State private var costByOperation: [String: Double] = [:]
     @State private var recentEntries: [APIUsageEntry] = []
-    @State private var duplicatesFound: Int = 0
     @State private var isLoading = true
 
     var body: some View {
@@ -22,7 +21,7 @@ struct AIStatisticsView: View {
                     VStack(spacing: 16) {
                         // Total cost hero
                         VStack(spacing: 4) {
-                            Text("총 API 비용")
+                            Text("추정 API 비용")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                             Text(String(format: "$%.4f", totalCost))
@@ -56,21 +55,6 @@ struct AIStatisticsView: View {
                             }
                             .padding()
                             .background(Color.primary.opacity(0.03))
-                            .cornerRadius(8)
-                        }
-
-                        // Duplicates
-                        if duplicatesFound > 0 {
-                            HStack(spacing: 6) {
-                                Image(systemName: "doc.on.doc")
-                                    .font(.caption)
-                                    .foregroundColor(.orange)
-                                Text("중복 발견: \(duplicatesFound)건")
-                                    .font(.caption)
-                                Spacer()
-                            }
-                            .padding()
-                            .background(Color.orange.opacity(0.06))
                             .cornerRadius(8)
                         }
 
@@ -154,13 +138,11 @@ struct AIStatisticsView: View {
             let byOp = await logger.costByOperation()
             let total = await logger.totalCost()
             let recent = await logger.recentEntries(limit: 20)
-            let dupes = UserDefaults.standard.integer(forKey: "pkmDuplicatesFound")
 
             await MainActor.run {
                 totalCost = total
                 costByOperation = byOp
                 recentEntries = recent
-                duplicatesFound = dupes
                 isLoading = false
             }
         }
