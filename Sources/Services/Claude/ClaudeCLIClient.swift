@@ -8,6 +8,14 @@ actor ClaudeCLIClient {
     static let fastModel = "haiku"
     static let preciseModel = "sonnet"
 
+    // MARK: - Cached State
+
+    /// Cached user shell environment (loaded once per app session)
+    private static var cachedEnvironment: [String: String]?
+    /// Cached claude binary path (resolved once per app session)
+    private static var cachedClaudePath: String?
+    private static var claudePathResolved = false
+
     // MARK: - Availability Check (sync, for AIProvider.hasAPIKey)
 
     /// Check if claude CLI binary is found at known paths
@@ -16,8 +24,13 @@ actor ClaudeCLIClient {
     }
 
     private static func findClaudePath() -> String? {
-        // 1. Resolve via user's login shell (loads .zshenv, .zprofile, .zshrc)
-        if let path = resolveViaLoginShell() {
+        // Return cached result if already resolved
+        if claudePathResolved { return cachedClaudePath }
+
+        // 1. Resolve via user's shell (sources .zshrc/.bashrc explicitly)
+        if let path = resolveViaShell() {
+            cachedClaudePath = path
+            claudePathResolved = true
             return path
         }
 
@@ -27,33 +40,53 @@ actor ClaudeCLIClient {
             "\(homeDir)/.local/bin/claude",
             "/usr/local/bin/claude",
             "/opt/homebrew/bin/claude",
+            "\(homeDir)/.npm-global/bin/claude",
+            "/usr/bin/claude",
         ]
         for path in candidates {
             if FileManager.default.isExecutableFile(atPath: path) {
+                cachedClaudePath = path
+                claudePathResolved = true
                 return path
             }
         }
+
+        claudePathResolved = true
         return nil
     }
 
-    /// Load environment variables from user's login shell.
+    /// Load environment variables from user's shell config.
     /// Captures PATH, proxy settings, SSL certs, etc. that GUI apps miss.
+    /// Sources .zshrc/.bashrc explicitly (no -i flag to avoid side effects).
+    /// Result is cached — shell is spawned only once per app session.
     private static func loadUserShellEnvironment() -> [String: String] {
+        if let cached = cachedEnvironment { return cached }
+
         let baseEnv = ProcessInfo.processInfo.environment
         let userShell = baseEnv["SHELL"] ?? "/bin/zsh"
         let process = Process()
         process.executableURL = URL(fileURLWithPath: userShell)
-        process.arguments = ["-l", "-c", "env"]
+        process.arguments = ["-l", "-c", "\(rcSourceCommand); env"]
+        process.standardError = FileHandle.nullDevice
+        process.standardInput = FileHandle.nullDevice
 
         let pipe = Pipe()
         process.standardOutput = pipe
-        process.standardError = FileHandle.nullDevice
 
         do {
             try process.run()
+
+            // 5-second timeout to prevent hanging on heavy shell configs
+            DispatchQueue.global().asyncAfter(deadline: .now() + 5) {
+                if process.isRunning { process.terminate() }
+            }
+
             process.waitUntilExit()
 
-            guard process.terminationStatus == 0 else { return baseEnv }
+            guard process.terminationStatus == 0 else {
+                cachedEnvironment = baseEnv
+                return baseEnv
+            }
 
             let data = pipe.fileHandleForReading.readDataToEndOfFile()
             let output = String(data: data, encoding: .utf8) ?? ""
@@ -65,32 +98,46 @@ actor ClaudeCLIClient {
                 let value = String(line[line.index(after: eqIndex)...])
                 env[key] = value
             }
+            cachedEnvironment = env
             return env
         } catch {
+            cachedEnvironment = baseEnv
             return baseEnv
         }
     }
 
-    /// Run user's login shell to resolve claude path via `which`
-    private static func resolveViaLoginShell() -> String? {
+    /// Resolve claude path via user's shell with explicit RC file sourcing.
+    /// Uses `command -v` (POSIX, more reliable than `which`).
+    /// No -i flag — avoids oh-my-zsh output pollution and stdin read attempts.
+    private static func resolveViaShell() -> String? {
         let userShell = ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh"
         let process = Process()
         process.executableURL = URL(fileURLWithPath: userShell)
-        process.arguments = ["-l", "-c", "which claude"]
+        process.arguments = ["-l", "-c", "\(rcSourceCommand); command -v claude"]
+        process.standardError = FileHandle.nullDevice
+        process.standardInput = FileHandle.nullDevice
 
         let pipe = Pipe()
         process.standardOutput = pipe
-        process.standardError = FileHandle.nullDevice
 
         do {
             try process.run()
+
+            // 5-second timeout
+            DispatchQueue.global().asyncAfter(deadline: .now() + 5) {
+                if process.isRunning { process.terminate() }
+            }
+
             process.waitUntilExit()
 
             guard process.terminationStatus == 0 else { return nil }
 
             let data = pipe.fileHandleForReading.readDataToEndOfFile()
-            let path = String(data: data, encoding: .utf8)?
+            let output = String(data: data, encoding: .utf8)?
                 .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+
+            // Take last non-empty line (in case shell prints anything before)
+            let path = output.split(separator: "\n").last.map(String.init) ?? output
 
             guard !path.isEmpty,
                   FileManager.default.isExecutableFile(atPath: path) else { return nil }
@@ -98,6 +145,12 @@ actor ClaudeCLIClient {
         } catch {
             return nil
         }
+    }
+
+    /// Shell command to explicitly source RC files without interactive mode.
+    /// Covers zsh (.zshrc) and bash (.bashrc) where most users define PATH.
+    private static var rcSourceCommand: String {
+        "[ -f ~/.zshrc ] && . ~/.zshrc 2>/dev/null; [ -f ~/.bashrc ] && . ~/.bashrc 2>/dev/null"
     }
 
     // MARK: - Send Message
