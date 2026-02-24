@@ -19,6 +19,7 @@ struct SettingsView: View {
     @State private var updateIconRotation: Double = 0
     @State private var updateCheckHovered = false
     @State private var isUpdateAnimating = false
+    @State private var fdaGranted = false
 
     @State private var viewingProvider: AIProvider = .claude
 
@@ -54,6 +55,9 @@ struct SettingsView: View {
                     // MARK: - PKM Folder
                     pkmFolderSection
 
+                    // MARK: - Full Disk Access
+                    fdaSection
+
                     // MARK: - App Info
                     appInfoSection
 
@@ -71,6 +75,7 @@ struct SettingsView: View {
         }
         .onAppear {
             isStructureReady = PKMPathManager(root: appState.pkmRootPath).isInitialized()
+            fdaGranted = OnboardingView.hasFullDiskAccess()
             viewingProvider = activeProvider
             loadKeyForProvider(viewingProvider)
         }
@@ -376,6 +381,59 @@ struct SettingsView: View {
                         Text("폴더 구조 만들기")
                     }
                     .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+            }
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.primary.opacity(0.03))
+        .cornerRadius(8)
+    }
+
+    // MARK: - Full Disk Access Section
+
+    private var fdaSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 6) {
+                Image(systemName: fdaGranted ? "checkmark.shield.fill" : "lock.shield")
+                    .font(.caption)
+                    .foregroundColor(fdaGranted ? .green : .orange)
+                Text("전체 디스크 접근")
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+
+                Spacer()
+
+                if fdaGranted {
+                    Text("허용됨")
+                        .font(.caption2)
+                        .foregroundColor(.green)
+                } else {
+                    Text("필요")
+                        .font(.caption2)
+                        .foregroundColor(.orange)
+                }
+            }
+
+            if !fdaGranted {
+                Text("파일 접근 권한이 없으면 일부 폴더에서 파일을 읽지 못합니다.\n시스템 설정에서 DotBrain에 전체 디스크 접근을 허용해주세요.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .lineSpacing(2)
+
+                Button(action: {
+                    if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles") {
+                        NSWorkspace.shared.open(url)
+                    }
+                }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "gearshape")
+                            .font(.caption2)
+                        Text("시스템 설정 열기")
+                            .font(.caption)
+                    }
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.small)
