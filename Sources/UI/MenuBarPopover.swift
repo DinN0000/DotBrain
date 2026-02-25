@@ -5,6 +5,12 @@ struct MenuBarPopover: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            // Full Disk Access warning (shown after update revokes permission)
+            if appState.needsFullDiskAccess && appState.currentScreen != .onboarding {
+                fullDiskAccessBanner
+                Divider()
+            }
+
             switch appState.currentScreen {
             case .onboarding:
                 OnboardingView()
@@ -123,6 +129,39 @@ struct MenuBarPopover: View {
                 .foregroundColor(isActive(screen) ? .accentColor : .secondary)
         }
         .buttonStyle(.plain)
+    }
+
+    private var fullDiskAccessBanner: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.system(size: 12))
+                .foregroundColor(.orange)
+
+            Text("디스크 접근 권한이 필요합니다")
+                .font(.caption)
+                .fontWeight(.medium)
+
+            Spacer()
+
+            Button("설정 열기") {
+                appState.openFullDiskAccessSettings()
+            }
+            .font(.caption2)
+            .buttonStyle(.borderedProminent)
+            .controlSize(.mini)
+
+            Button {
+                appState.recheckFullDiskAccess()
+            } label: {
+                Image(systemName: "arrow.clockwise")
+                    .font(.system(size: 10))
+            }
+            .buttonStyle(.plain)
+            .foregroundColor(.secondary)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(Color.orange.opacity(0.08))
     }
 
     private func isActive(_ screen: AppState.Screen) -> Bool {

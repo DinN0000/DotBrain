@@ -334,15 +334,11 @@ struct OnboardingView: View {
     }
 
     static func hasFullDiskAccess() -> Bool {
-        // ~/Library/Safari is TCC-protected; readable only with Full Disk Access
-        let testPath = NSHomeDirectory() + "/Library/Safari"
-        return (try? FileManager.default.contentsOfDirectory(atPath: testPath)) != nil
+        AppState.hasFullDiskAccess()
     }
 
     private static func openFullDiskAccessSettings() {
-        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles") {
-            NSWorkspace.shared.open(url)
-        }
+        AppState.shared.openFullDiskAccessSettings()
     }
 
     // MARK: - Step 2: Folder Setup

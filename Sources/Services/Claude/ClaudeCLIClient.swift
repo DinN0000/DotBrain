@@ -24,7 +24,15 @@ actor ClaudeCLIClient {
     }
 
     private static func findClaudePath() -> String? {
-        // Return cached result if already resolved
+        // Return cached result if already resolved AND still valid
+        if claudePathResolved, let cached = cachedClaudePath {
+            if FileManager.default.isExecutableFile(atPath: cached) {
+                return cached
+            }
+            // Cached path no longer valid (e.g. CLI upgraded, binary moved)
+            cachedClaudePath = nil
+            claudePathResolved = false
+        }
         if claudePathResolved { return cachedClaudePath }
 
         // 1. Resolve via user's shell (sources .zshrc/.bashrc explicitly)
@@ -51,7 +59,43 @@ actor ClaudeCLIClient {
             }
         }
 
+        // 3. Scan Claude versions directory for latest binary
+        // (handles broken symlinks after CLI upgrade)
+        if let path = findLatestVersionBinary(homeDir: homeDir) {
+            cachedClaudePath = path
+            claudePathResolved = true
+            return path
+        }
+
         claudePathResolved = true
+        return nil
+    }
+
+    /// Scan ~/.local/share/claude/versions/ for the latest executable binary.
+    /// Handles cases where symlink at ~/.local/bin/claude is broken after upgrade.
+    private static func findLatestVersionBinary(homeDir: String) -> String? {
+        let versionsDir = "\(homeDir)/.local/share/claude/versions"
+        let fm = FileManager.default
+
+        guard let entries = try? fm.contentsOfDirectory(atPath: versionsDir) else {
+            return nil
+        }
+
+        // Sort version entries descending to try newest first (skip hidden files)
+        let sorted = entries
+            .filter { !$0.hasPrefix(".") }
+            .sorted { a, b in
+                a.compare(b, options: .numeric) == .orderedDescending
+            }
+
+        for entry in sorted {
+            let fullPath = "\(versionsDir)/\(entry)"
+            var isDir: ObjCBool = false
+            guard fm.fileExists(atPath: fullPath, isDirectory: &isDir), !isDir.boolValue else { continue }
+            if fm.isExecutableFile(atPath: fullPath) {
+                return fullPath
+            }
+        }
         return nil
     }
 
@@ -148,9 +192,10 @@ actor ClaudeCLIClient {
     }
 
     /// Shell command to explicitly source RC files without interactive mode.
-    /// Covers zsh (.zshrc) and bash (.bashrc) where most users define PATH.
+    /// Sources profile files first (login shell configs, no interactive guard),
+    /// then rc files (where PATH extensions like ~/.local/bin are often added).
     private static var rcSourceCommand: String {
-        "[ -f ~/.zshrc ] && . ~/.zshrc 2>/dev/null; [ -f ~/.bashrc ] && . ~/.bashrc 2>/dev/null"
+        "[ -f ~/.zprofile ] && . ~/.zprofile 2>/dev/null; [ -f ~/.bash_profile ] && . ~/.bash_profile 2>/dev/null; [ -f ~/.zshrc ] && . ~/.zshrc 2>/dev/null; [ -f ~/.bashrc ] && . ~/.bashrc 2>/dev/null"
     }
 
     // MARK: - Send Message
