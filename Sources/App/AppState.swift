@@ -142,6 +142,7 @@ final class AppState: ObservableObject {
     @Published var hasClaudeKey: Bool = false
     @Published var hasGeminiKey: Bool = false
     @Published var hasClaudeCLI: Bool = false
+    @Published var needsFullDiskAccess: Bool = false
 
     private var inboxWatchdog: InboxWatchdog?
     private var securityScopedURL: URL?
@@ -192,6 +193,27 @@ final class AppState: ObservableObject {
         hasGeminiKey = KeychainService.getGeminiAPIKey() != nil
         hasClaudeCLI = ClaudeCLIClient.isAvailable()
         hasAPIKey = selectedProvider.hasAPIKey()
+    }
+
+    // MARK: - Full Disk Access
+
+    /// Check if Full Disk Access is granted.
+    /// Tests by reading ~/Library/Safari which is TCC-protected.
+    static func hasFullDiskAccess() -> Bool {
+        let testPath = NSHomeDirectory() + "/Library/Safari"
+        return (try? FileManager.default.contentsOfDirectory(atPath: testPath)) != nil
+    }
+
+    /// Open System Settings > Privacy & Security > Full Disk Access
+    func openFullDiskAccessSettings() {
+        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles") {
+            NSWorkspace.shared.open(url)
+        }
+    }
+
+    /// Re-check FDA status and clear the warning if granted.
+    func recheckFullDiskAccess() {
+        needsFullDiskAccess = !Self.hasFullDiskAccess()
     }
 
     // MARK: - Menubar Icon
@@ -257,11 +279,16 @@ final class AppState: ObservableObject {
 
         if !UserDefaults.standard.bool(forKey: "onboardingCompleted") {
             self.currentScreen = .onboarding
-        } else if !FileManager.default.fileExists(atPath: pkmRootPath) {
-            // PKM folder was deleted — send user to settings to recreate
-            self.currentScreen = .settings
-        } else if !self.hasAPIKey {
-            self.currentScreen = .settings
+        } else {
+            // Check Full Disk Access after onboarding (may be revoked after app update)
+            self.needsFullDiskAccess = !Self.hasFullDiskAccess()
+
+            if !FileManager.default.fileExists(atPath: pkmRootPath) {
+                // PKM folder was deleted — send user to settings to recreate
+                self.currentScreen = .settings
+            } else if !self.hasAPIKey {
+                self.currentScreen = .settings
+            }
         }
 
         // Resolve vault bookmark for persistent folder access
