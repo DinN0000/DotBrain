@@ -58,6 +58,8 @@ npx dotbrain
 
 메뉴바에 `·‿·` 가 나타나면 설치 완료입니다. 아이콘을 클릭하여 온보딩을 시작하세요.
 
+> 📖 자세한 사용법은 **[서비스 매뉴얼 (MANUAL.md)](MANUAL.md)**을 참고하세요.
+
 > **필요한 것:** macOS 13 (Ventura) 이상 / Node.js 18+ (npx 사용 시) / Claude 구독 (Pro/Max) + Claude CLI 기본. [Claude API 키](https://console.anthropic.com/settings/keys) 또는 [Gemini API 키](https://aistudio.google.com/apikey)도 지원.
 
 <details>
