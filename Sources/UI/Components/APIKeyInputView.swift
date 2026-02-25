@@ -101,9 +101,43 @@ struct APIKeyInputView: View {
                     .font(.caption)
                     .foregroundColor(.green)
             } else {
-                Label("Claude CLI를 찾을 수 없습니다", systemImage: "xmark.circle.fill")
-                    .font(.caption)
-                    .foregroundColor(.red)
+                VStack(alignment: .leading, spacing: 6) {
+                    Label("Claude CLI를 찾을 수 없습니다", systemImage: "xmark.circle.fill")
+                        .font(.caption)
+                        .foregroundColor(.red)
+
+                    Text("터미널에서 아래 명령어로 설치하세요:")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+
+                    HStack(spacing: 4) {
+                        Text("curl -fsSL https://claude.ai/install.sh | sh")
+                            .font(.system(size: 10, design: .monospaced))
+                            .foregroundColor(.primary)
+                            .textSelection(.enabled)
+
+                        Button {
+                            NSPasteboard.general.clearContents()
+                            NSPasteboard.general.setString("curl -fsSL https://claude.ai/install.sh | sh", forType: .string)
+                        } label: {
+                            Image(systemName: "doc.on.doc")
+                                .font(.system(size: 9))
+                        }
+                        .buttonStyle(.plain)
+                        .foregroundColor(.secondary)
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Color.primary.opacity(0.04))
+                    .cornerRadius(4)
+
+                    Button("설치 후 다시 확인") {
+                        appState.updateAPIKeyStatus()
+                    }
+                    .font(.caption2)
+                    .buttonStyle(.bordered)
+                    .controlSize(.mini)
+                }
             }
         }
         .padding(10)
