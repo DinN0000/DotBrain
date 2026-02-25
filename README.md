@@ -58,7 +58,7 @@ npx dotbrain
 
 메뉴바에 `·‿·` 가 나타나면 설치 완료입니다. 아이콘을 클릭하여 온보딩을 시작하세요.
 
-> **필요한 것:** macOS 13 (Ventura) 이상 / Node.js 18+ (npx 사용 시) / [Gemini API 키](https://aistudio.google.com/apikey) 또는 [Claude API 키](https://console.anthropic.com/settings/keys)
+> **필요한 것:** macOS 13 (Ventura) 이상 / Node.js 18+ (npx 사용 시) / Claude 구독 (Pro/Max) + Claude CLI 기본. [Claude API 키](https://console.anthropic.com/settings/keys) 또는 [Gemini API 키](https://aistudio.google.com/apikey)도 지원.
 
 <details>
 <summary><b>소스에서 직접 빌드</b></summary>
@@ -95,12 +95,13 @@ _Inbox/에 파일 추가 (드래그앤드롭)
 
 ### AI 분류 전략
 
-| 단계 | 모델 | 비용 | 방식 |
-|------|------|------|------|
-| Stage 1 (Fast) | Haiku / Flash | ~$0.002/파일 | 파일명 + 미리보기로 배치 분류 |
-| Stage 2 (Precise) | Sonnet / Pro | ~$0.01/파일 | 전체 내용으로 정밀 분류 (신뢰도 < 0.8만) |
+| 제공자 | Stage 1 (Fast) | Stage 2 (Precise) | 비용 |
+|--------|----------------|-------------------|------|
+| **Claude CLI (추천)** | Haiku | Sonnet | 구독 토큰 사용 |
+| Claude API | Haiku 4.5 | Sonnet 4.5 | ~$0.002/파일 |
+| Gemini API | Flash | Pro | 무료 티어 내 가능 |
 
-대부분의 파일은 Stage 1에서 끝납니다. 100개 파일 기준 Claude ~$0.20, Gemini는 무료 티어 내 가능.
+대부분의 파일은 Stage 1에서 끝납니다. Claude CLI는 구독 토큰을 사용하므로 별도 API 비용이 없습니다.
 
 ### 폴더 정리
 
@@ -203,9 +204,9 @@ PKM Root/
 
 - **Swift 5.9** + SwiftUI + Combine
 - **macOS 메뉴바 앱** — `NSStatusItem` + `NSPopover`
-- **AI** — Claude (Haiku + Sonnet) / Gemini (Flash + Pro) — 이중 제공자, 자동 폴백
+- **AI** — Claude CLI (구독, 추천) / Claude API / Gemini API — 3중 제공자, 자동 폴백
 - **의존성** — ZIPFoundation (DOCX/PPTX/XLSX 처리)
-- **보안** — API 키는 AES-GCM 암호화 파일로 기기 종속 저장 (하드웨어 UUID + HKDF)
+- **보안** — Claude CLI는 API 키 불필요 (구독 인증). API 키 사용 시 AES-GCM 암호화 파일로 기기 종속 저장 (하드웨어 UUID + HKDF)
 - **안정성** — 지수 백오프 재시도, 제공자 폴백, 경로 탐색 보호
 
 ---
