@@ -12,3 +12,4 @@
 | built-for-humans | - | 2026-02-23 | plan |
 | code-quality-review-fixes | - | 2026-02-23 | plan |
 | same-folder-auto-link | - | 2026-02-23 | plan, analysis |
+| context-builder-refactor | 100% | 2026-02-27 | plan, design, analysis, report |
