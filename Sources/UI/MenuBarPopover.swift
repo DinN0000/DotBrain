@@ -132,32 +132,40 @@ struct MenuBarPopover: View {
     }
 
     private var fullDiskAccessBanner: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "exclamationmark.triangle.fill")
-                .font(.system(size: 12))
-                .foregroundColor(.orange)
+        VStack(spacing: 4) {
+            HStack(spacing: 8) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .font(.system(size: 12))
+                    .foregroundColor(.orange)
 
-            Text("디스크 접근 권한이 필요합니다")
-                .font(.caption)
-                .fontWeight(.medium)
+                Text("업데이트 후 디스크 접근 권한을 다시 설정해주세요")
+                    .font(.caption)
+                    .fontWeight(.medium)
 
-            Spacer()
+                Spacer()
 
-            Button("설정 열기") {
-                appState.openFullDiskAccessSettings()
+                Button("권한 설정") {
+                    appState.openFullDiskAccessSettings()
+                }
+                .font(.caption2)
+                .buttonStyle(.borderedProminent)
+                .controlSize(.mini)
+
+                Button {
+                    appState.recheckFullDiskAccess()
+                } label: {
+                    Image(systemName: "arrow.clockwise")
+                        .font(.system(size: 10))
+                }
+                .buttonStyle(.plain)
+                .foregroundColor(.secondary)
             }
-            .font(.caption2)
-            .buttonStyle(.borderedProminent)
-            .controlSize(.mini)
 
-            Button {
-                appState.recheckFullDiskAccess()
-            } label: {
-                Image(systemName: "arrow.clockwise")
-                    .font(.system(size: 10))
-            }
-            .buttonStyle(.plain)
-            .foregroundColor(.secondary)
+            Text("설정 후 앱이 자동으로 다시 시작됩니다")
+                .font(.system(size: 10))
+                .foregroundColor(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.leading, 20)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
