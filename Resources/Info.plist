@@ -2,16 +2,16 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>CFBundleIconFile</key>
+	<string>AppIcon</string>
 	<key>CFBundleIdentifier</key>
 	<string>com.hwaa.dotbrain</string>
 	<key>CFBundleName</key>
 	<string>DotBrain</string>
 	<key>CFBundleShortVersionString</key>
-	<string>2.11.8</string>
+	<string>2.11.9</string>
 	<key>CFBundleVersion</key>
 	<string>2.11.8</string>
-	<key>CFBundleIconFile</key>
-	<string>AppIcon</string>
 	<key>LSUIElement</key>
 	<true/>
 	<key>NSAppTransportSecurity</key>
