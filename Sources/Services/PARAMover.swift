@@ -48,6 +48,11 @@ struct PARAMover {
             unmarkReferencesCompleted(folderName: safeName)
         }
 
+        // Clean up Area projects field when moving a project out of 1_Project
+        if source == .project {
+            FrontmatterWriter.removeProjectFromArea(projectName: safeName, pkmRoot: pkmRoot)
+        }
+
         return updatedCount
     }
 
@@ -65,6 +70,11 @@ struct PARAMover {
         }
         guard fm.fileExists(atPath: folderPath) else {
             throw PARAMoveError.notFound(safeName, category)
+        }
+
+        // Clean up Area projects field before deleting
+        if category == .project {
+            FrontmatterWriter.removeProjectFromArea(projectName: safeName, pkmRoot: pkmRoot)
         }
 
         let folderURL = URL(fileURLWithPath: folderPath)
@@ -179,6 +189,11 @@ struct PARAMover {
         // Remove now-empty source folder
         try? fm.removeItem(atPath: sourceDir)
 
+        // Clean up Area projects field for merged-away project
+        if category == .project {
+            FrontmatterWriter.removeProjectFromArea(projectName: safeSource, pkmRoot: pkmRoot)
+        }
+
         return movedCount
     }
 
@@ -237,6 +252,11 @@ struct PARAMover {
 
         // Update WikiLink references across the vault
         markInVault(pattern: "[[\(safeOld)]]", replacement: "[[\(safeNew)]]")
+
+        // Update Area projects field for renamed project
+        if category == .project {
+            FrontmatterWriter.renameProjectInArea(oldName: safeOld, newName: safeNew, pkmRoot: pkmRoot)
+        }
 
         return count
     }

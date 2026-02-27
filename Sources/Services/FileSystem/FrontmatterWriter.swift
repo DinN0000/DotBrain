@@ -127,6 +127,96 @@ enum FrontmatterWriter {
             .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
+    // MARK: - Area Projects Cleanup
+
+    /// Find which Area contains a given project by checking frontmatter and Area index notes
+    static func findAreaForProject(projectName: String, pkmRoot: String) -> String? {
+        let pm = PKMPathManager(root: pkmRoot)
+        let fm = FileManager.default
+
+        // 1. Check project index note for area field
+        let projectIndexPath = (pm.projectsPath as NSString)
+            .appendingPathComponent(projectName)
+            .appending("/\(projectName).md")
+        if let content = try? String(contentsOfFile: projectIndexPath, encoding: .utf8) {
+            let (frontmatter, _) = Frontmatter.parse(markdown: content)
+            if let area = frontmatter.area { return area }
+        }
+
+        // 2. Scan all Area index notes for projects field containing this project
+        guard let areas = try? fm.contentsOfDirectory(atPath: pm.areaPath) else { return nil }
+        for area in areas {
+            guard !area.hasPrefix("."), !area.hasPrefix("_") else { continue }
+            let areaIndexPath = (pm.areaPath as NSString)
+                .appendingPathComponent(area)
+                .appending("/\(area).md")
+            guard let content = try? String(contentsOfFile: areaIndexPath, encoding: .utf8) else { continue }
+            let (frontmatter, _) = Frontmatter.parse(markdown: content)
+            if let projects = frontmatter.projects, projects.contains(projectName) {
+                return area
+            }
+        }
+        return nil
+    }
+
+    /// Remove a project name from its Area index note's projects field
+    static func removeProjectFromArea(projectName: String, pkmRoot: String) {
+        guard let areaName = findAreaForProject(projectName: projectName, pkmRoot: pkmRoot) else { return }
+        let pm = PKMPathManager(root: pkmRoot)
+        let areaIndexPath = (pm.areaPath as NSString)
+            .appendingPathComponent(areaName)
+            .appending("/\(areaName).md")
+
+        guard let content = try? String(contentsOfFile: areaIndexPath, encoding: .utf8) else { return }
+        var (frontmatter, body) = Frontmatter.parse(markdown: content)
+        guard var projects = frontmatter.projects, projects.contains(projectName) else { return }
+
+        projects.removeAll { $0 == projectName }
+        frontmatter.projects = projects.isEmpty ? nil : projects
+
+        let updated = frontmatter.stringify() + "\n" + body
+        try? updated.write(toFile: areaIndexPath, atomically: true, encoding: .utf8)
+    }
+
+    /// Rename a project reference in its Area index note's projects field
+    static func renameProjectInArea(oldName: String, newName: String, pkmRoot: String) {
+        guard let areaName = findAreaForProject(projectName: oldName, pkmRoot: pkmRoot) else { return }
+        let pm = PKMPathManager(root: pkmRoot)
+        let areaIndexPath = (pm.areaPath as NSString)
+            .appendingPathComponent(areaName)
+            .appending("/\(areaName).md")
+
+        guard let content = try? String(contentsOfFile: areaIndexPath, encoding: .utf8) else { return }
+        var (frontmatter, body) = Frontmatter.parse(markdown: content)
+        guard var projects = frontmatter.projects, projects.contains(oldName) else { return }
+
+        projects = projects.map { $0 == oldName ? newName : $0 }
+        frontmatter.projects = projects
+
+        let updated = frontmatter.stringify() + "\n" + body
+        try? updated.write(toFile: areaIndexPath, atomically: true, encoding: .utf8)
+    }
+
+    /// Add a project name to its Area index note's projects field
+    static func addProjectToArea(projectName: String, areaName: String, pkmRoot: String) {
+        let pm = PKMPathManager(root: pkmRoot)
+        let areaIndexPath = (pm.areaPath as NSString)
+            .appendingPathComponent(areaName)
+            .appending("/\(areaName).md")
+
+        guard let content = try? String(contentsOfFile: areaIndexPath, encoding: .utf8) else { return }
+        var (frontmatter, body) = Frontmatter.parse(markdown: content)
+
+        var projects = frontmatter.projects ?? []
+        guard !projects.contains(projectName) else { return }
+        projects.append(projectName)
+        projects.sort()
+        frontmatter.projects = projects
+
+        let updated = frontmatter.stringify() + "\n" + body
+        try? updated.write(toFile: areaIndexPath, atomically: true, encoding: .utf8)
+    }
+
     /// Create index note for a new subfolder
     static func createIndexNote(
         folderName: String,

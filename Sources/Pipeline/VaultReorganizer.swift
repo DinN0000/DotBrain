@@ -90,7 +90,8 @@ struct VaultReorganizer {
 
         // 0.1-0.2: Build project context
         onProgress?(0.1, "프로젝트 컨텍스트 로드 중...")
-        let contextBuilder = ProjectContextBuilder(pkmRoot: pkmRoot)
+        let noteIndex = PKMPathManager(root: pkmRoot).loadNoteIndex()
+        let contextBuilder = ProjectContextBuilder(pkmRoot: pkmRoot, noteIndex: noteIndex)
         let projectContext = contextBuilder.buildProjectContext()
         let subfolderContext = contextBuilder.buildSubfolderContext()
         let projectNames = contextBuilder.extractProjectNames(from: projectContext)

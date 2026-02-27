@@ -73,6 +73,9 @@ struct ProjectManager {
         // Mark references in other notes with "(완료됨)"
         markReferencesCompleted(projectName: safeName)
 
+        // Remove from Area projects field
+        FrontmatterWriter.removeProjectFromArea(projectName: safeName, pkmRoot: pkmRoot)
+
         return updatedCount
     }
 
@@ -97,10 +100,23 @@ struct ProjectManager {
             throw ProjectError.alreadyExists(safeName)
         }
 
+        // Read area field before moving (while still in archive)
+        let indexPath = (archiveDir as NSString).appendingPathComponent("\(safeName).md")
+        let areaName: String? = {
+            guard let content = try? String(contentsOfFile: indexPath, encoding: .utf8) else { return nil }
+            let (frontmatter, _) = Frontmatter.parse(markdown: content)
+            return frontmatter.area
+        }()
+
         let updatedCount = try updateAllNotes(in: archiveDir, status: .active, para: .project)
         try fm.moveItem(atPath: archiveDir, toPath: projectDir)
 
         unmarkReferencesCompleted(projectName: safeName)
+
+        // Re-add to Area projects field
+        if let areaName {
+            FrontmatterWriter.addProjectToArea(projectName: safeName, areaName: areaName, pkmRoot: pkmRoot)
+        }
 
         return updatedCount
     }

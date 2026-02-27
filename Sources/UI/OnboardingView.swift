@@ -1136,6 +1136,7 @@ struct OnboardingView: View {
 
     private func removeProject(_ name: String) {
         let pathManager = PKMPathManager(root: appState.pkmRootPath)
+        FrontmatterWriter.removeProjectFromArea(projectName: name, pkmRoot: appState.pkmRootPath)
         let projectDir = (pathManager.projectsPath as NSString).appendingPathComponent(name)
         try? FileManager.default.trashItem(at: URL(fileURLWithPath: projectDir), resultingItemURL: nil)
         projects.removeAll { $0 == name }
