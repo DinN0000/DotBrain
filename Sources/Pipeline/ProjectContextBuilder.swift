@@ -109,9 +109,9 @@ struct ProjectContextBuilder {
         let subfolders = pathManager.existingSubfolders()
 
         let paraMapping: [(String, String)] = [
-            ("area", "2_Area"),
-            ("resource", "3_Resource"),
-            ("archive", "4_Archive"),
+            (PARACategory.area.rawValue, PARACategory.area.folderName),
+            (PARACategory.resource.rawValue, PARACategory.resource.folderName),
+            (PARACategory.archive.rawValue, PARACategory.archive.folderName),
         ]
 
         // Pre-compute note counts per folder to avoid repeated O(N) scans
