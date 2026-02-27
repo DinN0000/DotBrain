@@ -357,6 +357,7 @@ actor Classifier {
         \(areaSection)
         ## 기존 하위 폴더 (이 목록의 정확한 이름만 사용)
         \(subfolderContext)
+        각 폴더의 name, tags, summary, noteCount를 참고하여 가장 적합한 폴더를 선택하세요.
         새 폴더가 필요하면 targetFolder에 "NEW:폴더명"을 사용하세요. 기존 폴더와 비슷한 이름이 있으면 반드시 기존 이름을 사용하세요.
         \(weightedSection)\(tagSection)\(correctionContext.isEmpty ? "" : "\n\(correctionContext)\n")
         ## 분류 규칙
@@ -457,6 +458,7 @@ actor Classifier {
         \(areaSection)
         ## 기존 하위 폴더 (이 목록의 정확한 이름만 사용)
         \(subfolderContext)
+        각 폴더의 name, tags, summary, noteCount를 참고하여 가장 적합한 폴더를 선택하세요.
         새 폴더가 필요하면 targetFolder에 "NEW:폴더명"을 사용하세요. 기존 폴더와 비슷한 이름이 있으면 반드시 기존 이름을 사용하세요.
         \(weightedSection)\(tagSection)\(correctionContext.isEmpty ? "" : "\n\(correctionContext)\n")
         ## 분류 규칙

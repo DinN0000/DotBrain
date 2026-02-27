@@ -173,4 +173,10 @@ struct PKMPathManager {
 
         return result
     }
+
+    /// Load note-index.json, returning nil if missing or corrupt
+    func loadNoteIndex() -> NoteIndex? {
+        guard let data = FileManager.default.contents(atPath: noteIndexPath) else { return nil }
+        return try? JSONDecoder().decode(NoteIndex.self, from: data)
+    }
 }

@@ -11,6 +11,7 @@ struct NoteIndexEntry: Codable, Sendable {
     let summary: String
     let project: String?
     let status: String?
+    let area: String?
 }
 
 /// Folder-level summary entry in the vault index
@@ -199,7 +200,8 @@ struct NoteIndexGenerator: Sendable {
                 tags: frontmatter.tags,
                 summary: frontmatter.summary ?? "",
                 project: frontmatter.project,
-                status: frontmatter.status?.rawValue
+                status: frontmatter.status?.rawValue,
+                area: frontmatter.area
             )
 
             noteEntries.append((relNotePath, noteEntry))

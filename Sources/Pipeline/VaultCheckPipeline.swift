@@ -35,8 +35,13 @@ struct VaultCheckPipeline {
         onProgress(Progress(phase: "오류 검사 중...", fraction: 0.10))
 
         // Prune stale folder relations (folders that no longer exist)
-        let existingFolders = Self.collectExistingFolders(pm: PKMPathManager(root: pkmRoot))
+        let pm = PKMPathManager(root: pkmRoot)
+        let existingFolders = Self.collectExistingFolders(pm: pm)
         FolderRelationStore(pkmRoot: pkmRoot).pruneStale(existingFolders: existingFolders)
+
+        // Prune stale project references from Area index notes
+        let existingProjects = Self.collectExistingProjectNames(pm: pm)
+        Self.pruneStaleAreaProjects(pkmRoot: pkmRoot, pm: pm, existingProjects: existingProjects)
 
         // Phase 2: Repair (10% -> 20%)
         var repairedFiles: [String] = []
@@ -60,7 +65,6 @@ struct VaultCheckPipeline {
 
         // Check all .md files for changes (single batch actor call)
         onProgress(Progress(phase: "변경 파일 확인 중...", fraction: 0.20))
-        let pm = PKMPathManager(root: pkmRoot)
         let allMdFiles = Self.collectAllMdFiles(pm: pm)
         let fileStatuses = await cache.checkFiles(allMdFiles)
         let changedFiles = Set(fileStatuses.filter { $0.value != .unchanged }.map { $0.key })
@@ -292,5 +296,48 @@ struct VaultCheckPipeline {
             }
         }
         return results
+    }
+
+    /// Collect existing project folder names
+    private static func collectExistingProjectNames(pm: PKMPathManager) -> Set<String> {
+        let fm = FileManager.default
+        guard let entries = try? fm.contentsOfDirectory(atPath: pm.projectsPath) else { return [] }
+        var names = Set<String>()
+        for entry in entries {
+            guard !entry.hasPrefix("."), !entry.hasPrefix("_") else { continue }
+            let path = (pm.projectsPath as NSString).appendingPathComponent(entry)
+            var isDir: ObjCBool = false
+            if fm.fileExists(atPath: path, isDirectory: &isDir), isDir.boolValue {
+                names.insert(entry)
+            }
+        }
+        return names
+    }
+
+    /// Remove non-existent project names from Area index notes' projects fields
+    private static func pruneStaleAreaProjects(pkmRoot: String, pm: PKMPathManager, existingProjects: Set<String>) {
+        let fm = FileManager.default
+        guard let areas = try? fm.contentsOfDirectory(atPath: pm.areaPath) else { return }
+
+        for area in areas {
+            guard !area.hasPrefix("."), !area.hasPrefix("_") else { continue }
+            let areaDir = (pm.areaPath as NSString).appendingPathComponent(area)
+            var isDir: ObjCBool = false
+            guard fm.fileExists(atPath: areaDir, isDirectory: &isDir), isDir.boolValue else { continue }
+
+            let indexPath = (areaDir as NSString).appendingPathComponent("\(area).md")
+            guard let content = try? String(contentsOfFile: indexPath, encoding: .utf8) else { continue }
+            var (frontmatter, body) = Frontmatter.parse(markdown: content)
+            guard let projects = frontmatter.projects else { continue }
+
+            let valid = projects.filter { existingProjects.contains($0) }
+            if valid.count != projects.count {
+                frontmatter.projects = valid.isEmpty ? nil : valid
+                let updated = frontmatter.stringify() + "\n" + body
+                try? updated.write(toFile: indexPath, atomically: true, encoding: .utf8)
+                NSLog("[VaultCheck] Pruned stale projects from Area %@: %@",
+                      area, projects.filter { !existingProjects.contains($0) }.joined(separator: ", "))
+            }
+        }
     }
 }
