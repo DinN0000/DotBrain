@@ -91,20 +91,13 @@ struct FileMover {
         let resolvedDest = resolveConflict(destPath)
         try fm.moveItem(atPath: folderPath, toPath: resolvedDest)
 
-        // Collect all notes inside with context summaries for [[wikilinks]]
-        let noteEntries = collectNoteEntries(in: resolvedDest)
-
-        // Create or update index note with wikilinks
+        // Create index note if missing (frontmatter only — no wikilinks list)
         let indexPath = (resolvedDest as NSString).appendingPathComponent("\(folderName).md")
-        if fm.fileExists(atPath: indexPath) {
-            try appendWikilinksSection(to: indexPath, entries: noteEntries)
-        } else {
-            let content = createFolderIndexContent(
+        if !fm.fileExists(atPath: indexPath) {
+            let content = FrontmatterWriter.createIndexNote(
                 folderName: folderName,
                 para: classification.para,
-                tags: classification.tags,
-                summary: classification.summary,
-                entries: noteEntries
+                description: classification.summary
             )
             try content.write(toFile: indexPath, atomically: true, encoding: .utf8)
         }
@@ -118,96 +111,6 @@ struct FileMover {
     }
 
     // MARK: - Private
-
-    /// Note entry: name (for wikilink) + context summary from content
-    private struct NoteEntry {
-        let name: String
-        let context: String
-    }
-
-    /// Collect markdown notes inside a folder with context extracted from each file
-    private func collectNoteEntries(in dirPath: String) -> [NoteEntry] {
-        let fm = FileManager.default
-        guard let entries = try? fm.contentsOfDirectory(atPath: dirPath) else { return [] }
-        let folderName = (dirPath as NSString).lastPathComponent
-
-        return entries.sorted().compactMap { fileName -> NoteEntry? in
-            guard fileName.hasSuffix(".md") else { return nil }
-            let baseName = (fileName as NSString).deletingPathExtension
-            guard baseName != folderName else { return nil } // skip index note itself
-
-            let filePath = (dirPath as NSString).appendingPathComponent(fileName)
-            let context = extractContext(from: filePath)
-            return NoteEntry(name: baseName, context: context)
-        }
-    }
-
-    /// Extract a one-line context summary from a note's content
-    private func extractContext(from filePath: String) -> String {
-        guard let content = try? String(contentsOfFile: filePath, encoding: .utf8) else {
-            return ""
-        }
-
-        let (_, body) = Frontmatter.parse(markdown: content)
-
-        // Find first meaningful line (skip blank lines and headings)
-        let lines = body.components(separatedBy: .newlines)
-        for line in lines {
-            let trimmed = line.trimmingCharacters(in: .whitespaces)
-            if trimmed.isEmpty || trimmed.hasPrefix("#") { continue }
-            // Truncate to reasonable length
-            let maxLen = 80
-            if trimmed.count > maxLen {
-                return String(trimmed.prefix(maxLen)) + "…"
-            }
-            return trimmed
-        }
-
-        return ""
-    }
-
-    /// Create index note content with [[wikilinks]] + context for Obsidian
-    private func createFolderIndexContent(
-        folderName: String,
-        para: PARACategory,
-        tags: [String],
-        summary: String,
-        entries: [NoteEntry]
-    ) -> String {
-        let fm = Frontmatter.createDefault(
-            para: para,
-            tags: tags,
-            summary: summary,
-            source: .original
-        )
-
-        var content = fm.stringify() + "\n\n"
-        content += "## 포함된 노트\n\n"
-        for entry in entries {
-            if entry.context.isEmpty {
-                content += "- [[\(entry.name)]]\n"
-            } else {
-                content += "- [[\(entry.name)]] — \(entry.context)\n"
-            }
-        }
-        return content
-    }
-
-    /// Append [[wikilinks]] section to an existing index note if not already present
-    private func appendWikilinksSection(to indexPath: String, entries: [NoteEntry]) throws {
-        var content = try String(contentsOfFile: indexPath, encoding: .utf8)
-        guard !content.contains("## 포함된 노트") else { return }
-
-        content += "\n\n## 포함된 노트\n\n"
-        for entry in entries {
-            if entry.context.isEmpty {
-                content += "- [[\(entry.name)]]\n"
-            } else {
-                content += "- [[\(entry.name)]] — \(entry.context)\n"
-            }
-        }
-        try content.write(toFile: indexPath, atomically: true, encoding: .utf8)
-    }
 
     private func moveBinaryFile(
         filePath: String,
