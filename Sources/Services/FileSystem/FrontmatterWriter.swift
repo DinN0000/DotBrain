@@ -144,11 +144,6 @@ enum FrontmatterWriter {
         fm.area = area
         fm.projects = projects
 
-        return """
-        \(fm.stringify())
-
-        ## 포함된 노트
-
-        """
+        return fm.stringify() + "\n"
     }
 }

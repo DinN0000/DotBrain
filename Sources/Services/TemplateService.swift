@@ -56,8 +56,6 @@ enum TemplateService {
 
     ## 현재 상태
 
-    ## 포함된 노트
-
     ## Related Notes
 
     """
