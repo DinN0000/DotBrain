@@ -666,7 +666,17 @@ struct SettingsView: View {
             Spacer()
 
             Button(action: {
-                NSApplication.shared.terminate(nil)
+                let uid = getuid()
+                Task.detached(priority: .userInitiated) {
+                    let process = Process()
+                    process.executableURL = URL(fileURLWithPath: "/bin/launchctl")
+                    process.arguments = ["bootout", "gui/\(uid)/com.dotbrain.app"]
+                    try? process.run()
+                    process.waitUntilExit()
+                    await MainActor.run {
+                        NSApplication.shared.terminate(nil)
+                    }
+                }
             }) {
                 HStack(spacing: 3) {
                     Image(systemName: "power")
