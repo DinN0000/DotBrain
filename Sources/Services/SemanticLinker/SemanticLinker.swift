@@ -346,16 +346,16 @@ struct SemanticLinker: Sendable {
 
     // MARK: - Private
 
-    func buildNoteIndex() -> [LinkCandidateGenerator.NoteInfo] {
-        // Try index-first: load note-index.json, only read files for existingRelated
-        if let notes = buildNoteIndexFromIndex() {
+    func buildNoteIndex(skipRelated: Bool = false) -> [LinkCandidateGenerator.NoteInfo] {
+        // Try index-first: load note-index.json
+        if let notes = buildNoteIndexFromIndex(skipRelated: skipRelated) {
             return notes
         }
         // Fallback: full directory scan
         return buildNoteIndexFromDisk()
     }
 
-    private func buildNoteIndexFromIndex() -> [LinkCandidateGenerator.NoteInfo]? {
+    private func buildNoteIndexFromIndex(skipRelated: Bool = false) -> [LinkCandidateGenerator.NoteInfo]? {
         let indexPath = pathManager.noteIndexPath
         guard let data = FileManager.default.contents(atPath: indexPath),
               let index = try? JSONDecoder().decode(NoteIndex.self, from: data) else {
@@ -377,9 +377,9 @@ struct SemanticLinker: Sendable {
             let filePath = rootPrefix + entry.path
             let para = PARACategory(rawValue: entry.para) ?? .archive
 
-            // Only read file for existingRelated parsing
+            // Read file for existingRelated parsing (skip when only tags/folders needed)
             let existingRelated: Set<String>
-            if let content = try? String(contentsOfFile: filePath, encoding: .utf8) {
+            if !skipRelated, let content = try? String(contentsOfFile: filePath, encoding: .utf8) {
                 let (_, body) = Frontmatter.parse(markdown: content)
                 existingRelated = parseExistingRelatedNames(body)
             } else {

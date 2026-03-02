@@ -1,5 +1,10 @@
 # Changelog
 
+## v2.12.1 — Reorg Error Display + Relation Explorer UX (2026-03-03)
+- fix: 위치 제안 스캔 에러(API 429 등) 시 무반응 대신 에러 카드 표시
+- fix: 폴더 짝 매칭 로딩 속도 개선 — buildNoteIndex(skipRelated: true)로 불필요한 파일 읽기 생략
+- UX: 폴더 짝 매칭 설명 문구에 AI 분류 정확도 향상 효과 안내 추가
+
 ## v2.12.0 — Global Reorg Progress (2026-03-03)
 - 위치 제안(reorg scan) 진행률을 글로벌 배너로 표시 — 다른 화면에서도 진행 상황 확인 가능
 - 스캔 완료 시 이동 필요한 파일이 있으면 자동으로 VaultInspectorView로 화면 전환
