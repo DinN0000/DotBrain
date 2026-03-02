@@ -31,7 +31,7 @@ struct FolderRelationExplorer: View {
 
             // Description
             if isLoading || (!candidates.isEmpty && currentIndex < candidates.count) {
-                Text("관련 있어 보이는 폴더 짝이에요. 연결할지 말지 골라주세요.")
+                Text("폴더 관계를 매칭하면 AI가 파일을 더 정확하게 분류합니다.")
                     .font(.caption2)
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
@@ -479,7 +479,7 @@ struct FolderRelationExplorer: View {
     private func loadCandidates() async {
         let root = appState.pkmRootPath
         let linker = SemanticLinker(pkmRoot: root)
-        let allNotes = linker.buildNoteIndex()
+        let allNotes = linker.buildNoteIndex(skipRelated: true)
 
         // Group notes by folder for note count lookup
         var folderNotes: [String: [LinkCandidateGenerator.NoteInfo]] = [:]

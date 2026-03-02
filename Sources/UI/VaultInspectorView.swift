@@ -865,9 +865,16 @@ struct VaultInspectorView: View {
                     }
                 }
             } catch {
+                if Task.isCancelled { return }
                 await MainActor.run {
-                    AppState.shared.reorgStatus = "오류: \(error.localizedDescription)"
-                    AppState.shared.reorgPhase = .idle
+                    AppState.shared.reorgResults = [ProcessedFileResult(
+                        fileName: "스캔 오류",
+                        para: .archive,
+                        targetPath: "",
+                        tags: [],
+                        status: .error(error.localizedDescription)
+                    )]
+                    AppState.shared.reorgPhase = .done
                     AppState.shared.backgroundTaskKind = nil
                     AppState.shared.backgroundTaskName = nil
                     AppState.shared.backgroundTaskPhase = ""
