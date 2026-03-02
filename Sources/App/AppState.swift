@@ -84,6 +84,7 @@ final class AppState: ObservableObject {
 
     enum BackgroundTaskKind {
         case vaultCheck
+        case reorgScan
     }
 
     @Published var backgroundTaskKind: BackgroundTaskKind?
@@ -93,17 +94,15 @@ final class AppState: ObservableObject {
     @Published var backgroundTaskCompleted: Bool = false
     @Published var vaultCheckResult: VaultCheckResult?
     @Published var taskBlockedAlert: String?
-    @Published var viewTaskActive: Bool = false
     private var backgroundTask: Task<Void, Never>?
 
     var isAnyTaskRunning: Bool {
-        isProcessing || (backgroundTaskName != nil && !backgroundTaskCompleted) || viewTaskActive
+        isProcessing || (backgroundTaskName != nil && !backgroundTaskCompleted)
     }
 
     private var runningTaskDisplayName: String {
         if let bg = backgroundTaskName { return bg }
         if isProcessing { return "파일 처리" }
-        if viewTaskActive { return "재분류" }
         return ""
     }
 
@@ -123,13 +122,19 @@ final class AppState: ObservableObject {
 
     func resetReorg() {
         reorgTask?.cancel()
-        viewTaskActive = false
         reorgTask = nil
         reorgPhase = .idle
         reorgAnalyses = []
         reorgResults = []
         reorgProgress = 0
         reorgStatus = ""
+        if backgroundTaskKind == .reorgScan {
+            backgroundTaskKind = nil
+            backgroundTaskName = nil
+            backgroundTaskPhase = ""
+            backgroundTaskProgress = 0
+            backgroundTaskCompleted = false
+        }
     }
 
     // MARK: - Settings
@@ -377,6 +382,10 @@ final class AppState: ObservableObject {
     }
 
     func cancelBackgroundTask() {
+        if backgroundTaskKind == .reorgScan {
+            resetReorg()
+            return
+        }
         backgroundTask?.cancel()
         backgroundTask = nil
         backgroundTaskKind = nil
@@ -487,7 +496,7 @@ final class AppState: ObservableObject {
 
     func startProcessing() async {
         guard !isAnyTaskRunning else {
-            if backgroundTaskName != nil || viewTaskActive {
+            if backgroundTaskName != nil {
                 taskBlockedAlert = "'\(runningTaskDisplayName)' 진행 중입니다. 완료 또는 취소 후 다시 시도해주세요."
             }
             return
@@ -580,7 +589,7 @@ final class AppState: ObservableObject {
 
     func startReorganizing() async {
         guard !isAnyTaskRunning else {
-            if backgroundTaskName != nil || viewTaskActive {
+            if backgroundTaskName != nil {
                 taskBlockedAlert = "'\(runningTaskDisplayName)' 진행 중입니다. 완료 또는 취소 후 다시 시도해주세요."
             }
             return

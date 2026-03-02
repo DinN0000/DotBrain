@@ -779,7 +779,11 @@ struct VaultInspectorView: View {
     private func startReorgScan() {
         appState.reorgProgress = 0
         appState.reorgStatus = "스캔 준비 중..."
-        appState.viewTaskActive = true
+        appState.backgroundTaskKind = .reorgScan
+        appState.backgroundTaskName = "위치 제안"
+        appState.backgroundTaskProgress = 0
+        appState.backgroundTaskPhase = "스캔 준비 중..."
+        appState.backgroundTaskCompleted = false
         let root = appState.pkmRootPath
         let currentScope = appState.reorgScope
 
@@ -803,10 +807,13 @@ struct VaultInspectorView: View {
                     // Nothing changed — skip scan
                     await MainActor.run {
                         AppState.shared.reorgAnalyses = []
-                        AppState.shared.viewTaskActive = false
                         AppState.shared.reorgResults = []
                         AppState.shared.reorgPhase = .done
                         AppState.shared.reorgStatus = "변경된 파일이 없습니다"
+                        AppState.shared.backgroundTaskKind = nil
+                        AppState.shared.backgroundTaskName = nil
+                        AppState.shared.backgroundTaskPhase = ""
+                        AppState.shared.backgroundTaskProgress = 0
                     }
                     return
                 }
@@ -819,6 +826,8 @@ struct VaultInspectorView: View {
                     Task { @MainActor in
                         AppState.shared.reorgProgress = value
                         AppState.shared.reorgStatus = status
+                        AppState.shared.backgroundTaskProgress = value
+                        AppState.shared.backgroundTaskPhase = status
                     }
                 }
             )
@@ -840,9 +849,16 @@ struct VaultInspectorView: View {
 
                 await MainActor.run {
                     AppState.shared.reorgAnalyses = result.files
-                    AppState.shared.viewTaskActive = false
+                    AppState.shared.backgroundTaskKind = nil
+                    AppState.shared.backgroundTaskName = nil
+                    AppState.shared.backgroundTaskPhase = ""
+                    AppState.shared.backgroundTaskProgress = 0
                     if AppState.shared.reorgAnalyses.contains(where: \.needsMove) {
                         AppState.shared.reorgPhase = .reviewPlan
+                        // Auto-navigate to show results if user left VaultInspectorView
+                        if AppState.shared.currentScreen != .vaultInspector {
+                            AppState.shared.currentScreen = .vaultInspector
+                        }
                     } else {
                         AppState.shared.reorgResults = []
                         AppState.shared.reorgPhase = .done
@@ -850,9 +866,12 @@ struct VaultInspectorView: View {
                 }
             } catch {
                 await MainActor.run {
-                    AppState.shared.viewTaskActive = false
                     AppState.shared.reorgStatus = "오류: \(error.localizedDescription)"
                     AppState.shared.reorgPhase = .idle
+                    AppState.shared.backgroundTaskKind = nil
+                    AppState.shared.backgroundTaskName = nil
+                    AppState.shared.backgroundTaskPhase = ""
+                    AppState.shared.backgroundTaskProgress = 0
                 }
             }
         }
@@ -865,7 +884,11 @@ struct VaultInspectorView: View {
         appState.reorgPhase = .executing
         appState.reorgProgress = 0
         appState.reorgStatus = "실행 준비 중..."
-        appState.viewTaskActive = true
+        appState.backgroundTaskKind = .reorgScan
+        appState.backgroundTaskName = "위치 이동"
+        appState.backgroundTaskProgress = 0
+        appState.backgroundTaskPhase = "실행 준비 중..."
+        appState.backgroundTaskCompleted = false
         let root = appState.pkmRootPath
         let currentScope = appState.reorgScope
 
@@ -893,6 +916,8 @@ struct VaultInspectorView: View {
                     Task { @MainActor in
                         AppState.shared.reorgProgress = value
                         AppState.shared.reorgStatus = status
+                        AppState.shared.backgroundTaskProgress = value
+                        AppState.shared.backgroundTaskPhase = status
                     }
                 }
             )
@@ -912,15 +937,21 @@ struct VaultInspectorView: View {
                 }
 
                 await MainActor.run {
-                    AppState.shared.viewTaskActive = false
                     AppState.shared.reorgResults = executionResults
                     AppState.shared.reorgPhase = .done
+                    AppState.shared.backgroundTaskKind = nil
+                    AppState.shared.backgroundTaskName = nil
+                    AppState.shared.backgroundTaskPhase = ""
+                    AppState.shared.backgroundTaskProgress = 0
                 }
             } catch {
                 await MainActor.run {
-                    AppState.shared.viewTaskActive = false
                     AppState.shared.reorgStatus = "오류: \(error.localizedDescription)"
                     AppState.shared.reorgPhase = .done
+                    AppState.shared.backgroundTaskKind = nil
+                    AppState.shared.backgroundTaskName = nil
+                    AppState.shared.backgroundTaskPhase = ""
+                    AppState.shared.backgroundTaskProgress = 0
                 }
             }
         }
