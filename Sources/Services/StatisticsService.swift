@@ -2,6 +2,12 @@ import Foundation
 
 /// Collects and persists PKM statistics
 class StatisticsService {
+    fileprivate enum DefaultsKey {
+        static let apiCost = "pkmApiCost"
+        static let duplicatesFound = "pkmDuplicatesFound"
+        static let activityHistory = "pkmActivityHistory"
+    }
+
     private let pkmRoot: String
     static var sharedPkmRoot: String?  // Set by AppState on init
 
@@ -33,8 +39,8 @@ class StatisticsService {
         }
 
         stats.recentActivity = loadRecentActivity()
-        stats.apiCost = UserDefaults.standard.double(forKey: "pkmApiCost")
-        stats.duplicatesFound = UserDefaults.standard.integer(forKey: "pkmDuplicatesFound")
+        stats.apiCost = UserDefaults.standard.double(forKey: DefaultsKey.apiCost)
+        stats.duplicatesFound = UserDefaults.standard.integer(forKey: DefaultsKey.duplicatesFound)
 
         return stats
     }
@@ -116,14 +122,16 @@ class StatisticsService {
     }
 
     private static func loadActivityHistory() -> [[String: String]] {
-        (UserDefaults.standard.array(forKey: "pkmActivityHistory") as? [[String: String]]) ?? []
+        (UserDefaults.standard.array(forKey: DefaultsKey.activityHistory) as? [[String: String]]) ?? []
     }
 }
 
 /// Private actor for thread-safe UserDefaults mutations (replaces DispatchQueue serial)
 private actor StatisticsActor {
+    private typealias Key = StatisticsService.DefaultsKey
+
     func recordActivity(fileName: String, category: String, action: String, detail: String) {
-        var history = (UserDefaults.standard.array(forKey: "pkmActivityHistory") as? [[String: String]]) ?? []
+        var history = (UserDefaults.standard.array(forKey: Key.activityHistory) as? [[String: String]]) ?? []
         let entry: [String: String] = [
             "fileName": fileName,
             "category": category,
@@ -135,16 +143,16 @@ private actor StatisticsActor {
         if history.count > 100 {
             history = Array(history.prefix(100))
         }
-        UserDefaults.standard.set(history, forKey: "pkmActivityHistory")
+        UserDefaults.standard.set(history, forKey: Key.activityHistory)
     }
 
     func addApiCost(_ cost: Double) {
-        let current = UserDefaults.standard.double(forKey: "pkmApiCost")
-        UserDefaults.standard.set(current + cost, forKey: "pkmApiCost")
+        let current = UserDefaults.standard.double(forKey: Key.apiCost)
+        UserDefaults.standard.set(current + cost, forKey: Key.apiCost)
     }
 
     func incrementDuplicates() {
-        let current = UserDefaults.standard.integer(forKey: "pkmDuplicatesFound")
-        UserDefaults.standard.set(current + 1, forKey: "pkmDuplicatesFound")
+        let current = UserDefaults.standard.integer(forKey: Key.duplicatesFound)
+        UserDefaults.standard.set(current + 1, forKey: Key.duplicatesFound)
     }
 }

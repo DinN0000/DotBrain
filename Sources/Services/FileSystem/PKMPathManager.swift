@@ -27,12 +27,15 @@ struct PKMPathManager {
     }
 
     /// Sanitize a folder name to prevent path traversal attacks
-    private func sanitizeFolderName(_ name: String) -> String {
+    func sanitizeFolderName(_ name: String) -> String {
         let components = name.components(separatedBy: "/")
         let safe = components.filter { $0 != ".." && $0 != "." && !$0.isEmpty }
         let limited = Array(safe.prefix(3))
         return limited.map { component in
-            let cleaned = component.replacingOccurrences(of: "\0", with: "")
+            let cleaned = component
+                .replacingOccurrences(of: "\0", with: "")
+                .replacingOccurrences(of: "\\", with: "")
+                .trimmingCharacters(in: .whitespacesAndNewlines)
             return String(cleaned.prefix(255))
         }.joined(separator: "/")
     }
@@ -172,6 +175,41 @@ struct PKMPathManager {
         }
 
         return result
+    }
+
+    /// Enumerate all .md files in the 4 PARA folders recursively, skipping hidden/system entries
+    func allMarkdownFiles() -> [String] {
+        let fm = FileManager.default
+        var results: [String] = []
+
+        let folders = [projectsPath, areaPath, resourcePath, archivePath]
+
+        for folder in folders {
+            guard let enumerator = fm.enumerator(atPath: folder) else { continue }
+            while let element = enumerator.nextObject() as? String {
+                let name = (element as NSString).lastPathComponent
+
+                if name.hasPrefix(".") || name.hasPrefix("_") {
+                    let fullCheck = (folder as NSString).appendingPathComponent(element)
+                    var isDirCheck: ObjCBool = false
+                    if fm.fileExists(atPath: fullCheck, isDirectory: &isDirCheck), isDirCheck.boolValue {
+                        enumerator.skipDescendants()
+                    }
+                    continue
+                }
+
+                guard name.hasSuffix(".md") else { continue }
+
+                let fullPath = (folder as NSString).appendingPathComponent(element)
+                var isDir: ObjCBool = false
+                if fm.fileExists(atPath: fullPath, isDirectory: &isDir), !isDir.boolValue,
+                   isPathSafe(fullPath) {
+                    results.append(fullPath)
+                }
+            }
+        }
+
+        return results
     }
 
     /// Load note-index.json, returning nil if missing or corrupt

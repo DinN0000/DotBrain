@@ -154,11 +154,6 @@ struct RelatedNotesWriter: Sendable {
     }
 
     private func sanitizeWikilink(_ name: String) -> String {
-        name.replacingOccurrences(of: "[[", with: "")
-            .replacingOccurrences(of: "]]", with: "")
-            .replacingOccurrences(of: "/", with: "-")
-            .replacingOccurrences(of: "\\", with: "-")
-            .replacingOccurrences(of: "..", with: "")
-            .trimmingCharacters(in: .whitespacesAndNewlines)
+        FrontmatterWriter.sanitizeWikilink(name)
     }
 }

@@ -6,6 +6,15 @@ import SwiftUI
 final class AppState: ObservableObject {
     static let shared = AppState()
 
+    enum DefaultsKey {
+        static let pkmRootPath = "pkmRootPath"
+        static let selectedProvider = "selectedProvider"
+        static let onboardingCompleted = "onboardingCompleted"
+        static let onboardingStep = "onboardingStep"
+        static let vaultFolderBookmark = "vaultFolderBookmark"
+        static let assetMigrationV1Completed = "assetMigrationV1Completed"
+    }
+
     private static let codeExtensions: Set<String> = [
         "swift", "py", "js", "ts", "jsx", "tsx", "go", "rs", "java",
         "c", "cpp", "h", "hpp", "cs", "rb", "php", "kt", "scala",
@@ -127,9 +136,9 @@ final class AppState: ObservableObject {
 
     @Published var pkmRootPath: String {
         didSet {
-            UserDefaults.standard.set(pkmRootPath, forKey: "pkmRootPath")
+            UserDefaults.standard.set(pkmRootPath, forKey: DefaultsKey.pkmRootPath)
             inboxWatchdog?.stop()
-            if UserDefaults.standard.bool(forKey: "onboardingCompleted") {
+            if UserDefaults.standard.bool(forKey: DefaultsKey.onboardingCompleted) {
                 setupWatchdog()
                 StatisticsService.sharedPkmRoot = pkmRootPath
             }
@@ -138,12 +147,12 @@ final class AppState: ObservableObject {
 
     @Published var selectedProvider: AIProvider {
         didSet {
-            UserDefaults.standard.set(selectedProvider.rawValue, forKey: "selectedProvider")
+            UserDefaults.standard.set(selectedProvider.rawValue, forKey: DefaultsKey.selectedProvider)
             updateAPIKeyStatus()
         }
     }
 
-    @Published var hasAPIKey: Bool = false
+    var hasAPIKey: Bool { selectedProvider.hasAPIKey() }
     @Published var hasClaudeKey: Bool = false
     @Published var hasGeminiKey: Bool = false
     @Published var hasClaudeCLI: Bool = false
@@ -154,8 +163,6 @@ final class AppState: ObservableObject {
 
     // MARK: - Vault Bookmark
 
-    private static let vaultBookmarkKey = "vaultFolderBookmark"
-
     /// Save a URL bookmark for persistent vault folder access.
     /// Call after the user selects a folder via NSOpenPanel.
     func saveVaultBookmark(url: URL) {
@@ -165,7 +172,7 @@ final class AppState: ObservableObject {
                 includingResourceValuesForKeys: nil,
                 relativeTo: nil
             )
-            UserDefaults.standard.set(bookmarkData, forKey: Self.vaultBookmarkKey)
+            UserDefaults.standard.set(bookmarkData, forKey: DefaultsKey.vaultFolderBookmark)
         } catch {
             NSLog("[AppState] 북마크 저장 실패: %@", error.localizedDescription)
         }
@@ -173,7 +180,7 @@ final class AppState: ObservableObject {
 
     /// Resolve the saved vault bookmark. Starts security-scoped access if available.
     private func resolveVaultBookmark() {
-        guard let data = UserDefaults.standard.data(forKey: Self.vaultBookmarkKey) else { return }
+        guard let data = UserDefaults.standard.data(forKey: DefaultsKey.vaultFolderBookmark) else { return }
         do {
             var isStale = false
             let url = try URL(
@@ -197,7 +204,6 @@ final class AppState: ObservableObject {
         hasClaudeKey = KeychainService.getAPIKey() != nil
         hasGeminiKey = KeychainService.getGeminiAPIKey() != nil
         hasClaudeCLI = ClaudeCLIClient.isAvailable()
-        hasAPIKey = selectedProvider.hasAPIKey()
     }
 
     // MARK: - Full Disk Access
@@ -260,16 +266,16 @@ final class AppState: ObservableObject {
     // MARK: - Init
 
     private init() {
-        self.pkmRootPath = UserDefaults.standard.string(forKey: "pkmRootPath")
+        self.pkmRootPath = UserDefaults.standard.string(forKey: DefaultsKey.pkmRootPath)
             ?? (NSHomeDirectory() + "/Documents/DotBrain")
 
         // Load saved provider (migrate "Claude Code" → "Claude CLI")
-        if let savedProvider = UserDefaults.standard.string(forKey: "selectedProvider") {
+        if let savedProvider = UserDefaults.standard.string(forKey: DefaultsKey.selectedProvider) {
             if let provider = AIProvider(rawValue: savedProvider) {
                 self.selectedProvider = provider
             } else if savedProvider == "Claude Code" {
                 self.selectedProvider = .claudeCLI
-                UserDefaults.standard.set(AIProvider.claudeCLI.rawValue, forKey: "selectedProvider")
+                UserDefaults.standard.set(AIProvider.claudeCLI.rawValue, forKey: DefaultsKey.selectedProvider)
             } else {
                 self.selectedProvider = .claudeCLI
             }
@@ -280,9 +286,8 @@ final class AppState: ObservableObject {
         self.hasClaudeKey = KeychainService.getAPIKey() != nil
         self.hasGeminiKey = KeychainService.getGeminiAPIKey() != nil
         self.hasClaudeCLI = ClaudeCLIClient.isAvailable()
-        self.hasAPIKey = selectedProvider.hasAPIKey()
 
-        if !UserDefaults.standard.bool(forKey: "onboardingCompleted") {
+        if !UserDefaults.standard.bool(forKey: DefaultsKey.onboardingCompleted) {
             self.currentScreen = .onboarding
         } else {
             // Check Full Disk Access after onboarding (may be revoked after app update)
@@ -300,7 +305,7 @@ final class AppState: ObservableObject {
         resolveVaultBookmark()
 
         // Only start services if onboarding is already completed
-        if UserDefaults.standard.bool(forKey: "onboardingCompleted") {
+        if UserDefaults.standard.bool(forKey: DefaultsKey.onboardingCompleted) {
             AICompanionService.updateIfNeeded(pkmRoot: pkmRootPath)
             StatisticsService.sharedPkmRoot = pkmRootPath
 
@@ -313,20 +318,19 @@ final class AppState: ObservableObject {
             }
 
             // One-time migration: consolidate scattered _Assets/ to central _Assets/{documents,images}/
-            let migrationKey = "assetMigrationV1Completed"
-            if !UserDefaults.standard.bool(forKey: migrationKey) {
+            if !UserDefaults.standard.bool(forKey: DefaultsKey.assetMigrationV1Completed) {
                 let root = pkmRootPath
                 Task.detached(priority: .utility) {
                     guard AssetMigrator.needsMigration(pkmRoot: root) else {
                         await MainActor.run {
-                            UserDefaults.standard.set(true, forKey: migrationKey)
+                            UserDefaults.standard.set(true, forKey: DefaultsKey.assetMigrationV1Completed)
                         }
                         return
                     }
                     let migrationResult = AssetMigrator.migrate(pkmRoot: root)
                     NSLog("[AppState] 에셋 마이그레이션: 문서 %d, 이미지 %d 이동", migrationResult.movedDocuments, migrationResult.movedImages)
                     await MainActor.run {
-                        UserDefaults.standard.set(true, forKey: migrationKey)
+                        UserDefaults.standard.set(true, forKey: DefaultsKey.assetMigrationV1Completed)
                     }
                 }
             }

@@ -294,44 +294,7 @@ struct VaultAuditor {
 
     /// Enumerate all .md files in the 4 PARA folders recursively
     private func allMarkdownFiles() -> [String] {
-        let fm = FileManager.default
-        var results: [String] = []
-
-        let folders = [
-            pathManager.projectsPath,
-            pathManager.areaPath,
-            pathManager.resourcePath,
-            pathManager.archivePath,
-        ]
-
-        for folder in folders {
-            guard let enumerator = fm.enumerator(atPath: folder) else { continue }
-            while let element = enumerator.nextObject() as? String {
-                let name = (element as NSString).lastPathComponent
-
-                // Skip hidden and _ prefixed entries
-                if name.hasPrefix(".") || name.hasPrefix("_") {
-                    // Only skip descendants for directories; files need continue only
-                    let fullCheck = (folder as NSString).appendingPathComponent(element)
-                    var isDirCheck: ObjCBool = false
-                    if fm.fileExists(atPath: fullCheck, isDirectory: &isDirCheck), isDirCheck.boolValue {
-                        enumerator.skipDescendants()
-                    }
-                    continue
-                }
-
-                guard name.hasSuffix(".md") else { continue }
-
-                let fullPath = (folder as NSString).appendingPathComponent(element)
-                var isDir: ObjCBool = false
-                if fm.fileExists(atPath: fullPath, isDirectory: &isDir), !isDir.boolValue,
-                   pathManager.isPathSafe(fullPath) {
-                    results.append(fullPath)
-                }
-            }
-        }
-
-        return results
+        pathManager.allMarkdownFiles()
     }
 
     /// Build a set of all note basenames (without .md) from a pre-collected file list

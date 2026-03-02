@@ -325,7 +325,7 @@ struct SettingsView: View {
 
         let pm = PKMPathManager(root: newPath)
         if !pm.isInitialized() {
-            UserDefaults.standard.set(2, forKey: "onboardingStep")
+            UserDefaults.standard.set(2, forKey: AppState.DefaultsKey.onboardingStep)
             appState.currentScreen = .onboarding
         }
     }
@@ -609,8 +609,8 @@ struct SettingsView: View {
             }
 
             Button(action: {
-                UserDefaults.standard.set(0, forKey: "onboardingStep")
-                UserDefaults.standard.set(false, forKey: "onboardingCompleted")
+                UserDefaults.standard.set(0, forKey: AppState.DefaultsKey.onboardingStep)
+                UserDefaults.standard.set(false, forKey: AppState.DefaultsKey.onboardingCompleted)
                 appState.currentScreen = .onboarding
             }) {
                 HStack(spacing: 4) {

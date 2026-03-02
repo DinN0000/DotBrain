@@ -12,7 +12,7 @@ struct ProjectManager {
     /// Create a new project with folder and index note
     func createProject(name: String, summary: String = "") throws -> String {
         let fm = FileManager.default
-        let safeName = sanitizeName(name)
+        let safeName = pathManager.sanitizeFolderName(name)
         let projectDir = (pathManager.projectsPath as NSString).appendingPathComponent(safeName)
 
         guard pathManager.isPathSafe(projectDir) else {
@@ -46,7 +46,7 @@ struct ProjectManager {
     /// Archive a completed project: move to 4_Archive/, update status, mark references
     func completeProject(name: String) throws -> Int {
         let fm = FileManager.default
-        let safeName = sanitizeName(name)
+        let safeName = pathManager.sanitizeFolderName(name)
         let projectDir = (pathManager.projectsPath as NSString).appendingPathComponent(safeName)
 
         guard pathManager.isPathSafe(projectDir) else {
@@ -84,7 +84,7 @@ struct ProjectManager {
     /// Restore a project from archive back to 1_Project/
     func reactivateProject(name: String) throws -> Int {
         let fm = FileManager.default
-        let safeName = sanitizeName(name)
+        let safeName = pathManager.sanitizeFolderName(name)
         let archiveDir = (pathManager.archivePath as NSString).appendingPathComponent(safeName)
 
         guard pathManager.isPathSafe(archiveDir) else {
@@ -122,18 +122,6 @@ struct ProjectManager {
     }
 
     // MARK: - Private Helpers
-
-    private func sanitizeName(_ name: String) -> String {
-        let components = name.components(separatedBy: "/")
-        let safe = components.filter { $0 != ".." && $0 != "." && !$0.isEmpty }
-        return safe.prefix(3).map { component in
-            let cleaned = component
-                .replacingOccurrences(of: "\0", with: "")
-                .replacingOccurrences(of: "\\", with: "")
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-            return String(cleaned.prefix(255))
-        }.joined(separator: "/")
-    }
 
     /// Recursively update all .md files under a directory via FileManager.enumerator (single OS call)
     private func updateAllNotes(in directory: String, status: NoteStatus, para: PARACategory) throws -> Int {
@@ -187,26 +175,9 @@ struct ProjectManager {
         )
     }
 
-    /// Collect all .md files across PARA categories recursively (single enumerator per category)
+    /// Collect all .md files across PARA categories recursively
     private func collectVaultMarkdownFiles() -> [String] {
-        let fm = FileManager.default
-        let categories = [pathManager.projectsPath, pathManager.areaPath, pathManager.resourcePath, pathManager.archivePath]
-        var files: [String] = []
-
-        for basePath in categories {
-            guard let enumerator = fm.enumerator(atPath: basePath) else { continue }
-            while let relativePath = enumerator.nextObject() as? String {
-                guard relativePath.hasSuffix(".md") else { continue }
-                let fileName = (relativePath as NSString).lastPathComponent
-                guard !fileName.hasPrefix("."), !fileName.hasPrefix("_") else { continue }
-                // Skip hidden/system directories
-                let components = relativePath.components(separatedBy: "/")
-                guard !components.contains(where: { $0.hasPrefix(".") || $0.hasPrefix("_") }) else { continue }
-                files.append((basePath as NSString).appendingPathComponent(relativePath))
-            }
-        }
-
-        return files
+        pathManager.allMarkdownFiles()
     }
 
     /// Simple find-and-replace across vault markdown files
