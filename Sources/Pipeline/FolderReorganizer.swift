@@ -88,7 +88,7 @@ struct FolderReorganizer {
         }
 
         // Build context
-        let noteIndex = PKMPathManager(root: pkmRoot).loadNoteIndex()
+        let noteIndex = pathManager.loadNoteIndex()
         let contextBuilder = ProjectContextBuilder(pkmRoot: pkmRoot, noteIndex: noteIndex)
         let projectContext = contextBuilder.buildProjectContext()
         let subfolderContext = contextBuilder.buildSubfolderContext()

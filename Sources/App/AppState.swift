@@ -73,6 +73,11 @@ final class AppState: ObservableObject {
 
     // MARK: - Background Task State
 
+    enum BackgroundTaskKind {
+        case vaultCheck
+    }
+
+    @Published var backgroundTaskKind: BackgroundTaskKind?
     @Published var backgroundTaskName: String?
     @Published var backgroundTaskPhase: String = ""
     @Published var backgroundTaskProgress: Double = 0
@@ -336,6 +341,7 @@ final class AppState: ObservableObject {
             return
         }
 
+        backgroundTaskKind = .vaultCheck
         backgroundTaskName = "전체 점검"
         backgroundTaskPhase = "수동 정리 감지 중..."
         backgroundTaskProgress = 0
@@ -357,6 +363,7 @@ final class AppState: ObservableObject {
 
             await MainActor.run {
                 AppState.shared.vaultCheckResult = result
+                AppState.shared.backgroundTaskKind = nil
                 AppState.shared.backgroundTaskName = nil
                 AppState.shared.backgroundTaskPhase = ""
                 AppState.shared.backgroundTaskProgress = 0
@@ -368,6 +375,7 @@ final class AppState: ObservableObject {
     func cancelBackgroundTask() {
         backgroundTask?.cancel()
         backgroundTask = nil
+        backgroundTaskKind = nil
         backgroundTaskName = nil
         backgroundTaskPhase = ""
         backgroundTaskProgress = 0
@@ -445,6 +453,7 @@ final class AppState: ObservableObject {
     }
 
     func clearBackgroundTaskCompletion() {
+        backgroundTaskKind = nil
         backgroundTaskName = nil
         backgroundTaskPhase = ""
         backgroundTaskProgress = 0
