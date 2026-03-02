@@ -39,7 +39,7 @@ struct MenuBarPopover: View {
 
             // Background task indicator (hidden when VaultInspector shows its own inline card)
             if let taskName = appState.backgroundTaskName,
-               !(appState.currentScreen == .vaultInspector && appState.backgroundTaskKind == .vaultCheck) {
+               !(appState.currentScreen == .vaultInspector && appState.backgroundTaskKind != nil) {
                 Divider()
                 VStack(spacing: 6) {
                     HStack(spacing: 8) {

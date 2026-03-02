@@ -1,5 +1,10 @@
 # Changelog
 
+## v2.12.0 — Global Reorg Progress (2026-03-03)
+- 위치 제안(reorg scan) 진행률을 글로벌 배너로 표시 — 다른 화면에서도 진행 상황 확인 가능
+- 스캔 완료 시 이동 필요한 파일이 있으면 자동으로 VaultInspectorView로 화면 전환
+- BackgroundTaskKind.reorgScan 추가, viewTaskActive 제거 (backgroundTask 시스템으로 통합)
+
 ## v2.11.11 — Code Cleanup Round 2 (2026-03-03)
 - sanitizeName 3중 중복 제거: PARAMover/ProjectManager → PKMPathManager.sanitizeFolderName()으로 통합
 - collectVaultMarkdownFiles 중복 제거: VaultAuditor/PARAMover/ProjectManager → PKMPathManager.allMarkdownFiles()로 통합
