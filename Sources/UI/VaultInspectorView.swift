@@ -127,7 +127,7 @@ struct VaultInspectorView: View {
             .padding(.vertical, 8)
 
             // Inline progress/result cards
-            if appState.backgroundTaskName == "전체 점검" {
+            if appState.backgroundTaskKind == .vaultCheck {
                 taskProgressCard(
                     title: "자동 수리",
                     progress: appState.backgroundTaskProgress,
@@ -384,6 +384,16 @@ struct VaultInspectorView: View {
 
     @ViewBuilder
     private func reorgCategorySection(category: PARACategory, files: [VaultReorganizer.FileAnalysis]) -> some View {
+        // Build O(1) lookup: (fileName, category, folder) → index in reorgAnalyses
+        let indexMap: [String: Int] = {
+            var map: [String: Int] = [:]
+            for (i, analysis) in appState.reorgAnalyses.enumerated() {
+                let key = "\(analysis.fileName)|\(analysis.currentCategory)|\(analysis.currentFolder)"
+                map[key] = i
+            }
+            return map
+        }()
+
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 6) {
                 Image(systemName: "arrow.right.circle.fill")
@@ -404,11 +414,8 @@ struct VaultInspectorView: View {
             .padding(.horizontal, 4)
 
             ForEach(files.indices, id: \.self) { idx in
-                if let analysisIndex = appState.reorgAnalyses.firstIndex(where: {
-                    $0.fileName == files[idx].fileName
-                        && $0.currentCategory == files[idx].currentCategory
-                        && $0.currentFolder == files[idx].currentFolder
-                }) {
+                let key = "\(files[idx].fileName)|\(files[idx].currentCategory)|\(files[idx].currentFolder)"
+                if let analysisIndex = indexMap[key] {
                     reorgFileRow(index: analysisIndex)
                 }
             }

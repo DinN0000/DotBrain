@@ -75,7 +75,7 @@ struct SettingsView: View {
         }
         .onAppear {
             isStructureReady = PKMPathManager(root: appState.pkmRootPath).isInitialized()
-            fdaGranted = OnboardingView.hasFullDiskAccess()
+            fdaGranted = AppState.hasFullDiskAccess()
             viewingProvider = activeProvider
             loadKeyForProvider(viewingProvider)
         }
@@ -424,9 +424,7 @@ struct SettingsView: View {
                     .lineSpacing(2)
 
                 Button(action: {
-                    if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles") {
-                        NSWorkspace.shared.open(url)
-                    }
+                    appState.openFullDiskAccessSettings()
                 }) {
                     HStack(spacing: 4) {
                         Image(systemName: "gearshape")

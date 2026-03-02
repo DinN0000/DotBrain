@@ -325,16 +325,12 @@ struct OnboardingView: View {
         .padding(.horizontal)
         .task(id: step) {
             guard step == 1 else { return }
-            fdaGranted = Self.hasFullDiskAccess()
+            fdaGranted = AppState.hasFullDiskAccess()
             while !fdaGranted && step == 1 {
                 try? await Task.sleep(for: .seconds(1))
-                fdaGranted = Self.hasFullDiskAccess()
+                fdaGranted = AppState.hasFullDiskAccess()
             }
         }
-    }
-
-    static func hasFullDiskAccess() -> Bool {
-        AppState.hasFullDiskAccess()
     }
 
     private static func openFullDiskAccessSettings() {

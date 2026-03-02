@@ -5,13 +5,12 @@ struct ProjectContextBuilder {
     let pkmRoot: String
     let noteIndex: NoteIndex?
 
+    private let pathManager: PKMPathManager
+
     init(pkmRoot: String, noteIndex: NoteIndex? = nil) {
         self.pkmRoot = pkmRoot
         self.noteIndex = noteIndex
-    }
-
-    private var pathManager: PKMPathManager {
-        PKMPathManager(root: pkmRoot)
+        self.pathManager = PKMPathManager(root: pkmRoot)
     }
 
     /// Build project context string for classifier prompts

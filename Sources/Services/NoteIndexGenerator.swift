@@ -36,8 +36,15 @@ struct NoteIndex: Codable, Sendable {
 /// Replaces MOCGenerator with a single JSON index that AI tools can read efficiently.
 struct NoteIndexGenerator: Sendable {
     let pkmRoot: String
+    private let canonicalRoot: String
 
     private static let currentVersion = 1
+
+    init(pkmRoot: String) {
+        self.pkmRoot = pkmRoot
+        let resolved = URL(fileURLWithPath: pkmRoot).resolvingSymlinksInPath().path
+        self.canonicalRoot = resolved.hasSuffix("/") ? resolved : resolved + "/"
+    }
 
     private var pathManager: PKMPathManager {
         PKMPathManager(root: pkmRoot)
@@ -243,11 +250,9 @@ struct NoteIndexGenerator: Sendable {
 
     /// Convert an absolute path to a path relative to pkmRoot (canonicalized for symlink safety)
     private func relativePath(_ absolutePath: String) -> String {
-        let canonicalRoot = URL(fileURLWithPath: pkmRoot).resolvingSymlinksInPath().path
         let canonicalPath = URL(fileURLWithPath: absolutePath).resolvingSymlinksInPath().path
-        let root = canonicalRoot.hasSuffix("/") ? canonicalRoot : canonicalRoot + "/"
-        guard canonicalPath.hasPrefix(root) else { return absolutePath }
-        return String(canonicalPath.dropFirst(root.count))
+        guard canonicalPath.hasPrefix(canonicalRoot) else { return absolutePath }
+        return String(canonicalPath.dropFirst(canonicalRoot.count))
     }
 
     /// Load existing note-index.json if present

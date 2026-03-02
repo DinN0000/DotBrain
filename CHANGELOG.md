@@ -1,5 +1,14 @@
 # Changelog
 
+## v2.11.10 — Code Cleanup (2026-03-02)
+- OnboardingView.hasFullDiskAccess() 불필요한 래퍼 제거, AppState 직접 호출로 통일
+- SettingsView FDA URL 중복 제거 (appState.openFullDiskAccessSettings() 사용)
+- FolderReorganizer PKMPathManager 중복 생성 제거 (기존 pathManager 사용)
+- ProjectContextBuilder pathManager computed → stored property (실행당 7+회 불필요한 인스턴스 생성 제거)
+- BackgroundTaskKind enum 추가 — 문자열 비교("전체 점검") → 타입 안전 enum 비교
+- NoteIndexGenerator canonicalRoot 캐싱 (relativePath 호출마다 resolvingSymlinksInPath syscall → init에서 1회)
+- VaultInspectorView reorg plan O(N^2) firstIndex(where:) → O(1) 딕셔너리 룩업
+
 ## v2.1.10 — 10-Agent Deep Review Round 3 (2026-02-19)
 - 10개 전문 에이전트 심층 코드 리뷰 (동시성, 메모리, 에러경로, 경로안전, UI상태, 파일작업, CLAUDE.md 준수, 수치정확성, API계약, 데드코드)
 - AppState: isProcessing defer 패턴으로 전환 (3개 메서드) — 취소 시 UI 멈춤 방지
