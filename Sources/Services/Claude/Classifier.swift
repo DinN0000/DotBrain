@@ -40,10 +40,12 @@ actor Classifier {
         }
 
         // Stage 1: Process batches concurrently (max 3 concurrent API calls)
+        // Uses non-throwing TaskGroup — individual batch failures are caught and skipped
+        // so a single 429 doesn't kill the entire scan
         let maxConcurrentBatches = 3
 
         let totalBatches = batches.count
-        stage1Results = try await withThrowingTaskGroup(
+        stage1Results = await withTaskGroup(
             of: [String: ClassifyResult.Stage1Item].self,
             returning: [String: ClassifyResult.Stage1Item].self
         ) { group in
@@ -54,7 +56,7 @@ actor Classifier {
 
             for batch in batches {
                 if activeTasks >= maxConcurrentBatches {
-                    if let results = try await group.next() {
+                    if let results = await group.next() {
                         for (key, value) in results {
                             combined[key] = value
                         }
@@ -65,23 +67,42 @@ actor Classifier {
                 }
 
                 let idx = batchIndex
+                let batchFiles = batch
                 group.addTask {
-                    return try await self.classifyBatchStage1(
-                        batch,
-                        projectContext: projectContext,
-                        subfolderContext: subfolderContext,
-                        weightedContext: weightedContext,
-                        areaContext: areaContext,
-                        tagVocabulary: tagVocabulary,
-                        correctionContext: correctionContext
-                    )
+                    do {
+                        return try await self.classifyBatchStage1(
+                            batchFiles,
+                            projectContext: projectContext,
+                            subfolderContext: subfolderContext,
+                            weightedContext: weightedContext,
+                            areaContext: areaContext,
+                            tagVocabulary: tagVocabulary,
+                            correctionContext: correctionContext
+                        )
+                    } catch {
+                        NSLog("[Classifier] Stage1 배치 %d 실패 (스킵): %@", idx, error.localizedDescription)
+                        // Return defaults for failed batch files
+                        var fallback: [String: ClassifyResult.Stage1Item] = [:]
+                        for file in batchFiles {
+                            fallback[file.fileName] = ClassifyResult.Stage1Item(
+                                fileName: file.fileName,
+                                para: .resource,
+                                tags: [],
+                                summary: "",
+                                confidence: 0,
+                                project: nil,
+                                targetFolder: nil
+                            )
+                        }
+                        return fallback
+                    }
                 }
                 activeTasks += 1
                 batchIndex += 1
                 onProgress?(Double(completedBatches) / Double(totalBatches) * 0.6, "배치 \(idx + 1)/\(totalBatches) 분류 중...")
             }
 
-            for try await results in group {
+            for await results in group {
                 for (key, value) in results {
                     combined[key] = value
                 }
@@ -101,10 +122,11 @@ actor Classifier {
 
         if !uncertainFiles.isEmpty {
             // Stage 2: Process uncertain files concurrently (max 3)
+            // Uses non-throwing TaskGroup — individual file failures fall back to Stage 1 result
             let maxConcurrentStage2 = 3
 
-            stage2Results = try await withThrowingTaskGroup(
-                of: (String, ClassifyResult.Stage2Item).self,
+            stage2Results = await withTaskGroup(
+                of: (String, ClassifyResult.Stage2Item?).self,
                 returning: [String: ClassifyResult.Stage2Item].self
             ) { group in
                 var activeTasks = 0
@@ -112,29 +134,35 @@ actor Classifier {
 
                 for file in uncertainFiles {
                     if activeTasks >= maxConcurrentStage2 {
-                        if let (fileName, result) = try await group.next() {
-                            combined[fileName] = result
+                        if let (fileName, result) = await group.next() {
+                            if let result { combined[fileName] = result }
                             activeTasks -= 1
                         }
                     }
 
+                    let fileName = file.fileName
                     group.addTask {
-                        let result = try await self.classifySingleStage2(
-                            file,
-                            projectContext: projectContext,
-                            subfolderContext: subfolderContext,
-                            weightedContext: weightedContext,
-                            areaContext: areaContext,
-                            tagVocabulary: tagVocabulary,
-                            correctionContext: correctionContext
-                        )
-                        return (file.fileName, result)
+                        do {
+                            let result = try await self.classifySingleStage2(
+                                file,
+                                projectContext: projectContext,
+                                subfolderContext: subfolderContext,
+                                weightedContext: weightedContext,
+                                areaContext: areaContext,
+                                tagVocabulary: tagVocabulary,
+                                correctionContext: correctionContext
+                            )
+                            return (fileName, result)
+                        } catch {
+                            NSLog("[Classifier] Stage2 %@ 실패 (Stage1 결과 사용): %@", fileName, error.localizedDescription)
+                            return (fileName, nil)
+                        }
                     }
                     activeTasks += 1
                 }
 
-                for try await (fileName, result) in group {
-                    combined[fileName] = result
+                for await (fileName, result) in group {
+                    if let result { combined[fileName] = result }
                 }
                 return combined
             }

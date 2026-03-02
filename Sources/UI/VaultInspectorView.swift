@@ -814,6 +814,9 @@ struct VaultInspectorView: View {
                         AppState.shared.backgroundTaskName = nil
                         AppState.shared.backgroundTaskPhase = ""
                         AppState.shared.backgroundTaskProgress = 0
+                        if AppState.shared.currentScreen != .vaultInspector {
+                            AppState.shared.currentScreen = .vaultInspector
+                        }
                     }
                     return
                 }
@@ -862,6 +865,9 @@ struct VaultInspectorView: View {
                     } else {
                         AppState.shared.reorgResults = []
                         AppState.shared.reorgPhase = .done
+                        if AppState.shared.currentScreen != .vaultInspector {
+                            AppState.shared.currentScreen = .vaultInspector
+                        }
                     }
                 }
             } catch {
@@ -879,6 +885,9 @@ struct VaultInspectorView: View {
                     AppState.shared.backgroundTaskName = nil
                     AppState.shared.backgroundTaskPhase = ""
                     AppState.shared.backgroundTaskProgress = 0
+                    if AppState.shared.currentScreen != .vaultInspector {
+                        AppState.shared.currentScreen = .vaultInspector
+                    }
                 }
             }
         }
@@ -950,6 +959,9 @@ struct VaultInspectorView: View {
                     AppState.shared.backgroundTaskName = nil
                     AppState.shared.backgroundTaskPhase = ""
                     AppState.shared.backgroundTaskProgress = 0
+                    if AppState.shared.currentScreen != .vaultInspector {
+                        AppState.shared.currentScreen = .vaultInspector
+                    }
                 }
             } catch {
                 await MainActor.run {
@@ -959,6 +971,9 @@ struct VaultInspectorView: View {
                     AppState.shared.backgroundTaskName = nil
                     AppState.shared.backgroundTaskPhase = ""
                     AppState.shared.backgroundTaskProgress = 0
+                    if AppState.shared.currentScreen != .vaultInspector {
+                        AppState.shared.currentScreen = .vaultInspector
+                    }
                 }
             }
         }
