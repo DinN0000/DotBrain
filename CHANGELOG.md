@@ -1,5 +1,12 @@
 # Changelog
 
+## v2.11.11 — Code Cleanup Round 2 (2026-03-03)
+- sanitizeName 3중 중복 제거: PARAMover/ProjectManager → PKMPathManager.sanitizeFolderName()으로 통합
+- collectVaultMarkdownFiles 중복 제거: VaultAuditor/PARAMover/ProjectManager → PKMPathManager.allMarkdownFiles()로 통합
+- RelatedNotesWriter.sanitizeWikilink → FrontmatterWriter.sanitizeWikilink 호출로 교체
+- UserDefaults 키 상수화: AppState.DefaultsKey + StatisticsService.DefaultsKey enum 추가, 32곳 하드코딩 제거
+- hasAPIKey computed property 전환: @Published 수동 동기화 → selectedProvider 기반 자동 계산
+
 ## v2.11.10 — Code Cleanup (2026-03-02)
 - OnboardingView.hasFullDiskAccess() 불필요한 래퍼 제거, AppState 직접 호출로 통일
 - SettingsView FDA URL 중복 제거 (appState.openFullDiskAccessSettings() 사용)

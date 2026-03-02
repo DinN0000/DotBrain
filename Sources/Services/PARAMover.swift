@@ -15,7 +15,7 @@ struct PARAMover {
     /// Returns the number of notes updated.
     func moveFolder(name: String, from source: PARACategory, to target: PARACategory) throws -> Int {
         let fm = FileManager.default
-        let safeName = sanitizeName(name)
+        let safeName = pathManager.sanitizeFolderName(name)
         let sourcePath = pathManager.paraPath(for: source)
         let targetPath = pathManager.paraPath(for: target)
         let sourceDir = (sourcePath as NSString).appendingPathComponent(safeName)
@@ -61,7 +61,7 @@ struct PARAMover {
     /// Move a folder to macOS Trash (recoverable via Finder).
     func deleteFolder(name: String, category: PARACategory) throws {
         let fm = FileManager.default
-        let safeName = sanitizeName(name)
+        let safeName = pathManager.sanitizeFolderName(name)
         let basePath = pathManager.paraPath(for: category)
         let folderPath = (basePath as NSString).appendingPathComponent(safeName)
 
@@ -89,8 +89,8 @@ struct PARAMover {
     /// Returns the number of files moved.
     func mergeFolder(source: String, into target: String, category: PARACategory) throws -> Int {
         let fm = FileManager.default
-        let safeSource = sanitizeName(source)
-        let safeTarget = sanitizeName(target)
+        let safeSource = pathManager.sanitizeFolderName(source)
+        let safeTarget = pathManager.sanitizeFolderName(target)
         let basePath = pathManager.paraPath(for: category)
         let sourceDir = (basePath as NSString).appendingPathComponent(safeSource)
         let targetDir = (basePath as NSString).appendingPathComponent(safeTarget)
@@ -204,8 +204,8 @@ struct PARAMover {
     /// Returns the number of notes updated.
     func renameFolder(oldName: String, newName: String, category: PARACategory) throws -> Int {
         let fm = FileManager.default
-        let safeOld = sanitizeName(oldName)
-        let safeNew = sanitizeName(newName)
+        let safeOld = pathManager.sanitizeFolderName(oldName)
+        let safeNew = pathManager.sanitizeFolderName(newName)
         guard !safeNew.isEmpty else { throw PARAMoveError.notFound(safeNew, category) }
 
         let basePath = pathManager.paraPath(for: category)
@@ -263,18 +263,6 @@ struct PARAMover {
 
     // MARK: - Private Helpers
 
-    private func sanitizeName(_ name: String) -> String {
-        let components = name.components(separatedBy: "/")
-        let safe = components.filter { $0 != ".." && $0 != "." && !$0.isEmpty }
-        return safe.prefix(3).map { component in
-            let cleaned = component
-                .replacingOccurrences(of: "\0", with: "")
-                .replacingOccurrences(of: "\\", with: "")
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-            return String(cleaned.prefix(255))
-        }.joined(separator: "/")
-    }
-
     /// Recursively update all .md files under a directory via FileManager.enumerator
     private func updateAllNotes(in directory: String, status: NoteStatus, para: PARACategory) throws -> Int {
         let fm = FileManager.default
@@ -322,26 +310,7 @@ struct PARAMover {
 
     /// Collect all .md files across PARA categories recursively
     private func collectVaultMarkdownFiles() -> [String] {
-        let fm = FileManager.default
-        let categories = [
-            pathManager.projectsPath, pathManager.areaPath,
-            pathManager.resourcePath, pathManager.archivePath,
-        ]
-        var files: [String] = []
-
-        for basePath in categories {
-            guard let enumerator = fm.enumerator(atPath: basePath) else { continue }
-            while let relativePath = enumerator.nextObject() as? String {
-                guard relativePath.hasSuffix(".md") else { continue }
-                let fileName = (relativePath as NSString).lastPathComponent
-                guard !fileName.hasPrefix("."), !fileName.hasPrefix("_") else { continue }
-                let components = relativePath.components(separatedBy: "/")
-                guard !components.contains(where: { $0.hasPrefix(".") || $0.hasPrefix("_") }) else { continue }
-                files.append((basePath as NSString).appendingPathComponent(relativePath))
-            }
-        }
-
-        return files
+        pathManager.allMarkdownFiles()
     }
 
     /// Simple find-and-replace across vault markdown files

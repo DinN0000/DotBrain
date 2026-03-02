@@ -21,7 +21,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.setActivationPolicy(.accessory)
 
         // Auto-open popover on first launch
-        if !UserDefaults.standard.bool(forKey: "onboardingCompleted") {
+        if !UserDefaults.standard.bool(forKey: AppState.DefaultsKey.onboardingCompleted) {
             Task { @MainActor [weak self] in
                 try? await Task.sleep(for: .milliseconds(500))
                 self?.openPopover()

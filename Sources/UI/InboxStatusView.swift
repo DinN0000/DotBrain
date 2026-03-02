@@ -312,7 +312,7 @@ struct InboxStatusView: View {
         // If folder lacks PARA structure, trigger re-onboarding (skip welcome)
         let pm = PKMPathManager(root: newPath)
         if !pm.isInitialized() {
-            UserDefaults.standard.set(2, forKey: "onboardingStep")
+            UserDefaults.standard.set(2, forKey: AppState.DefaultsKey.onboardingStep)
             appState.currentScreen = .onboarding
             return
         }

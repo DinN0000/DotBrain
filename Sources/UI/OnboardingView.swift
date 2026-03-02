@@ -23,7 +23,7 @@ struct OnboardingView: View {
 
 
     init() {
-        let saved = UserDefaults.standard.integer(forKey: "onboardingStep")
+        let saved = UserDefaults.standard.integer(forKey: AppState.DefaultsKey.onboardingStep)
         _step = State(initialValue: saved)
     }
 
@@ -102,13 +102,13 @@ struct OnboardingView: View {
     private func goNext() {
         direction = 1
         step += 1
-        UserDefaults.standard.set(step, forKey: "onboardingStep")
+        UserDefaults.standard.set(step, forKey: AppState.DefaultsKey.onboardingStep)
     }
 
     private func goBack() {
         direction = -1
         step -= 1
-        UserDefaults.standard.set(step, forKey: "onboardingStep")
+        UserDefaults.standard.set(step, forKey: AppState.DefaultsKey.onboardingStep)
     }
 
     // MARK: - Step 0: Welcome (Before/After)
@@ -416,7 +416,7 @@ struct OnboardingView: View {
             HStack {
                 if isReOnboarding {
                     Button("취소") {
-                        UserDefaults.standard.removeObject(forKey: "onboardingStep")
+                        UserDefaults.standard.removeObject(forKey: AppState.DefaultsKey.onboardingStep)
                         appState.currentScreen = .inbox
                     }
                     .buttonStyle(.bordered)
@@ -1201,7 +1201,7 @@ struct OnboardingView: View {
     // MARK: - Step 6: Quick Start Guide
 
     private var isReOnboarding: Bool {
-        UserDefaults.standard.bool(forKey: "onboardingCompleted")
+        UserDefaults.standard.bool(forKey: AppState.DefaultsKey.onboardingCompleted)
     }
 
     private var trialStep: some View {
@@ -1270,8 +1270,8 @@ struct OnboardingView: View {
     }
 
     private func completeOnboarding() {
-        UserDefaults.standard.set(true, forKey: "onboardingCompleted")
-        UserDefaults.standard.removeObject(forKey: "onboardingStep")
+        UserDefaults.standard.set(true, forKey: AppState.DefaultsKey.onboardingCompleted)
+        UserDefaults.standard.removeObject(forKey: AppState.DefaultsKey.onboardingStep)
         AICompanionService.updateIfNeeded(pkmRoot: appState.pkmRootPath)
         appState.setupWatchdog()
         appState.currentScreen = .inbox

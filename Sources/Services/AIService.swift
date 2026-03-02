@@ -15,7 +15,7 @@ actor AIService {
 
     /// Current provider (read from UserDefaults)
     private var currentProvider: AIProvider {
-        if let saved = UserDefaults.standard.string(forKey: "selectedProvider"),
+        if let saved = UserDefaults.standard.string(forKey: AppState.DefaultsKey.selectedProvider),
            let provider = AIProvider(rawValue: saved) {
             return provider
         }
