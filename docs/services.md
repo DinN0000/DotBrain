@@ -366,11 +366,19 @@ AI를 이용한 폴더 쌍 관계 후보 생성. FolderRelationExplorer UI에서
 
 | 메서드 | 설명 |
 |--------|------|
-| `generateCandidates(allNotes:existingRelations:)` | 폴더 쌍 후보 생성 (기존 관계 제외, AI 분석 포함) |
+| `generateCandidates(allNotes:existingRelations:)` | 폴더 쌍 후보 생성 (캐시 지원, 기존 관계 제외, AI 분석 포함) |
 
-**스코어링**: 폴더 간 기존 링크 수 x3.0 + 공유 태그 수. 상위 20개 선택 후 AI 배치 분석.
+**스코어링**: 폴더 간 기존 링크 수 x3.0 + 공유 태그 수. 폴더별 태그/이름 Set 사전 계산으로 O(F^2) 루프 최적화. 상위 20개 선택 후 AI 배치 분석.
 
 **AI 분석**: hint("~할 때" 형식, 한국어 20자 이내), relationType(비교/대조|적용|확장|관련), confidence(0.0~1.0) 생성. confidence > 0.1만 반환.
+
+**캐시**: `.meta/folder-pair-cache.json`에 `FolderPairCache` (version, noteIndexUpdated, relationsUpdated, candidates) 저장. 타임스탬프 일치 시 O(F^2) 스코어링 + AI 호출 전부 스킵.
+
+| 무효화 트리거 | 조건 |
+|-------------|------|
+| 노트 추가/수정/삭제 | `note-index.json`의 `updated` 변경 |
+| 폴더 boost/suppress | `folder-relations.json`의 `updated` 변경 |
+| Vault 재구성 | note-index 재생성 → `updated` 변경 |
 
 **의존**: AIService, SemanticLinker (NoteInfo), StatisticsService
 
