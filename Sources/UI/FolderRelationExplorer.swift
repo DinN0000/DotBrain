@@ -513,7 +513,7 @@ struct FolderRelationExplorer: View {
                 )
             }
 
-        // Generate new AI candidates
+        // Generate new AI candidates (with cache support)
         let analyzer = FolderRelationAnalyzer(pkmRoot: root)
         let newCards = await analyzer.generateCandidates(
             allNotes: allNotes,
