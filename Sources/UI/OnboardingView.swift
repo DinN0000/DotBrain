@@ -510,7 +510,7 @@ struct OnboardingView: View {
                         Text("여러 도메인을 등록하면 DotBrain이 파일을 더 정확하게 분류합니다")
                             .font(.caption)
                             .foregroundColor(.secondary)
-                        Text("예: Nodit, WLV, Clair, FLAP, SCOPE, AX")
+                        Text("예: DevOps, Finance, Health, Marketing")
                             .font(.caption2)
                             .foregroundColor(.secondary.opacity(0.7))
                     }
@@ -619,7 +619,7 @@ struct OnboardingView: View {
                         Text("진행 중인 프로젝트를 모두 등록하세요.\nDotBrain이 파일을 더 정확하게 분류합니다.")
                             .font(.caption)
                             .foregroundColor(.secondary)
-                        Text("예: PoC-oo은행, SI-물류, 런칭-DotBrain")
+                        Text("예: PoC-Alpha, 연구-Beta, 런칭-DotBrain")
                             .font(.caption2)
                             .foregroundColor(.secondary.opacity(0.7))
                     }

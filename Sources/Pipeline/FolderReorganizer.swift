@@ -332,7 +332,7 @@ struct FolderReorganizer {
             let baseName = (fileName as NSString).deletingPathExtension
 
             let isPlaceholder = baseName == parentDirName
-                || baseName == topFolderName  // inner DOJANG/DOJANG.md → becomes the index note handled separately
+                || baseName == topFolderName  // inner FolderName/FolderName.md → becomes the index note handled separately
                 || fileName.hasPrefix("_")
 
             if isPlaceholder {

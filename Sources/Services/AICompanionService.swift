@@ -433,7 +433,7 @@ enum AICompanionService {
     | **아카이브** | Project → Archive | `archive` | `completed` |
     | **활성화** | Archive → Project | `project` | `active` |
     | **카테고리 이동** | Project → Area | 대상 카테고리 | 유지 |
-    | **폴더 내 이동** | DOJANG → PoC-신한은행 하위 | 유지 | 유지 |
+    | **폴더 내 이동** | ProjectA → PoC-Alpha 하위 | 유지 | 유지 |
 
     ### 필수 체크리스트 (모든 이동에 적용)
 
@@ -1416,10 +1416,10 @@ enum AICompanionService {
 
     | 유형 | 판별 기준 | 예시 |
     |------|-----------|------|
-    | **아카이브** | "끝났어", "Archive", "비활성", "안 써" | "Project_Clair Archive로 보내줘" |
-    | **활성화** | "꺼내줘", "다시 시작", "활성화" | "PoC-Toss 다시 꺼내줘" |
+    | **아카이브** | "끝났어", "Archive", "비활성", "안 써" | "ProjectA Archive로 보내줘" |
+    | **활성화** | "꺼내줘", "다시 시작", "활성화" | "PoC-Alpha 다시 꺼내줘" |
     | **카테고리 이동** | "Area로", "Resource로" 등 명시적 카테고리 | "이건 Resource로 옮겨줘" |
-    | **폴더 내 이동** | "귀속", "하위로", "안에 넣어줘" | "DOJANG은 PoC-신한은행에 귀속이야" |
+    | **폴더 내 이동** | "귀속", "하위로", "안에 넣어줘" | "SubProject는 PoC-Alpha에 귀속이야" |
 
     ## 워크플로
 
