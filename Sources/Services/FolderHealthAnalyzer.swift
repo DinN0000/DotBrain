@@ -10,7 +10,6 @@ struct FolderHealthAnalyzer {
         case tooManyFiles(count: Int)
         case missingFrontmatter(count: Int, total: Int)
         case lowTagDiversity(uniqueTags: Int, fileCount: Int)
-        case noIndexNote
 
         var localizedDescription: String {
             switch self {
@@ -20,8 +19,6 @@ struct FolderHealthAnalyzer {
                 return "\(count)개 파일 메타데이터 누락"
             case .lowTagDiversity:
                 return "태그 다양성 부족"
-            case .noIndexNote:
-                return "인덱스 노트 없음"
             }
         }
     }
@@ -57,12 +54,9 @@ struct FolderHealthAnalyzer {
 
         let mdFiles = visibleEntries.filter { entry in
             entry.hasSuffix(".md")
-                && (entry as NSString).deletingPathExtension != folderName
         }
 
-        let indexNoteName = "\(folderName).md"
-        let allFiles = visibleEntries.filter { $0 != indexNoteName }
-        let fileCount = allFiles.count
+        let fileCount = visibleEntries.count
 
         var issues: [Issue] = []
 
@@ -82,12 +76,6 @@ struct FolderHealthAnalyzer {
         let uniqueTagCount = Set(allTags).count
         if !mdFiles.isEmpty, uniqueTagCount < 2 {
             issues.append(.lowTagDiversity(uniqueTags: uniqueTagCount, fileCount: mdFiles.count))
-        }
-
-        // Issue: No index note for the folder
-        let indexNotePath = (folderPath as NSString).appendingPathComponent(indexNoteName)
-        if !fm.fileExists(atPath: indexNotePath) {
-            issues.append(.noIndexNote)
         }
 
         let score = calculateScore(from: issues)
@@ -174,8 +162,6 @@ struct FolderHealthAnalyzer {
                 score -= ratio * 0.3
             case .lowTagDiversity:
                 score -= 0.15
-            case .noIndexNote:
-                score -= 0.25
             }
         }
 

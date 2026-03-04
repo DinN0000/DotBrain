@@ -1086,20 +1086,6 @@ struct OnboardingView: View {
 
         do {
             try fm.createDirectory(atPath: projectDir, withIntermediateDirectories: true)
-            let indexPath = (projectDir as NSString).appendingPathComponent("\(name).md")
-            if !fm.fileExists(atPath: indexPath) {
-                let content = FrontmatterWriter.createIndexNote(
-                    folderName: name,
-                    para: .project,
-                    description: "\(name) 프로젝트",
-                    area: areaName
-                )
-                try content.write(toFile: indexPath, atomically: true, encoding: .utf8)
-            }
-
-            if let area = areaName {
-                updateAreaProjects(area: area, addProject: name)
-            }
 
             projects.append(name)
             projectAreas[name] = areaName ?? ""
@@ -1110,29 +1096,8 @@ struct OnboardingView: View {
         }
     }
 
-    private func updateAreaProjects(area: String, addProject projectName: String) {
-        let pathManager = PKMPathManager(root: appState.pkmRootPath)
-        let areaIndexPath = (pathManager.areaPath as NSString)
-            .appendingPathComponent(area)
-            .appending("/\(area).md")
-
-        guard let content = try? String(contentsOfFile: areaIndexPath, encoding: .utf8) else { return }
-        var (fm, body) = Frontmatter.parse(markdown: content)
-
-        var currentProjects = fm.projects ?? []
-        if !currentProjects.contains(projectName) {
-            currentProjects.append(projectName)
-            currentProjects.sort()
-        }
-        fm.projects = currentProjects
-
-        let updated = fm.stringify() + "\n" + body
-        try? updated.write(toFile: areaIndexPath, atomically: true, encoding: .utf8)
-    }
-
     private func removeProject(_ name: String) {
         let pathManager = PKMPathManager(root: appState.pkmRootPath)
-        FrontmatterWriter.removeProjectFromArea(projectName: name, pkmRoot: appState.pkmRootPath)
         let projectDir = (pathManager.projectsPath as NSString).appendingPathComponent(name)
         try? FileManager.default.trashItem(at: URL(fileURLWithPath: projectDir), resultingItemURL: nil)
         projects.removeAll { $0 == name }
@@ -1163,15 +1128,6 @@ struct OnboardingView: View {
 
         do {
             try fm.createDirectory(atPath: areaDir, withIntermediateDirectories: true)
-            let indexPath = (areaDir as NSString).appendingPathComponent("\(name).md")
-            if !fm.fileExists(atPath: indexPath) {
-                let content = FrontmatterWriter.createIndexNote(
-                    folderName: name,
-                    para: .area,
-                    description: "\(name) 도메인"
-                )
-                try content.write(toFile: indexPath, atomically: true, encoding: .utf8)
-            }
             areas.append(name)
             newAreaName = ""
         } catch {

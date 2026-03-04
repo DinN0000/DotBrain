@@ -338,20 +338,6 @@ struct FolderReorganizer {
                 || fileName.hasPrefix("_")
 
             if isPlaceholder {
-                // Special case: if this is the workspace root note (e.g. DOJANG/DOJANG/DOJANG.md),
-                // check if it has real content worth keeping as the index note
-                if baseName == topFolderName {
-                    let indexDest = (dirPath as NSString).appendingPathComponent("\(topFolderName).md")
-                    if !fm.fileExists(atPath: indexDest) {
-                        // Move it as the index note instead of deleting
-                        do {
-                            try fm.moveItem(atPath: fullPath, toPath: indexDest)
-                        } catch {
-                            NSLog("[FolderReorganizer] 인덱스 노트 이동 실패: %@ — %@", fullPath, error.localizedDescription)
-                        }
-                        continue
-                    }
-                }
                 placeholderFiles.append(fullPath)
                 continue
             }
@@ -413,16 +399,14 @@ struct FolderReorganizer {
 
     // MARK: - Scan
 
-    /// Scan folder for top-level files, excluding index note and _Assets/
+    /// Scan folder for top-level files, excluding _Assets/
     private func scanFolder(at dirPath: String) -> [String] {
         let fm = FileManager.default
         guard let entries = try? fm.contentsOfDirectory(atPath: dirPath) else { return [] }
-        let indexNoteName = "\(subfolder).md"
 
         return entries.compactMap { name -> String? in
-            // Skip hidden files, _-prefixed, index note
+            // Skip hidden files, _-prefixed
             guard !name.hasPrefix("."), !name.hasPrefix("_") else { return nil }
-            guard name != indexNoteName else { return nil }
 
             let fullPath = (dirPath as NSString).appendingPathComponent(name)
             var isDir: ObjCBool = false

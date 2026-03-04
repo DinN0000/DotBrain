@@ -176,11 +176,10 @@ struct NoteIndexGenerator: Sendable {
         var summaries: [String] = []
 
         for entry in entries.sorted() {
-            // Skip non-markdown, hidden, underscore-prefixed, and index note files
+            // Skip non-markdown, hidden, underscore-prefixed files
             guard entry.hasSuffix(".md"),
                   !entry.hasPrefix("."),
-                  !entry.hasPrefix("_"),
-                  entry != "\(folderName).md" else { continue }
+                  !entry.hasPrefix("_") else { continue }
 
             let filePath = (folderPath as NSString).appendingPathComponent(entry)
             guard let handle = FileHandle(forReadingAtPath: filePath) else { continue }

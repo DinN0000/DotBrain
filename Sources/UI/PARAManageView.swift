@@ -382,6 +382,9 @@ struct PARAManageView: View {
         let basePath = pathManager.paraPath(for: category)
         guard let entries = try? fm.contentsOfDirectory(atPath: basePath) else { return [] }
 
+        let noteIndex = pathManager.loadNoteIndex()
+        let categoryFolder = (basePath as NSString).lastPathComponent
+
         var results: [FolderEntry] = []
         for entry in entries.sorted() {
             guard !entry.hasPrefix("."), !entry.hasPrefix("_") else { continue }
@@ -399,15 +402,8 @@ struct PARAManageView: View {
                 }
             }
 
-            // Read index note for summary
-            let indexPath = (fullPath as NSString).appendingPathComponent("\(entry).md")
-            let summary: String
-            if let content = try? String(contentsOfFile: indexPath, encoding: .utf8) {
-                let (frontmatter, _) = Frontmatter.parse(markdown: content)
-                summary = frontmatter.summary ?? ""
-            } else {
-                summary = ""
-            }
+            let folderKey = "\(categoryFolder)/\(entry)"
+            let summary = noteIndex?.folders[folderKey]?.summary ?? ""
 
             results.append(FolderEntry(
                 name: entry,
@@ -464,12 +460,6 @@ struct PARAManageView: View {
 
         do {
             try fm.createDirectory(atPath: folderPath, withIntermediateDirectories: true)
-            // Create index note
-            let indexContent = FrontmatterWriter.createIndexNote(
-                folderName: name, para: category
-            )
-            let indexPath = (folderPath as NSString).appendingPathComponent("\(name).md")
-            try indexContent.write(toFile: indexPath, atomically: true, encoding: .utf8)
 
             isStatusError = false
             statusMessage = "'\(name)' 폴더 생성됨"

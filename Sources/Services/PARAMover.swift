@@ -12,7 +12,6 @@ struct PARAMover {
     /// Move a folder from one PARA category to another.
     /// Updates all internal .md frontmatter (para + status), moves the folder,
     /// and updates WikiLink references if moving to/from archive.
-    /// Returns the number of notes updated.
     func moveFolder(name: String, from source: PARACategory, to target: PARACategory) throws -> Int {
         let fm = FileManager.default
         let safeName = pathManager.sanitizeFolderName(name)
@@ -48,11 +47,6 @@ struct PARAMover {
             unmarkReferencesCompleted(folderName: safeName)
         }
 
-        // Clean up Area projects field when moving a project out of 1_Project
-        if source == .project {
-            FrontmatterWriter.removeProjectFromArea(projectName: safeName, pkmRoot: pkmRoot)
-        }
-
         return updatedCount
     }
 
@@ -72,11 +66,6 @@ struct PARAMover {
             throw PARAMoveError.notFound(safeName, category)
         }
 
-        // Clean up Area projects field before deleting
-        if category == .project {
-            FrontmatterWriter.removeProjectFromArea(projectName: safeName, pkmRoot: pkmRoot)
-        }
-
         let folderURL = URL(fileURLWithPath: folderPath)
         try fm.trashItem(at: folderURL, resultingItemURL: nil)
     }
@@ -86,7 +75,6 @@ struct PARAMover {
     /// Merge source folder into target folder within the same category.
     /// Moves all files from source to target, appending timestamp on conflict.
     /// Updates frontmatter project fields, then deletes source folder.
-    /// Returns the number of files moved.
     func mergeFolder(source: String, into target: String, category: PARACategory) throws -> Int {
         let fm = FileManager.default
         let safeSource = pathManager.sanitizeFolderName(source)
@@ -112,8 +100,6 @@ struct PARAMover {
             guard !rawEntry.hasPrefix(".") else { continue }
             let entry = rawEntry.precomposedStringWithCanonicalMapping
 
-            // Skip source's own index note
-            if entry == "\(safeSource).md" { continue }
             // Skip _Assets — move files to centralized _Assets/{documents,images}/
             if rawEntry == "_Assets" {
                 let sourceAssets = (sourceDir as NSString).appendingPathComponent("_Assets")
@@ -184,17 +170,8 @@ struct PARAMover {
             }
         }
 
-        // Delete source index note that was skipped during merge
-        let sourceIndex = (sourceDir as NSString).appendingPathComponent("\(safeSource).md")
-        try? fm.removeItem(atPath: sourceIndex)
-
         // Remove now-empty source folder
         try? fm.removeItem(atPath: sourceDir)
-
-        // Clean up Area projects field for merged-away project
-        if category == .project {
-            FrontmatterWriter.removeProjectFromArea(projectName: safeSource, pkmRoot: pkmRoot)
-        }
 
         return movedCount
     }
@@ -202,8 +179,7 @@ struct PARAMover {
     // MARK: - Rename
 
     /// Rename a folder within the same PARA category.
-    /// Updates frontmatter project fields, renames index note, and updates WikiLink references.
-    /// Returns the number of notes updated.
+    /// Updates frontmatter project fields and WikiLink references.
     func renameFolder(oldName: String, newName: String, category: PARACategory) throws -> Int {
         let fm = FileManager.default
         let safeOld = pathManager.sanitizeFolderName(oldName)
@@ -242,23 +218,11 @@ struct PARAMover {
             }
         }
 
-        // Rename index note after enumerator is done (avoids stale path in live enumeration)
-        let oldIndex = (oldDir as NSString).appendingPathComponent("\(safeOld).md")
-        let newIndex = (oldDir as NSString).appendingPathComponent("\(safeNew).md")
-        if fm.fileExists(atPath: oldIndex) {
-            try fm.moveItem(atPath: oldIndex, toPath: newIndex)
-        }
-
         // Move (rename) the folder
         try fm.moveItem(atPath: oldDir, toPath: newDir)
 
         // Update WikiLink references across the vault
         markInVault(pattern: "[[\(safeOld)]]", replacement: "[[\(safeNew)]]")
-
-        // Update Area projects field for renamed project
-        if category == .project {
-            FrontmatterWriter.renameProjectInArea(oldName: safeOld, newName: safeNew, pkmRoot: pkmRoot)
-        }
 
         return count
     }

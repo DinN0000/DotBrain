@@ -53,9 +53,10 @@ struct ProjectContextBuilder {
             guard fm.fileExists(atPath: projectDir, isDirectory: &isDir), isDir.boolValue else { continue }
             guard pathManager.isPathSafe(projectDir) else { continue }
 
-            let indexPath = (projectDir as NSString).appendingPathComponent("\(rawEntry).md")
-
-            if let content = try? String(contentsOfFile: indexPath, encoding: .utf8) {
+            // Read first .md file in project folder for metadata
+            if let files = try? fm.contentsOfDirectory(atPath: projectDir),
+               let mdFile = files.sorted().first(where: { $0.hasSuffix(".md") && !$0.hasPrefix(".") && !$0.hasPrefix("_") }),
+               let content = try? String(contentsOfFile: (projectDir as NSString).appendingPathComponent(mdFile), encoding: .utf8) {
                 let (frontmatter, _) = Frontmatter.parse(markdown: content)
                 let summary = frontmatter.summary ?? ""
                 let tags = frontmatter.tags.isEmpty ? "" : frontmatter.tags.joined(separator: ", ")
@@ -69,17 +70,40 @@ struct ProjectContextBuilder {
         return lines.isEmpty ? "활성 프로젝트 없음" : lines.joined(separator: "\n")
     }
 
-    /// Build Area-Project mapping context for classifier prompts
+    /// Build Area-Project mapping context for classifier prompts (uses note-index.json)
     func buildAreaContext() -> String {
-        let areaPath = pathManager.areaPath
-        let fm = FileManager.default
+        // Index-first: derive area-project mapping from individual notes' area field
+        if let index = noteIndex {
+            var areaProjects: [String: Set<String>] = [:]
 
-        guard let entries = try? fm.contentsOfDirectory(atPath: areaPath) else {
-            return ""
+            // Collect area names from folder structure
+            for (folderKey, folder) in index.folders where folder.para == "area" {
+                let name = (folderKey as NSString).lastPathComponent
+                areaProjects[name] = []
+            }
+
+            // Map projects to areas via individual notes' area field
+            for (_, note) in index.notes where note.para == "project" {
+                if let area = note.area, !area.isEmpty {
+                    let projectFolder = (note.folder as NSString).lastPathComponent
+                    areaProjects[area, default: []].insert(projectFolder)
+                }
+            }
+
+            var lines: [String] = []
+            for (area, projects) in areaProjects.sorted(by: { $0.key < $1.key }) {
+                let detail = projects.isEmpty ? "(프로젝트 없음)" : projects.sorted().joined(separator: ", ")
+                lines.append("- \(area): \(detail)")
+            }
+            return lines.isEmpty ? "" : lines.joined(separator: "\n")
         }
 
-        var lines: [String] = []
+        // Disk fallback: list area folders (no project mapping without index)
+        let areaPath = pathManager.areaPath
+        let fm = FileManager.default
+        guard let entries = try? fm.contentsOfDirectory(atPath: areaPath) else { return "" }
 
+        var lines: [String] = []
         for rawEntry in entries.sorted() {
             guard !rawEntry.hasPrefix("."), !rawEntry.hasPrefix("_") else { continue }
             let entry = rawEntry.precomposedStringWithCanonicalMapping
@@ -87,17 +111,7 @@ struct ProjectContextBuilder {
             var isDir: ObjCBool = false
             guard fm.fileExists(atPath: areaDir, isDirectory: &isDir), isDir.boolValue else { continue }
             guard pathManager.isPathSafe(areaDir) else { continue }
-
-            let indexPath = (areaDir as NSString).appendingPathComponent("\(rawEntry).md")
-            var projectList = ""
-            if let content = try? String(contentsOfFile: indexPath, encoding: .utf8) {
-                let (frontmatter, _) = Frontmatter.parse(markdown: content)
-                if let projects = frontmatter.projects, !projects.isEmpty {
-                    projectList = projects.joined(separator: ", ")
-                }
-            }
-            let detail = projectList.isEmpty ? "(프로젝트 없음)" : projectList
-            lines.append("- \(entry): \(detail)")
+            lines.append("- \(entry)")
         }
 
         return lines.isEmpty ? "" : lines.joined(separator: "\n")
@@ -176,31 +190,9 @@ struct ProjectContextBuilder {
 
     // MARK: - Weighted Context
 
-    /// Build weighted context from root index notes (max 4 file reads)
+    /// Build weighted context (uses note-index.json data via buildSubfolderContext)
     func buildWeightedContext() -> String {
-        let categories: [(path: String, label: String, weight: String)] = [
-            (pathManager.projectsPath, "Project", "높은 연결 가중치"),
-            (pathManager.areaPath, "Area", "중간 연결 가중치"),
-            (pathManager.resourcePath, "Resource", "중간 연결 가중치"),
-            (pathManager.archivePath, "Archive", "낮은 연결 가중치"),
-        ]
-
-        var sections: [String] = []
-
-        for (basePath, label, weight) in categories {
-            let categoryName = (basePath as NSString).lastPathComponent
-            let mocPath = (basePath as NSString).appendingPathComponent("\(categoryName).md")
-
-            if let content = try? String(contentsOfFile: mocPath, encoding: .utf8) {
-                let (_, body) = Frontmatter.parse(markdown: content)
-                let trimmed = body.trimmingCharacters(in: .whitespacesAndNewlines)
-                if !trimmed.isEmpty {
-                    sections.append("### \(label) (\(weight))\n\(trimmed)")
-                }
-            }
-        }
-
-        return sections.isEmpty ? "" : sections.joined(separator: "\n\n")
+        return ""
     }
 
     // MARK: - Tag Vocabulary

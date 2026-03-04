@@ -323,7 +323,6 @@ struct VaultReorganizer {
 
     /// Collect files from all folders in scope.
     /// Scans each PARA category's subfolders, collecting non-hidden, non-underscore files.
-    /// Skips index notes (folderName.md).
     private func collectFiles() -> [CollectedFile] {
         let fm = FileManager.default
         var results: [CollectedFile] = []
@@ -332,12 +331,10 @@ struct VaultReorganizer {
         if case .folder(let folderPath) = scope {
             let folderName = (folderPath as NSString).lastPathComponent
             let category = PARACategory.fromPath(folderPath) ?? .resource
-            let indexNoteName = "\(folderName).md"
 
             guard let entries = try? fm.contentsOfDirectory(atPath: folderPath) else { return [] }
             for entry in entries.sorted() {
                 guard !entry.hasPrefix("."), !entry.hasPrefix("_") else { continue }
-                guard entry != indexNoteName else { continue }
                 let filePath = (folderPath as NSString).appendingPathComponent(entry)
                 var fileIsDir: ObjCBool = false
                 guard fm.fileExists(atPath: filePath, isDirectory: &fileIsDir),
@@ -362,12 +359,10 @@ struct VaultReorganizer {
                     continue
                 }
 
-                let indexNoteName = "\(folder).md"
                 guard let entries = try? fm.contentsOfDirectory(atPath: folderPath) else { continue }
 
                 for entry in entries.sorted() {
                     guard !entry.hasPrefix("."), !entry.hasPrefix("_") else { continue }
-                    guard entry != indexNoteName else { continue }
 
                     let filePath = (folderPath as NSString).appendingPathComponent(entry)
                     var fileIsDir: ObjCBool = false
