@@ -108,18 +108,20 @@ struct PARAMover {
         guard let entries = try? fm.contentsOfDirectory(atPath: sourceDir) else { return 0 }
         var movedCount = 0
 
-        for entry in entries {
-            guard !entry.hasPrefix(".") else { continue }
+        for rawEntry in entries {
+            guard !rawEntry.hasPrefix(".") else { continue }
+            let entry = rawEntry.precomposedStringWithCanonicalMapping
 
             // Skip source's own index note
             if entry == "\(safeSource).md" { continue }
             // Skip _Assets — move files to centralized _Assets/{documents,images}/
-            if entry == "_Assets" {
+            if rawEntry == "_Assets" {
                 let sourceAssets = (sourceDir as NSString).appendingPathComponent("_Assets")
                 var assetMoveFailed = false
                 if let assetFiles = try? fm.contentsOfDirectory(atPath: sourceAssets) {
-                    for assetFile in assetFiles where !assetFile.hasPrefix(".") {
-                        let src = (sourceAssets as NSString).appendingPathComponent(assetFile)
+                    for rawAssetFile in assetFiles where !rawAssetFile.hasPrefix(".") {
+                        let assetFile = rawAssetFile.precomposedStringWithCanonicalMapping
+                        let src = (sourceAssets as NSString).appendingPathComponent(rawAssetFile)
                         let centralDir = pathManager.assetsDirectory(for: assetFile)
                         try? fm.createDirectory(atPath: centralDir, withIntermediateDirectories: true)
                         var dst = (centralDir as NSString).appendingPathComponent(assetFile)
@@ -149,7 +151,7 @@ struct PARAMover {
                 continue
             }
 
-            let srcPath = (sourceDir as NSString).appendingPathComponent(entry)
+            let srcPath = (sourceDir as NSString).appendingPathComponent(rawEntry)
             var dstPath = (targetDir as NSString).appendingPathComponent(entry)
 
             // Resolve name conflicts with timestamp

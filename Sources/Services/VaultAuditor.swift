@@ -6,6 +6,7 @@ struct AuditReport {
     var missingFrontmatter: [String]
     var untaggedFiles: [String]
     var missingPARA: [String]
+    var nfdFiles: [NFDFile]
     var totalScanned: Int
 
     struct BrokenLink {
@@ -14,9 +15,15 @@ struct AuditReport {
         let suggestion: String?
     }
 
+    /// File or directory whose name is in NFD (decomposed) Unicode form
+    struct NFDFile {
+        let currentPath: String
+        let nfcPath: String
+    }
+
     /// Actionable issues that repair can fix (excludes untagged — handled by NoteEnricher)
     var totalIssues: Int {
-        brokenLinks.count + missingFrontmatter.count + missingPARA.count
+        brokenLinks.count + missingFrontmatter.count + missingPARA.count + nfdFiles.count
     }
 }
 
@@ -25,6 +32,7 @@ struct RepairResult {
     var linksFixed: Int
     var frontmatterInjected: Int
     var paraFixed: Int
+    var nfdRenamed: Int
 }
 
 /// Scans the entire PKM vault and reports/fixes issues
@@ -115,11 +123,15 @@ struct VaultAuditor {
             }
         }
 
+        // Detect NFD (decomposed) filenames that should be NFC
+        let nfdFiles = detectNFDFiles()
+
         return AuditReport(
             brokenLinks: brokenLinks,
             missingFrontmatter: missingFrontmatter,
             untaggedFiles: untaggedFiles,
             missingPARA: missingPARA,
+            nfdFiles: nfdFiles,
             totalScanned: files.count
         )
     }
@@ -283,10 +295,35 @@ struct VaultAuditor {
             }
         }
 
+        // Rename NFD files/folders to NFC
+        var nfdRenamed = 0
+        let nfdFM = FileManager.default
+        // Sort by path depth (deepest first) so nested items are renamed before parents
+        let sortedNFD = report.nfdFiles
+            .map { (file: $0, depth: $0.currentPath.utf8.lazy.filter { $0 == UInt8(ascii: "/") }.count) }
+            .sorted { $0.depth > $1.depth }
+            .map { $0.file }
+        for nfdFile in sortedNFD {
+            do {
+                // Skip if already renamed by a parent folder rename
+                guard nfdFM.fileExists(atPath: nfdFile.currentPath) else { continue }
+                // Skip if NFC target already exists (avoid overwrite)
+                if nfdFM.fileExists(atPath: nfdFile.nfcPath) {
+                    NSLog("[VaultAuditor] NFD→NFC skip (target exists): %@", (nfdFile.nfcPath as NSString).lastPathComponent)
+                    continue
+                }
+                try nfdFM.moveItem(atPath: nfdFile.currentPath, toPath: nfdFile.nfcPath)
+                nfdRenamed += 1
+            } catch {
+                NSLog("[VaultAuditor] NFD→NFC rename 실패: %@ — %@", nfdFile.currentPath, error.localizedDescription)
+            }
+        }
+
         return RepairResult(
             linksFixed: linksFixed,
             frontmatterInjected: frontmatterInjected,
-            paraFixed: paraFixed
+            paraFixed: paraFixed,
+            nfdRenamed: nfdRenamed
         )
     }
 
@@ -305,6 +342,39 @@ struct VaultAuditor {
             names.insert(basename)
         }
         return names
+    }
+
+    /// Detect files and folders whose names are in NFD (decomposed) Unicode form
+    private func detectNFDFiles() -> [AuditReport.NFDFile] {
+        let fm = FileManager.default
+        var results: [AuditReport.NFDFile] = []
+        let basePaths = [pathManager.projectsPath, pathManager.areaPath,
+                         pathManager.resourcePath, pathManager.archivePath]
+
+        for basePath in basePaths {
+            guard let enumerator = fm.enumerator(atPath: basePath) else { continue }
+            while let element = enumerator.nextObject() as? String {
+                let name = (element as NSString).lastPathComponent
+                guard !name.hasPrefix("."), !name.hasPrefix("_") else {
+                    let fullPath = (basePath as NSString).appendingPathComponent(element)
+                    var isDir: ObjCBool = false
+                    if fm.fileExists(atPath: fullPath, isDirectory: &isDir), isDir.boolValue {
+                        enumerator.skipDescendants()
+                    }
+                    continue
+                }
+
+                let nfcName = name.precomposedStringWithCanonicalMapping
+                if name != nfcName {
+                    let fullPath = (basePath as NSString).appendingPathComponent(element)
+                    let parentDir = (fullPath as NSString).deletingLastPathComponent
+                    let nfcPath = (parentDir as NSString).appendingPathComponent(nfcName)
+                    results.append(AuditReport.NFDFile(currentPath: fullPath, nfcPath: nfcPath))
+                }
+            }
+        }
+
+        return results
     }
 
     /// Infer PARA category from a file's path

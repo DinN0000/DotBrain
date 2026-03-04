@@ -19,9 +19,10 @@ struct TagNormalizer: Sendable {
         // 1. Project folder notes: ensure project folder name is in tags
         let projectsBase = pathManager.projectsPath
         if let projects = try? fm.contentsOfDirectory(atPath: projectsBase) {
-            for project in projects {
-                guard !project.hasPrefix("."), !project.hasPrefix("_") else { continue }
-                let projectPath = (projectsBase as NSString).appendingPathComponent(project)
+            for rawProject in projects {
+                guard !rawProject.hasPrefix("."), !rawProject.hasPrefix("_") else { continue }
+                let project = rawProject.precomposedStringWithCanonicalMapping
+                let projectPath = (projectsBase as NSString).appendingPathComponent(rawProject)
                 var isDir: ObjCBool = false
                 guard fm.fileExists(atPath: projectPath, isDirectory: &isDir), isDir.boolValue else { continue }
 

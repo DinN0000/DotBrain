@@ -44,15 +44,16 @@ struct ProjectContextBuilder {
 
         var lines: [String] = []
 
-        for entry in entries {
-            guard !entry.hasPrefix("."), !entry.hasPrefix("_") else { continue }
+        for rawEntry in entries {
+            guard !rawEntry.hasPrefix("."), !rawEntry.hasPrefix("_") else { continue }
+            let entry = rawEntry.precomposedStringWithCanonicalMapping
 
-            let projectDir = (projectsPath as NSString).appendingPathComponent(entry)
+            let projectDir = (projectsPath as NSString).appendingPathComponent(rawEntry)
             var isDir: ObjCBool = false
             guard fm.fileExists(atPath: projectDir, isDirectory: &isDir), isDir.boolValue else { continue }
             guard pathManager.isPathSafe(projectDir) else { continue }
 
-            let indexPath = (projectDir as NSString).appendingPathComponent("\(entry).md")
+            let indexPath = (projectDir as NSString).appendingPathComponent("\(rawEntry).md")
 
             if let content = try? String(contentsOfFile: indexPath, encoding: .utf8) {
                 let (frontmatter, _) = Frontmatter.parse(markdown: content)
@@ -79,14 +80,15 @@ struct ProjectContextBuilder {
 
         var lines: [String] = []
 
-        for entry in entries.sorted() {
-            guard !entry.hasPrefix("."), !entry.hasPrefix("_") else { continue }
-            let areaDir = (areaPath as NSString).appendingPathComponent(entry)
+        for rawEntry in entries.sorted() {
+            guard !rawEntry.hasPrefix("."), !rawEntry.hasPrefix("_") else { continue }
+            let entry = rawEntry.precomposedStringWithCanonicalMapping
+            let areaDir = (areaPath as NSString).appendingPathComponent(rawEntry)
             var isDir: ObjCBool = false
             guard fm.fileExists(atPath: areaDir, isDirectory: &isDir), isDir.boolValue else { continue }
             guard pathManager.isPathSafe(areaDir) else { continue }
 
-            let indexPath = (areaDir as NSString).appendingPathComponent("\(entry).md")
+            let indexPath = (areaDir as NSString).appendingPathComponent("\(rawEntry).md")
             var projectList = ""
             if let content = try? String(contentsOfFile: indexPath, encoding: .utf8) {
                 let (frontmatter, _) = Frontmatter.parse(markdown: content)

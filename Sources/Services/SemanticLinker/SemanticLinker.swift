@@ -425,21 +425,24 @@ struct SemanticLinker: Sendable {
                 guard fm.fileExists(atPath: folderPath, isDirectory: &isDir), isDir.boolValue else { continue }
 
                 // Compute relative folder path e.g. "2_Area/SwiftUI-패턴"
+                let nfcFolder = folder.precomposedStringWithCanonicalMapping
                 let canonicalFolder = URL(fileURLWithPath: folderPath).resolvingSymlinksInPath().path
-                let folderRelPath = canonicalFolder.hasPrefix(rootPrefix)
+                let folderRelPath = (canonicalFolder.hasPrefix(rootPrefix)
                     ? String(canonicalFolder.dropFirst(rootPrefix.count))
-                    : folder
+                    : nfcFolder).precomposedStringWithCanonicalMapping
 
                 guard let files = try? fm.contentsOfDirectory(atPath: folderPath) else { continue }
                 for file in files {
                     guard file.hasSuffix(".md"), !file.hasPrefix("."), !file.hasPrefix("_") else { continue }
-                    guard file != "\(folder).md" else { continue }
+                    let nfcFile = file.precomposedStringWithCanonicalMapping
+                    guard nfcFile != "\(nfcFolder).md" else { continue }
 
                     let filePath = (folderPath as NSString).appendingPathComponent(file)
                     guard let content = try? String(contentsOfFile: filePath, encoding: .utf8) else { continue }
 
                     let (frontmatter, body) = Frontmatter.parse(markdown: content)
                     let baseName = (file as NSString).deletingPathExtension
+                        .precomposedStringWithCanonicalMapping
 
                     let existingRelated = parseExistingRelatedNames(body)
 
@@ -449,7 +452,7 @@ struct SemanticLinker: Sendable {
                         tags: frontmatter.tags,
                         summary: frontmatter.summary ?? "",
                         project: frontmatter.project,
-                        folderName: folder,
+                        folderName: nfcFolder,
                         folderRelPath: folderRelPath,
                         para: para,
                         existingRelated: existingRelated
