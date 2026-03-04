@@ -38,7 +38,7 @@
 > macOS 메뉴바 PKM 앱 만들었습니다. Swift 네이티브.
 >
 > 하는 일:
-> - 인박스에 파일 넣으면 AI가 PARA 분류 (2-stage: Haiku/Flash -> Sonnet/Pro)
+> - 인박스에 파일 넣으면 AI가 PARA 분류 (Sonnet/Pro 단일 패스)
 > - PDF, DOCX, PPTX, XLSX, 이미지 전부 내용 추출
 > - Obsidian 호환 frontmatter + wiki-link 자동 생성
 > - MOC(Map of Content) 폴더별 자동 갱신

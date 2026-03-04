@@ -1775,32 +1775,32 @@ onProgress?(0.3, "\(inputs.count)개 파일 내용 추출 완료")
 ```swift
 for (i, batch) in batches.enumerated() {
     let progress = Double(i) / Double(batches.count) * 0.6
-    onProgress?(progress, "Stage 1: 배치 \(i + 1)/\(batches.count) 분류 중...")
+    onProgress?(progress, "배치 \(i + 1)/\(batches.count) 분류 중...")
 
-    let results = try await classifyBatchStage1(
+    let results = try await classifyBatch(
         batch,
         projectContext: projectContext,
         subfolderContext: subfolderContext,
         weightedContext: weightedContext
     )
     for (key, value) in results {
-        stage1Results[key] = value
+        batchResults[key] = value
     }
 }
 ```
 
 **변경:**
 ```swift
-// Stage 1: Process batches concurrently (max 3 concurrent API calls)
+// Process batches concurrently (max 3 concurrent API calls)
 let maxConcurrentBatches = 3
 
-stage1Results = try await withThrowingTaskGroup(
-    of: [String: ClassifyResult.Stage1Item].self,
-    returning: [String: ClassifyResult.Stage1Item].self
+batchResults = try await withThrowingTaskGroup(
+    of: [String: ClassifyResult.BatchItem].self,
+    returning: [String: ClassifyResult.BatchItem].self
 ) { group in
     var activeTasks = 0
     var batchIndex = 0
-    var combined: [String: ClassifyResult.Stage1Item] = [:]
+    var combined: [String: ClassifyResult.BatchItem] = [:]
 
     for batch in batches {
         if activeTasks >= maxConcurrentBatches {
@@ -1815,7 +1815,7 @@ stage1Results = try await withThrowingTaskGroup(
 
         let idx = batchIndex
         group.addTask {
-            return try await self.classifyBatchStage1(
+            return try await self.classifyBatch(
                 batch,
                 projectContext: projectContext,
                 subfolderContext: subfolderContext,
@@ -1824,7 +1824,7 @@ stage1Results = try await withThrowingTaskGroup(
         }
         activeTasks += 1
         batchIndex += 1
-        onProgress?(Double(idx) / Double(batches.count) * 0.6, "Stage 1: 배치 \(idx + 1)/\(batches.count) 분류 중...")
+        onProgress?(Double(idx) / Double(batches.count) * 0.6, "배치 \(idx + 1)/\(batches.count) 분류 중...")
     }
 
     // Collect remaining
@@ -1837,66 +1837,9 @@ stage1Results = try await withThrowingTaskGroup(
 }
 ```
 
-### Step 5: Classifier — Stage 2 동시 실행 (max 5)
+### Step 5: (삭제됨 -- Stage 2 제거)
 
-`Sources/Services/Claude/Classifier.swift` 54-65행을:
-
-**현재:**
-```swift
-for (i, file) in uncertainFiles.enumerated() {
-    let progress = 0.6 + Double(i) / Double(uncertainFiles.count) * 0.3
-    onProgress?(progress, "Stage 2: \(file.fileName) 정밀 분류 중...")
-
-    let result = try await classifySingleStage2(
-        file,
-        projectContext: projectContext,
-        subfolderContext: subfolderContext,
-        weightedContext: weightedContext
-    )
-    stage2Results[file.fileName] = result
-}
-```
-
-**변경:**
-```swift
-// Stage 2: Process uncertain files concurrently (max 5)
-let maxConcurrentStage2 = 5
-
-stage2Results = try await withThrowingTaskGroup(
-    of: (String, ClassifyResult.Stage2Item).self,
-    returning: [String: ClassifyResult.Stage2Item].self
-) { group in
-    var activeTasks = 0
-    var combined: [String: ClassifyResult.Stage2Item] = [:]
-
-    for file in uncertainFiles {
-        if activeTasks >= maxConcurrentStage2 {
-            if let (fileName, result) = try await group.next() {
-                combined[fileName] = result
-                activeTasks -= 1
-            }
-        }
-
-        group.addTask {
-            let result = try await self.classifySingleStage2(
-                file,
-                projectContext: projectContext,
-                subfolderContext: subfolderContext,
-                weightedContext: weightedContext
-            )
-            return (file.fileName, result)
-        }
-        activeTasks += 1
-    }
-
-    for try await (fileName, result) in group {
-        combined[fileName] = result
-    }
-    return combined
-}
-
-onProgress?(0.9, "결과 정리 중...")
-```
+> Stage 통합으로 Stage 2 단계가 삭제되었음. Sonnet/Pro 단일 패스 배치 분류로 대체. `classifySingleStage2()`, `Stage2Item`, `Stage2RawItem`은 삭제됨.
 
 ### Step 6: MOCGenerator — 폴더별 병렬 MOC 생성 (max 3)
 
@@ -1983,8 +1926,8 @@ git commit -m "perf: parallelize pipeline with TaskGroup — extraction, classif
 | 30개 | ~120초 | ~30초 | **4x** |
 | 50개 | ~200초 | ~45초 | **4.5x** |
 
-> Stage 1 배치 3개 동시, Stage 2 파일 5개 동시, 추출 완전 병렬 기준.
-> API rate limit에 따라 동시성 상수 (`maxConcurrentBatches`, `maxConcurrentStage2`, `maxConcurrentMOC`) 조절 가능.
+> 배치 3개 동시, 추출 완전 병렬 기준.
+> API rate limit에 따라 동시성 상수 (`maxConcurrentBatches`, `maxConcurrentMOC`) 조절 가능.
 
 ---
 

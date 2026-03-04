@@ -241,7 +241,7 @@ note        — 일반 노트 (default)
 |------|--------|
 | `Frontmatter.swift` | `enum DocType` + `var doctype: DocType?`, parse/stringify |
 | `ClassifyResult.swift` | `var doctype: DocType?` 추가 |
-| `Classifier.swift` | Stage1/Stage2 프롬프트에 doctype 분류 규칙 추가 |
+| `Classifier.swift` | 분류 프롬프트에 doctype 분류 규칙 추가 |
 | `FrontmatterWriter.swift` | `injectFrontmatter()`에 `doctype` 파라미터 추가 |
 | `MOCGenerator.swift` | doctype별 그룹화 (선택적) |
 
@@ -264,7 +264,7 @@ note        — 일반 노트 (default)
 | File | Change |
 |------|--------|
 | `ClassifyResult.swift` | `var subCategory: String?` 추가 |
-| `Classifier.swift` | Stage1/Stage2에 `subCategory` 필드 추가 + 프롬프트에 기존 하위 폴더 정보 주입 |
+| `Classifier.swift` | 분류 프롬프트에 `subCategory` 필드 추가 + 기존 하위 폴더 정보 주입 |
 | `PKMPathManager.swift` (28~34행) | `sanitizeFolderName()` depth 3 -> 4 변경 + 보안 강화 |
 | `PKMPathManager.swift` | `targetDirectory()`에 subCategory 경로 조합 로직 |
 | `ProjectContextBuilder.swift` | `buildSubfolderContext()` 2단계 스캔 |

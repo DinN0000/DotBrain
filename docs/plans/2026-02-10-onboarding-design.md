@@ -20,7 +20,7 @@
 **Step 2: API 키 설정**
 - Claude API 키 입력 SecureField (`APIKeyInputView` 컴포넌트 재사용)
 - Keychain 저장 + `sk-ant-` prefix 검증
-- 비용 안내 인라인 표시 (Haiku ~$0.002/파일, Sonnet ~$0.01/파일)
+- 비용 안내 인라인 표시 (Sonnet ~$0.01/파일)
 - [다음] 버튼 — 키 저장 완료 시에만 활성화
 
 **Step 3: PKM 폴더 설정**

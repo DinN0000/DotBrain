@@ -93,11 +93,11 @@ Verify that the pipeline-optimization feature (FR-01 through FR-04) has been imp
 |------|--------|----------------|--------|
 | `fileContents = files.map { (fileName, content) }` | Present | Lines 182-184: `let fileContents = files.map { file in (fileName: file.fileName, content: file.content) }` | MATCH |
 | `extractPreview` call removed | Not present | Not present (confirmed via grep) | MATCH |
-| Prompt uses `fileContents` | `buildStage1Prompt(fileContents, ...)` | Line 186: `buildStage1Prompt(fileContents, ...)` | MATCH |
+| Prompt uses `fileContents` | `buildClassifyPrompt(fileContents, ...)` | Line 186: `buildClassifyPrompt(fileContents, ...)` | MATCH |
 
 **Result: 3/3 items match -- 100%**
 
-#### Change C: `buildStage1Prompt` signature + body -- Classifier.swift (lines 264-273)
+#### Change C: `buildClassifyPrompt` signature + body -- Classifier.swift (lines 264-273)
 
 | Item | Design | Implementation | Status |
 |------|--------|----------------|--------|

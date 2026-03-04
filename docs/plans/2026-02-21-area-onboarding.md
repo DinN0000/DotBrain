@@ -576,7 +576,7 @@ git commit -m "feat: add Area context building to ProjectContextBuilder"
 
 **Step 1: Add areaContext parameter to classify methods**
 
-Add `areaContext: String` parameter to `classifyFiles`, `classifyStage1`, `classifyStage2`, and `buildStage1Prompt`. Thread it through from `classifyFiles` down to prompt builder.
+Add `areaContext: String` parameter to `classifyFiles` and `buildClassifyPrompt`. Thread it through from `classifyFiles` down to prompt builder.
 
 In `classifyFiles`:
 ```swift
@@ -592,11 +592,11 @@ func classifyFiles(
 ) async throws -> [ClassifyResult] {
 ```
 
-Thread `areaContext` through to `classifyStage1` and into `buildStage1Prompt`.
+Thread `areaContext` through to `buildClassifyPrompt`.
 
-**Step 2: Insert Area context into Stage 1 prompt**
+**Step 2: Insert Area context into classify prompt**
 
-In `buildStage1Prompt`, after the `## 활성 프로젝트 목록` section, add:
+In `buildClassifyPrompt`, after the `## 활성 프로젝트 목록` section, add:
 
 ```swift
 let areaSection = areaContext.isEmpty ? "" : """

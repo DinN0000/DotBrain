@@ -133,11 +133,8 @@ enum Screen {
 │     ├─ 하위 폴더 구조                               │
 │     └─ 가중치: Project > Area/Resource > Archive    │
 │                                                     │
-│  4. Stage 1 분류 (Haiku/Flash) — 배치 10개          │
-│     └─ confidence ≥ 0.8 → 확정                      │
-│                                                     │
-│  5. Stage 2 분류 (Sonnet/Pro) — 불확실한 것만        │
-│     └─ confidence < 0.8인 파일 정밀 분류             │
+│  4. Sonnet/Pro 배치 분류 — 5개/요청, 3병렬           │
+│     └─ 정밀 모델 단일 패스로 분류                    │
 │                                                     │
 │  6. 시맨틱 링킹 (ContextLinker)                      │
 │     └─ AI가 볼트 내 관련 노트 [[위키링크]] 추천      │
@@ -172,7 +169,7 @@ enum Screen {
 | 모듈 | 역할 |
 |------|------|
 | `AIService` | Provider 라우터 (Claude/Gemini), fallback, 재시도 |
-| `Classifier` | 2단계 분류 (Fast → Precise), 배치 동시성 |
+| `Classifier` | Sonnet/Pro 단일 패스 배치 분류, 배치 동시성 |
 | `ClaudeAPIClient` | Anthropic v1/messages API (URLSession actor) |
 | `GeminiAPIClient` | Google Gemini API (URLSession actor) |
 | `RateLimiter` | Provider별 적응형 스로틀링 |
@@ -355,7 +352,7 @@ curl -sL https://raw.githubusercontent.com/DinN0000/DotBrain/main/install.sh | b
 |------|------|
 | Menu Bar Only (NSPopover) | 최소 UI, 어디서든 빠른 접근 |
 | Actor 기반 동시성 | Lock 없이 AI API 동시 호출 안전 보장 |
-| 2단계 분류 | 비용 효율: Fast 모델로 대부분 처리, 불확실한 것만 Precise |
+| Sonnet/Pro 단일 패스 분류 | 정밀 모델로 배치 분류. 단일 패스로 파이프라인 단순화 및 분류 품질 향상 |
 | 하드웨어 바인딩 암호화 | OS Keychain 대신 자체 관리 → 디바이스 종속 보안 |
 | Provider Agnostic | Claude/Gemini 자유 전환 + fallback |
 | ZIPFoundation만 의존 | 외부 의존성 최소화, Swift 기본 API 활용 |

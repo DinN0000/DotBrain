@@ -136,7 +136,7 @@ Swift Package, 단일 앱, 외부 의존성 1개 — Dynamic 수준.
 |----------|------|-----------|------|
 | Actor 기반 동시성 | Actor + @MainActor | 유지 | 안전하고 적절 |
 | Singleton 패턴 | AppState.shared 등 | 유지 | 메뉴바 앱에 적합 |
-| 2단계 분류 | Fast → Precise | 유지 | 비용 효율적 |
+| 단일 패스 분류 | Sonnet/Pro 배치 | 유지 | 정밀 모델 단일 패스로 품질 향상 |
 | 자체 암호화 | AES-GCM + HW UUID | 강화 (KDF 추가) | 키 파생 보안 강화 |
 | Provider Agnostic | Claude/Gemini 전환 | 유지 + 에러 타입 통합 | 유지보수성 향상 |
 

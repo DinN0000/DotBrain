@@ -1,11 +1,9 @@
 import Foundation
 
-/// 2-stage document classifier (Fast batch → Precise for uncertain)
-/// Supports Claude (Haiku/Sonnet) and Gemini (Flash/Pro)
+/// Document classifier using Sonnet batch classification
 actor Classifier {
     private let aiService = AIService.shared
-    private let batchSize = 5
-    private let confidenceThreshold = 0.8
+    private let batchSize = 3
 
     private static let numericPrefixRegex = try? NSRegularExpression(
         pattern: #"^[1-4][\s_\-]?(?:Project|Area|Resource|Archive)/?"#,
@@ -18,7 +16,7 @@ actor Classifier {
 
     // MARK: - Main Classification
 
-    /// Classify files using 2-stage approach
+    /// Classify files using Sonnet batch classification
     func classifyFiles(
         _ files: [ClassifyInput],
         projectContext: String,
@@ -33,26 +31,26 @@ actor Classifier {
     ) async throws -> [ClassifyResult] {
         guard !files.isEmpty else { return [] }
 
-        // Stage 1: Haiku batch classification
-        var stage1Results: [String: ClassifyResult.Stage1Item] = [:]
+        // Batch classification
+        var batchResults: [String: ClassifyResult.BatchItem] = [:]
         let batches = stride(from: 0, to: files.count, by: batchSize).map {
             Array(files[$0..<min($0 + batchSize, files.count)])
         }
 
-        // Stage 1: Process batches concurrently (max 3 concurrent API calls)
+        // Process batches concurrently (max 3 concurrent API calls)
         // Uses non-throwing TaskGroup — individual batch failures are caught and skipped
         // so a single 429 doesn't kill the entire scan
         let maxConcurrentBatches = 3
 
         let totalBatches = batches.count
-        stage1Results = await withTaskGroup(
-            of: [String: ClassifyResult.Stage1Item].self,
-            returning: [String: ClassifyResult.Stage1Item].self
+        batchResults = await withTaskGroup(
+            of: [String: ClassifyResult.BatchItem].self,
+            returning: [String: ClassifyResult.BatchItem].self
         ) { group in
             var activeTasks = 0
             var batchIndex = 0
             var completedBatches = 0
-            var combined: [String: ClassifyResult.Stage1Item] = [:]
+            var combined: [String: ClassifyResult.BatchItem] = [:]
 
             for batch in batches {
                 if activeTasks >= maxConcurrentBatches {
@@ -62,7 +60,7 @@ actor Classifier {
                         }
                         activeTasks -= 1
                         completedBatches += 1
-                        onProgress?(Double(completedBatches) / Double(totalBatches) * 0.6, "Stage 1: 배치 \(completedBatches)/\(totalBatches) 완료")
+                        onProgress?(Double(completedBatches) / Double(totalBatches) * 0.6, "배치 \(completedBatches)/\(totalBatches) 완료")
                     }
                 }
 
@@ -70,7 +68,7 @@ actor Classifier {
                 let batchFiles = batch
                 group.addTask {
                     do {
-                        return try await self.classifyBatchStage1(
+                        return try await self.classifyBatch(
                             batchFiles,
                             projectContext: projectContext,
                             subfolderContext: subfolderContext,
@@ -80,11 +78,11 @@ actor Classifier {
                             correctionContext: correctionContext
                         )
                     } catch {
-                        NSLog("[Classifier] Stage1 배치 %d 실패 (스킵): %@", idx, error.localizedDescription)
+                        NSLog("[Classifier] 배치 %d 실패 (스킵): %@", idx, error.localizedDescription)
                         // Return defaults for failed batch files
-                        var fallback: [String: ClassifyResult.Stage1Item] = [:]
+                        var fallback: [String: ClassifyResult.BatchItem] = [:]
                         for file in batchFiles {
-                            fallback[file.fileName] = ClassifyResult.Stage1Item(
+                            fallback[file.fileName] = ClassifyResult.BatchItem(
                                 fileName: file.fileName,
                                 para: .resource,
                                 tags: [],
@@ -107,65 +105,9 @@ actor Classifier {
                     combined[key] = value
                 }
                 completedBatches += 1
-                onProgress?(Double(completedBatches) / Double(totalBatches) * 0.6, "Stage 1: 배치 \(completedBatches)/\(totalBatches) 완료")
+                onProgress?(Double(completedBatches) / Double(totalBatches) * 0.6, "배치 \(completedBatches)/\(totalBatches) 완료")
             }
             return combined
-        }
-
-        // Stage 2: Sonnet for uncertain files
-        let uncertainFiles = files.filter { file in
-            guard let s1 = stage1Results[file.fileName] else { return true }
-            return s1.confidence < confidenceThreshold
-        }
-
-        var stage2Results: [String: ClassifyResult.Stage2Item] = [:]
-
-        if !uncertainFiles.isEmpty {
-            // Stage 2: Process uncertain files concurrently (max 3)
-            // Uses non-throwing TaskGroup — individual file failures fall back to Stage 1 result
-            let maxConcurrentStage2 = 3
-
-            stage2Results = await withTaskGroup(
-                of: (String, ClassifyResult.Stage2Item?).self,
-                returning: [String: ClassifyResult.Stage2Item].self
-            ) { group in
-                var activeTasks = 0
-                var combined: [String: ClassifyResult.Stage2Item] = [:]
-
-                for file in uncertainFiles {
-                    if activeTasks >= maxConcurrentStage2 {
-                        if let (fileName, result) = await group.next() {
-                            if let result { combined[fileName] = result }
-                            activeTasks -= 1
-                        }
-                    }
-
-                    let fileName = file.fileName
-                    group.addTask {
-                        do {
-                            let result = try await self.classifySingleStage2(
-                                file,
-                                projectContext: projectContext,
-                                subfolderContext: subfolderContext,
-                                weightedContext: weightedContext,
-                                areaContext: areaContext,
-                                tagVocabulary: tagVocabulary,
-                                correctionContext: correctionContext
-                            )
-                            return (fileName, result)
-                        } catch {
-                            NSLog("[Classifier] Stage2 %@ 실패 (Stage1 결과 사용): %@", fileName, error.localizedDescription)
-                            return (fileName, nil)
-                        }
-                    }
-                    activeTasks += 1
-                }
-
-                for await (fileName, result) in group {
-                    if let result { combined[fileName] = result }
-                }
-                return combined
-            }
         }
 
         onProgress?(0.9, "결과 정리 중...")
@@ -173,32 +115,20 @@ actor Classifier {
         // Combine results with project validation
         return files.map { file in
             var result: ClassifyResult
-            let s2 = stage2Results[file.fileName]
-            let s1 = stage1Results[file.fileName]
+            let item = batchResults[file.fileName]
 
-            // Capture raw project name before fuzzy matching
-            let rawProject = s2?.project ?? s1?.project
+            let rawProject = item?.project
 
-            if let s2 = s2 {
+            if let item = item {
                 result = ClassifyResult(
-                    para: s2.para,
-                    tags: s2.tags,
-                    summary: s2.summary,
-                    targetFolder: s2.targetFolder,
+                    para: item.para,
+                    tags: item.tags,
+                    summary: item.summary,
+                    targetFolder: stripNewPrefix(stripParaPrefix(item.targetFolder ?? "")),
                     project: rawProject.flatMap { fuzzyMatchProject($0, projectNames: projectNames, pkmRoot: pkmRoot) },
-                    confidence: s2.confidence ?? 0.0
-                )
-            } else if let s1 = s1 {
-                result = ClassifyResult(
-                    para: s1.para,
-                    tags: s1.tags,
-                    summary: s1.summary,
-                    targetFolder: stripNewPrefix(stripParaPrefix(s1.targetFolder ?? "")),
-                    project: rawProject.flatMap { fuzzyMatchProject($0, projectNames: projectNames, pkmRoot: pkmRoot) },
-                    confidence: s1.confidence
+                    confidence: item.confidence
                 )
             } else {
-                // Fallback
                 result = ClassifyResult(
                     para: .resource,
                     tags: [],
@@ -208,13 +138,10 @@ actor Classifier {
                 )
             }
 
-            // para가 project인데 매칭 프로젝트 없으면 → suggestedProject에 원래 이름 보존
-            // InboxProcessor가 PendingConfirmation을 생성하도록 para: .project 유지
             if result.para == .project && result.project == nil {
                 result.suggestedProject = rawProject
             }
 
-            // Remove project names from tags (AI hallucination prevention)
             let projectNameSet = Set(projectNames.map { $0.lowercased() })
             result.tags = result.tags.filter { !projectNameSet.contains($0.lowercased()) }
 
@@ -222,9 +149,9 @@ actor Classifier {
         }
     }
 
-    // MARK: - Stage 1: Haiku Batch
+    // MARK: - Batch Classification
 
-    private func classifyBatchStage1(
+    private func classifyBatch(
         _ files: [ClassifyInput],
         projectContext: String,
         subfolderContext: String,
@@ -232,28 +159,27 @@ actor Classifier {
         areaContext: String,
         tagVocabulary: String,
         correctionContext: String
-    ) async throws -> [String: ClassifyResult.Stage1Item] {
-        // Use condensed preview (800 chars) instead of full content (5000 chars) for Stage 1 triage
+    ) async throws -> [String: ClassifyResult.BatchItem] {
         let fileContents = files.map { file in
-            (fileName: file.fileName, content: file.preview)
+            (fileName: file.fileName, content: file.content)
         }
 
-        let prompt = buildStage1Prompt(fileContents, projectContext: projectContext, subfolderContext: subfolderContext, weightedContext: weightedContext, areaContext: areaContext, tagVocabulary: tagVocabulary, correctionContext: correctionContext)
+        let prompt = buildClassifyPrompt(fileContents, projectContext: projectContext, subfolderContext: subfolderContext, weightedContext: weightedContext, areaContext: areaContext, tagVocabulary: tagVocabulary, correctionContext: correctionContext)
 
-        let response = try await aiService.sendFastWithUsage(maxTokens: 4096, message: prompt)
+        let response = try await aiService.sendPreciseWithUsage(maxTokens: 4096, message: prompt)
         if let usage = response.usage {
-            let model = await aiService.fastModel
-            StatisticsService.logTokenUsage(operation: "classify-stage1", model: model, usage: usage)
+            let model = await aiService.preciseModel
+            StatisticsService.logTokenUsage(operation: "classify", model: model, usage: usage)
         }
 
-        var results: [String: ClassifyResult.Stage1Item] = [:]
-        if let items = parseJSONSafe([Stage1RawItem].self, from: response.text) {
+        var results: [String: ClassifyResult.BatchItem] = [:]
+        if let items = parseJSONSafe([RawClassifyItem].self, from: response.text) {
             if items.isEmpty {
-                NSLog("[Classifier] Stage1 JSON parsed but empty array — response: %@", String(response.text.prefix(200)))
+                NSLog("[Classifier] JSON parsed but empty array — response: %@", String(response.text.prefix(200)))
             }
             for item in items {
                 guard let para = PARACategory(rawValue: item.para), !item.fileName.isEmpty else { continue }
-                results[item.fileName] = ClassifyResult.Stage1Item(
+                results[item.fileName] = ClassifyResult.BatchItem(
                     fileName: item.fileName,
                     para: para,
                     tags: Array((item.tags ?? []).prefix(5)),
@@ -264,12 +190,12 @@ actor Classifier {
                 )
             }
         } else {
-            NSLog("[Classifier] Stage1 JSON parse failed — response: %@", String(response.text.prefix(200)))
+            NSLog("[Classifier] JSON parse failed — response: %@", String(response.text.prefix(200)))
         }
 
         // Fill missing with default
         for file in files where results[file.fileName] == nil {
-            results[file.fileName] = ClassifyResult.Stage1Item(
+            results[file.fileName] = ClassifyResult.BatchItem(
                 fileName: file.fileName,
                 para: .resource,
                 tags: [],
@@ -283,59 +209,9 @@ actor Classifier {
         return results
     }
 
-    // MARK: - Stage 2: Sonnet Precise
-
-    private func classifySingleStage2(
-        _ file: ClassifyInput,
-        projectContext: String,
-        subfolderContext: String,
-        weightedContext: String,
-        areaContext: String,
-        tagVocabulary: String,
-        correctionContext: String
-    ) async throws -> ClassifyResult.Stage2Item {
-        let prompt = buildStage2Prompt(
-            fileName: file.fileName,
-            content: file.content,
-            projectContext: projectContext,
-            subfolderContext: subfolderContext,
-            weightedContext: weightedContext,
-            areaContext: areaContext,
-            tagVocabulary: tagVocabulary,
-            correctionContext: correctionContext
-        )
-
-        let response = try await aiService.sendPreciseWithUsage(maxTokens: 2048, message: prompt)
-        if let usage = response.usage {
-            let model = await aiService.preciseModel
-            StatisticsService.logTokenUsage(operation: "classify-stage2", model: model, usage: usage)
-        }
-
-        if let item = parseJSONSafe(Stage2RawItem.self, from: response.text),
-           let para = PARACategory(rawValue: item.para) {
-            return ClassifyResult.Stage2Item(
-                para: para,
-                tags: Array((item.tags ?? []).prefix(5)),
-                summary: item.summary ?? "",
-                targetFolder: stripNewPrefix(stripParaPrefix(item.targetFolder ?? item.targetPath ?? "")),
-                project: item.project,
-                confidence: item.confidence.map { max(0, min(1, $0)) }
-            )
-        }
-
-        // Fallback
-        return ClassifyResult.Stage2Item(
-            para: .resource,
-            tags: [],
-            summary: "",
-            targetFolder: "",
-            project: nil
-        )
-    }
-
     // MARK: - Prompt Builders (Korean)
 
-    private func buildStage1Prompt(
+    private func buildClassifyPrompt(
         _ files: [(fileName: String, content: String)],
         projectContext: String,
         subfolderContext: String,
@@ -378,7 +254,7 @@ actor Classifier {
         """
 
         return """
-        당신은 PARA 방법론 기반 문서 분류 전문가입니다.
+        당신은 PARA 방법론 기반 문서 분류 전문가입니다. **각 문서를 정밀하게 분석해주세요.**
 
         ## 활성 프로젝트 목록
         \(projectContext)
@@ -426,7 +302,7 @@ actor Classifier {
             "fileName": "파일명",
             "para": "project" | "area" | "resource" | "archive",
             "tags": ["태그1", "태그2"],
-            "summary": "핵심 내용 한 줄 요약 (15자 이상)",
+            "summary": "핵심 내용을 2~3문장으로 요약",
             "confidence": 0.0~1.0,
             "project": "관련 프로젝트명 (관련 있을 때만, 없으면 생략)",
             "targetFolder": "기존 폴더명 또는 NEW:폴더명. PARA 접두사 포함하지 말 것"
@@ -435,114 +311,14 @@ actor Classifier {
 
         각 파일에 대해 정확히 하나의 객체를 반환하세요. tags는 최대 5개, 한국어 또는 영어 혼용 가능합니다.
         confidence는 분류 확신도입니다 (0.0=모름, 1.0=확실).
-        summary는 이 문서가 무엇에 관한 것인지 구체적으로 한 줄로 요약하세요 (후속 노트 연결에 사용됩니다).
-        """
-    }
-
-    private func buildStage2Prompt(
-        fileName: String,
-        content: String,
-        projectContext: String,
-        subfolderContext: String,
-        weightedContext: String,
-        areaContext: String,
-        tagVocabulary: String,
-        correctionContext: String = ""
-    ) -> String {
-        let weightedSection = weightedContext.isEmpty ? "" : """
-
-        ## 기존 문서 맥락 (가중치 기반)
-        아래 기존 문서 정보를 참고하여, 이 문서가 기존 문서와 태그나 주제가 겹치면 같은 카테고리/폴더로 분류하세요.
-        (높음) Project 문서와 겹치면 → 해당 프로젝트 연결 가중치 높음
-        (중간) Area/Resource 문서와 겹치면 → 해당 폴더 연결 가중치 중간
-        (낮음) Archive는 참고만 (낮은 가중치)
-
-        \(weightedContext)
-
-        """
-
-        let tagSection = tagVocabulary == "[]" ? "" : """
-
-        ## 기존 태그 참고
-        볼트에서 사용 중인 태그입니다. 동일한 개념이면 아래 표기를 그대로 따르세요.
-        새로운 개념의 태그는 자유롭게 생성해도 됩니다.
-        \(tagVocabulary)
-
-        """
-
-        let areaSection = areaContext.isEmpty ? "" : """
-
-        ## Area(도메인) 목록
-        아래 등록된 도메인과 소속 프로젝트를 참고하세요. Area는 여러 프로젝트를 묶는 상위 영역입니다.
-        \(areaContext)
-
-        """
-
-        return """
-        당신은 PARA 방법론 기반 문서 분류 전문가입니다. 이 문서를 정밀하게 분석해주세요.
-
-        ## 활성 프로젝트 목록
-        \(projectContext)
-        \(areaSection)
-        ## 기존 하위 폴더 (이 목록의 정확한 이름만 사용)
-        \(subfolderContext)
-        각 폴더의 name, tags, summary, noteCount를 참고하여 가장 적합한 폴더를 선택하세요.
-        새 폴더가 필요하면 targetFolder에 "NEW:폴더명"을 사용하세요. 기존 폴더와 비슷한 이름이 있으면 반드시 기존 이름을 사용하세요.
-        \(weightedSection)\(tagSection)\(correctionContext.isEmpty ? "" : "\n\(correctionContext)\n")
-        ## 분류 규칙
-
-        | para | 조건 | 예시 | project 필드 |
-        |------|------|------|-------------|
-        | project | 활성 프로젝트의 직접 작업 문서 (마감 있는 작업, 체크리스트, 회의록) | 스프린트 백로그, 회의록, TODO | 필수: 정확한 프로젝트명 |
-        | area | 등록된 도메인 전반의 관리/운영 문서. 특정 프로젝트에 속하지 않지만 도메인과 관련된 문서 | 도메인 운영, 인프라 관리, 정책 문서 | 관련시만 |
-        | resource | 참고/학습/분석 자료 | 기술 가이드, API 레퍼런스, 분석 보고서 | 관련시만 |
-        | archive | 완료/비활성/오래된 문서 | 종료된 작업, 과거 회고록 | 관련시만 |
-
-        항상은 아니지만 Area는 도메인(상위 영역)이 될 수 있고 그 아래 여러 Project가 묶일 수 있음.
-
-        ## 주의사항
-
-        | 문서 유형 | 올바른 분류 | 흔한 오분류 |
-        |-----------|-----------|-----------|
-        | 프로젝트 참고자료/분석 | resource | project |
-        | 프로젝트 소개/개요/제안서 | resource | project |
-        | 프로젝트 회고/리뷰 | resource 또는 archive | project |
-        | 도메인 운영/관리 문서 | area | project |
-        | project가 아닌데 프로젝트 관련 | project 필드에 프로젝트명 기재 | project 필드 생략 |
-        | 목록에 없는 명확한 프로젝트 작업 | project (project: "제안명") | resource |
-
-        ## 프로젝트 경계 규칙
-        - project 필드는 해당 문서가 프로젝트의 **직접 작업물**이거나 **직접 참조 자료**일 때만 기재
-        - 같은 회사/조직의 문서라도 주제가 다르면 다른 프로젝트 (또는 프로젝트 없음)
-        - 확실하지 않으면 project 필드를 생략 (잘못 연결하는 것보다 비워두는 게 나음)
-        - 프로젝트 이름을 태그에 넣지 말 것 (태그는 주제/기술 키워드만)
-
-        ## 대상 파일
-        파일명: \(fileName)
-
-        ## 전체 내용
-        \(content)
-
-        ## 응답 형식
-        반드시 아래 JSON 객체만 출력하세요. 설명이나 마크다운 코드블록 없이 순수 JSON만 반환합니다.
-        {
-          "para": "project" | "area" | "resource" | "archive",
-          "tags": ["태그1", "태그2"],
-          "summary": "문서 내용을 2~3문장으로 요약",
-          "confidence": 0.0~1.0,
-          "targetFolder": "기존 폴더명 또는 NEW:폴더명. PARA 접두사 포함하지 말 것",
-          "project": "관련 프로젝트명 (관련 있을 때만, 없으면 생략)"
-        }
-
-        tags는 최대 5개, summary는 한국어로 작성하세요.
-        confidence는 분류 확신도입니다 (0.0=모름, 1.0=확실).
+        summary는 이 문서가 무엇에 관한 것인지 구체적으로 2~3문장으로 요약하세요 (후속 노트 연결에 사용됩니다).
         """
     }
 
     // MARK: - JSON Parsing
 
     /// Raw JSON types for decoding (using String for para to allow validation)
-    private struct Stage1RawItem: Decodable {
+    private struct RawClassifyItem: Decodable {
         let fileName: String
         let para: String
         var tags: [String]?
@@ -550,16 +326,6 @@ actor Classifier {
         var confidence: Double?
         var project: String?
         var targetFolder: String?
-    }
-
-    private struct Stage2RawItem: Decodable {
-        let para: String
-        var tags: [String]?
-        var summary: String?
-        var targetFolder: String?
-        var targetPath: String?  // legacy field
-        var project: String?
-        var confidence: Double?
     }
 
     /// Safely parse JSON from LLM response (handles markdown code blocks)

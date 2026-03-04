@@ -16,6 +16,31 @@ actor ClaudeCLIClient {
     private static var cachedClaudePath: String?
     private static var claudePathResolved = false
 
+    // MARK: - Process Pool
+
+    private final class PooledProcess {
+        let process: Process
+        let stdinPipe: Pipe
+        let stdoutPipe: Pipe
+        let stderrPipe: Pipe
+        let spawnTime: ContinuousClock.Instant
+
+        init(process: Process, stdinPipe: Pipe, stdoutPipe: Pipe, stderrPipe: Pipe) {
+            self.process = process
+            self.stdinPipe = stdinPipe
+            self.stdoutPipe = stdoutPipe
+            self.stderrPipe = stderrPipe
+            self.spawnTime = .now
+        }
+
+        var isAlive: Bool { process.isRunning }
+        var isStale: Bool { ContinuousClock.now - spawnTime > .seconds(300) }
+    }
+
+    private var pool: [PooledProcess] = []
+    private let poolSize = 2
+    private let poolModel = ClaudeCLIClient.preciseModel
+
     // MARK: - Availability Check (sync, for AIProvider.hasAPIKey)
 
     /// Check if claude CLI binary is found at known paths
@@ -198,6 +223,125 @@ actor ClaudeCLIClient {
         "[ -f ~/.zprofile ] && . ~/.zprofile 2>/dev/null; [ -f ~/.bash_profile ] && . ~/.bash_profile 2>/dev/null; [ -f ~/.zshrc ] && . ~/.zshrc 2>/dev/null; [ -f ~/.bashrc ] && . ~/.bashrc 2>/dev/null"
     }
 
+    // MARK: - Pool Lifecycle
+
+    func warmUp() {
+        guard pool.isEmpty else { return }
+
+        guard let claudePath = Self.findClaudePath() else {
+            NSLog("[ClaudeCLI] Pool warmup skipped — claude not found")
+            return
+        }
+
+        for _ in 0..<poolSize {
+            if let p = spawnPooledProcess(claudePath: claudePath) {
+                pool.append(p)
+            }
+        }
+        NSLog("[ClaudeCLI] Pool warmed up: %d processes", pool.count)
+    }
+
+    func shutdown() {
+        for p in pool {
+            if p.isAlive {
+                p.process.terminate()
+            }
+        }
+        pool.removeAll()
+        NSLog("[ClaudeCLI] Pool shut down")
+    }
+
+    private func checkoutWarmProcess(model: String, claudePath: String) -> PooledProcess? {
+        // Pool only holds sonnet processes
+        guard model == poolModel else { return nil }
+
+        while let p = pool.first {
+            pool.removeFirst()
+            if p.isAlive && !p.isStale {
+                // Replenish pool
+                if let replacement = spawnPooledProcess(claudePath: claudePath) {
+                    pool.append(replacement)
+                }
+                return p
+            }
+            // Dead or stale — discard
+            if p.isAlive { p.process.terminate() }
+        }
+        return nil
+    }
+
+    private func spawnPooledProcess(claudePath: String) -> PooledProcess? {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: claudePath)
+        process.arguments = ["-p", "--model", poolModel, "--output-format", "text"]
+        process.environment = Self.loadUserShellEnvironment()
+
+        let stdinPipe = Pipe()
+        let stdoutPipe = Pipe()
+        let stderrPipe = Pipe()
+        process.standardInput = stdinPipe
+        process.standardOutput = stdoutPipe
+        process.standardError = stderrPipe
+
+        do {
+            try process.run()
+            return PooledProcess(process: process, stdinPipe: stdinPipe, stdoutPipe: stdoutPipe, stderrPipe: stderrPipe)
+        } catch {
+            NSLog("[ClaudeCLI] Failed to spawn pool process: %@", error.localizedDescription)
+            return nil
+        }
+    }
+
+    private func runWarmProcess(_ p: PooledProcess, input: String) async throws -> String {
+        try await Task.detached(priority: .userInitiated) {
+            // Timeout: terminate if still running after 120s
+            DispatchQueue.global().asyncAfter(deadline: .now() + 120) {
+                if p.process.isRunning { p.process.terminate() }
+            }
+
+            if let data = input.data(using: .utf8) {
+                p.stdinPipe.fileHandleForWriting.write(data)
+            }
+            p.stdinPipe.fileHandleForWriting.closeFile()
+
+            return try Self.collectProcessOutput(
+                process: p.process,
+                stdoutPipe: p.stdoutPipe,
+                stderrPipe: p.stderrPipe
+            )
+        }.value
+    }
+
+    /// Collect output from a running process, validate exit status, return trimmed result.
+    /// Called from within Task.detached context (synchronous/blocking I/O).
+    private static func collectProcessOutput(
+        process: Process,
+        stdoutPipe: Pipe,
+        stderrPipe: Pipe
+    ) throws -> String {
+        let outputData = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
+        let errorData = stderrPipe.fileHandleForReading.readDataToEndOfFile()
+
+        process.waitUntilExit()
+
+        if process.terminationStatus != 0 {
+            let errorOutput = String(data: errorData, encoding: .utf8) ?? ""
+            throw ClaudeCLIError.processError(
+                status: process.terminationStatus,
+                message: String(errorOutput.prefix(500))
+            )
+        }
+
+        let output = String(data: outputData, encoding: .utf8) ?? ""
+        let trimmed = output.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        if trimmed.isEmpty {
+            throw ClaudeCLIError.emptyResponse
+        }
+
+        return trimmed
+    }
+
     // MARK: - Send Message
 
     /// Send a prompt to Claude CLI and return the text response.
@@ -211,14 +355,19 @@ actor ClaudeCLIClient {
             throw ClaudeCLIError.claudeNotFound
         }
 
-        let arguments = ["-p", "--model", model, "--output-format", "text"]
+        // Try warm process from pool
+        if let warm = checkoutWarmProcess(model: model, claudePath: claudePath) {
+            let result = try await runWarmProcess(warm, input: userMessage)
+            return (result, nil)
+        }
 
+        // Cold start fallback
+        let arguments = ["-p", "--model", model, "--output-format", "text"]
         let result = try await runProcess(
             executablePath: claudePath,
             arguments: arguments,
             input: userMessage
         )
-
         return (result, nil)
     }
 
@@ -234,10 +383,7 @@ actor ClaudeCLIClient {
             let process = Process()
             process.executableURL = URL(fileURLWithPath: executablePath)
             process.arguments = arguments
-
-            // Load user's shell environment (proxy, SSL certs, PATH, etc.)
-            let env = Self.loadUserShellEnvironment()
-            process.environment = env
+            process.environment = Self.loadUserShellEnvironment()
 
             let inputPipe = Pipe()
             let outputPipe = Pipe()
@@ -249,34 +395,16 @@ actor ClaudeCLIClient {
 
             try process.run()
 
-            // Write prompt to stdin (handles long prompts without shell length limits)
             if let data = input.data(using: .utf8) {
                 inputPipe.fileHandleForWriting.write(data)
             }
             inputPipe.fileHandleForWriting.closeFile()
 
-            // Read output before waitUntilExit to avoid pipe buffer deadlock
-            let outputData = outputPipe.fileHandleForReading.readDataToEndOfFile()
-            let errorData = errorPipe.fileHandleForReading.readDataToEndOfFile()
-
-            process.waitUntilExit()
-
-            if process.terminationStatus != 0 {
-                let errorOutput = String(data: errorData, encoding: .utf8) ?? ""
-                throw ClaudeCLIError.processError(
-                    status: process.terminationStatus,
-                    message: String(errorOutput.prefix(500))
-                )
-            }
-
-            let output = String(data: outputData, encoding: .utf8) ?? ""
-            let trimmed = output.trimmingCharacters(in: .whitespacesAndNewlines)
-
-            if trimmed.isEmpty {
-                throw ClaudeCLIError.emptyResponse
-            }
-
-            return trimmed
+            return try Self.collectProcessOutput(
+                process: process,
+                stdoutPipe: outputPipe,
+                stderrPipe: errorPipe
+            )
         }.value
     }
 }

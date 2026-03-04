@@ -21,13 +21,12 @@ _Inbox/ 파일
     │           바이너리: BinaryExtractor 디스패치
     │           폴더: 하위 파일 목록 추출
     ▼
-3. Classify ── Classifier 2단계 AI 분류
+3. Classify ── Classifier Sonnet/Pro 단일 패스 AI 분류
     │           ProjectContextBuilder로 볼트 컨텍스트 구성
     │           + buildAreaContext()로 Area 컨텍스트
     │           + buildTagVocabulary()로 상위 50 태그 어휘 주입
     │           + CorrectionMemory.buildPromptContext()로 사용자 수정 이력
-    │           Stage 1: Haiku/Flash 배치 (5파일/요청, 3병렬)
-    │           Stage 2: Sonnet/Pro 정밀 (confidence < 0.8만, 3병렬)
+    │           Sonnet/Pro 배치 (5파일/요청, 3병렬)
     ▼
 4. Process ── 충돌 감지 → FileMover.moveFile()/moveFolder()
     │           충돌 없으면 자동 이동
@@ -40,22 +39,16 @@ _Inbox/ 파일
               NotificationService 알림
 ```
 
-### 2단계 AI 분류 상세
+### AI 분류 상세
 
 `Sources/Services/Claude/Classifier.swift`
 
-**Stage 1 (Haiku/Flash — 빠른 배치)**:
+**Sonnet/Pro 단일 패스 배치 분류**:
 - 최대 5개 파일을 하나의 AI 요청으로 전송
 - 최대 3개 배치 동시 실행
-- `extractPreview()` (800자)로 압축된 프리뷰 사용
-- 출력: `Stage1Item` (fileName, para, tags, summary, confidence, project, targetFolder)
-
-**Stage 2 (Sonnet/Pro — 정밀)**:
-- Stage 1에서 `confidence < 0.8`인 파일만 대상
-- 파일당 1개 요청, 최대 3개 동시 실행
 - `extract()` (5000자)로 상세 콘텐츠 사용
 - 프로젝트 컨텍스트 + 서브폴더 컨텍스트 포함
-- 출력: `Stage2Item` (para, tags, summary, targetFolder, project, confidence)
+- 출력: `BatchItem` (fileName, para, tags, summary, confidence, project, targetFolder)
 
 **Project Name Resolution**:
 - `fuzzyMatchProject()` — AI가 제안한 프로젝트명을 실제 폴더명과 매칭
@@ -112,7 +105,7 @@ PARA 하위 폴더 (예: 2_Area/DevOps/)
     │          바이너리: 스트리밍 해시 (1MB 청크)
     │          중복: 휴지통 이동, 태그 병합
     ▼
-3. Classify ── 2단계 AI 분류 (InboxProcessor와 동일)
+3. Classify ── Sonnet/Pro 단일 패스 AI 분류 (InboxProcessor와 동일)
     │
     ▼
 4. Compare ── 현재 위치 vs AI 추천 위치
@@ -172,7 +165,7 @@ PARA 폴더 전체, 특정 카테고리, 또는 특정 폴더
     ▼
 3. Extract ── 병렬 추출 (max 5)
     ▼
-4. Classify ── 2단계 AI 분류
+4. Classify ── Sonnet/Pro 단일 패스 AI 분류
     ▼
 5. Compare ── 현재 위치 vs 추천 위치
               needsMove인 파일만 FileAnalysis로 반환
@@ -350,7 +343,7 @@ struct LinkResult {
 
 | 파이프라인 | 동기/비동기 | 병렬 추출 | 병렬 분류 | 취소 지원 |
 |-----------|-----------|----------|----------|----------|
-| InboxProcessor | async | max 5 | max 3 (배치) + max 3 (정밀) | Task.isCancelled |
+| InboxProcessor | async | max 5 | max 3 (배치) | Task.isCancelled |
 | FolderReorganizer | async | max 5 | Classifier 재사용 | - |
 | VaultReorganizer | async | max 5 | Classifier 재사용 | Task.isCancelled |
 | VaultCheckPipeline | async | - | max 3 (Enrich) | Task.isCancelled |

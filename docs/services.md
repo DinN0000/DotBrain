@@ -28,17 +28,16 @@
 
 `Sources/Services/Claude/Classifier.swift` — **actor**
 
-2단계 AI 분류기. `classifyFiles()` 메서드가 전체 흐름을 조율.
+Sonnet/Pro 단일 패스 AI 분류기. `classifyFiles()` 메서드가 전체 흐름을 조율.
 
 | 메서드 | 설명 |
 |--------|------|
-| `classifyFiles(_:projectContext:subfolderContext:projectNames:weightedContext:areaContext:tagVocabulary:correctionContext:pkmRoot:onProgress:)` | 파일 목록을 2단계로 분류 |
+| `classifyFiles(_:projectContext:subfolderContext:projectNames:weightedContext:areaContext:tagVocabulary:correctionContext:pkmRoot:onProgress:)` | 파일 목록을 Sonnet/Pro 배치로 분류 |
 
 **내부 흐름**:
-1. `classifyBatchStage1()` — Haiku/Flash, 5파일/배치, 3병렬
-2. `classifySingleStage2()` — Sonnet/Pro, confidence < 0.8만, 3병렬
-3. `fuzzyMatchProject()` — AI 프로젝트명 → 실제 폴더 매칭
-4. `parseJSONSafe()` — 마크다운 코드블록에서 JSON 추출
+1. `classifyBatch()` — Sonnet/Pro, 5파일/배치, 3병렬
+2. `fuzzyMatchProject()` — AI 프로젝트명 → 실제 폴더 매칭
+3. `parseJSONSafe()` — 마크다운 코드블록에서 JSON 추출
 
 **의존**: AIService, StatisticsService
 
@@ -170,7 +169,7 @@ PARA 경로 관리 및 보안 검증.
 | 메서드 | 설명 |
 |--------|------|
 | `extract(from:maxLength:)` | AI 분류용 텍스트 추출 (기본 5000자) |
-| `extractPreview(from:content:maxLength:)` | Stage 1 배치용 압축 프리뷰 (기본 800자) |
+| `extractPreview(from:content:maxLength:)` | 압축 프리뷰 생성 (기본 800자, ContextLinker에서 사용) |
 
 **마크다운 Smart Extraction**: frontmatter(20%) + intro(30%) + headings(30%) + tail(20%) 예산 배분. FileHandle 1MB 청크 스트리밍.
 

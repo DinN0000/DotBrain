@@ -46,7 +46,7 @@ v2.1.0 릴리즈 후 11개 에이전트 병렬 코드 리뷰 수행.
 | # | File | Line | Issue | Fix |
 |---|------|------|-------|-----|
 | 4 | `RateLimiter.swift` | 40 | `backoffUntil` sleep 후 미초기화 | sleep 후 `ps.backoffUntil = nil` |
-| 5 | `Classifier.swift` | 142 | Stage2 parse 실패 -> confidence 0.9 | `?? 0.0`으로 변경 |
+| 5 | `Classifier.swift` | 142 | classify parse 실패 -> confidence 0.9 | `?? 0.0`으로 변경 |
 | 6 | `AIService.swift` | 127 | fallback empty catch | NSLog 에러 로깅 추가 |
 | 7 | `ProjectManager.swift` | 18 | `isPathSafe` 오용 — `.alreadyExists` 에러 | 올바른 에러 타입으로 변경 |
 | 8 | `FolderReorganizer.swift` | 259 | `failed: 0` 하드코딩 | 실제 실패 카운트 전달 |

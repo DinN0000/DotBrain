@@ -20,7 +20,7 @@ macOS 메뉴바 앱. Obsidian 볼트의 `_Inbox/` 폴더에 드롭된 파일을 
 
 - **macOS menubar app**: `NSStatusItem` + `NSPopover`, dock 아이콘 없음 (`.accessory` policy)
 - **Obsidian 호환**: 동일 볼트 폴더를 공유. 마크다운 + YAML frontmatter + `[[wikilink]]` 형식 사용
-- **AI 이중 프로바이더**: Claude (Haiku + Sonnet) 또는 Gemini (Flash + Pro). 런타임 전환 가능, fallback 지원
+- **AI 이중 프로바이더**: Claude (Sonnet) 또는 Gemini (Pro). 단일 정밀 모델 패스. 런타임 전환 가능, fallback 지원
 
 ## Layer Architecture
 
@@ -84,7 +84,7 @@ macOS 메뉴바 앱. Obsidian 볼트의 `_Inbox/` 폴더에 드롭된 파일을 
 
 | 그룹 | 주요 서비스 | 역할 |
 |------|------------|------|
-| **AI** | AIService(actor), Classifier(actor), RateLimiter(actor), ClaudeAPIClient(actor), GeminiAPIClient(actor) | AI 호출, 2단계 분류, 적응형 rate limiting |
+| **AI** | AIService(actor), Classifier(actor), RateLimiter(actor), ClaudeAPIClient(actor), GeminiAPIClient(actor) | AI 호출, Sonnet/Pro 단일 패스 분류, 적응형 rate limiting |
 | **FileSystem** | FileMover, PKMPathManager, InboxScanner, InboxWatchdog, FrontmatterWriter, AssetMigrator | 파일 이동, 경로 관리, 볼트 감시, frontmatter 주입 |
 | **Extraction** | FileContentExtractor, BinaryExtractor, PDF/PPTX/XLSX/DOCX/ImageExtractor | 텍스트/바이너리 콘텐츠 추출 |
 | **SemanticLinker** | SemanticLinker, TagNormalizer, LinkCandidateGenerator, LinkAIFilter, RelatedNotesWriter, FolderRelationStore, FolderRelationAnalyzer, LinkFeedbackStore, LinkStateDetector | 태그 정규화, 후보 생성, AI 필터링, wikilink 작성, 폴더 관계, 링크 피드백 (index-first 최적화) |
@@ -134,9 +134,8 @@ MenuBarPopover (root, 화면 전환)
 ┌─ InboxProcessor ──────────────────────────────────────┐
 │  1. Scan      InboxScanner로 파일 목록 수집              │
 │  2. Extract   FileContentExtractor로 병렬 추출 (max 5)   │
-│  3. Classify  Classifier 2단계:                         │
-│               Stage1 (Haiku/Flash 배치, 5개/요청, 3병렬)  │
-│               Stage2 (Sonnet/Pro 정밀, 신뢰도<0.8만)     │
+│  3. Classify  Classifier Sonnet/Pro 단일 패스:            │
+│               배치 분류 (5개/요청, 3병렬)                  │
 │  4. Conflict  4유형 감지:                               │
 │               lowConfidence / indexNoteConflict /       │
 │               nameConflict / unmatchedProject           │
@@ -155,7 +154,7 @@ MenuBarPopover (root, 화면 전환)
 |------|------|
 | `@MainActor` singleton AppState | 모든 UI 상태를 단일 진실 원천으로 관리. 스레드 안전성 보장 |
 | Actor 기반 AI 서비스 | Swift concurrency의 data race 방지. GCD 대신 actor 격리 |
-| 2단계 AI 분류 (Haiku→Sonnet) | 비용 최적화: 빠른 모델로 1차 분류, 불확실한 것만 정밀 모델 |
+| Sonnet/Pro 단일 패스 분류 | 정밀 모델로 배치 분류. 단일 패스로 파이프라인 단순화 및 분류 품질 향상 |
 | 이중 AI 프로바이더 | 가용성. 하나가 실패하면 fallback 전환 |
 | YAML frontmatter 사용 | Obsidian 호환. 기계/사람 모두 읽기 가능한 메타데이터 |
 | `[[wikilink]]` 기반 연결 | Obsidian의 네이티브 링크 형식. 양방향 연결 지원 |

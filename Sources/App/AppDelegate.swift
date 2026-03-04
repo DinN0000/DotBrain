@@ -29,6 +29,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    func applicationWillTerminate(_ notification: Notification) {
+        let sem = DispatchSemaphore(value: 0)
+        Task.detached {
+            await AIService.shared.shutdownCLIPool()
+            sem.signal()
+        }
+        sem.wait(timeout: .now() + 2)
+    }
+
     private func setupStatusItem() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
 

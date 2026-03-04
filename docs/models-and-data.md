@@ -105,7 +105,7 @@ struct ClassifyResult: Codable {
     let summary: String
     var targetFolder: String
     var project: String?          // 프로젝트 이름 (para == .project일 때)
-    var confidence: Double        // 0.0–1.0 (mutable: Stage 2에서 업데이트)
+    var confidence: Double        // 0.0–1.0
     var relatedNotes: [RelatedNote] = []  // 기본값 빈 배열
     var suggestedProject: String? // fuzzyMatch 실패 시 AI 원본 프로젝트명
 }
@@ -116,13 +116,13 @@ struct RelatedNote: Codable, Equatable {
 }
 ```
 
-### Stage1Item / Stage2Item
+### BatchItem
 
-2단계 AI 분류에서 사용하는 중간 타입.
+Sonnet/Pro 단일 패스 배치 분류에서 사용하는 중간 타입.
 
 ```swift
-// Stage 1: Haiku/Flash 배치 분류 결과 (5개 파일 동시)
-struct Stage1Item: Codable {
+// Sonnet/Pro 배치 분류 결과 (5개 파일 동시)
+struct BatchItem: Codable {
     let fileName: String
     let para: PARACategory
     let tags: [String]
@@ -131,25 +131,14 @@ struct Stage1Item: Codable {
     var project: String?
     var targetFolder: String?
 }
-
-// Stage 2: Sonnet/Pro 정밀 분류 결과 (1개 파일)
-struct Stage2Item: Codable {
-    let para: PARACategory
-    let tags: [String]
-    let summary: String
-    let targetFolder: String
-    var project: String?
-    var confidence: Double?
-}
 ```
 
 **ClassifyInput** — 분류 입력:
 ```swift
 struct ClassifyInput {
     let filePath: String
-    let content: String       // 전체 추출 텍스트 (5000자, Stage 2용)
+    let content: String       // 전체 추출 텍스트 (5000자)
     let fileName: String
-    let preview: String       // 압축 프리뷰 (800자, Stage 1 배치용)
 }
 ```
 
@@ -299,8 +288,8 @@ enum AIProvider: String, CaseIterable, Identifiable {
 | 속성 | claude | gemini |
 |------|--------|--------|
 | `displayName` | "Claude (Anthropic)" | "Gemini (Google)" |
-| `modelPipeline` | "Haiku 4.5 → Sonnet 4.5" | "Flash → Pro" |
-| `costInfo` | "파일당 약 $0.002 (Haiku 4.5)" | "무료 티어: 분당 15회, 일 1500회" |
+| `modelPipeline` | "Sonnet 4.5" | "Pro" |
+| `costInfo` | "파일당 약 $0.01 (Sonnet 4.5)" | "무료 티어: 분당 15회, 일 1500회" |
 | `keyPrefix` | `"sk-ant-"` | `"AIza"` |
 | `keyPlaceholder` | `"sk-ant-..."` | `"AIza..."` |
 
@@ -451,8 +440,7 @@ Models (순수 데이터)
   │
   ├─ ClassifyInput ──→ Services (Classifier)
   │                        │
-  │                        ├─ Stage1Item (Haiku 배치 결과)
-  │                        ├─ Stage2Item (Sonnet 정밀 결과)
+  │                        ├─ BatchItem (Sonnet/Pro 배치 결과)
   │                        ▼
   ├─ ClassifyResult ──→ Pipeline (InboxProcessor)
   │                        │

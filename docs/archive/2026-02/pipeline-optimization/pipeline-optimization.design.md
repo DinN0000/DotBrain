@@ -244,7 +244,7 @@ private let confidenceThreshold = 0.8
 // previewLength 삭제
 ```
 
-#### 변경 B: Stage 1 배치 분류 함수 (lines 183-190)
+#### 변경 B: 배치 분류 함수 (lines 183-190)
 
 **Before:**
 ```swift
@@ -257,7 +257,7 @@ let previews = files.map { file in
     return (fileName: file.fileName, preview: preview)
 }
 
-let prompt = buildStage1Prompt(previews, projectContext: ..., ...)
+let prompt = buildClassifyPrompt(previews, projectContext: ..., ...)
 ```
 
 **After:**
@@ -266,14 +266,14 @@ let fileContents = files.map { file in
     (fileName: file.fileName, content: file.content)
 }
 
-let prompt = buildStage1Prompt(fileContents, projectContext: ..., ...)
+let prompt = buildClassifyPrompt(fileContents, projectContext: ..., ...)
 ```
 
-#### 변경 C: `buildStage1Prompt` 시그니처 + 본문 (lines 270-278)
+#### 변경 C: `buildClassifyPrompt` 시그니처 + 본문 (lines 270-278)
 
 **Before:**
 ```swift
-private func buildStage1Prompt(
+private func buildClassifyPrompt(
     _ files: [(fileName: String, preview: String)],
     ...
 ) -> String {
@@ -284,7 +284,7 @@ private func buildStage1Prompt(
 
 **After:**
 ```swift
-private func buildStage1Prompt(
+private func buildClassifyPrompt(
     _ files: [(fileName: String, content: String)],
     ...
 ) -> String {
@@ -300,9 +300,9 @@ private func buildStage1Prompt(
 
 #### 변경 D: content 길이 방어 코드
 
-> `file.content`는 `InboxProcessor.extractContent()`에서 최대 5000자로 추출되지만, 이는 암묵적 계약. `buildStage1Prompt` 내에서 명시적 제한을 추가하여 향후 `maxLength` 기본값 변경 시에도 토큰 폭발을 방지.
+> `file.content`는 `InboxProcessor.extractContent()`에서 최대 5000자로 추출되지만, 이는 암묵적 계약. `buildClassifyPrompt` 내에서 명시적 제한을 추가하여 향후 `maxLength` 기본값 변경 시에도 토큰 폭발을 방지.
 
-**After** (`buildStage1Prompt` 내부):
+**After** (`buildClassifyPrompt` 내부):
 ```swift
 let fileList = files.enumerated().map { (i, f) in
     let truncated = String(f.content.prefix(5000))
@@ -346,9 +346,9 @@ let estimatedCost = Double(inputs.count) * 0.005  // ~$0.005 per file (Stage 1 f
 #### 총 분류 시간 추정
 
 - Before: Stage1 ~14s + Stage2 ~81s = **~95s**
-- After (expected): Stage1 ~35s + Stage2 ~21s = **~56s** (약 40% 단축)
+- After (Sonnet/Pro 단일 패스): 배치 분류 ~35s = **~35s** (약 63% 단축)
 
-Stage 1 배치 수 2배 증가(20->40)로 시간이 늘지만, Stage 2 감소(80건->40건)로 총 시간은 단축.
+Stage 2 제거로 총 시간 대폭 단축.
 
 ### 3.3 파일: `Sources/Services/AICompanionService.swift` (line 760)
 

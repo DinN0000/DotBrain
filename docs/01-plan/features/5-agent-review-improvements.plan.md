@@ -125,7 +125,7 @@
 | 단점 | 없음 |
 | 리스크 | **없음** — guard 추가 |
 
-### 1-11. Classifier classifyBatchStage1 실패 시 무로그
+### 1-11. Classifier classifyBatch 실패 시 무로그
 
 | 항목 | 내용 |
 |------|------|

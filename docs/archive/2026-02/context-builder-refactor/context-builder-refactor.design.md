@@ -310,7 +310,7 @@ func buildSubfolderContext() -> String {
 
 #### 3.4.2 Classifier 프롬프트 수정
 
-`Classifier.swift`의 Stage1/Stage2 프롬프트에서 subfolderContext 설명 변경:
+`Classifier.swift`의 분류 프롬프트에서 subfolderContext 설명 변경:
 
 현재:
 ```
@@ -543,7 +543,7 @@ let contextBuilder = ProjectContextBuilder(pkmRoot: pkmRoot, noteIndex: noteInde
 
 ### 4.3 Classifier 프롬프트 subfolderContext 설명
 
-Stage1/Stage2 buildPrompt에서 subfolderContext 안내 문구 1줄 추가 (3.4.2 참조).
+buildClassifyPrompt에서 subfolderContext 안내 문구 1줄 추가 (3.4.2 참조).
 
 ---
 

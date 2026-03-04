@@ -142,7 +142,7 @@ func buildProjectContext() -> String {
 
 ### 2.4 FR-02: buildSubfolderContext() Enriched JSON + Classifier Prompts -- MATCH
 
-**Design**: Output enriched JSON with `name/tags/summary/noteCount` per folder. Classifier Stage1/Stage2 prompts updated with new instructions.
+**Design**: Output enriched JSON with `name/tags/summary/noteCount` per folder. Classifier 분류 프롬프트 updated with new instructions.
 
 **Implementation** (`Sources/Pipeline/ProjectContextBuilder.swift`, `Sources/Services/Claude/Classifier.swift`):
 
@@ -158,7 +158,7 @@ func buildSubfolderContext() -> String {
 }
 ```
 
-Classifier prompts updated (both Stage1 at line 360-361 and Stage2 at line 461-462):
+Classifier prompts updated (classify prompt):
 ```
 각 폴더의 name, tags, summary, noteCount를 참고하여 가장 적합한 폴더를 선택하세요.
 새 폴더가 필요하면 targetFolder에 "NEW:폴더명"을 사용하세요. 기존 폴더와 비슷한 이름이 있으면 반드시 기존 이름을 사용하세요.
@@ -169,8 +169,7 @@ Classifier prompts updated (both Stage1 at line 360-361 and Stage2 at line 461-4
 | Enriched JSON output | `name/tags/summary/noteCount` | Lines 131-149 | Match |
 | Disk scan for folder list | `pathManager.existingSubfolders()` | Line 109 | Match |
 | Index enrichment | `index.folders[folderKey]` | Lines 134-147 | Match |
-| Stage1 prompt updated | New subfolder instructions | Lines 360-361 | Match |
-| Stage2 prompt updated | New subfolder instructions | Lines 461-462 | Match |
+| Classify prompt updated | New subfolder instructions | Classifier.swift | Match |
 | noteCount optimization | Pre-computed folderNoteCounts | Lines 118-123 | Match (better than design) |
 
 **Note**: Implementation adds a performance optimization (pre-computed `folderNoteCounts` dictionary) that avoids repeated O(N) scans per folder. This is an improvement over the design's inline `index.notes.values.filter` approach.

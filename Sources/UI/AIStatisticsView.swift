@@ -150,6 +150,7 @@ struct AIStatisticsView: View {
 
     private func operationLabel(_ op: String) -> String {
         switch op {
+        case "classify": return "분류"
         case "classify-stage1": return "분류 (1단계)"
         case "classify-stage2": return "분류 (2단계)"
         case "enrich": return "메타 보완"

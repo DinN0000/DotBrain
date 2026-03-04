@@ -77,7 +77,7 @@ The design underwent comprehensive review by 5 independent agents, which identif
 
 2. **Content Length Defense** (agent #5 suggested)
    - Design relied on implicit 5000-char contract from InboxProcessor
-   - **Gap Identified**: No explicit truncation in buildStage1Prompt
+   - **Gap Identified**: No explicit truncation in buildClassifyPrompt
    - **Resolution**: Added `String(f.content.prefix(5000))` defensive cap (Change D)
 
 3. **API Cost Estimate Accuracy** (agents #1, #3)
@@ -196,7 +196,7 @@ The design underwent comprehensive review by 5 independent agents, which identif
 - `## Related Notes` sections preserved across all 5 confirmation pathways
 - Build warnings: 0
 
-### FR-02: Stage 1 Content Optimization
+### FR-02: 배치 분류 Content Optimization
 
 **Status**: ✅ Complete (100% match)
 
