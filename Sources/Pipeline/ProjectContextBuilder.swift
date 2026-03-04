@@ -234,11 +234,21 @@ struct ProjectContextBuilder {
 
                 for file in mdFiles.prefix(5) {
                     let filePath = (folderPath as NSString).appendingPathComponent(file)
-                    if let content = try? String(contentsOfFile: filePath, encoding: .utf8) {
-                        let (fileFM, _) = Frontmatter.parse(markdown: content)
-                        for tag in fileFM.tags {
-                            tagCounts[tag, default: 0] += 1
+                    guard let handle = FileHandle(forReadingAtPath: filePath) else { continue }
+                    let data = handle.readData(ofLength: 4096)
+                    handle.closeFile()
+                    // readData may cut in the middle of a multi-byte UTF-8 character
+                    var partial: String?
+                    for trim in 0...min(3, data.count) {
+                        if let s = String(data: data.dropLast(trim), encoding: .utf8) {
+                            partial = s
+                            break
                         }
+                    }
+                    guard let partial else { continue }
+                    let (fileFM, _) = Frontmatter.parse(markdown: partial)
+                    for tag in fileFM.tags {
+                        tagCounts[tag, default: 0] += 1
                     }
                 }
             }

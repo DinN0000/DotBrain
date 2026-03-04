@@ -40,9 +40,8 @@ enum FrontmatterWriter {
 
         // Build ## Related Notes section with context descriptions
         var lines: [String] = []
-        if let project = project, !project.isEmpty, !result.contains("[[\(project)]]") {
-            let safeProject = sanitizeWikilink(project)
-            lines.append("- [[\(safeProject)]] — 소속 프로젝트")
+        if let project = project, !project.isEmpty {
+            lines.append("- 소속 프로젝트: \(project)")
         }
         for note in relatedNotes where !result.contains("[[\(note.name)]]") {
             let safeName = sanitizeWikilink(note.name)
@@ -100,8 +99,7 @@ enum FrontmatterWriter {
         // Related Notes
         var lines: [String] = []
         if let project = classification.project, !project.isEmpty {
-            let safeProject = sanitizeWikilink(project)
-            lines.append("- [[\(safeProject)]] — 소속 프로젝트")
+            lines.append("- 소속 프로젝트: \(project)")
         }
         for note in relatedNotes where !result.contains("[[\(note.name)]]") {
             let safeName = sanitizeWikilink(note.name)
