@@ -18,7 +18,7 @@ struct TokenUsage: Codable, Sendable {
 struct APIUsageEntry: Codable, Identifiable {
     let id: UUID
     let timestamp: Date
-    let operation: String   // "classify-stage1", "classify-stage2", "enrich", "moc", "semantic-link", "summary"
+    let operation: String   // "classify", "enrich", "moc", "semantic-link", "summary"
     let model: String
     let inputTokens: Int
     let outputTokens: Int

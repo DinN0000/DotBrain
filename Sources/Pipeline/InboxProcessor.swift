@@ -25,6 +25,9 @@ struct InboxProcessor {
             return Result(processed: [], needsConfirmation: [], affectedFolders: [], total: 0, failed: 0)
         }
 
+        // Warm up CLI process pool concurrently while context is being built
+        let warmUpTask = Task { await AIService.shared.warmUpCLIPool() }
+
         onProgress?(0.05, "\(files.count)개 파일 발견")
         onFileProgress?(0, files.count, "")
 
@@ -84,12 +87,10 @@ struct InboxProcessor {
                 group.addTask {
                     let content = self.extractContent(from: filePath)
                     let fileName = (filePath as NSString).lastPathComponent
-                    let preview = FileContentExtractor.extractPreview(from: filePath, content: content)
                     return ClassifyInput(
                         filePath: filePath,
                         content: content,
-                        fileName: fileName,
-                        preview: preview
+                        fileName: fileName
                     )
                 }
                 activeTasks += 1
@@ -120,6 +121,9 @@ struct InboxProcessor {
                 textInputs.append(input)
             }
         }
+
+        // Ensure pool is ready before classification
+        await warmUpTask.value
 
         onProgress?(0.3, "AI 분류 시작...")
         onPhaseChange?(.classifying)

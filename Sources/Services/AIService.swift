@@ -277,6 +277,19 @@ actor AIService {
         let (text, usage) = try await sendMessage(model: preciseModel, maxTokens: maxTokens, userMessage: message)
         return AIResponse(text: text, usage: usage)
     }
+
+    // MARK: - Pool Lifecycle
+
+    /// Warm up CLI process pool (only active when using Claude CLI provider)
+    func warmUpCLIPool() async {
+        guard currentProvider == .claudeCLI else { return }
+        await claudeCLIClient.warmUp()
+    }
+
+    /// Shut down CLI process pool
+    func shutdownCLIPool() async {
+        await claudeCLIClient.shutdown()
+    }
 }
 
 enum AIServiceError: LocalizedError {
