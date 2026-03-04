@@ -1,5 +1,11 @@
 # Changelog
 
+## v2.14.1 — Security: Remove Sensitive Info (2026-03-05)
+- security: 소스코드에서 내부 제품명/고객사명 제거 (OnboardingView, AICompanionService, FolderReorganizer)
+- security: README.md, MANUAL.md에서 내부 프로젝트명(DOJANG) 제거
+- chore: docs/ 디렉토리 전체 히스토리에서 삭제 (git filter-repo)
+- chore: CLAUDE.md에서 docs/ 참조 제거
+
 ## v2.12.2 — Reorg Resilience + Auto-Navigate (2026-03-03)
 - fix: 429 근본 원인 해결 — Classifier를 non-throwing TaskGroup으로 전환, 개별 배치 실패 시 스킵하고 나머지 계속 진행 (전체 스캔 중단 방지)
 - fix: 위치 제안 완료 시 모든 케이스(에러, 이동 없음, 실행 완료)에서 자동 화면 전환 — 다른 화면에 있어도 결과 확인 가능
