@@ -35,16 +35,31 @@ struct InboxProcessor {
             detail: "\(files.count)개 파일"
         )
 
-        // Build context
+        // Build context — run independent builders concurrently
         let noteIndex = PKMPathManager(root: pkmRoot).loadNoteIndex()
         let contextBuilder = ProjectContextBuilder(pkmRoot: pkmRoot, noteIndex: noteIndex)
-        let projectContext = contextBuilder.buildProjectContext()
-        let subfolderContext = contextBuilder.buildSubfolderContext()
+        let root = pkmRoot
+
+        let contexts = await withTaskGroup(of: (Int, String).self, returning: [String].self) { group in
+            group.addTask { (0, contextBuilder.buildProjectContext()) }
+            group.addTask { (1, contextBuilder.buildSubfolderContext()) }
+            group.addTask { (2, contextBuilder.buildTagVocabulary()) }
+            group.addTask { (3, contextBuilder.buildAreaContext()) }
+            group.addTask { (4, CorrectionMemory.buildPromptContext(pkmRoot: root)) }
+
+            var results = Array(repeating: "", count: 5)
+            for await (index, value) in group {
+                results[index] = value
+            }
+            return results
+        }
+        let projectContext = contexts[0]
+        let subfolderContext = contexts[1]
         let projectNames = contextBuilder.extractProjectNames(from: projectContext)
         let weightedContext = contextBuilder.buildWeightedContext()
-        let tagVocabulary = contextBuilder.buildTagVocabulary()
-        let areaContext = contextBuilder.buildAreaContext()
-        let correctionContext = CorrectionMemory.buildPromptContext(pkmRoot: pkmRoot)
+        let tagVocabulary = contexts[2]
+        let areaContext = contexts[3]
+        let correctionContext = contexts[4]
 
         onProgress?(0.1, "프로젝트 컨텍스트 로드 완료")
 

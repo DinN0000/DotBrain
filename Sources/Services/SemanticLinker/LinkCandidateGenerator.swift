@@ -148,10 +148,10 @@ struct LinkCandidateGenerator: Sendable {
 
             var score: Double = 0
 
-            // Tag overlap: minimum 2 tags required for genuine relevance
+            // Tag overlap: count shared tags (1+ qualifies)
             let otherTags = Set(other.tags.map { $0.lowercased() })
             let tagOverlap = noteTags.intersection(otherTags).count
-            if tagOverlap >= 2 {
+            if tagOverlap >= 1 {
                 score += Double(tagOverlap) * 1.5
             }
 
@@ -173,7 +173,7 @@ struct LinkCandidateGenerator: Sendable {
             }
 
             // Minimum score threshold for meaningful connections
-            guard score >= 3.0 else { continue }
+            guard score >= 2.0 else { continue }
 
             candidates.append(Candidate(
                 name: other.name,

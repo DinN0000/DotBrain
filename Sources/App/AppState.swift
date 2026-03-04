@@ -341,6 +341,17 @@ final class AppState: ObservableObject {
             }
 
             setupWatchdog()
+
+            // Pre-generate note-index.json if missing so first inbox processing
+            // doesn't fall back to expensive disk scans
+            let root = pkmRootPath
+            if !FileManager.default.fileExists(atPath: PKMPathManager(root: root).noteIndexPath) {
+                Task.detached(priority: .utility) {
+                    let generator = NoteIndexGenerator(pkmRoot: root)
+                    await generator.regenerateAll()
+                    NSLog("[AppState] note-index.json 사전 생성 완료")
+                }
+            }
         }
     }
 
