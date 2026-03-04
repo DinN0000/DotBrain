@@ -91,11 +91,6 @@ struct NoteIndexGenerator: Sendable {
                 }
                 index.notes[notePath] = entry
             }
-
-            // Clean up orphaned folder if no notes remain
-            if !index.notes.values.contains(where: { $0.folder == relFolder }) {
-                index.folders.removeValue(forKey: relFolder)
-            }
         }
 
         index = NoteIndex(
@@ -221,8 +216,6 @@ struct NoteIndexGenerator: Sendable {
             }
         }
 
-        guard !noteEntries.isEmpty else { return (nil, []) }
-
         // Top 10 tags by frequency
         let topTags = tagCounts
             .sorted { $0.value > $1.value }
@@ -231,7 +224,9 @@ struct NoteIndexGenerator: Sendable {
 
         // Folder summary: combine first few note summaries or use count
         let folderSummary: String
-        if summaries.isEmpty {
+        if noteEntries.isEmpty {
+            folderSummary = "empty"
+        } else if summaries.isEmpty {
             folderSummary = "\(noteEntries.count) notes"
         } else {
             folderSummary = summaries.prefix(3).joined(separator: "; ")
