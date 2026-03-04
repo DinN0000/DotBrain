@@ -133,7 +133,8 @@ struct VaultSearcher {
 
                     let (frontmatter, body) = Frontmatter.parse(markdown: content)
                     if body.range(of: queryLower, options: .caseInsensitive) != nil {
-                        let noteName = (file as NSString).deletingPathExtension
+                        let noteName = ((file as NSString).deletingPathExtension as String)
+                            .precomposedStringWithCanonicalMapping
                         results.append(SearchResult(
                             noteName: noteName,
                             filePath: filePath,

@@ -172,15 +172,16 @@ actor ContentHashCache {
         return digest.compactMap { String(format: "%02x", $0) }.joined()
     }
 
-    /// Convert an absolute path to a path relative to pkmRoot
+    /// Convert an absolute path to a path relative to pkmRoot (NFC-normalized)
     private func relativePath(for absolutePath: String) -> String {
         let resolvedRoot = URL(fileURLWithPath: pkmRoot).resolvingSymlinksInPath().path
         let resolvedPath = URL(fileURLWithPath: absolutePath).resolvingSymlinksInPath().path
         let normalizedRoot = resolvedRoot.hasSuffix("/") ? resolvedRoot : resolvedRoot + "/"
         if resolvedPath.hasPrefix(normalizedRoot) {
             return String(resolvedPath.dropFirst(normalizedRoot.count))
+                .precomposedStringWithCanonicalMapping
         }
-        return absolutePath
+        return absolutePath.precomposedStringWithCanonicalMapping
     }
 
     /// Validate that a path is safely within the PKM root (prevents symlink traversal)

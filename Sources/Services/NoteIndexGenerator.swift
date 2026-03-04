@@ -248,11 +248,14 @@ struct NoteIndexGenerator: Sendable {
         return (folderEntry, noteEntries)
     }
 
-    /// Convert an absolute path to a path relative to pkmRoot (canonicalized for symlink safety)
+    /// Convert an absolute path to a path relative to pkmRoot (canonicalized for symlink safety, NFC-normalized)
     private func relativePath(_ absolutePath: String) -> String {
         let canonicalPath = URL(fileURLWithPath: absolutePath).resolvingSymlinksInPath().path
-        guard canonicalPath.hasPrefix(canonicalRoot) else { return absolutePath }
+        guard canonicalPath.hasPrefix(canonicalRoot) else {
+            return absolutePath.precomposedStringWithCanonicalMapping
+        }
         return String(canonicalPath.dropFirst(canonicalRoot.count))
+            .precomposedStringWithCanonicalMapping
     }
 
     /// Load existing note-index.json if present

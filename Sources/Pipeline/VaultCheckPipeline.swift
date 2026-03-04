@@ -48,7 +48,7 @@ struct VaultCheckPipeline {
         if report.totalIssues > 0 {
             onProgress(Progress(phase: "자동 복구 중...", fraction: 0.12))
             let repair = auditor.repair(report: report)
-            repairCount = repair.linksFixed + repair.frontmatterInjected + repair.paraFixed
+            repairCount = repair.linksFixed + repair.frontmatterInjected + repair.paraFixed + repair.nfdRenamed
 
             repairedFiles = Self.collectRepairedFiles(from: report)
             await cache.updateHashes(repairedFiles)
@@ -203,6 +203,9 @@ struct VaultCheckPipeline {
         for path in report.missingPARA {
             files.insert(path)
         }
+        for nfd in report.nfdFiles {
+            files.insert(nfd.nfcPath)
+        }
         return Array(files)
     }
 
@@ -221,9 +224,10 @@ struct VaultCheckPipeline {
 
         for (basePath, category) in paraPaths {
             guard let entries = try? fm.contentsOfDirectory(atPath: basePath) else { continue }
-            for entry in entries {
-                guard !entry.hasPrefix("."), !entry.hasPrefix("_") else { continue }
-                let folderPath = (basePath as NSString).appendingPathComponent(entry)
+            for rawEntry in entries {
+                guard !rawEntry.hasPrefix("."), !rawEntry.hasPrefix("_") else { continue }
+                let entry = rawEntry.precomposedStringWithCanonicalMapping
+                let folderPath = (basePath as NSString).appendingPathComponent(rawEntry)
                 var isDir: ObjCBool = false
                 guard fm.fileExists(atPath: folderPath, isDirectory: &isDir), isDir.boolValue else { continue }
 
@@ -264,7 +268,8 @@ struct VaultCheckPipeline {
                 guard fm.fileExists(atPath: folderPath, isDirectory: &isDir), isDir.boolValue else { continue }
                 let canonical = URL(fileURLWithPath: folderPath).resolvingSymlinksInPath().path
                 if canonical.hasPrefix(rootPrefix) {
-                    folders.insert(String(canonical.dropFirst(rootPrefix.count)))
+                    folders.insert(String(canonical.dropFirst(rootPrefix.count))
+                        .precomposedStringWithCanonicalMapping)
                 }
             }
         }

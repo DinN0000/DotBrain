@@ -40,7 +40,7 @@ struct FileMover {
     /// Move a file according to its classification result
     func moveFile(at filePath: String, with classification: ClassifyResult) async throws -> ProcessedFileResult {
         let fm = FileManager.default
-        let fileName = (filePath as NSString).lastPathComponent
+        let fileName = PKMPathManager.normalizeToNFC((filePath as NSString).lastPathComponent)
 
         // Validate source path is inside PKM root
         guard pathManager.isPathSafe(filePath) else {
@@ -75,7 +75,7 @@ struct FileMover {
     /// Move an entire folder — keep structure intact, create index note with [[wikilinks]]
     func moveFolder(at folderPath: String, with classification: ClassifyResult) throws -> ProcessedFileResult {
         let fm = FileManager.default
-        let folderName = (folderPath as NSString).lastPathComponent
+        let folderName = PKMPathManager.normalizeToNFC((folderPath as NSString).lastPathComponent)
 
         guard pathManager.isPathSafe(folderPath) else {
             throw NSError(domain: "FileMover", code: 1,
