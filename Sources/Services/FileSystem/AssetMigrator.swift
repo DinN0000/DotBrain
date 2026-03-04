@@ -100,9 +100,6 @@ enum AssetMigrator {
         // Step 5: Update wikilinks in document companion files
         updateCompanionWikilinks(pkmRoot: pkmRoot, pathManager: pathManager, result: &result)
 
-        // Step 6: Clean up index notes — remove wikilinks to deleted image companions
-        cleanIndexNotes(pkmRoot: pkmRoot, pathManager: pathManager, result: &result)
-
         NSLog(
             "[AssetMigrator] 마이그레이션 완료 — 문서: %d, 이미지: %d, 삭제된 이미지 동반파일: %d, 업데이트된 동반파일: %d, 정리된 폴더: %d, 오류: %d",
             result.movedDocuments, result.movedImages, result.deletedImageCompanions,
@@ -450,60 +447,4 @@ enum AssetMigrator {
         return (dir as NSString).appendingPathComponent(fallbackName)
     }
 
-    /// Remove wikilinks to deleted image companions from index notes
-    private static func cleanIndexNotes(
-        pkmRoot: String,
-        pathManager: PKMPathManager,
-        result: inout MigrationResult
-    ) {
-        let paraFolders = [
-            pathManager.projectsPath,
-            pathManager.areaPath,
-            pathManager.resourcePath,
-            pathManager.archivePath,
-        ]
-
-        let fm = FileManager.default
-        for paraFolder in paraFolders {
-            guard let subfolders = try? fm.contentsOfDirectory(atPath: paraFolder) else { continue }
-            for subfolder in subfolders {
-                let subfolderPath = (paraFolder as NSString).appendingPathComponent(subfolder)
-                var isDir: ObjCBool = false
-                guard fm.fileExists(atPath: subfolderPath, isDirectory: &isDir), isDir.boolValue else {
-                    continue
-                }
-                // Index note has the same name as its folder
-                let indexPath = (subfolderPath as NSString).appendingPathComponent("\(subfolder).md")
-                guard fm.fileExists(atPath: indexPath),
-                      var content = try? String(contentsOfFile: indexPath, encoding: .utf8) else { continue }
-
-                // Remove lines that link to image companion files (e.g., "- [[슬라이드47.png]]")
-                let lines = content.components(separatedBy: "\n")
-                var newLines: [String] = []
-                var removed = false
-
-                for line in lines {
-                    // Match wikilink lines referencing image files
-                    if line.contains("[["),
-                       BinaryExtractor.imageExtensions.contains(where: { ext in
-                           line.contains(".\(ext)]]") || line.contains(".\(ext).md]]")
-                       }) {
-                        removed = true
-                        continue
-                    }
-                    newLines.append(line)
-                }
-
-                if removed {
-                    content = newLines.joined(separator: "\n")
-                    do {
-                        try content.write(toFile: indexPath, atomically: true, encoding: .utf8)
-                        NSLog("[AssetMigrator] 인덱스 노트 정리: %@", subfolder)
-                    } catch {
-                        NSLog("[AssetMigrator] 인덱스 노트 쓰기 실패: %@ — %@", indexPath, error.localizedDescription)
-                    }
-                }
-            }
-        }
-    }
 }

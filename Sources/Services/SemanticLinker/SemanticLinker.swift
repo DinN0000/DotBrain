@@ -371,9 +371,6 @@ struct SemanticLinker: Sendable {
             let baseName = ((entry.path as NSString).lastPathComponent as NSString).deletingPathExtension
             let folderName = (entry.folder as NSString).lastPathComponent
 
-            // Skip index notes (folder-name.md)
-            guard baseName != folderName else { continue }
-
             let filePath = rootPrefix + entry.path
             let para = PARACategory(rawValue: entry.para) ?? .archive
 
@@ -434,9 +431,6 @@ struct SemanticLinker: Sendable {
                 guard let files = try? fm.contentsOfDirectory(atPath: folderPath) else { continue }
                 for file in files {
                     guard file.hasSuffix(".md"), !file.hasPrefix("."), !file.hasPrefix("_") else { continue }
-                    let nfcFile = file.precomposedStringWithCanonicalMapping
-                    guard nfcFile != "\(nfcFolder).md" else { continue }
-
                     let filePath = (folderPath as NSString).appendingPathComponent(file)
                     guard let content = try? String(contentsOfFile: filePath, encoding: .utf8) else { continue }
 

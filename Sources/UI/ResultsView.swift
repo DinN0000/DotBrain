@@ -336,10 +336,6 @@ struct ConfirmationRow: View {
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
-            } else if confirmation.reason == .indexNoteConflict {
-                Text("인덱스 노트와 이름이 같습니다 — 다른 위치를 선택하거나 건너뛰세요")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
             } else if confirmation.reason == .nameConflict {
                 Text("같은 이름의 파일이 이미 있습니다 — 다른 위치를 선택하거나 건너뛰세요")
                     .font(.caption)
@@ -653,8 +649,6 @@ struct AffectedFolderRow: View {
             return "\(count)개 파일 정보 누락"
         case .lowTagDiversity:
             return "태그 다양성 부족"
-        case .noIndexNote:
-            return "폴더 요약 없음"
         }
     }
 

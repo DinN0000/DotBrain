@@ -1,7 +1,7 @@
 import Foundation
 import CryptoKit
 
-/// Moves files to PARA folders with conflict resolution and index note creation
+/// Moves files to PARA folders with conflict resolution
 struct FileMover {
     let pkmRoot: String
     private let pathManager: PKMPathManager
@@ -18,16 +18,6 @@ struct FileMover {
     /// Reference-type wrapper so the cache is mutable without requiring mutating methods.
     private final class BodyHashCache {
         var storage: [String: [String: String]] = [:]
-    }
-
-    /// Check if moving this file would conflict with the index note
-    func wouldConflictWithIndexNote(fileName: String, classification: ClassifyResult) -> Bool {
-        guard classification.para != .project else { return false }
-        guard !classification.targetFolder.isEmpty else { return false }
-        let targetDir = pathManager.targetDirectory(for: classification)
-        let indexBaseName = (targetDir as NSString).lastPathComponent
-        let indexNoteName = "\(indexBaseName).md"
-        return fileName == indexNoteName
     }
 
     /// Check if a file with the same name already exists at the target (different content)
@@ -54,12 +44,6 @@ struct FileMover {
         // Create target directory if needed
         try fm.createDirectory(atPath: targetDir, withIntermediateDirectories: true)
 
-        // Create index note FIRST — index note is the authoritative management document
-        if classification.para != .project {
-            let indexFolderName = (targetDir as NSString).lastPathComponent
-            try ensureIndexNote(at: targetDir, para: classification.para, folderName: indexFolderName)
-        }
-
         let isBinary = BinaryExtractor.isBinaryFile(filePath)
 
         let result: ProcessedFileResult
@@ -72,7 +56,7 @@ struct FileMover {
         return result
     }
 
-    /// Move an entire folder — keep structure intact, create index note with [[wikilinks]]
+    /// Move an entire folder — keep structure intact
     func moveFolder(at folderPath: String, with classification: ClassifyResult) throws -> ProcessedFileResult {
         let fm = FileManager.default
         let folderName = PKMPathManager.normalizeToNFC((folderPath as NSString).lastPathComponent)
@@ -90,17 +74,6 @@ struct FileMover {
         let destPath = (targetDir as NSString).appendingPathComponent(folderName)
         let resolvedDest = resolveConflict(destPath)
         try fm.moveItem(atPath: folderPath, toPath: resolvedDest)
-
-        // Create index note if missing (frontmatter only — no wikilinks list)
-        let indexPath = (resolvedDest as NSString).appendingPathComponent("\(folderName).md")
-        if !fm.fileExists(atPath: indexPath) {
-            let content = FrontmatterWriter.createIndexNote(
-                folderName: folderName,
-                para: classification.para,
-                description: classification.summary
-            )
-            try content.write(toFile: indexPath, atomically: true, encoding: .utf8)
-        }
 
         return ProcessedFileResult(
             fileName: folderName,
@@ -392,24 +365,6 @@ struct FileMover {
         } catch {
             return false
         }
-    }
-
-    /// Ensure index note exists for subfolder
-    private func ensureIndexNote(at dir: String, para: PARACategory, folderName: String) throws {
-        guard !folderName.isEmpty else { return }
-
-        let indexPath = (dir as NSString).appendingPathComponent("\(folderName).md")
-        let fm = FileManager.default
-
-        guard !fm.fileExists(atPath: indexPath) else { return }
-
-        let content = FrontmatterWriter.createIndexNote(
-            folderName: folderName,
-            para: para,
-            description: "\(folderName) 관련 자료"
-        )
-
-        try content.write(toFile: indexPath, atomically: true, encoding: .utf8)
     }
 
     /// Resolve filename conflicts by appending _2, _3, etc.

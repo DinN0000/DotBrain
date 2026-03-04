@@ -245,7 +245,6 @@ enum AICompanionService {
     ```
     1_Project/
     ├── MyProject/
-    │   ├── MyProject.md    ← 인덱스 노트
     │   ├── _Assets/        ← 프로젝트 첨부파일
     │   ├── meeting_0115.md
     │   └── design_spec.md
@@ -300,7 +299,6 @@ enum AICompanionService {
     - confidence < 0.5 → 사용자에게 확인 요청
 
     ### 충돌 처리
-    - **인덱스 노트 충돌**: 파일명이 `폴더명.md`와 같으면 사용자 확인
     - **이름 충돌**: 대상에 같은 파일명이 있으면 사용자 확인
     - **중복 콘텐츠**: SHA256 일치 시 태그 병합 후 자동 삭제
 
@@ -589,7 +587,6 @@ enum AICompanionService {
     **PARA 카테고리 이동 시:**
     - 폴더 내 모든 노트의 `para` 필드를 대상 카테고리로 갱신
     - 볼트 전체에서 해당 폴더 내 파일의 `[[위키링크]]` 경로 자동 갱신
-    - 인덱스 노트에 이동 이력 기록
 
     **볼트 전체 재정리 시:**
     - AI가 현재 위치와 추천 위치를 비교하여 이동 필요 파일 식별
@@ -779,7 +776,7 @@ enum AICompanionService {
     Glob("2_Area/*/")            → 영역 폴더 목록
     Glob("3_Resource/*/")        → 자료 폴더 목록
     ```
-    각 폴더의 인덱스 노트(`폴더명.md`)를 읽어 태그와 키워드를 수집합니다.
+    `.meta/note-index.json`에서 각 폴더의 태그와 요약 정보를 수집합니다.
     기존 문서와의 가중치 기반 맥락도 구축합니다 (🔴 Project 높음 / 🟡 Area·Resource 중간 / ⚪ Archive 낮음).
 
     ### Step 3: 콘텐츠 추출 (병렬)
@@ -818,7 +815,6 @@ enum AICompanionService {
 
     **사용자 확인 필요:**
     - confidence < 0.5 → 분류 옵션 제시
-    - 인덱스 노트 충돌 → 파일명이 `폴더명.md`와 같을 때
     - 이름 충돌 → 대상에 같은 파일명이 존재할 때
 
     ### Step 7: 인덱스 갱신 + 알림
@@ -841,7 +837,6 @@ enum AICompanionService {
     - 파일을 이동하지 **않음**
     - 빈 프론트매터 필드만 AI로 채움
     - 관련 노트 링크 보강
-    - 인덱스 노트에 등록
 
     ## 관련 노트 추가 규칙
 
@@ -866,9 +861,7 @@ enum AICompanionService {
 
     1. 이름 파싱 → 폴더명 생성 (특수문자 제거)
     2. `1_Project/폴더명/` 디렉토리 생성
-    3. `1_Project/폴더명/_Assets/` 생성
-    4. `.Templates/Project.md` 기반으로 인덱스 노트 생성
-    5. 결과 보고
+    3. 결과 보고
 
     ## 프로젝트 완료 (아카이브)
 
@@ -895,31 +888,9 @@ enum AICompanionService {
     ## 프로젝트 이름 변경
 
     1. 새 폴더명 생성
-    2. 인덱스 노트 파일명 변경
-    3. 폴더명 변경
-    4. 볼트 전체에서 `[[이전이름]]` → `[[새이름]]`으로 변경
-    5. 변경된 참조 수 보고
-
-    ## 인덱스 노트 구조
-
-    ```markdown
-    ---
-    para: project
-    tags: []
-    created: YYYY-MM-DD
-    status: active
-    summary: "프로젝트 설명"
-    source: original
-    ---
-
-    # 프로젝트명
-
-    ## 목적
-
-    ## 현재 상태
-
-    ## Related Notes
-    ```
+    2. 폴더명 변경
+    3. 볼트 전체에서 `[[이전이름]]` → `[[새이름]]`으로 변경
+    4. 변경된 참조 수 보고
     """
 
     private static let searchAgentContent = """
@@ -1090,7 +1061,7 @@ enum AICompanionService {
     ```
     Glob("1_Project/*/")
     ```
-    각 프로젝트의 인덱스 노트에서 status를 확인합니다.
+    `.meta/note-index.json`에서 각 프로젝트 노트의 status를 확인합니다.
 
     ### Step 3: 건강 지표 수집
 
@@ -1240,7 +1211,6 @@ enum AICompanionService {
 
     ### Step 3: 고아 노트 탐지
     다른 어떤 노트에서도 `[[참조]]`되지 않는 노트를 찾습니다:
-    - 인덱스 노트(`폴더명.md`)는 제외 (고아여도 정상)
     - `.Templates/`, `.claude/` 등 시스템 폴더 제외
 
     ### Step 4: 링크 밀도 분석
@@ -1487,7 +1457,6 @@ enum AICompanionService {
 
     ## 주의 사항
     - `_Inbox/`는 이동 대상/목적지로 사용 불가
-    - 인덱스 노트 파일명이 폴더명과 같은 경우 충돌 확인
     - 대상 폴더에 같은 이름의 파일이 있으면 사용자에게 확인
     - 위키링크는 파일명 기반이므로 경로 이동으로는 깨지지 않음
     """
@@ -1617,7 +1586,6 @@ enum AICompanionService {
     - `_Inbox/` (DotBrain 자동 처리)
     - `.claude/`, `.Templates/`, `.obsidian/` (시스템)
     - Personal_Images 스텁 (summary 검증에서 제외)
-    - 인덱스 노트(`폴더명.md`)의 tags 개수
 
     ## 주의사항
     - 삭제는 절대 하지 않음 — 이동 또는 수정만
@@ -1803,7 +1771,7 @@ enum AICompanionService {
     # 프로젝트명 — 현황 보고서 (YYYY-MM-DD)
 
     ## 요약
-    (프로젝트 인덱스 노트의 목적/설명)
+    (프로젝트의 목적/설명)
 
     ## 현재 상태
     - 전체 노트: N개
@@ -1994,7 +1962,7 @@ enum AICompanionService {
 
     ```yaml
     para: project | area | resource | archive
-    tags: [태그1, 태그2]       # 최대 5개 (인덱스 노트 제외)
+    tags: [태그1, 태그2]       # 최대 5개
     created: YYYY-MM-DD
     status: active | draft | completed | on-hold
     summary: "2-3문장 요약"    # 빈 값 불가
@@ -2059,15 +2027,7 @@ enum AICompanionService {
 
     ### Step 5: tags 개수
 
-    - **일반 파일**: 최대 5개. 초과 시 위반.
-    - **인덱스 노트** (폴더명/폴더명.md): DotBrain 태그 클라우드이므로 **검사 제외**
-
-    인덱스 노트 판별법:
-    ```
-    파일명 == 부모폴더명 + ".md"
-    예: Research/Research.md → 인덱스 노트
-    예: Research/paper.md → 일반 파일
-    ```
+    - 최대 5개. 초과 시 위반.
 
     ### Step 6: summary 비어있는지
 
@@ -2171,7 +2131,7 @@ enum AICompanionService {
     ### Step 2: 인덱스 ↔ 실제 파일 동기화
 
     1. 인덱스의 `notes` 키 목록 추출
-    2. 실제 PARA 폴더 내 .md 파일 목록과 비교 (인덱스 노트, _Assets 제외)
+    2. 실제 PARA 폴더 내 .md 파일 목록과 비교 (_Assets 제외)
     3. 차이 기록:
        - 인덱스에 있지만 실제 없음 → **삭제된 문서** (인덱스 재생성 필요)
        - 실제 있지만 인덱스에 없음 → **누락 문서** (인덱스 재생성 필요)
@@ -2209,7 +2169,7 @@ enum AICompanionService {
     # 인덱스 무결성 보고서
 
     ## 요약
-    - 인덱스 노트 수: N개
+    - 인덱스 등록 노트 수: N개
     - 실제 노트 수: N개
     - 동기화율: N%
     - 메타데이터 정확도: N% (샘플 10개 기준)
@@ -2232,7 +2192,6 @@ enum AICompanionService {
     ## 주의사항
     - 인덱스는 DotBrain이 자동 관리하므로 직접 수정하지 않음
     - 불일치 발견 시 DotBrain "볼트 점검" 실행으로 해결
-    - 인덱스 노트(`폴더명.md`)는 검사 대상에서 제외
     - _Assets 폴더는 인덱스에 포함되지 않음
     """
 }

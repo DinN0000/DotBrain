@@ -67,7 +67,6 @@ struct ProcessedFileResult: Identifiable {
 struct PendingConfirmation: Identifiable {
     enum Reason {
         case lowConfidence
-        case indexNoteConflict
         case nameConflict
         case misclassified
         case unmatchedProject

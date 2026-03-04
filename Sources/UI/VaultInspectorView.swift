@@ -702,6 +702,7 @@ struct VaultInspectorView: View {
             let allStatuses = await hashCache.checkFiles(allFiles)
 
             // Build folder info from batch results
+            let noteIndex = pathManager.loadNoteIndex()
             var result: [FolderInfo] = []
             for (folderPath, info) in folderFiles.sorted(by: { $0.key < $1.key }) {
                 var fileCount = 0
@@ -715,15 +716,8 @@ struct VaultInspectorView: View {
                     default: break
                     }
                 }
-                // Read summary from index note
-                let indexPath = (folderPath as NSString).appendingPathComponent("\(info.name).md")
-                let summary: String
-                if let content = try? String(contentsOfFile: indexPath, encoding: .utf8) {
-                    let (frontmatter, _) = Frontmatter.parse(markdown: content)
-                    summary = frontmatter.summary ?? ""
-                } else {
-                    summary = ""
-                }
+                let folderKey = "\(info.category.folderName)/\(info.name)"
+                let summary = noteIndex?.folders[folderKey]?.summary ?? ""
 
                 let health = FolderHealthAnalyzer.analyze(
                     folderPath: folderPath, folderName: info.name, category: info.category
@@ -841,7 +835,6 @@ struct VaultInspectorView: View {
                 if Task.isCancelled { return }
 
                 // Update hash cache for ALL files in scope so health dots refresh
-                // (includes index notes which reorg scan skips)
                 let allScopePaths = Self.collectAllMdFiles(scope: currentScope, pkmRoot: root)
                 if !allScopePaths.isEmpty {
                     let cache = ContentHashCache(pkmRoot: root)
@@ -979,7 +972,7 @@ struct VaultInspectorView: View {
         }
     }
 
-    /// Collect all .md file paths within a reorg scope (including index notes).
+    /// Collect all .md file paths within a reorg scope.
     private nonisolated static func collectAllMdFiles(scope: VaultReorganizer.Scope, pkmRoot: String) -> [String] {
         let fm = FileManager.default
         let pathManager = PKMPathManager(root: pkmRoot)

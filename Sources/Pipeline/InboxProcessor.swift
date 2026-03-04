@@ -196,18 +196,6 @@ struct InboxProcessor {
                 continue
             }
 
-            // Index note conflict: file name matches 폴더명.md — ask user instead of auto-renaming
-            if mover.wouldConflictWithIndexNote(fileName: input.fileName, classification: classification) {
-                needsConfirmation.append(PendingConfirmation(
-                    fileName: input.fileName,
-                    filePath: input.filePath,
-                    content: String(input.content.prefix(500)),
-                    options: generateOptions(for: classification, projectNames: projectNames),
-                    reason: .indexNoteConflict
-                ))
-                continue
-            }
-
             // Name conflict: same name exists at target with different content
             if !isDirectory(input.filePath),
                mover.wouldConflictWithExistingFile(fileName: input.fileName, classification: classification) {
