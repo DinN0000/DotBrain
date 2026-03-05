@@ -19,7 +19,11 @@ struct OnboardingView: View {
     @State private var projectAreas: [String: String] = [:]
     @State private var fdaGranted = false
 
-    private let totalSteps = 7
+    @State private var expandedArea: String?
+    @State private var newProjectSummary: String = ""
+    @State private var projectSummaries: [String: String] = [:]
+
+    private let totalSteps = 6
 
 
     init() {
@@ -38,10 +42,9 @@ struct OnboardingView: View {
                 case 0: welcomeStep
                 case 1: permissionStep
                 case 2: folderStep
-                case 3: areaStep
-                case 4: projectStep
-                case 5: providerAndKeyStep
-                case 6: trialStep
+                case 3: domainAndProjectStep
+                case 4: providerAndKeyStep
+                case 5: trialStep
                 default: trialStep
                 }
             }
@@ -433,7 +436,6 @@ struct OnboardingView: View {
                     if !isStructureReady {
                         if !validateAndCreateFolder() { return }
                     }
-                    loadExistingAreas()
                     goNext()
                 }) {
                     Text("다음")
@@ -492,13 +494,13 @@ struct OnboardingView: View {
         return path + "/"
     }
 
-    // MARK: - Step 3: Area (Domain) Registration
+    // MARK: - Step 3: Domain & Project (Combined)
 
-    private var areaStep: some View {
+    private var domainAndProjectStep: some View {
         VStack(spacing: 0) {
             stepHeader(
-                title: "도메인 등록",
-                desc: "지속적으로 관리하는 책임 영역을 등록합니다."
+                title: "도메인 & 프로젝트",
+                desc: "도메인을 등록하고, 각 도메인의 프로젝트를 추가하세요."
             )
 
             VStack(alignment: .leading, spacing: 10) {
@@ -506,14 +508,9 @@ struct OnboardingView: View {
                     Image(systemName: "lightbulb.fill")
                         .font(.caption)
                         .foregroundColor(.blue)
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("여러 도메인을 등록하면 DotBrain이 파일을 더 정확하게 분류합니다")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                        Text("예: DevOps, Finance, Health, Marketing")
-                            .font(.caption2)
-                            .foregroundColor(.secondary.opacity(0.7))
-                    }
+                    Text("도메인과 프로젝트를 등록하면\nDotBrain이 파일을 더 정확하게 분류합니다")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
                 }
                 .padding(10)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -525,12 +522,12 @@ struct OnboardingView: View {
                 .cornerRadius(6)
 
                 HStack(spacing: 8) {
-                    TextField("도메인 이름 입력 후 + 버튼", text: $newAreaName)
+                    TextField("도메인 이름 (예: DevOps, Finance)", text: $newAreaName)
                         .textFieldStyle(.roundedBorder)
                         .font(.subheadline)
-                        .onSubmit { addArea() }
+                        .onSubmit { addAreaAndExpand() }
 
-                    Button(action: addArea) {
+                    Button(action: addAreaAndExpand) {
                         Image(systemName: "plus")
                     }
                     .buttonStyle(.bordered)
@@ -538,54 +535,44 @@ struct OnboardingView: View {
                     .disabled(newAreaName.trimmingCharacters(in: .whitespaces).isEmpty)
                 }
 
-                if !areas.isEmpty {
-                    ScrollView {
-                        VStack(spacing: 3) {
-                            ForEach(areas.reversed(), id: \.self) { name in
-                                HStack(spacing: 8) {
-                                    Image(systemName: "square.stack.3d.up.fill")
-                                        .font(.caption)
-                                        .foregroundColor(.green)
-                                    Text(name)
-                                        .font(.subheadline)
-
-                                    Spacer()
-
-                                    Button(action: { removeArea(name) }) {
-                                        Image(systemName: "xmark")
-                                            .font(.caption2)
-                                            .foregroundColor(.secondary)
-                                    }
-                                    .buttonStyle(.plain)
-                                }
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 6)
-                                .background(Color.secondary.opacity(0.05))
-                                .cornerRadius(6)
-                            }
+                ScrollView {
+                    VStack(spacing: 6) {
+                        ForEach(areas, id: \.self) { areaName in
+                            areaCard(areaName)
                         }
                     }
-                    .frame(maxHeight: 200)
-                } else {
-                    Text("최소 1개의 도메인을 등록해주세요")
-                        .font(.caption)
-                        .foregroundColor(.orange)
-                        .padding(.vertical, 4)
                 }
+                .frame(maxHeight: 300)
             }
             .padding(.horizontal, 16)
 
             Spacer()
 
+            if areas.isEmpty {
+                Text("최소 1개의 도메인을 등록해주세요")
+                    .font(.caption)
+                    .foregroundColor(.orange)
+                    .padding(.bottom, 8)
+            }
+
             HStack {
-                Button("이전") { goBack() }
+                if isReOnboarding {
+                    Button("취소") {
+                        UserDefaults.standard.removeObject(forKey: AppState.DefaultsKey.onboardingStep)
+                        appState.currentScreen = .inbox
+                    }
                     .buttonStyle(.bordered)
                     .controlSize(.regular)
+                } else {
+                    Button("이전") { goBack() }
+                        .buttonStyle(.bordered)
+                        .controlSize(.regular)
+                }
 
                 Spacer()
 
                 Button(action: {
-                    loadExistingProjects()
+                    saveRegistry()
                     goNext()
                 }) {
                     Text("다음")
@@ -593,148 +580,128 @@ struct OnboardingView: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .controlSize(.regular)
-                .disabled(areas.isEmpty)
+                .disabled(areas.isEmpty || projects.isEmpty)
             }
             .padding(.horizontal, 32)
             .padding(.bottom, 20)
         }
         .padding(.horizontal)
+        .onAppear {
+            loadExistingAreas()
+            loadExistingProjects()
+        }
     }
 
-    // MARK: - Step 4: Project Registration
+    private func areaCard(_ areaName: String) -> some View {
+        let isExpanded = expandedArea == areaName
+        let areaProjects = projects.filter { projectAreas[$0] == areaName }
 
-    private var projectStep: some View {
-        VStack(spacing: 0) {
-            stepHeader(
-                title: "프로젝트 등록",
-                desc: "지금 진행 중인 일에 이름을 붙여주세요."
-            )
+        return VStack(spacing: 0) {
+            // Header
+            HStack(spacing: 8) {
+                Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+                    .frame(width: 12)
 
-            VStack(alignment: .leading, spacing: 10) {
-                HStack(alignment: .top, spacing: 8) {
-                    Image(systemName: "lightbulb.fill")
-                        .font(.caption)
-                        .foregroundColor(.blue)
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("진행 중인 프로젝트를 모두 등록하세요.\nDotBrain이 파일을 더 정확하게 분류합니다.")
+                Image(systemName: "square.stack.3d.up.fill")
+                    .font(.caption)
+                    .foregroundColor(.green)
+
+                Text(areaName)
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+
+                if !isExpanded {
+                    Text("(\(areaProjects.count)개 프로젝트)")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
+
+                Spacer()
+
+                Button(action: { removeAreaWithProjects(areaName) }) {
+                    Image(systemName: "xmark")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
+            .contentShape(Rectangle())
+            .onTapGesture {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    expandedArea = isExpanded ? nil : areaName
+                }
+            }
+
+            if isExpanded {
+                VStack(alignment: .leading, spacing: 6) {
+                    ForEach(areaProjects, id: \.self) { projectName in
+                        HStack(spacing: 8) {
+                            Image(systemName: "folder.fill")
+                                .font(.caption2)
+                                .foregroundColor(.blue)
+
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text(projectName)
+                                    .font(.caption)
+                                if let summary = projectSummaries[projectName], !summary.isEmpty {
+                                    Text(summary)
+                                        .font(.caption2)
+                                        .foregroundColor(.secondary)
+                                }
+                            }
+
+                            Spacer()
+
+                            Button(action: { removeProject(projectName) }) {
+                                Image(systemName: "xmark")
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 4)
+                    }
+
+                    VStack(spacing: 4) {
+                        HStack(spacing: 6) {
+                            TextField("프로젝트 이름", text: $newProjectName)
+                                .textFieldStyle(.roundedBorder)
+                                .font(.caption)
+                                .onSubmit { addProjectToArea(areaName) }
+
+                            Button(action: { addProjectToArea(areaName) }) {
+                                Image(systemName: "plus")
+                            }
+                            .buttonStyle(.bordered)
+                            .controlSize(.small)
+                            .disabled(newProjectName.trimmingCharacters(in: .whitespaces).isEmpty)
+                        }
+
+                        TextField("입력하면 분류가 정확해져요", text: $newProjectSummary)
+                            .textFieldStyle(.roundedBorder)
                             .font(.caption)
                             .foregroundColor(.secondary)
-                        Text("예: PoC-Alpha, 연구-Beta, 런칭-DotBrain")
-                            .font(.caption2)
-                            .foregroundColor(.secondary.opacity(0.7))
                     }
+                    .padding(.horizontal, 10)
+                    .padding(.bottom, 6)
                 }
-                .padding(10)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color.blue.opacity(0.05))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 6)
-                        .stroke(Color.blue.opacity(0.15), lineWidth: 1)
-                )
-                .cornerRadius(6)
-
-                HStack(spacing: 6) {
-                    TextField("프로젝트 이름", text: $newProjectName)
-                        .textFieldStyle(.roundedBorder)
-                        .font(.subheadline)
-                        .onSubmit { if !selectedArea.isEmpty { addProject() } }
-
-                    if !areas.isEmpty {
-                        Picker("", selection: $selectedArea) {
-                            Text("선택").tag("")
-                            ForEach(areas, id: \.self) { area in
-                                Text(area).tag(area)
-                            }
-                        }
-                        .pickerStyle(.menu)
-                        .frame(maxWidth: 100)
-                        .lineLimit(1)
-                        .truncationMode(.tail)
-                    }
-
-                    Button(action: addProject) {
-                        Image(systemName: "plus")
-                    }
-                    .buttonStyle(.bordered)
-                    .controlSize(.regular)
-                    .disabled(newProjectName.trimmingCharacters(in: .whitespaces).isEmpty || selectedArea.isEmpty)
-                    .accessibilityLabel("프로젝트 추가")
-                }
-
-                if !projects.isEmpty {
-                    ScrollView {
-                        VStack(spacing: 3) {
-                            ForEach(projects.reversed(), id: \.self) { name in
-                                HStack(spacing: 8) {
-                                    Image(systemName: "folder.fill")
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                    Text(name)
-                                        .font(.subheadline)
-
-                                    if let area = projectAreas[name], !area.isEmpty {
-                                        Text(area)
-                                            .font(.caption2)
-                                            .foregroundColor(.green)
-                                            .padding(.horizontal, 6)
-                                            .padding(.vertical, 1)
-                                            .background(Color.green.opacity(0.1))
-                                            .cornerRadius(4)
-                                    }
-
-                                    Spacer()
-
-                                    Button(action: { removeProject(name) }) {
-                                        Image(systemName: "xmark")
-                                            .font(.caption2)
-                                            .foregroundColor(.secondary)
-                                    }
-                                    .buttonStyle(.plain)
-                                    .accessibilityLabel("\(name) 삭제")
-                                }
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 6)
-                                .background(Color.secondary.opacity(0.05))
-                                .cornerRadius(6)
-                            }
-                        }
-                    }
-                    .frame(maxHeight: 200)
-                } else {
-                    Text("최소 1개의 프로젝트를 등록해주세요")
-                        .font(.caption)
-                        .foregroundColor(.orange)
-                        .padding(.vertical, 4)
-                }
+                .transition(.opacity.combined(with: .move(edge: .top)))
             }
-            .padding(.horizontal, 16)
-
-            Spacer()
-
-            HStack {
-                Button("이전") { goBack() }
-                    .buttonStyle(.bordered)
-                    .controlSize(.regular)
-
-                Spacer()
-
-                Button(action: {
-                    goNext()
-                }) {
-                    Text("다음")
-                        .frame(minWidth: 80)
-                }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.regular)
-                .disabled(projects.isEmpty)
-            }
-            .padding(.horizontal, 32)
-            .padding(.bottom, 20)
         }
-        .padding(.horizontal)
+        .background(Color.secondary.opacity(0.05))
+        .cornerRadius(8)
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .strokeBorder(isExpanded ? Color.green.opacity(0.3) : Color.secondary.opacity(0.1), lineWidth: 1)
+        )
     }
 
-    // MARK: - Step 5: Provider + API Key (Combined)
+    // MARK: - Step 4: Provider + API Key (Combined)
 
     private var providerAndKeyStep: some View {
         let provider = appState.selectedProvider
@@ -1072,27 +1039,48 @@ struct OnboardingView: View {
         return String(cleaned.prefix(255)).trimmingCharacters(in: .whitespaces)
     }
 
-    private func addProject() {
+    private func addAreaAndExpand() {
+        let raw = newAreaName.trimmingCharacters(in: .whitespaces)
+        let name = sanitizeProjectName(raw)
+        guard !name.isEmpty, !areas.contains(name) else { return }
+
+        let pathManager = PKMPathManager(root: appState.pkmRootPath)
+        let areaDir = (pathManager.areaPath as NSString).appendingPathComponent(name)
+        guard pathManager.isPathSafe(areaDir) else { return }
+
+        do {
+            try FileManager.default.createDirectory(atPath: areaDir, withIntermediateDirectories: true)
+            areas.append(name)
+            newAreaName = ""
+            withAnimation(.easeInOut(duration: 0.2)) {
+                expandedArea = name
+            }
+        } catch {
+            NSLog("[OnboardingView] Area 생성 실패: %@", error.localizedDescription)
+            newAreaName = ""
+        }
+    }
+
+    private func addProjectToArea(_ areaName: String) {
         let raw = newProjectName.trimmingCharacters(in: .whitespaces)
         let name = sanitizeProjectName(raw)
-        guard !name.isEmpty, !projects.contains(name), !selectedArea.isEmpty else { return }
+        guard !name.isEmpty, !projects.contains(name) else { return }
 
         let pathManager = PKMPathManager(root: appState.pkmRootPath)
         let projectDir = (pathManager.projectsPath as NSString).appendingPathComponent(name)
         guard pathManager.isPathSafe(projectDir) else { return }
-        let fm = FileManager.default
-
-        let areaName = selectedArea.isEmpty ? nil : selectedArea
 
         do {
-            try fm.createDirectory(atPath: projectDir, withIntermediateDirectories: true)
-
+            try FileManager.default.createDirectory(atPath: projectDir, withIntermediateDirectories: true)
             projects.append(name)
-            projectAreas[name] = areaName ?? ""
+            projectAreas[name] = areaName
+            projectSummaries[name] = newProjectSummary.trimmingCharacters(in: .whitespaces)
             newProjectName = ""
+            newProjectSummary = ""
         } catch {
             NSLog("[OnboardingView] 프로젝트 생성 실패: %@", error.localizedDescription)
             newProjectName = ""
+            newProjectSummary = ""
         }
     }
 
@@ -1101,6 +1089,22 @@ struct OnboardingView: View {
         let projectDir = (pathManager.projectsPath as NSString).appendingPathComponent(name)
         try? FileManager.default.trashItem(at: URL(fileURLWithPath: projectDir), resultingItemURL: nil)
         projects.removeAll { $0 == name }
+        projectAreas.removeValue(forKey: name)
+        projectSummaries.removeValue(forKey: name)
+    }
+
+    private func removeAreaWithProjects(_ name: String) {
+        let pathManager = PKMPathManager(root: appState.pkmRootPath)
+        let areaDir = (pathManager.areaPath as NSString).appendingPathComponent(name)
+        try? FileManager.default.trashItem(at: URL(fileURLWithPath: areaDir), resultingItemURL: nil)
+
+        let associatedProjects = projects.filter { projectAreas[$0] == name }
+        for project in associatedProjects {
+            removeProject(project)
+        }
+
+        areas.removeAll { $0 == name }
+        if expandedArea == name { expandedArea = nil }
     }
 
     private func loadExistingAreas() {
@@ -1116,31 +1120,22 @@ struct OnboardingView: View {
         }.sorted()
     }
 
-    private func addArea() {
-        let raw = newAreaName.trimmingCharacters(in: .whitespaces)
-        let name = sanitizeProjectName(raw)
-        guard !name.isEmpty, !areas.contains(name) else { return }
+    private func saveRegistry() {
+        var registryAreas: [String: ProjectRegistry.AreaInfo] = [:]
 
-        let pathManager = PKMPathManager(root: appState.pkmRootPath)
-        let areaDir = (pathManager.areaPath as NSString).appendingPathComponent(name)
-        guard pathManager.isPathSafe(areaDir) else { return }
-        let fm = FileManager.default
+        for areaName in areas {
+            let areaProjects = projects.filter { projectAreas[$0] == areaName }
+            var projectInfos: [String: ProjectRegistry.ProjectInfo] = [:]
 
-        do {
-            try fm.createDirectory(atPath: areaDir, withIntermediateDirectories: true)
-            areas.append(name)
-            newAreaName = ""
-        } catch {
-            NSLog("[OnboardingView] Area 생성 실패: %@", error.localizedDescription)
-            newAreaName = ""
+            for projectName in areaProjects {
+                let summary = projectSummaries[projectName] ?? ""
+                projectInfos[projectName] = ProjectRegistry.ProjectInfo(summary: summary)
+            }
+
+            registryAreas[areaName] = ProjectRegistry.AreaInfo(projects: projectInfos)
         }
-    }
 
-    private func removeArea(_ name: String) {
-        let pathManager = PKMPathManager(root: appState.pkmRootPath)
-        let areaDir = (pathManager.areaPath as NSString).appendingPathComponent(name)
-        try? FileManager.default.trashItem(at: URL(fileURLWithPath: areaDir), resultingItemURL: nil)
-        areas.removeAll { $0 == name }
+        ProjectRegistry.save(areas: registryAreas, pkmRoot: appState.pkmRootPath)
     }
 
     private func saveAPIKey(provider: AIProvider) {
@@ -1153,7 +1148,7 @@ struct OnboardingView: View {
         }
     }
 
-    // MARK: - Step 6: Quick Start Guide
+    // MARK: - Step 5: Quick Start Guide
 
     private var isReOnboarding: Bool {
         UserDefaults.standard.bool(forKey: AppState.DefaultsKey.onboardingCompleted)
