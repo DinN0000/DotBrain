@@ -28,6 +28,21 @@ enum FileContentExtractor {
         return extractTextHeadTail(from: filePath, maxLength: maxLength)
     }
 
+    /// Extract a short preview suitable for batch classification (Stage 1)
+    /// Includes frontmatter summary, heading outline, and first paragraph
+    /// - Parameters:
+    ///   - filePath: Path to the file
+    ///   - maxLength: Maximum character count (default 800)
+    /// - Returns: Condensed structural preview
+    static func extractPreview(from filePath: String, content: String, maxLength: Int = 800) -> String {
+        let ext = URL(fileURLWithPath: filePath).pathExtension.lowercased()
+        guard ext == "md" || ext == "markdown" else {
+            return String(content.prefix(maxLength))
+        }
+
+        return buildMarkdownPreview(from: content, maxLength: maxLength)
+    }
+
     // MARK: - Markdown Smart Extraction
 
     /// Extract markdown content preserving structural context:
@@ -106,6 +121,39 @@ enum FileContentExtractor {
         return String(result.prefix(maxLength))
     }
 
+    /// Build a condensed preview for Stage 1 batch classification
+    /// Focuses on: existing tags/summary from frontmatter + heading outline + first paragraph
+    private static func buildMarkdownPreview(from content: String, maxLength: Int) -> String {
+        let (frontmatterText, bodyStartIndex) = extractFrontmatterRaw(from: content)
+        let body = String(content[bodyStartIndex...])
+
+        var parts: [String] = []
+
+        // Extract key frontmatter fields (tags, summary, para) — these are classification gold
+        let fmSummary = extractFrontmatterField(from: frontmatterText, field: "summary")
+        let fmTags = extractFrontmatterField(from: frontmatterText, field: "tags")
+        let fmPara = extractFrontmatterField(from: frontmatterText, field: "para")
+
+        if let para = fmPara { parts.append("para: \(para)") }
+        if let tags = fmTags { parts.append("tags: \(tags)") }
+        if let summary = fmSummary { parts.append("summary: \(summary)") }
+
+        // All headings — gives document structure in minimal space
+        let headings = extractHeadings(from: body)
+        if !headings.isEmpty {
+            parts.append("구조: " + headings.prefix(10).joined(separator: " > "))
+        }
+
+        // First meaningful paragraph (skip empty lines and headings)
+        let firstParagraph = extractFirstParagraph(from: body, maxLength: maxLength / 2)
+        if !firstParagraph.isEmpty {
+            parts.append(firstParagraph)
+        }
+
+        let result = parts.joined(separator: "\n")
+        return String(result.prefix(maxLength))
+    }
+
     // MARK: - Non-Markdown Text Extraction
 
     /// Read head + tail of a text file without loading entire file
@@ -168,6 +216,20 @@ enum FileContentExtractor {
         return ("", text.startIndex)
     }
 
+    /// Extract a specific field value from raw frontmatter YAML
+    private static func extractFrontmatterField(from fmText: String, field: String) -> String? {
+        for line in fmText.components(separatedBy: "\n") {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            if trimmed.hasPrefix("\(field):") {
+                let value = trimmed.dropFirst(field.count + 1).trimmingCharacters(in: .whitespaces)
+                if !value.isEmpty && value != "[]" && value != "\"\"" {
+                    return value
+                }
+            }
+        }
+        return nil
+    }
+
     /// Extract all headings from markdown body
     private static func extractHeadings(from body: String) -> [String] {
         var headings: [String] = []
@@ -181,4 +243,32 @@ enum FileContentExtractor {
         return headings
     }
 
+    /// Extract first meaningful paragraph (skip blank lines, headings, frontmatter markers)
+    private static func extractFirstParagraph(from body: String, maxLength: Int) -> String {
+        var paragraph = ""
+        var foundContent = false
+
+        for line in body.components(separatedBy: "\n") {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+
+            // Skip empty lines before content
+            if trimmed.isEmpty {
+                if foundContent { break }  // End of first paragraph
+                continue
+            }
+
+            // Skip headings — we already capture those separately
+            if trimmed.hasPrefix("#") {
+                if foundContent { break }
+                continue
+            }
+
+            foundContent = true
+            paragraph += (paragraph.isEmpty ? "" : " ") + trimmed
+
+            if paragraph.count >= maxLength { break }
+        }
+
+        return String(paragraph.prefix(maxLength))
+    }
 }

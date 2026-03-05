@@ -121,10 +121,12 @@ struct VaultReorganizer {
                 group.addTask {
                     let content = self.extractContent(from: entry.filePath)
                     let fileName = (entry.filePath as NSString).lastPathComponent
+                    let preview = FileContentExtractor.extractPreview(from: entry.filePath, content: content)
                     return ClassifyInput(
                         filePath: entry.filePath,
                         content: content,
-                        fileName: fileName
+                        fileName: fileName,
+                        preview: preview
                     )
                 }
                 activeTasks += 1
