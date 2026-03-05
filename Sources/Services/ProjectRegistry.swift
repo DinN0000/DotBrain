@@ -28,13 +28,16 @@ struct ProjectRegistry {
         let metaDir = (path as NSString).deletingLastPathComponent
         try? FileManager.default.createDirectory(atPath: metaDir, withIntermediateDirectories: true)
 
-        guard let data = try? JSONEncoder().encode(registry) else { return }
-        // Pretty-print for human readability
-        if let pretty = try? JSONSerialization.jsonObject(with: data),
-           let prettyData = try? JSONSerialization.data(withJSONObject: pretty, options: [.prettyPrinted, .sortedKeys]) {
-            try? prettyData.write(to: URL(fileURLWithPath: path))
-        } else {
-            try? data.write(to: URL(fileURLWithPath: path))
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        guard let data = try? encoder.encode(registry) else {
+            NSLog("[ProjectRegistry] JSON 인코딩 실패")
+            return
+        }
+        do {
+            try data.write(to: URL(fileURLWithPath: path))
+        } catch {
+            NSLog("[ProjectRegistry] 저장 실패: %@", error.localizedDescription)
         }
     }
 

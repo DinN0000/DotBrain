@@ -6,11 +6,13 @@ struct ProjectContextBuilder {
     let noteIndex: NoteIndex?
 
     private let pathManager: PKMPathManager
+    private let registry: ProjectRegistry.Registry?
 
     init(pkmRoot: String, noteIndex: NoteIndex? = nil) {
         self.pkmRoot = pkmRoot
         self.noteIndex = noteIndex
         self.pathManager = PKMPathManager(root: pkmRoot)
+        self.registry = ProjectRegistry.load(pkmRoot: pkmRoot)
     }
 
     /// Build project context string for classifier prompts
@@ -40,7 +42,7 @@ struct ProjectContextBuilder {
     }
 
     private func buildProjectContextFromRegistry() -> String? {
-        guard let registry = ProjectRegistry.load(pkmRoot: pkmRoot) else { return nil }
+        guard let registry else { return nil }
 
         var lines: [String] = []
         for (areaName, areaInfo) in registry.areas.sorted(by: { $0.key < $1.key }) {
@@ -127,7 +129,7 @@ struct ProjectContextBuilder {
     }
 
     private func buildAreaContextFromRegistry() -> String? {
-        guard let registry = ProjectRegistry.load(pkmRoot: pkmRoot) else { return nil }
+        guard let registry else { return nil }
 
         var lines: [String] = []
         for (areaName, areaInfo) in registry.areas.sorted(by: { $0.key < $1.key }) {

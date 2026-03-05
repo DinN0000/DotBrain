@@ -15,13 +15,15 @@ struct OnboardingView: View {
     @State private var showFolderError = false
     @State private var areas: [String] = []
     @State private var newAreaName: String = ""
-    @State private var selectedArea: String = ""
-    @State private var projectAreas: [String: String] = [:]
     @State private var fdaGranted = false
 
+    struct ProjectEntry {
+        var area: String
+        var summary: String
+    }
+    @State private var projectEntries: [String: ProjectEntry] = [:]
     @State private var expandedArea: String?
     @State private var newProjectSummary: String = ""
-    @State private var projectSummaries: [String: String] = [:]
 
     private let totalSteps = 6
 
@@ -475,16 +477,6 @@ struct OnboardingView: View {
         }
     }
 
-    private func folderTreeRow(prefix: String, name: String) -> some View {
-        HStack(spacing: 2) {
-            Text(prefix)
-                .font(.system(.caption2, design: .monospaced))
-                .foregroundColor(.secondary)
-            Text(name)
-                .font(.system(.caption2, design: .monospaced))
-                .foregroundColor(.secondary)
-        }
-    }
 
     private func abbreviatedPath(_ path: String) -> String {
         let home = FileManager.default.homeDirectoryForCurrentUser.path
@@ -594,7 +586,7 @@ struct OnboardingView: View {
 
     private func areaCard(_ areaName: String) -> some View {
         let isExpanded = expandedArea == areaName
-        let areaProjects = projects.filter { projectAreas[$0] == areaName }
+        let areaProjects = projectsForArea(areaName)
 
         return VStack(spacing: 0) {
             // Header
@@ -647,7 +639,7 @@ struct OnboardingView: View {
                             VStack(alignment: .leading, spacing: 1) {
                                 Text(projectName)
                                     .font(.caption)
-                                if let summary = projectSummaries[projectName], !summary.isEmpty {
+                                if let summary = projectEntries[projectName]?.summary, !summary.isEmpty {
                                     Text(summary)
                                         .font(.caption2)
                                         .foregroundColor(.secondary)
@@ -1030,18 +1022,22 @@ struct OnboardingView: View {
             var isDir: ObjCBool = false
             return fm.fileExists(atPath: fullPath, isDirectory: &isDir) && isDir.boolValue
         }.sorted()
-    }
 
-    private func sanitizeProjectName(_ raw: String) -> String {
-        let invalid = CharacterSet(charactersIn: "/:\\0\t\n\r")
-        var cleaned = raw.components(separatedBy: invalid).joined()
-        cleaned = cleaned.replacingOccurrences(of: "..", with: "")
-        return String(cleaned.prefix(255)).trimmingCharacters(in: .whitespaces)
+        // Restore area/summary mappings from registry
+        if let registry = ProjectRegistry.load(pkmRoot: appState.pkmRootPath) {
+            for (areaName, areaInfo) in registry.areas {
+                for (projectName, projectInfo) in areaInfo.projects where projects.contains(projectName) {
+                    if projectEntries[projectName] == nil {
+                        projectEntries[projectName] = ProjectEntry(area: areaName, summary: projectInfo.summary)
+                    }
+                }
+            }
+        }
     }
 
     private func addAreaAndExpand() {
         let raw = newAreaName.trimmingCharacters(in: .whitespaces)
-        let name = sanitizeProjectName(raw)
+        let name = PKMPathManager(root: appState.pkmRootPath).sanitizeFolderName(raw)
         guard !name.isEmpty, !areas.contains(name) else { return }
 
         let pathManager = PKMPathManager(root: appState.pkmRootPath)
@@ -1063,7 +1059,7 @@ struct OnboardingView: View {
 
     private func addProjectToArea(_ areaName: String) {
         let raw = newProjectName.trimmingCharacters(in: .whitespaces)
-        let name = sanitizeProjectName(raw)
+        let name = PKMPathManager(root: appState.pkmRootPath).sanitizeFolderName(raw)
         guard !name.isEmpty, !projects.contains(name) else { return }
 
         let pathManager = PKMPathManager(root: appState.pkmRootPath)
@@ -1073,8 +1069,7 @@ struct OnboardingView: View {
         do {
             try FileManager.default.createDirectory(atPath: projectDir, withIntermediateDirectories: true)
             projects.append(name)
-            projectAreas[name] = areaName
-            projectSummaries[name] = newProjectSummary.trimmingCharacters(in: .whitespaces)
+            projectEntries[name] = ProjectEntry(area: areaName, summary: newProjectSummary.trimmingCharacters(in: .whitespaces))
             newProjectName = ""
             newProjectSummary = ""
         } catch {
@@ -1089,8 +1084,7 @@ struct OnboardingView: View {
         let projectDir = (pathManager.projectsPath as NSString).appendingPathComponent(name)
         try? FileManager.default.trashItem(at: URL(fileURLWithPath: projectDir), resultingItemURL: nil)
         projects.removeAll { $0 == name }
-        projectAreas.removeValue(forKey: name)
-        projectSummaries.removeValue(forKey: name)
+        projectEntries.removeValue(forKey: name)
     }
 
     private func removeAreaWithProjects(_ name: String) {
@@ -1098,7 +1092,7 @@ struct OnboardingView: View {
         let areaDir = (pathManager.areaPath as NSString).appendingPathComponent(name)
         try? FileManager.default.trashItem(at: URL(fileURLWithPath: areaDir), resultingItemURL: nil)
 
-        let associatedProjects = projects.filter { projectAreas[$0] == name }
+        let associatedProjects = projectsForArea(name)
         for project in associatedProjects {
             removeProject(project)
         }
@@ -1120,22 +1114,27 @@ struct OnboardingView: View {
         }.sorted()
     }
 
+    private func projectsForArea(_ areaName: String) -> [String] {
+        projects.filter { projectEntries[$0]?.area == areaName }
+    }
+
     private func saveRegistry() {
         var registryAreas: [String: ProjectRegistry.AreaInfo] = [:]
 
         for areaName in areas {
-            let areaProjects = projects.filter { projectAreas[$0] == areaName }
             var projectInfos: [String: ProjectRegistry.ProjectInfo] = [:]
-
-            for projectName in areaProjects {
-                let summary = projectSummaries[projectName] ?? ""
+            for projectName in projectsForArea(areaName) {
+                let summary = projectEntries[projectName]?.summary ?? ""
                 projectInfos[projectName] = ProjectRegistry.ProjectInfo(summary: summary)
             }
-
             registryAreas[areaName] = ProjectRegistry.AreaInfo(projects: projectInfos)
         }
 
-        ProjectRegistry.save(areas: registryAreas, pkmRoot: appState.pkmRootPath)
+        if !registryAreas.isEmpty {
+            ProjectRegistry.save(areas: registryAreas, pkmRoot: appState.pkmRootPath)
+        } else {
+            NSLog("[OnboardingView] Registry 저장 스킵: 데이터 없음")
+        }
     }
 
     private func saveAPIKey(provider: AIProvider) {
