@@ -23,6 +23,7 @@ struct OnboardingView: View {
     }
     @State private var projectEntries: [String: ProjectEntry] = [:]
     @State private var expandedArea: String?
+    @State private var areaSummaries: [String: String] = [:]
     @State private var newProjectSummary: String = ""
 
     private let totalSteps = 6
@@ -545,6 +546,11 @@ struct OnboardingView: View {
                     .font(.caption)
                     .foregroundColor(.orange)
                     .padding(.bottom, 8)
+            } else if !allAreasHaveSummary {
+                Text("모든 도메인에 설명을 입력해주세요")
+                    .font(.caption)
+                    .foregroundColor(.orange)
+                    .padding(.bottom, 8)
             }
 
             HStack {
@@ -572,7 +578,7 @@ struct OnboardingView: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .controlSize(.regular)
-                .disabled(areas.isEmpty || projects.isEmpty)
+                .disabled(areas.isEmpty || !allAreasHaveSummary)
             }
             .padding(.horizontal, 32)
             .padding(.bottom, 20)
@@ -630,36 +636,37 @@ struct OnboardingView: View {
 
             if isExpanded {
                 VStack(alignment: .leading, spacing: 6) {
-                    ForEach(areaProjects, id: \.self) { projectName in
-                        HStack(spacing: 8) {
-                            Image(systemName: "folder.fill")
-                                .font(.caption2)
-                                .foregroundColor(.blue)
+                    // Area summary (required)
+                    TextField("다른 도메인과 구분되는 간단한 설명을 입력해주세요", text: areaSummaryBinding(areaName))
+                        .textFieldStyle(.roundedBorder)
+                        .font(.caption)
+                        .padding(.horizontal, 10)
 
-                            VStack(alignment: .leading, spacing: 1) {
+                    let hasSummary = !(areaSummaries[areaName]?.trimmingCharacters(in: .whitespaces).isEmpty ?? true)
+
+                    if hasSummary {
+                        ForEach(areaProjects, id: \.self) { projectName in
+                            HStack(spacing: 8) {
+                                Image(systemName: "folder.fill")
+                                    .font(.caption2)
+                                    .foregroundColor(.blue)
+
                                 Text(projectName)
                                     .font(.caption)
-                                if let summary = projectEntries[projectName]?.summary, !summary.isEmpty {
-                                    Text(summary)
+
+                                Spacer()
+
+                                Button(action: { removeProject(projectName) }) {
+                                    Image(systemName: "xmark")
                                         .font(.caption2)
                                         .foregroundColor(.secondary)
                                 }
+                                .buttonStyle(.plain)
                             }
-
-                            Spacer()
-
-                            Button(action: { removeProject(projectName) }) {
-                                Image(systemName: "xmark")
-                                    .font(.caption2)
-                                    .foregroundColor(.secondary)
-                            }
-                            .buttonStyle(.plain)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 4)
                         }
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 4)
-                    }
 
-                    VStack(spacing: 4) {
                         HStack(spacing: 6) {
                             TextField("프로젝트 이름", text: $newProjectName)
                                 .textFieldStyle(.roundedBorder)
@@ -673,15 +680,10 @@ struct OnboardingView: View {
                             .controlSize(.small)
                             .disabled(newProjectName.trimmingCharacters(in: .whitespaces).isEmpty)
                         }
-
-                        TextField("입력하면 분류가 정확해져요", text: $newProjectSummary)
-                            .textFieldStyle(.roundedBorder)
-                            .font(.caption)
-                            .foregroundColor(.secondary)
+                        .padding(.horizontal, 10)
                     }
-                    .padding(.horizontal, 10)
-                    .padding(.bottom, 6)
                 }
+                .padding(.bottom, 6)
                 .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
@@ -1026,6 +1028,9 @@ struct OnboardingView: View {
         // Restore area/summary mappings from registry
         if let registry = ProjectRegistry.load(pkmRoot: appState.pkmRootPath) {
             for (areaName, areaInfo) in registry.areas {
+                if areaSummaries[areaName] == nil && !areaInfo.summary.isEmpty {
+                    areaSummaries[areaName] = areaInfo.summary
+                }
                 for (projectName, projectInfo) in areaInfo.projects where projects.contains(projectName) {
                     if projectEntries[projectName] == nil {
                         projectEntries[projectName] = ProjectEntry(area: areaName, summary: projectInfo.summary)
@@ -1046,7 +1051,7 @@ struct OnboardingView: View {
 
         do {
             try FileManager.default.createDirectory(atPath: areaDir, withIntermediateDirectories: true)
-            areas.append(name)
+            areas.insert(name, at: 0)
             newAreaName = ""
             withAnimation(.easeInOut(duration: 0.2)) {
                 expandedArea = name
@@ -1069,13 +1074,11 @@ struct OnboardingView: View {
         do {
             try FileManager.default.createDirectory(atPath: projectDir, withIntermediateDirectories: true)
             projects.append(name)
-            projectEntries[name] = ProjectEntry(area: areaName, summary: newProjectSummary.trimmingCharacters(in: .whitespaces))
+            projectEntries[name] = ProjectEntry(area: areaName, summary: "")
             newProjectName = ""
-            newProjectSummary = ""
         } catch {
             NSLog("[OnboardingView] 프로젝트 생성 실패: %@", error.localizedDescription)
             newProjectName = ""
-            newProjectSummary = ""
         }
     }
 
@@ -1098,6 +1101,7 @@ struct OnboardingView: View {
         }
 
         areas.removeAll { $0 == name }
+        areaSummaries.removeValue(forKey: name)
         if expandedArea == name { expandedArea = nil }
     }
 
@@ -1118,6 +1122,17 @@ struct OnboardingView: View {
         projects.filter { projectEntries[$0]?.area == areaName }
     }
 
+    private var allAreasHaveSummary: Bool {
+        areas.allSatisfy { !(areaSummaries[$0]?.trimmingCharacters(in: .whitespaces).isEmpty ?? true) }
+    }
+
+    private func areaSummaryBinding(_ areaName: String) -> Binding<String> {
+        Binding(
+            get: { areaSummaries[areaName] ?? "" },
+            set: { areaSummaries[areaName] = $0 }
+        )
+    }
+
     private func saveRegistry() {
         var registryAreas: [String: ProjectRegistry.AreaInfo] = [:]
 
@@ -1127,7 +1142,8 @@ struct OnboardingView: View {
                 let summary = projectEntries[projectName]?.summary ?? ""
                 projectInfos[projectName] = ProjectRegistry.ProjectInfo(summary: summary)
             }
-            registryAreas[areaName] = ProjectRegistry.AreaInfo(projects: projectInfos)
+            let areaSummary = areaSummaries[areaName] ?? ""
+            registryAreas[areaName] = ProjectRegistry.AreaInfo(summary: areaSummary, projects: projectInfos)
         }
 
         if !registryAreas.isEmpty {

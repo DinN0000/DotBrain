@@ -13,7 +13,19 @@ struct ProjectRegistry {
     }
 
     struct AreaInfo: Codable {
+        var summary: String
         var projects: [String: ProjectInfo]
+
+        init(summary: String = "", projects: [String: ProjectInfo] = [:]) {
+            self.summary = summary
+            self.projects = projects
+        }
+
+        init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            summary = try container.decodeIfPresent(String.self, forKey: .summary) ?? ""
+            projects = try container.decode([String: ProjectInfo].self, forKey: .projects)
+        }
     }
 
     struct Registry: Codable {

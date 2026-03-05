@@ -47,7 +47,8 @@ struct ProjectContextBuilder {
         var lines: [String] = []
         for (areaName, areaInfo) in registry.areas.sorted(by: { $0.key < $1.key }) {
             for (projectName, projectInfo) in areaInfo.projects.sorted(by: { $0.key < $1.key }) {
-                lines.append("- \(projectName): \(projectInfo.summary) (Area: \(areaName))")
+                let areaSummary = areaInfo.summary.isEmpty ? areaName : "\(areaName) — \(areaInfo.summary)"
+                lines.append("- \(projectName): \(projectInfo.summary) (Area: \(areaSummary))")
             }
         }
 
@@ -133,8 +134,9 @@ struct ProjectContextBuilder {
         var lines: [String] = []
         for (areaName, areaInfo) in registry.areas.sorted(by: { $0.key < $1.key }) {
             let projects = areaInfo.projects.keys.sorted()
+            let summaryStr = areaInfo.summary.isEmpty ? "" : " — \(areaInfo.summary)"
             let detail = projects.isEmpty ? "(프로젝트 없음)" : projects.joined(separator: ", ")
-            lines.append("- \(areaName): \(detail)")
+            lines.append("- \(areaName)\(summaryStr): \(detail)")
         }
 
         return lines.isEmpty ? nil : lines.joined(separator: "\n")
