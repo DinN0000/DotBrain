@@ -27,11 +27,30 @@ struct ProjectContextBuilder {
                 let areaStr = areaValue.map { " (Area: \($0))" } ?? ""
                 lines.append("- \(name): \(folder.summary) [\(tags)]\(areaStr)")
             }
-            return lines.isEmpty ? "활성 프로젝트 없음" : lines.joined(separator: "\n")
+            if !lines.isEmpty { return lines.joined(separator: "\n") }
+        }
+
+        // Registry fallback (onboarding seed data)
+        if let context = buildProjectContextFromRegistry() {
+            return context
         }
 
         // Disk fallback
         return buildProjectContextFromDisk()
+    }
+
+    private func buildProjectContextFromRegistry() -> String? {
+        guard let registry = ProjectRegistry.load(pkmRoot: pkmRoot) else { return nil }
+
+        var lines: [String] = []
+        for (areaName, areaInfo) in registry.areas.sorted(by: { $0.key < $1.key }) {
+            for (projectName, projectInfo) in areaInfo.projects.sorted(by: { $0.key < $1.key }) {
+                let summary = projectInfo.summary.isEmpty ? "" : projectInfo.summary
+                lines.append("- \(projectName): \(summary) (Area: \(areaName))")
+            }
+        }
+
+        return lines.isEmpty ? nil : lines.joined(separator: "\n")
     }
 
     private func buildProjectContextFromDisk() -> String {
@@ -95,10 +114,32 @@ struct ProjectContextBuilder {
                 let detail = projects.isEmpty ? "(프로젝트 없음)" : projects.sorted().joined(separator: ", ")
                 lines.append("- \(area): \(detail)")
             }
-            return lines.isEmpty ? "" : lines.joined(separator: "\n")
+            if !lines.isEmpty { return lines.joined(separator: "\n") }
+        }
+
+        // Registry fallback
+        if let context = buildAreaContextFromRegistry() {
+            return context
         }
 
         // Disk fallback: list area folders (no project mapping without index)
+        return buildAreaContextFromDisk()
+    }
+
+    private func buildAreaContextFromRegistry() -> String? {
+        guard let registry = ProjectRegistry.load(pkmRoot: pkmRoot) else { return nil }
+
+        var lines: [String] = []
+        for (areaName, areaInfo) in registry.areas.sorted(by: { $0.key < $1.key }) {
+            let projects = areaInfo.projects.keys.sorted()
+            let detail = projects.isEmpty ? "(프로젝트 없음)" : projects.joined(separator: ", ")
+            lines.append("- \(areaName): \(detail)")
+        }
+
+        return lines.isEmpty ? nil : lines.joined(separator: "\n")
+    }
+
+    private func buildAreaContextFromDisk() -> String {
         let areaPath = pathManager.areaPath
         let fm = FileManager.default
         guard let entries = try? fm.contentsOfDirectory(atPath: areaPath) else { return "" }
