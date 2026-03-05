@@ -1036,11 +1036,11 @@ struct OnboardingView: View {
     }
 
     private func addAreaAndExpand() {
+        let pathManager = PKMPathManager(root: appState.pkmRootPath)
         let raw = newAreaName.trimmingCharacters(in: .whitespaces)
-        let name = PKMPathManager(root: appState.pkmRootPath).sanitizeFolderName(raw)
+        let name = pathManager.sanitizeFolderName(raw)
         guard !name.isEmpty, !areas.contains(name) else { return }
 
-        let pathManager = PKMPathManager(root: appState.pkmRootPath)
         let areaDir = (pathManager.areaPath as NSString).appendingPathComponent(name)
         guard pathManager.isPathSafe(areaDir) else { return }
 
@@ -1058,11 +1058,11 @@ struct OnboardingView: View {
     }
 
     private func addProjectToArea(_ areaName: String) {
+        let pathManager = PKMPathManager(root: appState.pkmRootPath)
         let raw = newProjectName.trimmingCharacters(in: .whitespaces)
-        let name = PKMPathManager(root: appState.pkmRootPath).sanitizeFolderName(raw)
+        let name = pathManager.sanitizeFolderName(raw)
         guard !name.isEmpty, !projects.contains(name) else { return }
 
-        let pathManager = PKMPathManager(root: appState.pkmRootPath)
         let projectDir = (pathManager.projectsPath as NSString).appendingPathComponent(name)
         guard pathManager.isPathSafe(projectDir) else { return }
 

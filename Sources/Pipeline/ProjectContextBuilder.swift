@@ -47,8 +47,7 @@ struct ProjectContextBuilder {
         var lines: [String] = []
         for (areaName, areaInfo) in registry.areas.sorted(by: { $0.key < $1.key }) {
             for (projectName, projectInfo) in areaInfo.projects.sorted(by: { $0.key < $1.key }) {
-                let summary = projectInfo.summary.isEmpty ? "" : projectInfo.summary
-                lines.append("- \(projectName): \(summary) (Area: \(areaName))")
+                lines.append("- \(projectName): \(projectInfo.summary) (Area: \(areaName))")
             }
         }
 
