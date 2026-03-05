@@ -32,9 +32,9 @@ enum FileContentExtractor {
     /// Includes frontmatter summary, heading outline, and first paragraph
     /// - Parameters:
     ///   - filePath: Path to the file
-    ///   - maxLength: Maximum character count (default 800)
+    ///   - maxLength: Maximum character count (default 2000)
     /// - Returns: Condensed structural preview
-    static func extractPreview(from filePath: String, content: String, maxLength: Int = 800) -> String {
+    static func extractPreview(from filePath: String, content: String, maxLength: Int = 2000) -> String {
         let ext = URL(fileURLWithPath: filePath).pathExtension.lowercased()
         guard ext == "md" || ext == "markdown" else {
             return String(content.prefix(maxLength))

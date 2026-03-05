@@ -1143,7 +1143,6 @@ struct OnboardingView: View {
         areas.removeAll { $0 == name }
     }
 
-
     private func saveAPIKey(provider: AIProvider) {
         if keyInput.hasPrefix(provider.keyPrefix) {
             let saved = provider.saveAPIKey(keyInput)

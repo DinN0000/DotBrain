@@ -233,7 +233,7 @@ actor Classifier {
         tagVocabulary: String,
         correctionContext: String
     ) async throws -> [String: ClassifyResult.Stage1Item] {
-        // Use condensed preview (800 chars) instead of full content (5000 chars) for Stage 1 triage
+        // Use condensed preview (2000 chars) instead of full content (5000 chars) for Stage 1 triage
         let fileContents = files.map { file in
             (fileName: file.fileName, content: file.preview)
         }

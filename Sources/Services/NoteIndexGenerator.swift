@@ -225,18 +225,21 @@ struct NoteIndexGenerator: Sendable {
         // Folder summary: combine first few note summaries or use count
         let folderSummary: String
         if noteEntries.isEmpty {
-            folderSummary = "empty"
+            folderSummary = "\(folderName) (\(para.rawValue))"
         } else if summaries.isEmpty {
             folderSummary = "\(noteEntries.count) notes"
         } else {
             folderSummary = summaries.prefix(3).joined(separator: "; ")
         }
 
+        // Use folder name as tag when no notes provide tags
+        let finalTags = topTags.isEmpty ? [folderName] : topTags
+
         let folderEntry = FolderIndexEntry(
             path: relFolder,
             para: para.rawValue,
             summary: folderSummary,
-            tags: topTags
+            tags: finalTags
         )
 
         return (folderEntry, noteEntries)

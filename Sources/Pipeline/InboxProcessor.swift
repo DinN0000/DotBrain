@@ -39,7 +39,9 @@ struct InboxProcessor {
         )
 
         // Build context — run independent builders concurrently
-        let noteIndex = PKMPathManager(root: pkmRoot).loadNoteIndex()
+        // Ensure note-index covers all existing folders (new folders since last update)
+        let pathManager = PKMPathManager(root: pkmRoot)
+        let noteIndex = await Self.ensureIndexFresh(pathManager: pathManager)
         let contextBuilder = ProjectContextBuilder(pkmRoot: pkmRoot, noteIndex: noteIndex)
         let root = pkmRoot
 
@@ -112,13 +114,17 @@ struct InboxProcessor {
         onProgress?(0.3, "\(inputs.count)개 파일 내용 추출 완료")
 
         // Separate media files (image+video) from text files — media skips AI classification
+        // Also separate files with existing para: frontmatter — they skip AI classification too
         let mediaExtensions = BinaryExtractor.imageExtensions.union(BinaryExtractor.videoExtensions)
         var mediaInputs: [ClassifyInput] = []
         var textInputs: [ClassifyInput] = []
+        var preClassifiedInputs: [(input: ClassifyInput, para: PARACategory)] = []
         for input in inputs {
             let ext = URL(fileURLWithPath: input.filePath).pathExtension.lowercased()
             if mediaExtensions.contains(ext) {
                 mediaInputs.append(input)
+            } else if let existingPara = Self.extractParaFromContent(input.content) {
+                preClassifiedInputs.append((input: input, para: existingPara))
             } else {
                 textInputs.append(input)
             }
@@ -167,9 +173,22 @@ struct InboxProcessor {
             )
         }
 
-        // Merge: media first, then text (preserves pairing with inputs)
-        let allInputs = mediaInputs + textInputs
-        let allClassifications = mediaClassifications + textClassifications
+        // Pre-classified files (existing para: frontmatter) — skip AI, confidence 1.0
+        let preClassifiedResults = preClassifiedInputs.map { item in
+            ClassifyResult(
+                para: item.para,
+                tags: [],
+                summary: "",
+                targetFolder: "",
+                project: nil,
+                confidence: 1.0,
+                relatedNotes: []
+            )
+        }
+
+        // Merge: media first, then pre-classified, then text (preserves pairing with inputs)
+        let allInputs = mediaInputs + preClassifiedInputs.map(\.input) + textInputs
+        let allClassifications = mediaClassifications + preClassifiedResults + textClassifications
 
         // Classifications ready for move (semantic linking happens post-move)
         onPhaseChange?(.linking)
@@ -487,5 +506,47 @@ struct InboxProcessor {
         }
 
         return options
+    }
+
+    /// Extract existing para: value from frontmatter content
+    private static func extractParaFromContent(_ content: String) -> PARACategory? {
+        Frontmatter.parse(markdown: content).frontmatter.para
+    }
+
+    /// Ensure note-index.json covers all existing PARA folders.
+    /// Detects folders on disk that are missing from the index and runs incremental update.
+    private static func ensureIndexFresh(pathManager: PKMPathManager) async -> NoteIndex? {
+        let existingIndex = pathManager.loadNoteIndex()
+        let indexedFolders: Set<String> = existingIndex.map { Set($0.folders.keys) } ?? []
+
+        let fm = FileManager.default
+        let categories: [(PARACategory, String)] = [
+            (.project, pathManager.projectsPath),
+            (.area, pathManager.areaPath),
+            (.resource, pathManager.resourcePath),
+            (.archive, pathManager.archivePath),
+        ]
+
+        var missingFolderPaths: Set<String> = []
+        for (category, basePath) in categories {
+            guard let entries = try? fm.contentsOfDirectory(atPath: basePath) else { continue }
+            for entry in entries {
+                guard !entry.hasPrefix("."), !entry.hasPrefix("_") else { continue }
+                let folderPath = (basePath as NSString).appendingPathComponent(entry)
+                var isDir: ObjCBool = false
+                guard fm.fileExists(atPath: folderPath, isDirectory: &isDir), isDir.boolValue else { continue }
+                let relKey = "\(category.folderName)/\(entry)"
+                if !indexedFolders.contains(relKey) {
+                    missingFolderPaths.insert(folderPath)
+                }
+            }
+        }
+
+        guard !missingFolderPaths.isEmpty else { return existingIndex }
+
+        NSLog("[InboxProcessor] 인덱스 누락 폴더 %d개 갱신", missingFolderPaths.count)
+        let generator = NoteIndexGenerator(pkmRoot: pathManager.root)
+        await generator.updateForFolders(missingFolderPaths)
+        return pathManager.loadNoteIndex()
     }
 }

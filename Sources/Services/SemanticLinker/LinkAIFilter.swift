@@ -52,7 +52,7 @@ struct LinkAIFilter: Sendable {
         [{"noteIndex": 0, "links": [{"index": 0, "context": "~하려면 참고", "relation": "reference"}]}]
         """
 
-        let response = try await aiService.sendFastWithUsage(message: prompt)
+        let response = try await aiService.sendFastWithUsage(maxTokens: 8192, message: prompt)
         if let usage = response.usage {
             let model = await aiService.fastModel
             StatisticsService.logTokenUsage(operation: "semantic-link", model: model, usage: usage)

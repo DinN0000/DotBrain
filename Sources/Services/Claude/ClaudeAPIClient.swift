@@ -25,10 +25,21 @@ actor ClaudeAPIClient {
         let max_tokens: Int
         let temperature: Double
         let messages: [Message]
+        let system: [SystemBlock]?
 
         struct Message: Encodable {
             let role: String
             let content: String
+        }
+
+        struct SystemBlock: Encodable {
+            let type: String
+            let text: String
+            let cache_control: CacheControl?
+
+            struct CacheControl: Encodable {
+                let type: String
+            }
         }
     }
 
@@ -71,7 +82,8 @@ actor ClaudeAPIClient {
     func sendMessage(
         model: String,
         maxTokens: Int,
-        userMessage: String
+        userMessage: String,
+        systemMessage: String? = nil
     ) async throws -> (String, TokenUsage?) {
         guard let apiKey = KeychainService.getAPIKey() else {
             throw ClaudeAPIError.noAPIKey
@@ -81,11 +93,20 @@ actor ClaudeAPIClient {
             throw ClaudeAPIError.invalidURL
         }
 
+        let systemBlocks: [MessageRequest.SystemBlock]? = systemMessage.map { msg in
+            [MessageRequest.SystemBlock(
+                type: "text",
+                text: msg,
+                cache_control: .init(type: "ephemeral")
+            )]
+        }
+
         let request = MessageRequest(
             model: model,
             max_tokens: maxTokens,
             temperature: 0.1,
-            messages: [.init(role: "user", content: userMessage)]
+            messages: [.init(role: "user", content: userMessage)],
+            system: systemBlocks
         )
 
         var urlRequest = URLRequest(url: url)

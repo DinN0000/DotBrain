@@ -64,13 +64,15 @@ actor AIService {
     func sendMessage(
         model: String,
         maxTokens: Int,
-        userMessage: String
+        userMessage: String,
+        systemMessage: String? = nil
     ) async throws -> (String, TokenUsage?) {
         try await sendWithRetry(
             provider: currentProvider,
             model: model,
             maxTokens: maxTokens,
-            userMessage: userMessage
+            userMessage: userMessage,
+            systemMessage: systemMessage
         )
     }
 
@@ -78,7 +80,8 @@ actor AIService {
         provider: AIProvider,
         model: String,
         maxTokens: Int,
-        userMessage: String
+        userMessage: String,
+        systemMessage: String? = nil
     ) async throws -> (String, TokenUsage?) {
         var lastError: Error?
         // CLI gets longer deadline due to process startup overhead
@@ -99,7 +102,8 @@ actor AIService {
                     provider: provider,
                     model: model,
                     maxTokens: maxTokens,
-                    userMessage: userMessage
+                    userMessage: userMessage,
+                    systemMessage: systemMessage
                 )
                 await rateLimiter.recordSuccess(for: provider, duration: ContinuousClock.now - start)
                 return result
@@ -134,7 +138,8 @@ actor AIService {
                     provider: fallback,
                     model: fallbackModel,
                     maxTokens: maxTokens,
-                    userMessage: userMessage
+                    userMessage: userMessage,
+                    systemMessage: systemMessage
                 )
                 await rateLimiter.recordSuccess(for: fallback, duration: ContinuousClock.now - start)
                 return result
@@ -150,14 +155,16 @@ actor AIService {
         provider: AIProvider,
         model: String,
         maxTokens: Int,
-        userMessage: String
+        userMessage: String,
+        systemMessage: String? = nil
     ) async throws -> (String, TokenUsage?) {
         switch provider {
         case .claude:
             return try await claudeClient.sendMessage(
                 model: model,
                 maxTokens: maxTokens,
-                userMessage: userMessage
+                userMessage: userMessage,
+                systemMessage: systemMessage
             )
         case .gemini:
             return try await geminiClient.sendMessage(
@@ -166,10 +173,11 @@ actor AIService {
                 userMessage: userMessage
             )
         case .claudeCLI:
+            let combined = systemMessage.map { $0 + "\n\n" + userMessage } ?? userMessage
             return try await claudeCLIClient.sendMessage(
                 model: model,
                 maxTokens: maxTokens,
-                userMessage: userMessage
+                userMessage: combined
             )
         }
     }
@@ -257,24 +265,24 @@ actor AIService {
     }
 
     /// Send using the fast model (Haiku / Flash)
-    func sendFast(maxTokens: Int = 4096, message: String) async throws -> String {
-        try await sendMessage(model: fastModel, maxTokens: maxTokens, userMessage: message).0
+    func sendFast(maxTokens: Int = 4096, message: String, systemMessage: String? = nil) async throws -> String {
+        try await sendMessage(model: fastModel, maxTokens: maxTokens, userMessage: message, systemMessage: systemMessage).0
     }
 
     /// Send using the precise model (Sonnet / Pro)
-    func sendPrecise(maxTokens: Int = 2048, message: String) async throws -> String {
-        try await sendMessage(model: preciseModel, maxTokens: maxTokens, userMessage: message).0
+    func sendPrecise(maxTokens: Int = 2048, message: String, systemMessage: String? = nil) async throws -> String {
+        try await sendMessage(model: preciseModel, maxTokens: maxTokens, userMessage: message, systemMessage: systemMessage).0
     }
 
     /// Send using the fast model and return full AIResponse with token usage
-    func sendFastWithUsage(maxTokens: Int = 4096, message: String) async throws -> AIResponse {
-        let (text, usage) = try await sendMessage(model: fastModel, maxTokens: maxTokens, userMessage: message)
+    func sendFastWithUsage(maxTokens: Int = 4096, message: String, systemMessage: String? = nil) async throws -> AIResponse {
+        let (text, usage) = try await sendMessage(model: fastModel, maxTokens: maxTokens, userMessage: message, systemMessage: systemMessage)
         return AIResponse(text: text, usage: usage)
     }
 
     /// Send using the precise model and return full AIResponse with token usage
-    func sendPreciseWithUsage(maxTokens: Int = 2048, message: String) async throws -> AIResponse {
-        let (text, usage) = try await sendMessage(model: preciseModel, maxTokens: maxTokens, userMessage: message)
+    func sendPreciseWithUsage(maxTokens: Int = 2048, message: String, systemMessage: String? = nil) async throws -> AIResponse {
+        let (text, usage) = try await sendMessage(model: preciseModel, maxTokens: maxTokens, userMessage: message, systemMessage: systemMessage)
         return AIResponse(text: text, usage: usage)
     }
 
