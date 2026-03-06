@@ -76,6 +76,10 @@ actor ClaudeAPIClient {
         }
     }
 
+    func shutdown() {
+        session.invalidateAndCancel()
+    }
+
     // MARK: - API Call
 
     /// Send a message to Claude and get the text response with token usage
@@ -152,7 +156,7 @@ actor ClaudeAPIClient {
 
 // MARK: - Errors
 
-enum ClaudeAPIError: LocalizedError {
+enum ClaudeAPIError: LocalizedError, RetryClassifiable {
     case noAPIKey
     case invalidURL
     case invalidResponse
@@ -177,6 +181,24 @@ enum ClaudeAPIError: LocalizedError {
             return message
         case .jsonParseFailed(let raw):
             return "JSON 파싱 실패: \(raw.prefix(100))"
+        }
+    }
+
+    private var statusCode: Int? {
+        switch self {
+        case .httpError(let s): return s
+        case .apiError(let s, _): return s
+        default: return nil
+        }
+    }
+
+    var isRateLimitError: Bool { statusCode == 429 }
+    var isServerError: Bool { (statusCode ?? 0) >= 500 }
+    var isRetryable: Bool {
+        if isRateLimitError || isServerError { return true }
+        switch self {
+        case .invalidResponse, .emptyResponse: return true
+        default: return false
         }
     }
 }

@@ -174,95 +174,31 @@ actor AIService {
                 systemMessage: systemMessage
             )
         case .claudeCLI:
-            let combined = systemMessage.map { $0 + "\n\n" + userMessage } ?? userMessage
             return try await claudeCLIClient.sendMessage(
                 model: model,
                 maxTokens: maxTokens,
-                userMessage: combined
+                userMessage: userMessage,
+                systemMessage: systemMessage
             )
         }
     }
 
-    // MARK: - Error Classification
+    // MARK: - Error Classification (via RetryClassifiable protocol)
 
-    /// Check if error is a rate limit (429) error
     private func isRateLimitError(_ error: Error) -> Bool {
-        if let e = error as? ClaudeAPIError {
-            switch e {
-            case .httpError(let s): return s == 429
-            case .apiError(let s, _): return s == 429
-            default: return false
-            }
-        }
-        if let e = error as? GeminiAPIError {
-            switch e {
-            case .httpError(let s): return s == 429
-            case .apiError(let s, _): return s == 429
-            default: return false
-            }
-        }
-        return false
+        (error as? RetryClassifiable)?.isRateLimitError ?? false
     }
 
-    /// Check if error is a server error (5xx)
     private func isServerError(_ error: Error) -> Bool {
-        if let e = error as? ClaudeAPIError {
-            switch e {
-            case .httpError(let s): return s >= 500
-            case .apiError(let s, _): return s >= 500
-            default: return false
-            }
-        }
-        if let e = error as? GeminiAPIError {
-            switch e {
-            case .httpError(let s): return s >= 500
-            case .apiError(let s, _): return s >= 500
-            default: return false
-            }
-        }
-        return false
+        (error as? RetryClassifiable)?.isServerError ?? false
     }
 
-    /// Check if an error is worth retrying
     private func isRetryable(_ error: Error) -> Bool {
-        if let claudeError = error as? ClaudeAPIError {
-            switch claudeError {
-            case .httpError(let status):
-                return status == 429 || status >= 500
-            case .apiError(let status, _):
-                return status == 429 || status >= 500
-            case .invalidResponse, .emptyResponse:
-                return true
-            case .noAPIKey, .invalidURL, .jsonParseFailed:
-                return false
-            }
-        }
-        if let geminiError = error as? GeminiAPIError {
-            switch geminiError {
-            case .httpError(let status):
-                return status == 429 || status >= 500
-            case .apiError(let status, _):
-                return status == 429 || status >= 500
-            case .invalidResponse, .emptyResponse:
-                return true
-            case .noAPIKey, .invalidURL:
-                return false
-            }
-        }
-        if let cliError = error as? ClaudeCLIError {
-            switch cliError {
-            case .claudeNotFound:
-                return false
-            case .processError, .emptyResponse:
-                return true
-            }
+        if let classified = error as? RetryClassifiable {
+            return classified.isRetryable
         }
         // Network errors are retryable
-        let nsError = error as NSError
-        if nsError.domain == NSURLErrorDomain {
-            return true
-        }
-        return false
+        return (error as NSError).domain == NSURLErrorDomain
     }
 
     /// Send using the fast model (Haiku / Flash)
@@ -295,9 +231,12 @@ actor AIService {
         await claudeCLIClient.warmUp()
     }
 
-    /// Shut down CLI process pool
-    func shutdownCLIPool() async {
-        await claudeCLIClient.shutdown()
+    /// Shut down CLI process pool and release URLSessions
+    func shutdownAll() async {
+        async let a: () = claudeCLIClient.shutdown()
+        async let b: () = claudeClient.shutdown()
+        async let c: () = geminiClient.shutdown()
+        _ = await (a, b, c)
     }
 }
 

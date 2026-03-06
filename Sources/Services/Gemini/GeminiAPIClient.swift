@@ -93,6 +93,10 @@ actor GeminiAPIClient {
         }
     }
 
+    func shutdown() {
+        session.invalidateAndCancel()
+    }
+
     // MARK: - API Call
 
     /// Send a message to Gemini and get the text response with token usage
@@ -197,7 +201,7 @@ actor GeminiAPIClient {
 
 // MARK: - Errors
 
-enum GeminiAPIError: LocalizedError {
+enum GeminiAPIError: LocalizedError, RetryClassifiable {
     case noAPIKey
     case invalidURL
     case invalidResponse
@@ -219,6 +223,24 @@ enum GeminiAPIError: LocalizedError {
             return "HTTP 오류: \(status)"
         case .apiError(_, let message):
             return message
+        }
+    }
+
+    private var statusCode: Int? {
+        switch self {
+        case .httpError(let s): return s
+        case .apiError(let s, _): return s
+        default: return nil
+        }
+    }
+
+    var isRateLimitError: Bool { statusCode == 429 }
+    var isServerError: Bool { (statusCode ?? 0) >= 500 }
+    var isRetryable: Bool {
+        if isRateLimitError || isServerError { return true }
+        switch self {
+        case .invalidResponse, .emptyResponse: return true
+        default: return false
         }
     }
 }
