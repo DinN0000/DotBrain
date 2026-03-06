@@ -219,6 +219,8 @@ enum L10n {
         static let createStructure = tr("settings.create_structure")
         static let fullDiskAccess = tr("settings.full_disk_access")
         static let granted = tr("settings.granted")
+        static let authenticated = tr("settings.authenticated")
+        static let keyRegistered = tr("settings.key_registered")
         static let needed = tr("settings.needed")
         static let fdaDescription = tr("settings.fda_description")
         static let openSystemSettings = tr("settings.open_system_settings")
