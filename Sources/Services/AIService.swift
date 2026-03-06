@@ -1,12 +1,5 @@
 import Foundation
 
-/// Shared interface for CLI-based AI providers
-protocol CLISendable: Actor {
-    func sendMessage(model: String, maxTokens: Int, userMessage: String) async throws -> (String, TokenUsage?)
-}
-
-extension CodexCLIClient: CLISendable {}
-
 /// Provider-agnostic AI service that routes to Claude, Gemini, or Claude CLI
 /// with adaptive rate limiting, retry logic, and provider fallback
 actor AIService {
@@ -216,14 +209,6 @@ actor AIService {
     private func isRetryable(_ error: Error) -> Bool {
         if let classified = error as? RetryClassifiable {
             return classified.isRetryable
-        }
-        if let codexError = error as? CodexCLIError {
-            switch codexError {
-            case .codexNotFound, .notAuthenticated:
-                return false
-            case .processError, .emptyResponse:
-                return true
-            }
         }
         // Network errors are retryable
         return (error as NSError).domain == NSURLErrorDomain

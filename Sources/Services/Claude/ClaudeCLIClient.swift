@@ -214,34 +214,18 @@ actor ClaudeCLIClient {
         }.value
     }
 
-    /// Collect output from a running process, validate exit status, return trimmed result.
-    /// Called from within Task.detached context (synchronous/blocking I/O).
     private static func collectProcessOutput(
         process: Process,
         stdoutPipe: Pipe,
         stderrPipe: Pipe
     ) throws -> String {
-        let outputData = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
-        let errorData = stderrPipe.fileHandleForReading.readDataToEndOfFile()
-
-        process.waitUntilExit()
-
-        if process.terminationStatus != 0 {
-            let errorOutput = String(data: errorData, encoding: .utf8) ?? ""
-            throw ClaudeCLIError.processError(
-                status: process.terminationStatus,
-                message: String(errorOutput.prefix(500))
-            )
-        }
-
-        let output = String(data: outputData, encoding: .utf8) ?? ""
-        let trimmed = output.trimmingCharacters(in: .whitespacesAndNewlines)
-
-        if trimmed.isEmpty {
-            throw ClaudeCLIError.emptyResponse
-        }
-
-        return trimmed
+        try ShellEnvironment.collectProcessOutput(
+            process: process,
+            stdoutPipe: stdoutPipe,
+            stderrPipe: stderrPipe,
+            errorFactory: { ClaudeCLIError.processError(status: $0, message: $1) },
+            emptyErrorFactory: { ClaudeCLIError.emptyResponse }
+        )
     }
 
     // MARK: - Send Message

@@ -10,8 +10,9 @@ actor CodexCLIClient {
 
     // MARK: - Cached State
 
-    private static var cachedCodexPath: String?
-    private static var codexPathResolved = false
+    private static let cacheLock = NSLock()
+    private static nonisolated(unsafe) var cachedCodexPath: String?
+    private static nonisolated(unsafe) var codexPathResolved = false
 
     // MARK: - Availability Check
 
@@ -25,18 +26,22 @@ actor CodexCLIClient {
     }
 
     private static func findCodexPath() -> String? {
+        // Fast path: check cache under lock
+        cacheLock.lock()
         if codexPathResolved, let cached = cachedCodexPath {
             if FileManager.default.isExecutableFile(atPath: cached) {
+                cacheLock.unlock()
                 return cached
             }
             cachedCodexPath = nil
             codexPathResolved = false
         }
-        if codexPathResolved { return cachedCodexPath }
+        if codexPathResolved { cacheLock.unlock(); return cachedCodexPath }
+        cacheLock.unlock()
 
+        // Slow path: resolve without lock
         if let path = ShellEnvironment.resolveBinaryViaShell("codex") {
-            cachedCodexPath = path
-            codexPathResolved = true
+            cacheLock.withLock { cachedCodexPath = path; codexPathResolved = true }
             return path
         }
 
@@ -50,13 +55,12 @@ actor CodexCLIClient {
         ]
         for path in candidates {
             if FileManager.default.isExecutableFile(atPath: path) {
-                cachedCodexPath = path
-                codexPathResolved = true
+                cacheLock.withLock { cachedCodexPath = path; codexPathResolved = true }
                 return path
             }
         }
 
-        codexPathResolved = true
+        cacheLock.withLock { codexPathResolved = true }
         return nil
     }
 
@@ -81,7 +85,7 @@ actor CodexCLIClient {
             arguments: arguments,
             input: userMessage
         )
-        return (result, nil)
+        return (result, TokenUsage.zero)
     }
 
     // MARK: - Process Execution
@@ -116,34 +120,20 @@ actor CodexCLIClient {
             }
             inputPipe.fileHandleForWriting.closeFile()
 
-            let outputData = outputPipe.fileHandleForReading.readDataToEndOfFile()
-            let errorData = errorPipe.fileHandleForReading.readDataToEndOfFile()
-
-            process.waitUntilExit()
-
-            if process.terminationStatus != 0 {
-                let errorOutput = String(data: errorData, encoding: .utf8) ?? ""
-                throw CodexCLIError.processError(
-                    status: process.terminationStatus,
-                    message: String(errorOutput.prefix(500))
-                )
-            }
-
-            let output = String(data: outputData, encoding: .utf8) ?? ""
-            let trimmed = output.trimmingCharacters(in: .whitespacesAndNewlines)
-
-            if trimmed.isEmpty {
-                throw CodexCLIError.emptyResponse
-            }
-
-            return trimmed
+            return try ShellEnvironment.collectProcessOutput(
+                process: process,
+                stdoutPipe: outputPipe,
+                stderrPipe: errorPipe,
+                errorFactory: { CodexCLIError.processError(status: $0, message: $1) },
+                emptyErrorFactory: { CodexCLIError.emptyResponse }
+            )
         }.value
     }
 }
 
 // MARK: - Errors
 
-enum CodexCLIError: LocalizedError {
+enum CodexCLIError: LocalizedError, RetryClassifiable {
     case codexNotFound
     case notAuthenticated
     case processError(status: Int32, message: String)
@@ -159,6 +149,15 @@ enum CodexCLIError: LocalizedError {
             return "Codex CLI 오류: \(message.isEmpty ? "알 수 없는 오류" : message)"
         case .emptyResponse:
             return "Codex CLI에서 빈 응답"
+        }
+    }
+
+    var isRateLimitError: Bool { false }
+    var isServerError: Bool { false }
+    var isRetryable: Bool {
+        switch self {
+        case .codexNotFound, .notAuthenticated: return false
+        case .processError, .emptyResponse: return true
         }
     }
 }

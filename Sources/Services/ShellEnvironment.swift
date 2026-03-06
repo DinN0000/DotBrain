@@ -7,7 +7,8 @@ enum ShellEnvironment {
 
     // MARK: - Cached State
 
-    private static var cachedEnvironment: [String: String]?
+    private static let cacheLock = NSLock()
+    private static nonisolated(unsafe) var cachedEnvironment: [String: String]?
 
     // MARK: - Shell Environment
 
@@ -15,7 +16,7 @@ enum ShellEnvironment {
     /// Sources .zshrc/.bashrc explicitly (no -i flag to avoid side effects).
     /// Result is cached — shell is spawned only once per app session.
     static func loadUserEnvironment() -> [String: String] {
-        if let cached = cachedEnvironment { return cached }
+        if let cached = cacheLock.withLock({ cachedEnvironment }) { return cached }
 
         let baseEnv = ProcessInfo.processInfo.environment
         let userShell = baseEnv["SHELL"] ?? "/bin/zsh"
@@ -38,7 +39,7 @@ enum ShellEnvironment {
             process.waitUntilExit()
 
             guard process.terminationStatus == 0 else {
-                cachedEnvironment = baseEnv
+                cacheLock.withLock { cachedEnvironment = baseEnv }
                 return baseEnv
             }
 
@@ -52,10 +53,10 @@ enum ShellEnvironment {
                 let value = String(line[line.index(after: eqIndex)...])
                 env[key] = value
             }
-            cachedEnvironment = env
+            cacheLock.withLock { cachedEnvironment = env }
             return env
         } catch {
-            cachedEnvironment = baseEnv
+            cacheLock.withLock { cachedEnvironment = baseEnv }
             return baseEnv
         }
     }
@@ -99,6 +100,37 @@ enum ShellEnvironment {
         } catch {
             return nil
         }
+    }
+
+    // MARK: - Process Output Collection
+
+    /// Collect output from a running process, validate exit status, return trimmed result.
+    /// Shared by ClaudeCLIClient and CodexCLIClient to avoid duplication.
+    static func collectProcessOutput(
+        process: Process,
+        stdoutPipe: Pipe,
+        stderrPipe: Pipe,
+        errorFactory: (Int32, String) -> Error,
+        emptyErrorFactory: () -> Error
+    ) throws -> String {
+        let outputData = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
+        let errorData = stderrPipe.fileHandleForReading.readDataToEndOfFile()
+
+        process.waitUntilExit()
+
+        if process.terminationStatus != 0 {
+            let errorOutput = String(data: errorData, encoding: .utf8) ?? ""
+            throw errorFactory(process.terminationStatus, String(errorOutput.prefix(500)))
+        }
+
+        let output = String(data: outputData, encoding: .utf8) ?? ""
+        let trimmed = output.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        if trimmed.isEmpty {
+            throw emptyErrorFactory()
+        }
+
+        return trimmed
     }
 
     /// Shell command to explicitly source RC files without interactive mode.
