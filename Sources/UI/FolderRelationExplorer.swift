@@ -7,6 +7,7 @@ struct FolderRelationExplorer: View {
     @State private var candidates: [FolderPairCandidate] = []
     @State private var currentIndex: Int = 0
     @State private var isLoading: Bool = true
+    @State private var isLoadingNewCards: Bool = false
     @State private var keyMonitor: Any?
 
     // Drag state
@@ -31,10 +32,16 @@ struct FolderRelationExplorer: View {
 
             // Description
             if isLoading || (!candidates.isEmpty && currentIndex < candidates.count) {
-                Text("폴더 관계를 매칭하면 AI가 파일을 더 정확하게 분류합니다.")
+                HStack(spacing: 4) {
+                    Text("폴더 관계를 매칭하면 AI가 파일을 더 정확하게 분류합니다.")
+                        .multilineTextAlignment(.center)
+                    if isLoadingNewCards {
+                        ProgressView()
+                            .controlSize(.mini)
+                    }
+                }
                     .font(.caption2)
                     .foregroundColor(.secondary)
-                    .multilineTextAlignment(.center)
                     .padding(.horizontal, 20)
                     .padding(.vertical, 8)
             }
@@ -513,6 +520,15 @@ struct FolderRelationExplorer: View {
                 )
             }
 
+        // Show existing cards immediately
+        if !existingCards.isEmpty {
+            await MainActor.run {
+                candidates = existingCards
+                isLoading = false
+                isLoadingNewCards = true
+            }
+        }
+
         // Generate new AI candidates (with cache support)
         let analyzer = FolderRelationAnalyzer(pkmRoot: root)
         let newCards = await analyzer.generateCandidates(
@@ -521,19 +537,21 @@ struct FolderRelationExplorer: View {
         )
 
         await MainActor.run {
-            // Interleave: 2 existing, 1 new, repeat. Remainder appended at end.
+            let unseenExisting = Array(existingCards.dropFirst(currentIndex))
+
+            // Interleave unseen existing + new: 2 existing, 1 new
             var merged: [FolderPairCandidate] = []
             var ei = 0, ni = 0
-            while ei < existingCards.count || ni < newCards.count {
-                // 2 existing
+            while ei < unseenExisting.count || ni < newCards.count {
                 for _ in 0..<2 {
-                    if ei < existingCards.count { merged.append(existingCards[ei]); ei += 1 }
+                    if ei < unseenExisting.count { merged.append(unseenExisting[ei]); ei += 1 }
                 }
-                // 1 new
                 if ni < newCards.count { merged.append(newCards[ni]); ni += 1 }
             }
-            candidates = merged
+
+            candidates = Array(candidates.prefix(currentIndex)) + merged
             isLoading = false
+            isLoadingNewCards = false
         }
     }
 }
