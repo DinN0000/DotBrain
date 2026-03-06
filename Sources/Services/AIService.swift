@@ -8,6 +8,7 @@ actor AIService {
     private let claudeClient = ClaudeAPIClient()
     private let geminiClient = GeminiAPIClient()
     private let claudeCLIClient = ClaudeCLIClient()
+    private let codexCLIClient = CodexCLIClient()
     private let rateLimiter = RateLimiter.shared
     private let maxRetries = 3
 
@@ -28,11 +29,13 @@ actor AIService {
         let candidates: [AIProvider]
         switch primary {
         case .claude:
-            candidates = [.gemini, .claudeCLI]
+            candidates = [.gemini, .claudeCLI, .codexCLI]
         case .gemini:
-            candidates = [.claude, .claudeCLI]
+            candidates = [.claude, .claudeCLI, .codexCLI]
         case .claudeCLI:
-            candidates = [.claude, .gemini]
+            candidates = [.codexCLI, .claude, .gemini]
+        case .codexCLI:
+            candidates = [.claudeCLI, .claude, .gemini]
         }
         return candidates.first { $0.hasAPIKey() }
     }
@@ -47,6 +50,7 @@ actor AIService {
         case .claude: return ClaudeAPIClient.haikuModel
         case .gemini: return GeminiAPIClient.flashModel
         case .claudeCLI: return ClaudeCLIClient.fastModel
+        case .codexCLI: return CodexCLIClient.fastModel
         }
     }
 
@@ -55,6 +59,7 @@ actor AIService {
         case .claude: return ClaudeAPIClient.sonnetModel
         case .gemini: return GeminiAPIClient.proModel
         case .claudeCLI: return ClaudeCLIClient.preciseModel
+        case .codexCLI: return CodexCLIClient.preciseModel
         }
     }
 
@@ -85,7 +90,8 @@ actor AIService {
     ) async throws -> (String, TokenUsage?) {
         var lastError: Error?
         // CLI gets longer deadline due to process startup overhead
-        let deadline = ContinuousClock.now + .seconds(provider == .claudeCLI ? 180 : 120)
+        let isCLI = provider == .claudeCLI || provider == .codexCLI
+        let deadline = ContinuousClock.now + .seconds(isCLI ? 180 : 120)
 
         for _ in 0..<maxRetries {
             if ContinuousClock.now >= deadline {
@@ -180,6 +186,13 @@ actor AIService {
                 maxTokens: maxTokens,
                 userMessage: combined
             )
+        case .codexCLI:
+            let combined = systemMessage.map { $0 + "\n\n" + userMessage } ?? userMessage
+            return try await codexCLIClient.sendMessage(
+                model: model,
+                maxTokens: maxTokens,
+                userMessage: combined
+            )
         }
     }
 
@@ -257,6 +270,14 @@ actor AIService {
                 return true
             }
         }
+        if let codexError = error as? CodexCLIError {
+            switch codexError {
+            case .codexNotFound, .notAuthenticated:
+                return false
+            case .processError, .emptyResponse:
+                return true
+            }
+        }
         // Network errors are retryable
         let nsError = error as NSError
         if nsError.domain == NSURLErrorDomain {
@@ -292,6 +313,7 @@ actor AIService {
     /// Warm up CLI process pool (only active when using Claude CLI provider)
     func warmUpCLIPool() async {
         guard currentProvider == .claudeCLI else { return }
+        // Codex CLI has no process pool — only Claude CLI needs warmup
         await claudeCLIClient.warmUp()
     }
 

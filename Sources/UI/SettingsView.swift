@@ -30,6 +30,7 @@ struct SettingsView: View {
         case .claude: return appState.hasClaudeKey
         case .gemini: return appState.hasGeminiKey
         case .claudeCLI: return appState.hasClaudeCLI
+        case .codexCLI: return appState.hasCodexCLI
         }
     }
 
@@ -38,6 +39,7 @@ struct SettingsView: View {
         case .claude: return appState.hasClaudeKey
         case .gemini: return appState.hasGeminiKey
         case .claudeCLI: return appState.hasClaudeCLI
+        case .codexCLI: return appState.hasCodexCLI
         }
     }
 
@@ -135,7 +137,7 @@ struct SettingsView: View {
             }
 
             // Key section: CLI shows status, API providers show key input
-            if viewingProvider == .claudeCLI {
+            if viewingProvider == .claudeCLI || viewingProvider == .codexCLI {
                 cliStatusSection
             } else if viewingHasKey && !isEditingKey {
                 HStack {
@@ -216,7 +218,7 @@ struct SettingsView: View {
                         .background(Color.secondary.opacity(0.12))
                         .cornerRadius(2)
                 }
-                if provider == .claudeCLI {
+                if provider == .claudeCLI || provider == .codexCLI {
                     Text("구독")
                         .font(.system(size: 8, weight: .semibold))
                         .foregroundColor(.secondary)
@@ -239,20 +241,45 @@ struct SettingsView: View {
 
     private var cliStatusSection: some View {
         VStack(alignment: .leading, spacing: 6) {
-            if appState.hasClaudeCLI {
-                Label("Claude CLI 설치됨", systemImage: "checkmark.circle.fill")
-                    .font(.caption)
-                    .foregroundColor(.green)
-                Text("claude -p 파이프 모드로 AI 호출")
-                    .font(.caption2)
-                    .foregroundColor(.secondary)
-            } else {
-                Label("Claude CLI를 찾을 수 없습니다", systemImage: "xmark.circle.fill")
-                    .font(.caption)
-                    .foregroundColor(.red)
-                Text("설치: https://claude.com/download")
-                    .font(.caption2)
-                    .foregroundColor(.secondary)
+            if viewingProvider == .claudeCLI {
+                if appState.hasClaudeCLI {
+                    Label("Claude CLI 설치됨", systemImage: "checkmark.circle.fill")
+                        .font(.caption)
+                        .foregroundColor(.green)
+                    Text("claude -p 파이프 모드로 AI 호출")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                } else {
+                    Label("Claude CLI를 찾을 수 없습니다", systemImage: "xmark.circle.fill")
+                        .font(.caption)
+                        .foregroundColor(.red)
+                    Text("설치: https://claude.com/download")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
+            } else if viewingProvider == .codexCLI {
+                if appState.hasCodexCLI {
+                    Label("Codex CLI 인증됨", systemImage: "checkmark.circle.fill")
+                        .font(.caption)
+                        .foregroundColor(.green)
+                    Text("codex -q 모드로 AI 호출")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                } else if CodexCLIClient.isAvailable() {
+                    Label("Codex CLI 인증 필요", systemImage: "exclamationmark.triangle.fill")
+                        .font(.caption)
+                        .foregroundColor(.orange)
+                    Text("터미널에서 codex auth login 실행")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                } else {
+                    Label("Codex CLI를 찾을 수 없습니다", systemImage: "xmark.circle.fill")
+                        .font(.caption)
+                        .foregroundColor(.red)
+                    Text("설치: npm install -g @openai/codex")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
             }
         }
     }
@@ -768,7 +795,7 @@ struct SettingsView: View {
     // MARK: - Key Actions
 
     private func loadKeyForProvider(_ provider: AIProvider) {
-        if provider == .claudeCLI {
+        if provider == .claudeCLI || provider == .codexCLI {
             keyInput = ""
             return
         }

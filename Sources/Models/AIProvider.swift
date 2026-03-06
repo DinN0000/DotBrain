@@ -3,6 +3,7 @@ import Foundation
 /// Supported AI providers for classification
 enum AIProvider: String, CaseIterable, Identifiable {
     case claudeCLI = "Claude CLI"
+    case codexCLI = "Codex CLI"
     case claude = "Claude"
     case gemini = "Gemini"
 
@@ -11,6 +12,7 @@ enum AIProvider: String, CaseIterable, Identifiable {
     var displayName: String {
         switch self {
         case .claudeCLI: return "Claude CLI"
+        case .codexCLI: return "Codex CLI"
         case .claude: return "Claude (API)"
         case .gemini: return "Gemini (Google)"
         }
@@ -19,6 +21,7 @@ enum AIProvider: String, CaseIterable, Identifiable {
     var modelPipeline: String {
         switch self {
         case .claudeCLI: return "claude -p (Sonnet)"
+        case .codexCLI: return "o4-mini → o3"
         case .claude: return "Haiku 4.5 → Sonnet 4.5"
         case .gemini: return "Flash → Pro"
         }
@@ -27,6 +30,8 @@ enum AIProvider: String, CaseIterable, Identifiable {
     var costInfo: String {
         switch self {
         case .claudeCLI:
+            return "구독 포함"
+        case .codexCLI:
             return "구독 포함"
         case .claude:
             return "파일당 약 $0.002 (Haiku 4.5)"
@@ -37,7 +42,7 @@ enum AIProvider: String, CaseIterable, Identifiable {
 
     var keyPlaceholder: String {
         switch self {
-        case .claudeCLI: return ""
+        case .claudeCLI, .codexCLI: return ""
         case .claude: return "sk-ant-..."
         case .gemini: return "AIza..."
         }
@@ -45,7 +50,7 @@ enum AIProvider: String, CaseIterable, Identifiable {
 
     var keyPrefix: String {
         switch self {
-        case .claudeCLI: return ""
+        case .claudeCLI, .codexCLI: return ""
         case .claude: return "sk-ant-"
         case .gemini: return "AIza"
         }
@@ -55,7 +60,7 @@ enum AIProvider: String, CaseIterable, Identifiable {
     var needsAPIKey: Bool {
         switch self {
         case .claude, .gemini: return true
-        case .claudeCLI: return false
+        case .claudeCLI, .codexCLI: return false
         }
     }
 
@@ -67,6 +72,8 @@ enum AIProvider: String, CaseIterable, Identifiable {
             return KeychainService.getGeminiAPIKey() != nil
         case .claudeCLI:
             return ClaudeCLIClient.isAvailable()
+        case .codexCLI:
+            return CodexCLIClient.isAvailable() && CodexCLIClient.isAuthenticated()
         }
     }
 
@@ -76,7 +83,7 @@ enum AIProvider: String, CaseIterable, Identifiable {
             return KeychainService.saveAPIKey(key)
         case .gemini:
             return KeychainService.saveGeminiAPIKey(key)
-        case .claudeCLI:
+        case .claudeCLI, .codexCLI:
             return true
         }
     }
@@ -87,7 +94,7 @@ enum AIProvider: String, CaseIterable, Identifiable {
             KeychainService.deleteAPIKey()
         case .gemini:
             KeychainService.deleteGeminiAPIKey()
-        case .claudeCLI:
+        case .claudeCLI, .codexCLI:
             break
         }
     }

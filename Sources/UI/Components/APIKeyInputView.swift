@@ -158,6 +158,7 @@ struct APIKeyInputView: View {
         case .claude: return Color(red: 0.85, green: 0.45, blue: 0.25)
         case .gemini: return Color(red: 0.25, green: 0.52, blue: 0.96)
         case .claudeCLI: return Color(red: 0.85, green: 0.45, blue: 0.25)
+        case .codexCLI: return Color(red: 0.0, green: 0.65, blue: 0.42)
         }
     }
 
