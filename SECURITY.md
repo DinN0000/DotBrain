@@ -1,3 +1,5 @@
+[한국어](SECURITY.md) | [English](SECURITY.en.md)
+
 # Security Policy
 
 ## 지원 버전
@@ -29,7 +31,22 @@
 
 ## 보안 설계
 
-- API 키: AES-GCM 암호화 파일, 하드웨어 UUID + HKDF 기반 키 유도
-- 네트워크: HTTPS only (NSAppTransportSecurity)
-- 파일 경로: canonicalize 후 prefix 검사
-- YAML: 이중 인용부호로 injection 방지
+### API 키 저장
+- AES-GCM 암호화 파일, 하드웨어 UUID + HKDF 기반 키 유도 (기기 종속)
+- 저장 파일 퍼미션: `0o600` (소유자만 읽기/쓰기)
+- 레거시 macOS Keychain에서 암호화 파일로 자동 마이그레이션 (V1 SHA256 → V2 HKDF)
+- Claude CLI 사용 시 API 키 불필요 (구독 인증)
+
+### 네트워크
+- HTTPS only (NSAppTransportSecurity)
+- API 키는 HTTP 헤더로만 전달 (URL 파라미터 미사용)
+
+### 파일 시스템
+- 경로 탐색 방지: `URL.resolvingSymlinksInPath()` 후 `hasPrefix` 검사
+- 폴더명 검증: `sanitizeFolderName()` — 최대 3 depth, 255자 제한, `..` 금지, null byte 제거
+- 위키링크 인젝션 방지: `sanitizeWikilink()` — `[[`, `]]`, `/`, `\\`, `..` 제거
+
+### 데이터 보호
+- YAML: 태그를 항상 이중 인용부호 배열로 저장 (`tags: ["tag1", "tag2"]`)
+- 파일 삭제: `trashItem` 사용 (복구 가능한 삭제)
+- 파일 쓰기: `atomically: true` 옵션으로 원자적 쓰기

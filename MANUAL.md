@@ -1,8 +1,10 @@
+[한국어](MANUAL.md) | [English](MANUAL.en.md)
+
 # DotBrain 서비스 매뉴얼
 
 > **Built for Humans. Optimized for AI.**
 >
-> 버전: 2.11 | 최종 수정: 2026-02-25
+> 버전: 2.15 | 최종 수정: 2026-03-06
 
 ---
 
@@ -102,7 +104,7 @@ rm -rf ~/Applications/DotBrain.app
 
 ## 3. 초기 설정 (온보딩)
 
-첫 실행 시 7단계 온보딩 마법사가 시작됩니다.
+첫 실행 시 6단계 온보딩 마법사가 시작됩니다.
 
 ### Step 0: 환영
 
@@ -122,21 +124,15 @@ DotBrain이 PKM 폴더에 접근하려면 **전체 디스크 접근** 권한이 
 
 볼트로 사용할 폴더를 선택합니다. PARA 하위 폴더(`1_Project/`, `2_Area/`, `3_Resource/`, `4_Archive/`, `_Inbox/`)가 자동 생성됩니다.
 
-### Step 3: 영역(Area) 등록
+### Step 3: 영역(Area) + 프로젝트 등록
 
-지속적으로 관리하는 책임 영역을 1개 이상 등록합니다.
+지속적으로 관리하는 책임 영역(Area)을 1개 이상 등록하고, 현재 진행 중인 프로젝트를 등록합니다. 하나의 화면에서 Area와 프로젝트를 함께 설정합니다.
 
-- 예: `DevOps`, `Finance`, `Health`, `Learning`
-- 텍스트 입력 후 "+" 버튼으로 추가
-
-### Step 4: 프로젝트 등록
-
-현재 진행 중인 프로젝트를 1개 이상 등록합니다.
-
-- 예: `PoC-Alpha`, `DotBrain`, `Q1-Report`
+- **영역 예:** `DevOps`, `Finance`, `Health`, `Learning`
+- **프로젝트 예:** `PoC-Alpha`, `DotBrain`, `Q1-Report`
 - 각 프로젝트를 Area에 연결할 수 있습니다
 
-### Step 5: AI 제공자 선택
+### Step 4: AI 제공자 선택
 
 세 가지 AI 제공자 중 하나를 선택합니다:
 
@@ -146,7 +142,7 @@ DotBrain이 PKM 폴더에 접근하려면 **전체 디스크 접근** 권한이 
 | Claude API | API 키 입력 (`sk-ant-...`) | ~$0.002/파일 |
 | Gemini API | API 키 입력 (`AIza...`) | 무료 티어 가능 |
 
-### Step 6: 완료
+### Step 5: 완료
 
 설정이 끝나면 인박스 화면으로 이동합니다. 파일을 넣어보세요.
 
@@ -179,7 +175,7 @@ API 키 기반 직접 호출입니다.
 Google AI 무료 티어를 활용할 수 있습니다.
 
 - **키 발급:** [aistudio.google.com/apikey](https://aistudio.google.com/apikey)
-- **모델:** Flash (Fast) → Pro (Precise)
+- **모델:** Flash 2.5 (Fast) → Pro 2.5 (Precise)
 - **비용:** 무료 티어 (15회/분, 1500회/일)
 - **키 형식:** `AIza` 접두사
 
@@ -220,8 +216,8 @@ AI 분류 (30-70%) Stage 1: 빠른 배치 분류 (Haiku/Flash)
 ```
 
 **2단계 AI 분류:**
-- **Stage 1 (Fast):** 파일명 + 800자 미리보기로 배치 분류 (5개씩). 대부분 여기서 끝남
-- **Stage 2 (Precise):** 신뢰도 < 0.8인 파일만 전체 내용(5000자)으로 정밀 분류
+- **Stage 1 (Fast):** 파일명 + 2000자 미리보기로 배치 분류 (5개씩). 대부분 여기서 끝남
+- **Stage 2 (Precise):** 신뢰도 < 0.8인 파일만 전체 내용으로 정밀 분류
 
 **사용자 확인이 필요한 경우:**
 - 신뢰도가 낮은 분류 (< 0.5)
@@ -526,7 +522,7 @@ DotBrain은 볼트에 AI 도구용 가이드 파일을 자동 생성합니다.
 ### AI 설정
 - **제공자 선택:** Claude CLI / Claude API / Gemini (세그먼트 탭)
 - **API 키 관리:** 제공자별 키 입력/변경/삭제
-- **키 저장:** macOS Keychain에 안전하게 저장
+- **키 저장:** AES-GCM 암호화 파일로 안전하게 저장 (하드웨어 UUID + HKDF 기반 키 유도, 기기 종속)
 
 ### PKM 폴더
 - **경로 변경:** "변경" 버튼으로 볼트 폴더 재선택
@@ -590,8 +586,9 @@ npx dotbrain --uninstall
 ```
 Sources/
 ├── App/
-│   ├── main.swift              ← 진입점
+│   ├── DotBrainApp.swift       ← 진입점 (@main)
 │   ├── AppDelegate.swift       ← NSStatusItem + NSPopover 설정
+│   ├── AppIconGenerator.swift  ← 메뉴바 아이콘 동적 생성
 │   └── AppState.swift          ← 중앙 상태 관리 (@MainActor, ObservableObject)
 ├── Pipeline/                   ← 다단계 처리 파이프라인
 │   ├── InboxProcessor.swift    ← 인박스 → PARA 분류
@@ -600,10 +597,25 @@ Sources/
 │   ├── VaultCheckPipeline.swift← 볼트 감사 + 수리 + 보강
 │   └── ProjectContextBuilder.swift ← AI 프롬프트용 컨텍스트 생성
 ├── Services/                   ← 단일 책임 유틸리티
-│   ├── Claude/Classifier.swift ← 2단계 AI 분류
-│   ├── AIService.swift         ← Claude/Gemini API 추상화
-│   ├── SemanticLinker/         ← 시맨틱 링킹 시스템
-│   ├── FileSystem/FileMover.swift ← 파일 이동 + 충돌 해결
+│   ├── AIService.swift         ← Claude/Gemini API 추상화, 자동 폴백
+│   ├── Claude/                 ← Claude 제공자
+│   │   ├── Classifier.swift    ← 2단계 AI 분류 (Stage 1 배치 + Stage 2 정밀)
+│   │   ├── ClaudeAPIClient.swift ← Claude API HTTP 클라이언트
+│   │   └── ClaudeCLIClient.swift ← Claude CLI 프로세스 풀 관리
+│   ├── Gemini/
+│   │   └── GeminiAPIClient.swift ← Gemini API 클라이언트
+│   ├── SemanticLinker/         ← 시맨틱 링킹 시스템 (9개 컴포넌트)
+│   ├── FileSystem/             ← 파일 시스템 유틸리티
+│   │   ├── FileMover.swift     ← 파일 이동 + 충돌 해결 + 중복 감지
+│   │   ├── PKMPathManager.swift ← 경로 검증 + PARA 카테고리 감지
+│   │   ├── FrontmatterWriter.swift ← 프론트매터 + 위키링크 기록
+│   │   ├── InboxScanner.swift  ← 인박스 파일 스캔
+│   │   ├── InboxWatchdog.swift ← 인박스 변경 감시 (DispatchSource)
+│   │   └── AssetMigrator.swift ← 에셋 구조 마이그레이션
+│   ├── Extraction/             ← 파일 형식별 내용 추출
+│   │   ├── FileContentExtractor.swift ← 추출 라우터
+│   │   ├── PDFExtractor.swift, DOCXExtractor.swift, ...
+│   │   └── ImageExtractor.swift, BinaryExtractor.swift
 │   └── ...
 ├── Models/                     ← 데이터 모델
 │   ├── Frontmatter.swift
@@ -700,6 +712,7 @@ audit → repair → enrich (AI, max 3 concurrent) → index update → semantic
 
 AI 프롬프트에 주입하는 컨텍스트를 생성합니다:
 - 프로젝트 목록 (이름, 요약, 태그, Area 연결)
+- Area 컨텍스트 (Area-Project 매핑)
 - 하위 폴더 JSON (AI 환각 방지 — 존재하는 폴더명만 허용)
 - 상위 50개 태그 (일관성 유지)
 - 교정 메모리 (사용자 피드백 패턴)
@@ -709,9 +722,14 @@ AI 프롬프트에 주입하는 컨텍스트를 생성합니다:
 **핵심 AI:**
 | 서비스 | 역할 |
 |--------|------|
-| `AIService` | Claude/Gemini API 추상화, 속도 제한 |
+| `AIService` | Claude/Gemini API 추상화, 자동 폴백 |
 | `Classifier` | 2단계 AI 분류 (Stage 1 배치 + Stage 2 정밀) |
+| `ClaudeAPIClient` | Claude API HTTP 클라이언트 (actor) |
+| `ClaudeCLIClient` | Claude CLI 프로세스 풀 관리 (actor) |
+| `GeminiAPIClient` | Gemini API 클라이언트 (actor) |
 | `NoteEnricher` | 빈 메타데이터 필드 AI 보충 |
+| `RateLimiter` | 제공자별 적응형 API 호출 속도 제한 (actor) |
+| `APIUsageLogger` | API 사용량/비용 로깅 (actor) |
 
 **시맨틱 링킹:**
 | 서비스 | 역할 |
@@ -729,24 +747,38 @@ AI 프롬프트에 주입하는 컨텍스트를 생성합니다:
 **파일 처리:**
 | 서비스 | 역할 |
 |--------|------|
-| `FileMover` | 파일 이동, 충돌 해결, 중복 감지 |
-| `PKMPathManager` | 경로 검증, PARA 카테고리 감지 |
-| `FileContentExtractor` | 형식별 내용 추출 |
+| `FileMover` | 파일 이동, 충돌 해결, 중복 감지 (SHA256) |
+| `PKMPathManager` | 경로 검증, PARA 카테고리 감지, 폴더명 검증 |
+| `FileContentExtractor` | 형식별 내용 추출 라우터 |
+| `PDFExtractor` | PDF 텍스트 + 메타데이터 추출 (PDFKit) |
+| `DOCXExtractor` | DOCX 본문 추출 (ZIPFoundation + XML) |
+| `PPTXExtractor` | PPTX 슬라이드 텍스트 추출 |
+| `XLSXExtractor` | XLSX 셀 데이터 추출 |
+| `ImageExtractor` | 이미지 EXIF 메타데이터 추출 (ImageIO) |
 | `NoteIndexGenerator` | `.meta/note-index.json` 증분 업데이트 |
-| `VaultSearcher` | 볼트 전문 검색 |
+| `VaultSearcher` | 볼트 전문 검색 (인덱스 우선 + 64KB 본문 폴백) |
 | `VaultAuditor` | 볼트 이슈 감지 (깨진 링크, 누락 메타) |
 | `FolderHealthAnalyzer` | 폴더 건강 점수 (0-1.0) |
-| `ContentHashCache` | 중복 감지 해시 캐시 |
+| `ContentHashCache` | 중복 감지 해시 캐시 (actor) |
+| `InboxScanner` | 인박스 파일 스캔 + 심볼릭 링크 검증 |
+| `InboxWatchdog` | 인박스 파일 변경 감시 (DispatchSource) |
+| `FrontmatterWriter` | 프론트매터 직렬화 + 위키링크 생성 |
+| `AssetMigrator` | 에셋 구조 마이그레이션 (v2.1.0+) |
 
 **기타:**
 | 서비스 | 역할 |
 |--------|------|
 | `StatisticsService` | 활동 로그, API 비용 추적 |
-| `AICompanionService` | CLAUDE.md, AGENTS.md 등 생성 |
-| `CorrectionMemory` | 사용자 분류 교정 기록 |
-| `ProjectAliasRegistry` | AI 이름 제안 → 실제 프로젝트 매핑 |
-| `KeychainService` | API 키 안전 저장 |
-| `RateLimiter` | API 호출 속도 제한 |
+| `AICompanionService` | CLAUDE.md, AGENTS.md, .cursorrules, 에이전트/스킬 생성 |
+| `CorrectionMemory` | 사용자 분류 교정 기록 (다음 분류에 반영) |
+| `ProjectAliasRegistry` | AI 이름 제안 → 실제 프로젝트 퍼지 매핑 |
+| `ProjectRegistry` | 프로젝트/Area 레지스트리 (온보딩 시 설정) |
+| `ProjectManager` | 프로젝트 CRUD (생성, 이름 변경, 위키링크 갱신) |
+| `PARAMover` | PARA 카테고리 간 파일/폴더 이동 + 프론트매터/MOC 갱신 |
+| `KeychainService` | API 키 AES-GCM 암호화 저장 (하드웨어 UUID + HKDF) |
+| `ContextMap` / `ContextMapBuilder` | 볼트 컨텍스트 맵 구축 |
+| `NotificationService` | macOS 알림 전송 |
+| `TemplateService` | 노트 템플릿 관리 |
 
 ### 14.6 모델
 

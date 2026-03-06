@@ -1,3 +1,5 @@
+[한국어](CONTRIBUTING.md) | [English](CONTRIBUTING.en.md)
+
 # Contributing to DotBrain
 
 ## 개발 환경
@@ -35,17 +37,10 @@ chore: update .gitignore
 ## 코드 스타일
 
 - **Zero warnings** — 커밋 전 `swift build`에서 경고 없어야 함
-- UI 문자열은 한국어, 코드/주석은 영어
-- `Task.detached(priority:)` 사용, `DispatchQueue.global` 금지
-- `@MainActor` + `await MainActor.run`으로 UI 업데이트
 - 불필요한 주석, docstring 추가 금지
 - 요청한 것만 수정 — 주변 코드 리팩토링 금지
 
-## 보안
-
-- 경로: `URL.resolvingSymlinksInPath()` 후 `hasPrefix` 검사
-- YAML: 태그는 항상 `tags: ["tag1", "tag2"]` 형식
-- 폴더명: `sanitizeFolderName()`으로 검증 (최대 3 depth, 255자, `..` 금지)
+> 상세한 코드 스타일 및 보안 규칙은 [CLAUDE.md](CLAUDE.md) 참조
 
 ## PR 프로세스
 
