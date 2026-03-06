@@ -146,18 +146,18 @@ struct InboxStatusView: View {
 
     private var emptyContent: some View {
         VStack(spacing: 8) {
-            Text("인박스가 비어 있음")
+            Text(L10n.Inbox.empty)
                 .font(.title3)
                 .foregroundColor(.secondary)
 
-            Text("파일을 여기에 끌어다 놓거나")
+            Text(L10n.Inbox.dragHint)
                 .font(.caption)
                 .foregroundColor(.secondary)
 
             Button(action: pickFilesForInbox) {
                 HStack(spacing: 4) {
                     Image(systemName: "plus.circle")
-                    Text("파일 선택")
+                    Text(L10n.Inbox.selectFiles)
                 }
             }
             .buttonStyle(.bordered)
@@ -166,7 +166,7 @@ struct InboxStatusView: View {
     }
 
     private var dragContent: some View {
-        Text("놓으면 인박스에 추가됩니다")
+        Text(L10n.Inbox.dropToAdd)
             .font(.subheadline)
             .fontWeight(.medium)
             .foregroundColor(.primary.opacity(0.7))
@@ -193,7 +193,7 @@ struct InboxStatusView: View {
                         fileRow(url: url)
                     }
                     if cachedInboxFiles.count > 6 {
-                        Text("외 \(cachedInboxFiles.count - 6)개")
+                        Text(L10n.Inbox.moreFiles(cachedInboxFiles.count - 6))
                             .font(.caption2)
                             .foregroundColor(.secondary)
                             .frame(maxWidth: .infinity)
@@ -206,7 +206,7 @@ struct InboxStatusView: View {
 
             // Action bar
             HStack(spacing: 12) {
-                Text("약 \(max(appState.inboxFileCount * 3, 1))초")
+                Text(L10n.Inbox.estimatedTime(max(appState.inboxFileCount * 3, 1)))
                     .font(.caption2)
                     .foregroundColor(.secondary)
 
@@ -218,7 +218,7 @@ struct InboxStatusView: View {
                 }
                 .buttonStyle(.plain)
                 .foregroundColor(.accentColor)
-                .accessibilityLabel("인박스 파일 추가")
+                .accessibilityLabel(L10n.Inbox.addLabel)
 
                 Button(action: { showClearConfirmation = true }) {
                     Image(systemName: "trash")
@@ -226,12 +226,12 @@ struct InboxStatusView: View {
                 }
                 .buttonStyle(.plain)
                 .foregroundColor(.secondary)
-                .accessibilityLabel("인박스 비우기")
-                .alert("인박스 비우기", isPresented: $showClearConfirmation) {
-                    Button("비우기", role: .destructive) { clearInbox() }
-                    Button("취소", role: .cancel) {}
+                .accessibilityLabel(L10n.Inbox.clearLabel)
+                .alert(L10n.Inbox.clearTitle, isPresented: $showClearConfirmation) {
+                    Button(L10n.Inbox.clearButton, role: .destructive) { clearInbox() }
+                    Button(L10n.Common.cancel, role: .cancel) {}
                 } message: {
-                    Text("\(appState.inboxFileCount)개 파일을 휴지통으로 보냅니다.")
+                    Text(L10n.Inbox.clearMessage(appState.inboxFileCount))
                 }
             }
             .padding(.horizontal, 20)
@@ -242,7 +242,7 @@ struct InboxStatusView: View {
                 HStack(spacing: 6) {
                     Image(systemName: "sparkles")
                         .font(.system(size: 12))
-                    Text("정리하기")
+                    Text(L10n.Inbox.organize)
                         .fontWeight(.medium)
                 }
                 .frame(maxWidth: .infinity)
@@ -257,7 +257,7 @@ struct InboxStatusView: View {
             .disabled(!appState.hasAPIKey)
 
             if !appState.hasAPIKey {
-                Text("API 키를 먼저 설정하세요")
+                Text(L10n.Inbox.setApiKey)
                     .font(.caption2)
                     .foregroundColor(.orange)
             }
@@ -296,7 +296,7 @@ struct InboxStatusView: View {
 
     private func pickNewPKMRoot() {
         let panel = NSOpenPanel()
-        panel.title = "PKM 볼트 폴더 선택"
+        panel.title = L10n.Inbox.pickVaultTitle
         panel.canChooseDirectories = true
         panel.canChooseFiles = false
         panel.allowsMultipleSelection = false
@@ -349,8 +349,8 @@ struct InboxStatusView: View {
         loadInboxFiles()
         Task { await appState.refreshInboxCount() }
         let message = failed > 0
-            ? "인박스 비움 (\(failed)개 실패 — 파일이 사용 중일 수 있습니다)"
-            : "인박스 비움 (휴지통으로 이동)"
+            ? L10n.Inbox.clearFailed(failed)
+            : L10n.Inbox.clearSuccess
         showFeedback(message)
     }
 
@@ -358,7 +358,7 @@ struct InboxStatusView: View {
 
     private func pickFilesForInbox() {
         let panel = NSOpenPanel()
-        panel.title = "인박스에 추가할 파일 선택"
+        panel.title = L10n.Inbox.pickFilesTitle
         panel.canChooseDirectories = false
         panel.canChooseFiles = true
         panel.allowsMultipleSelection = true
@@ -401,17 +401,17 @@ struct InboxStatusView: View {
         var parts: [String] = []
 
         if result.added > 0 {
-            parts.append("\(result.added)개 추가됨")
+            parts.append(L10n.Inbox.addedCount(result.added))
         }
         if !result.skippedCode.isEmpty {
-            parts.append("코드 \(result.skippedCode.count)개 건너뜀")
+            parts.append(L10n.Inbox.skippedCode(result.skippedCode.count))
         }
         if !result.failedFiles.isEmpty {
-            parts.append("\(result.failedFiles.count)개 실패")
+            parts.append(L10n.Inbox.failedCount(result.failedFiles.count))
         }
 
         if parts.isEmpty {
-            showFeedback("추가할 수 있는 파일이 없습니다")
+            showFeedback(L10n.Inbox.noAddableFiles)
         } else {
             showFeedback(parts.joined(separator: " · "))
         }

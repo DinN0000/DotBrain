@@ -11,10 +11,19 @@ struct SearchResult: Identifiable {
     let relevanceScore: Double
     let isArchived: Bool
 
-    enum MatchType: String {
-        case tagMatch = "태그 일치"
-        case bodyMatch = "본문 일치"
-        case summaryMatch = "요약 일치"
-        case titleMatch = "제목 일치"
+    enum MatchType {
+        case tagMatch
+        case bodyMatch
+        case summaryMatch
+        case titleMatch
+
+        var displayName: String {
+            switch self {
+            case .tagMatch: return L10n.Search.tagMatch
+            case .bodyMatch: return L10n.Search.bodyMatch
+            case .summaryMatch: return L10n.Search.summaryMatch
+            case .titleMatch: return L10n.Search.titleMatch
+            }
+        }
     }
 }

@@ -18,7 +18,7 @@ struct SearchView: View {
             HStack {
                 Image(systemName: "magnifyingglass")
                     .foregroundColor(.secondary)
-                TextField("태그, 키워드, 제목으로 검색", text: $query)
+                TextField(L10n.Search.placeholder, text: $query)
                     .textFieldStyle(.plain)
                     .onSubmit { performSearch() }
 
@@ -35,7 +35,7 @@ struct SearchView: View {
                             .foregroundColor(.secondary)
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel("검색어 지우기")
+                    .accessibilityLabel(L10n.Search.clearLabel)
                 }
             }
             .padding(8)
@@ -49,7 +49,7 @@ struct SearchView: View {
                 HStack(spacing: 8) {
                     ProgressView()
                         .controlSize(.small)
-                    Text("검색 중...")
+                    Text(L10n.Search.searching)
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
@@ -63,7 +63,7 @@ struct SearchView: View {
                         Image(systemName: "magnifyingglass")
                             .font(.title2)
                             .foregroundColor(.secondary)
-                        Text("결과 없음")
+                        Text(L10n.Search.noResults)
                             .font(.subheadline)
                             .foregroundColor(.secondary)
                     }
@@ -79,7 +79,7 @@ struct SearchView: View {
                         }
 
                         HStack {
-                            Text("\(results.count)개 결과")
+                            Text(L10n.Search.resultCount(results.count))
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                             Spacer()
@@ -105,7 +105,7 @@ struct SearchView: View {
                     Image(systemName: "text.magnifyingglass")
                         .font(.title2)
                         .foregroundColor(.secondary)
-                    Text("태그, 키워드, 제목으로\nPKM 전체를 검색합니다")
+                    Text(L10n.Search.searchDescription)
                         .font(.caption)
                         .foregroundColor(.secondary)
                         .multilineTextAlignment(.center)
@@ -175,14 +175,14 @@ struct SearchResultRow: View {
                         .lineLimit(1)
 
                     if result.isArchived {
-                        Text("(아카이브)")
+                        Text(L10n.Search.archived)
                             .font(.caption2)
                             .foregroundColor(.secondary)
                     }
 
                     Spacer()
 
-                    Text(result.matchType.rawValue)
+                    Text(result.matchType.displayName)
                         .font(.caption2)
                         .foregroundColor(.secondary)
                         .padding(.horizontal, 4)

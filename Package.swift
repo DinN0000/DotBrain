@@ -4,6 +4,7 @@ import PackageDescription
 
 let package = Package(
     name: "DotBrain",
+    defaultLocalization: "ko",
     platforms: [
         .macOS(.v13)
     ],

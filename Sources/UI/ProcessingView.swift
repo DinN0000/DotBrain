@@ -6,11 +6,11 @@ struct ProcessingView: View {
     @State private var isAnimating = false
 
     private var originTitle: String {
-        appState.processingOrigin == .paraManage ? "폴더 정리 중" : "인박스 처리 중"
+        appState.processingOrigin == .paraManage ? L10n.Processing.folderReorganizing : L10n.Processing.inboxProcessing
     }
 
     private var phaseBadge: String {
-        appState.processingPhase.rawValue
+        appState.processingPhase.displayName
     }
 
     var body: some View {
@@ -49,7 +49,7 @@ struct ProcessingView: View {
 
             Spacer()
 
-            Button("취소") { appState.cancelProcessing() }
+            Button(L10n.Processing.cancel) { appState.cancelProcessing() }
                 .buttonStyle(.bordered)
                 .controlSize(.small)
                 .padding(.bottom, 4)
@@ -67,7 +67,7 @@ struct ProcessingView: View {
                 ProgressView()
                     .controlSize(.large)
                 if appState.processingTotalCount > 0 {
-                    Text("\(appState.processingTotalCount)개 파일 준비 완료")
+                    Text(L10n.Processing.filesReady(appState.processingTotalCount))
                         .font(.subheadline)
                         .foregroundColor(.secondary)
                 }
@@ -124,7 +124,7 @@ struct ProcessingView: View {
                         pulseScale = 1.0
                     }
 
-                Text("관련 노트 연결 중...")
+                Text(L10n.Processing.linkingNotes)
                     .font(.subheadline)
                     .foregroundColor(.secondary)
             }

@@ -21,7 +21,7 @@ struct AIStatisticsView: View {
                     VStack(spacing: 16) {
                         // Total cost hero
                         VStack(spacing: 4) {
-                            Text("추정 API 비용")
+                            Text(L10n.AIStats.estimatedCost)
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                             Text(String(format: "$%.4f", totalCost))
@@ -36,7 +36,7 @@ struct AIStatisticsView: View {
                         // Cost by operation
                         if !costByOperation.isEmpty {
                             VStack(alignment: .leading, spacing: 8) {
-                                Text("작업별 비용")
+                                Text(L10n.AIStats.costByOperation)
                                     .font(.caption)
                                     .fontWeight(.semibold)
                                     .foregroundColor(.secondary)
@@ -61,7 +61,7 @@ struct AIStatisticsView: View {
                         // Recent API calls
                         if !recentEntries.isEmpty {
                             VStack(alignment: .leading, spacing: 8) {
-                                Text("최근 API 호출")
+                                Text(L10n.AIStats.recentCalls)
                                     .font(.caption)
                                     .fontWeight(.semibold)
                                     .foregroundColor(.secondary)
@@ -108,10 +108,10 @@ struct AIStatisticsView: View {
                                 Image(systemName: "chart.bar.xaxis")
                                     .font(.title2)
                                     .foregroundColor(.secondary)
-                                Text("아직 API 사용 기록이 없습니다")
+                                Text(L10n.AIStats.noUsage)
                                     .font(.caption)
                                     .foregroundColor(.secondary)
-                                Text("파일을 분류하면 여기에 비용이 표시됩니다")
+                                Text(L10n.AIStats.noUsageHint)
                                     .font(.caption2)
                                     .foregroundColor(.secondary)
                             }
@@ -150,13 +150,13 @@ struct AIStatisticsView: View {
 
     private func operationLabel(_ op: String) -> String {
         switch op {
-        case "classify": return "분류"
-        case "classify-stage1": return "분류 (1단계)"
-        case "classify-stage2": return "분류 (2단계)"
-        case "enrich": return "메타 보완"
-        case "moc": return "폴더 요약"
-        case "semantic-link": return "시맨틱 링크"
-        case "summary": return "AI 요약"
+        case "classify": return L10n.AIStats.opClassify
+        case "classify-stage1": return L10n.AIStats.opClassifyStage1
+        case "classify-stage2": return L10n.AIStats.opClassifyStage2
+        case "enrich": return L10n.AIStats.opEnrich
+        case "moc": return L10n.AIStats.opMoc
+        case "semantic-link": return L10n.AIStats.opSemanticLink
+        case "summary": return L10n.AIStats.opSummary
         default: return op
         }
     }

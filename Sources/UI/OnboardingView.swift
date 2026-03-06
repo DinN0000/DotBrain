@@ -63,10 +63,10 @@ struct OnboardingView: View {
             isStructureReady = PKMPathManager(root: appState.pkmRootPath).isInitialized()
             projects = []
         }
-        .alert("폴더 생성 실패", isPresented: $showFolderError) {
-            Button("확인") {}
+        .alert(L10n.Onboarding.folderCreationFailed, isPresented: $showFolderError) {
+            Button(L10n.Onboarding.confirm) {}
         } message: {
-            Text(folderError ?? "알 수 없는 오류가 발생했습니다.")
+            Text(folderError ?? L10n.Onboarding.unknownError)
         }
     }
 
@@ -191,7 +191,7 @@ struct OnboardingView: View {
             Spacer()
 
             Button(action: { goNext() }) {
-                Text("시작하기")
+                Text(L10n.Onboarding.getStarted)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 4)
             }
@@ -240,8 +240,8 @@ struct OnboardingView: View {
     private var permissionStep: some View {
         VStack(spacing: 0) {
             stepHeader(
-                title: "파일 접근 권한",
-                desc: "DotBrain이 모든 폴더의 파일을 읽고 정리하려면\n\"전체 디스크 접근\" 권한이 필요합니다."
+                title: L10n.Onboarding.permissionTitle,
+                desc: L10n.Onboarding.permissionDesc
             )
 
             VStack(spacing: 16) {
@@ -252,12 +252,12 @@ struct OnboardingView: View {
                         .foregroundColor(fdaGranted ? .green : .orange)
 
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(fdaGranted ? "권한이 허용되었습니다" : "권한이 필요합니다")
+                        Text(fdaGranted ? L10n.Onboarding.permissionGranted : L10n.Onboarding.permissionNeeded)
                             .font(.subheadline)
                             .fontWeight(.medium)
                         Text(fdaGranted
-                            ? "파일 접근 준비 완료"
-                            : "허용하지 않으면 파일마다 개별 권한을 요청합니다")
+                            ? L10n.Onboarding.permissionReady
+                            : L10n.Onboarding.permissionFallback)
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
@@ -276,9 +276,9 @@ struct OnboardingView: View {
                 if !fdaGranted {
                     // Instructions
                     VStack(alignment: .leading, spacing: 8) {
-                        instructionRow(num: "1", text: "아래 버튼을 눌러 시스템 설정을 엽니다")
-                        instructionRow(num: "2", text: "목록에서 DotBrain을 찾아 토글을 켭니다")
-                        instructionRow(num: "3", text: "이 화면이 자동으로 업데이트됩니다")
+                        instructionRow(num: "1", text: L10n.Onboarding.instructionStep1)
+                        instructionRow(num: "2", text: L10n.Onboarding.instructionStep2)
+                        instructionRow(num: "3", text: L10n.Onboarding.instructionStep3)
                     }
                     .padding(12)
                     .background(Color.secondary.opacity(0.05))
@@ -288,7 +288,7 @@ struct OnboardingView: View {
                         HStack(spacing: 6) {
                             Image(systemName: "gearshape")
                                 .font(.system(size: 12))
-                            Text("시스템 설정 열기")
+                            Text(L10n.Onboarding.openSystemSettings)
                                 .fontWeight(.medium)
                         }
                         .frame(maxWidth: .infinity)
@@ -303,7 +303,7 @@ struct OnboardingView: View {
             Spacer()
 
             HStack {
-                Button("이전") { goBack() }
+                Button(L10n.Onboarding.previous) { goBack() }
                     .buttonStyle(.bordered)
                     .controlSize(.regular)
 
@@ -311,14 +311,14 @@ struct OnboardingView: View {
 
                 if fdaGranted {
                     Button(action: { goNext() }) {
-                        Text("다음")
+                        Text(L10n.Onboarding.next)
                             .frame(minWidth: 80)
                     }
                     .buttonStyle(.borderedProminent)
                     .controlSize(.regular)
                 } else {
                     Button(action: { goNext() }) {
-                        Text("건너뛰기")
+                        Text(L10n.Onboarding.skip)
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
@@ -348,15 +348,15 @@ struct OnboardingView: View {
     private var folderStep: some View {
         VStack(spacing: 0) {
             stepHeader(
-                title: "내 공간 만들기",
-                desc: "파일이 정리될 폴더를 선택하고, PARA 구조를 확인하세요."
+                title: L10n.Onboarding.folderTitle,
+                desc: L10n.Onboarding.folderDesc
             )
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
                     // Folder path selection
                     VStack(alignment: .leading, spacing: 6) {
-                        Text("저장 경로")
+                        Text(L10n.Onboarding.storagePath)
                             .font(.caption)
                             .fontWeight(.medium)
 
@@ -372,7 +372,7 @@ struct OnboardingView: View {
 
                             Spacer()
 
-                            Button("변경") {
+                            Button(L10n.Onboarding.change) {
                                 pickVaultFolder()
                             }
                             .buttonStyle(.bordered)
@@ -384,30 +384,30 @@ struct OnboardingView: View {
 
                     // PARA explanation
                     VStack(alignment: .leading, spacing: 6) {
-                        Text("PARA 구조")
+                        Text(L10n.Onboarding.paraStructure)
                             .font(.caption)
                             .fontWeight(.medium)
 
                         VStack(alignment: .leading, spacing: 8) {
                             paraExplanationRow(
                                 folder: "Project",
-                                metaphor: "진행 중인 작업",
-                                desc: "마감이 있는 프로젝트 단위 업무"
+                                metaphor: L10n.Onboarding.paraProjectMetaphor,
+                                desc: L10n.Onboarding.paraProjectDesc
                             )
                             paraExplanationRow(
                                 folder: "Area",
-                                metaphor: "도메인",
-                                desc: "지속적으로 관리하는 책임 영역. 제품, 사업, 팀"
+                                metaphor: L10n.Onboarding.paraAreaMetaphor,
+                                desc: L10n.Onboarding.paraAreaDesc
                             )
                             paraExplanationRow(
                                 folder: "Resource",
-                                metaphor: "참고 자료",
-                                desc: "가이드, 레퍼런스, 분석 보고서"
+                                metaphor: L10n.Onboarding.paraResourceMetaphor,
+                                desc: L10n.Onboarding.paraResourceDesc
                             )
                             paraExplanationRow(
                                 folder: "Archive",
-                                metaphor: "보관함",
-                                desc: "완료되거나 비활성화된 문서"
+                                metaphor: L10n.Onboarding.paraArchiveMetaphor,
+                                desc: L10n.Onboarding.paraArchiveDesc
                             )
                         }
                     }
@@ -421,14 +421,14 @@ struct OnboardingView: View {
 
             HStack {
                 if isReOnboarding {
-                    Button("취소") {
+                    Button(L10n.Onboarding.cancel) {
                         UserDefaults.standard.removeObject(forKey: AppState.DefaultsKey.onboardingStep)
                         appState.currentScreen = .inbox
                     }
                     .buttonStyle(.bordered)
                     .controlSize(.regular)
                 } else {
-                    Button("이전") { goBack() }
+                    Button(L10n.Onboarding.previous) { goBack() }
                         .buttonStyle(.bordered)
                         .controlSize(.regular)
                 }
@@ -441,7 +441,7 @@ struct OnboardingView: View {
                     }
                     goNext()
                 }) {
-                    Text("다음")
+                    Text(L10n.Onboarding.next)
                         .frame(minWidth: 80)
                 }
                 .buttonStyle(.borderedProminent)
@@ -492,8 +492,8 @@ struct OnboardingView: View {
     private var domainAndProjectStep: some View {
         VStack(spacing: 0) {
             stepHeader(
-                title: "도메인 & 프로젝트",
-                desc: "도메인을 등록하고, 각 도메인의 프로젝트를 추가하세요."
+                title: L10n.Onboarding.domainProjectTitle,
+                desc: L10n.Onboarding.domainProjectDesc
             )
 
             VStack(alignment: .leading, spacing: 10) {
@@ -501,7 +501,7 @@ struct OnboardingView: View {
                     Image(systemName: "lightbulb.fill")
                         .font(.caption)
                         .foregroundColor(.blue)
-                    Text("도메인과 프로젝트를 등록하면\nDotBrain이 파일을 더 정확하게 분류합니다")
+                    Text(L10n.Onboarding.domainProjectHint)
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
@@ -515,7 +515,7 @@ struct OnboardingView: View {
                 .cornerRadius(6)
 
                 HStack(spacing: 8) {
-                    TextField("도메인 이름 (예: DevOps, Finance)", text: $newAreaName)
+                    TextField(L10n.Onboarding.domainPlaceholder, text: $newAreaName)
                         .textFieldStyle(.roundedBorder)
                         .font(.subheadline)
                         .onSubmit { addAreaAndExpand() }
@@ -542,12 +542,12 @@ struct OnboardingView: View {
             Spacer()
 
             if areas.isEmpty {
-                Text("최소 1개의 도메인을 등록해주세요")
+                Text(L10n.Onboarding.addDomainHint)
                     .font(.caption)
                     .foregroundColor(.orange)
                     .padding(.bottom, 8)
             } else if !allAreasHaveSummary {
-                Text("모든 도메인에 설명을 입력해주세요")
+                Text(L10n.Onboarding.addDomainSummaryHint)
                     .font(.caption)
                     .foregroundColor(.orange)
                     .padding(.bottom, 8)
@@ -555,14 +555,14 @@ struct OnboardingView: View {
 
             HStack {
                 if isReOnboarding {
-                    Button("취소") {
+                    Button(L10n.Onboarding.cancel) {
                         UserDefaults.standard.removeObject(forKey: AppState.DefaultsKey.onboardingStep)
                         appState.currentScreen = .inbox
                     }
                     .buttonStyle(.bordered)
                     .controlSize(.regular)
                 } else {
-                    Button("이전") { goBack() }
+                    Button(L10n.Onboarding.previous) { goBack() }
                         .buttonStyle(.bordered)
                         .controlSize(.regular)
                 }
@@ -573,7 +573,7 @@ struct OnboardingView: View {
                     saveRegistry()
                     goNext()
                 }) {
-                    Text("다음")
+                    Text(L10n.Onboarding.next)
                         .frame(minWidth: 80)
                 }
                 .buttonStyle(.borderedProminent)
@@ -611,7 +611,7 @@ struct OnboardingView: View {
                     .fontWeight(.medium)
 
                 if !isExpanded {
-                    Text("(\(areaProjects.count)개 프로젝트)")
+                    Text(L10n.Onboarding.projectCount(areaProjects.count))
                         .font(.caption2)
                         .foregroundColor(.secondary)
                 }
@@ -637,7 +637,7 @@ struct OnboardingView: View {
             if isExpanded {
                 VStack(alignment: .leading, spacing: 6) {
                     // Area summary (required)
-                    TextField("다른 도메인과 구분되는 간단한 설명을 입력해주세요", text: areaSummaryBinding(areaName))
+                    TextField(L10n.Onboarding.areaSummaryPlaceholder, text: areaSummaryBinding(areaName))
                         .textFieldStyle(.roundedBorder)
                         .font(.caption)
                         .padding(.horizontal, 10)
@@ -668,7 +668,7 @@ struct OnboardingView: View {
                         }
 
                         HStack(spacing: 6) {
-                            TextField("프로젝트 이름", text: $newProjectName)
+                            TextField(L10n.Onboarding.projectName, text: $newProjectName)
                                 .textFieldStyle(.roundedBorder)
                                 .font(.caption)
                                 .onSubmit { addProjectToArea(areaName) }
@@ -702,8 +702,8 @@ struct OnboardingView: View {
 
         return VStack(spacing: 0) {
             stepHeader(
-                title: "AI 연결",
-                desc: "AI가 파일을 읽고 분류합니다.\n제공자를 선택하세요."
+                title: L10n.Onboarding.aiConnectionTitle,
+                desc: L10n.Onboarding.aiConnectionDesc
             )
 
             ScrollView {
@@ -712,19 +712,19 @@ struct OnboardingView: View {
                     VStack(spacing: 8) {
                         providerCard(
                             provider: .claudeCLI,
-                            badge: "구독 사용 (추천)",
+                            badge: L10n.Onboarding.badgeSubscription,
                             badgeColor: .blue
                         )
 
                         providerCard(
                             provider: .gemini,
-                            badge: "무료로 시작 가능",
+                            badge: L10n.Onboarding.badgeFreeStart,
                             badgeColor: .green
                         )
 
                         providerCard(
                             provider: .claude,
-                            badge: "API 결제 필요",
+                            badge: L10n.Onboarding.badgeApiPayment,
                             badgeColor: .orange
                         )
                     }
@@ -735,17 +735,17 @@ struct OnboardingView: View {
                         // CLI status section (no API key needed)
                         VStack(alignment: .leading, spacing: 8) {
                             if ClaudeCLIClient.isAvailable() {
-                                Label("Claude CLI 설치됨", systemImage: "checkmark.circle.fill")
+                                Label(L10n.Onboarding.cliInstalled, systemImage: "checkmark.circle.fill")
                                     .font(.caption)
                                     .foregroundColor(.green)
-                                Text("claude -p 파이프 모드로 AI 호출")
+                                Text(L10n.Onboarding.cliPipeMode)
                                     .font(.caption2)
                                     .foregroundColor(.secondary)
                             } else {
-                                Label("Claude CLI를 찾을 수 없습니다", systemImage: "xmark.circle.fill")
+                                Label(L10n.Onboarding.cliNotFound, systemImage: "xmark.circle.fill")
                                     .font(.caption)
                                     .foregroundColor(.red)
-                                Text("설치: https://claude.com/download")
+                                Text(L10n.Onboarding.cliInstallHint)
                                     .font(.caption2)
                                     .foregroundColor(.secondary)
                             }
@@ -758,7 +758,7 @@ struct OnboardingView: View {
                         // API key input inline
                         VStack(alignment: .leading, spacing: 8) {
                             HStack(spacing: 6) {
-                                Text("\(provider.displayName) API 키")
+                                Text(L10n.Onboarding.apiKeyLabel(provider.displayName))
                                     .font(.caption)
                                     .fontWeight(.semibold)
 
@@ -774,7 +774,7 @@ struct OnboardingView: View {
                                     HStack(spacing: 2) {
                                         Image(systemName: "arrow.up.right.square")
                                             .font(.caption2)
-                                        Text("키 발급")
+                                        Text(L10n.Onboarding.getApiKey)
                                             .font(.caption2)
                                     }
                                 }
@@ -810,7 +810,7 @@ struct OnboardingView: View {
                             }
 
                             HStack(spacing: 8) {
-                                Button("저장") {
+                                Button(L10n.Onboarding.save) {
                                     saveAPIKey(provider: provider)
                                 }
                                 .buttonStyle(.bordered)
@@ -820,13 +820,13 @@ struct OnboardingView: View {
                                 if let msg = keySaveMessage {
                                     Text(msg)
                                         .font(.caption2)
-                                        .foregroundColor(msg == "저장 완료" ? .green : .orange)
+                                        .foregroundColor(msg == L10n.Onboarding.keySaved ? .green : .orange)
                                 }
 
                                 Spacer()
 
                                 if appState.hasAPIKey {
-                                    Label("준비됨", systemImage: "checkmark.circle.fill")
+                                    Label(L10n.Onboarding.ready, systemImage: "checkmark.circle.fill")
                                         .font(.caption)
                                         .foregroundColor(.green)
                                 }
@@ -842,14 +842,14 @@ struct OnboardingView: View {
 
             VStack(spacing: 6) {
                 HStack {
-                    Button("이전") { goBack() }
+                    Button(L10n.Onboarding.previous) { goBack() }
                         .buttonStyle(.bordered)
                         .controlSize(.regular)
 
                     Spacer()
 
                     Button(action: { goNext() }) {
-                        Text("다음")
+                        Text(L10n.Onboarding.next)
                             .frame(minWidth: 80)
                     }
                     .buttonStyle(.borderedProminent)
@@ -858,7 +858,7 @@ struct OnboardingView: View {
 
                 if !appState.hasAPIKey {
                     Button(action: { goNext() }) {
-                        Text("건너뛰기")
+                        Text(L10n.Onboarding.skip)
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
@@ -975,7 +975,7 @@ struct OnboardingView: View {
     /// NSOpenPanel grants implicit file access via user selection, avoiding TCC permission dialogs.
     private func pickVaultFolder() {
         let panel = NSOpenPanel()
-        panel.title = "DotBrain 볼트 폴더 선택"
+        panel.title = L10n.Onboarding.pickVaultTitle
         panel.canChooseDirectories = true
         panel.canChooseFiles = false
         panel.allowsMultipleSelection = false
@@ -995,7 +995,7 @@ struct OnboardingView: View {
         // Check if parent directory is writable
         let parent = (path as NSString).deletingLastPathComponent
         if fm.fileExists(atPath: parent) && !fm.isWritableFile(atPath: parent) {
-            folderError = "선택한 경로에 쓰기 권한이 없습니다.\n다른 경로를 선택해주세요."
+            folderError = L10n.Onboarding.noWritePermission
             showFolderError = true
             return false
         }
@@ -1007,7 +1007,7 @@ struct OnboardingView: View {
             appState.saveVaultBookmark(url: URL(fileURLWithPath: path))
             return true
         } catch {
-            folderError = "폴더 생성에 실패했습니다: \(error.localizedDescription)\n다른 경로를 선택해주세요."
+            folderError = L10n.Onboarding.folderCreationError(error.localizedDescription)
             showFolderError = true
             return false
         }
@@ -1156,10 +1156,10 @@ struct OnboardingView: View {
     private func saveAPIKey(provider: AIProvider) {
         if keyInput.hasPrefix(provider.keyPrefix) {
             let saved = provider.saveAPIKey(keyInput)
-            keySaveMessage = saved ? "저장 완료" : "저장 실패"
+            keySaveMessage = saved ? L10n.Onboarding.keySaved : L10n.Onboarding.keySaveFailed
             appState.updateAPIKeyStatus()
         } else {
-            keySaveMessage = "\(provider.keyPlaceholder)로 시작하는 키를 입력하세요"
+            keySaveMessage = L10n.Onboarding.keyFormatHint(provider.keyPlaceholder)
         }
     }
 
@@ -1173,13 +1173,13 @@ struct OnboardingView: View {
         VStack(spacing: 0) {
             stepHeader(
                 title: appState.hasAPIKey
-                    ? (isReOnboarding ? "볼트 설정 완료!" : "준비 완료!")
-                    : "거의 다 됐어요!",
+                    ? (isReOnboarding ? L10n.Onboarding.vaultSetupComplete : L10n.Onboarding.allReady)
+                    : L10n.Onboarding.almostDone,
                 desc: appState.hasAPIKey
                     ? (isReOnboarding
-                        ? "새 볼트가 준비되었습니다.\n인박스에 파일을 넣어 정리를 시작하세요."
-                        : "이제 인박스에 파일을 넣으면\nAI가 자동으로 정리합니다.")
-                    : "API 키 없이도 폴더 구조를 활용할 수 있습니다."
+                        ? L10n.Onboarding.vaultReadyDesc
+                        : L10n.Onboarding.inboxReadyDesc)
+                    : L10n.Onboarding.noApiKeyDesc
             )
 
             Text(appState.hasAPIKey ? "·‿·" : "·_·")
@@ -1188,12 +1188,12 @@ struct OnboardingView: View {
 
             VStack(alignment: .leading, spacing: 8) {
                 if appState.hasAPIKey {
-                    guideRow(icon: "1.circle.fill", text: "메뉴바에서 DotBrain을 클릭")
-                    guideRow(icon: "2.circle.fill", text: "파일을 드래그하거나 Cmd+V로 붙여넣기")
-                    guideRow(icon: "3.circle.fill", text: "\"정리하기\" 버튼을 누르면 AI가 분류")
+                    guideRow(icon: "1.circle.fill", text: L10n.Onboarding.guideClickMenubar)
+                    guideRow(icon: "2.circle.fill", text: L10n.Onboarding.guideDragOrPaste)
+                    guideRow(icon: "3.circle.fill", text: L10n.Onboarding.guideOrganize)
                 } else {
-                    guideRow(icon: "terminal", text: "Claude CLI로 폴더에 연결해서 사용")
-                    guideRow(icon: "gearshape", text: "설정에서 언제든 API 키를 추가 가능")
+                    guideRow(icon: "terminal", text: L10n.Onboarding.guideCliConnect)
+                    guideRow(icon: "gearshape", text: L10n.Onboarding.guideAddApiKey)
                 }
             }
             .padding(14)
@@ -1204,14 +1204,14 @@ struct OnboardingView: View {
             Spacer()
 
             HStack {
-                Button("이전") { goBack() }
+                Button(L10n.Onboarding.previous) { goBack() }
                     .buttonStyle(.bordered)
                     .controlSize(.regular)
 
                 Spacer()
 
                 Button(action: completeOnboarding) {
-                    Text("시작하기")
+                    Text(L10n.Onboarding.getStarted)
                         .frame(minWidth: 80)
                 }
                 .buttonStyle(.borderedProminent)

@@ -59,7 +59,7 @@ struct APIKeyInputView: View {
                     .fontWeight(isActive ? .bold : .medium)
                     .foregroundColor(isActive ? .primary : .secondary)
 
-                Text("구독")
+                Text(L10n.Provider.subscription)
                     .font(.system(size: 9, weight: .semibold))
                     .foregroundColor(.secondary)
                     .padding(.horizontal, 5)
@@ -70,7 +70,7 @@ struct APIKeyInputView: View {
                 Spacer()
 
                 if isActive {
-                    Text("사용 중")
+                    Text(L10n.Provider.active)
                         .font(.caption2)
                         .fontWeight(.semibold)
                         .foregroundColor(.white)
@@ -78,7 +78,7 @@ struct APIKeyInputView: View {
                         .padding(.vertical, 2)
                         .background(Capsule().fill(accent))
                 } else if appState.hasClaudeCLI {
-                    Button("활성화") {
+                    Button(L10n.Provider.activate) {
                         withAnimation(.easeOut(duration: 0.15)) {
                             appState.selectedProvider = .claudeCLI
                         }
@@ -97,12 +97,12 @@ struct APIKeyInputView: View {
             }
 
             if appState.hasClaudeCLI {
-                Label("Claude CLI 설치됨", systemImage: "checkmark.circle.fill")
+                Label(L10n.Settings.cliInstalled, systemImage: "checkmark.circle.fill")
                     .font(.caption)
                     .foregroundColor(.green)
             } else {
                 VStack(alignment: .leading, spacing: 6) {
-                    Label("Claude CLI를 찾을 수 없습니다", systemImage: "xmark.circle.fill")
+                    Label(L10n.Settings.cliNotFound, systemImage: "xmark.circle.fill")
                         .font(.caption)
                         .foregroundColor(.red)
 
@@ -131,7 +131,7 @@ struct APIKeyInputView: View {
                     .background(Color.primary.opacity(0.04))
                     .cornerRadius(4)
 
-                    Button("설치 후 다시 확인") {
+                    Button(L10n.Settings.recheckCli) {
                         appState.updateAPIKeyStatus()
                     }
                     .font(.caption2)
@@ -188,7 +188,7 @@ struct APIKeyInputView: View {
                 Spacer()
 
                 if isActive {
-                    Text("사용 중")
+                    Text(L10n.Provider.active)
                         .font(.caption2)
                         .fontWeight(.semibold)
                         .foregroundColor(.white)
@@ -196,7 +196,7 @@ struct APIKeyInputView: View {
                         .padding(.vertical, 2)
                         .background(Capsule().fill(accent))
                 } else if hasKey {
-                    Button("활성화") {
+                    Button(L10n.Provider.activate) {
                         withAnimation(.easeOut(duration: 0.15)) {
                             appState.selectedProvider = provider
                         }
@@ -244,7 +244,7 @@ struct APIKeyInputView: View {
             }
 
             HStack {
-                Button("저장") {
+                Button(L10n.Settings.save) {
                     saveKey(keyInput.wrappedValue, provider: provider)
                 }
                 .buttonStyle(.bordered)
@@ -252,11 +252,11 @@ struct APIKeyInputView: View {
                 .disabled(keyInput.wrappedValue.isEmpty || keyInput.wrappedValue == "••••••••")
 
                 if showDeleteButton && hasKey {
-                    Button("삭제") {
+                    Button(L10n.Settings.deleteKey) {
                         provider.deleteAPIKey()
                         keyInput.wrappedValue = ""
                         appState.updateAPIKeyStatus()
-                        saveMessage = (provider: provider, text: "삭제됨")
+                        saveMessage = (provider: provider, text: L10n.Settings.keyDeleted)
                     }
                     .buttonStyle(.bordered)
                     .controlSize(.mini)
@@ -265,7 +265,7 @@ struct APIKeyInputView: View {
                 if let msg = saveMessage, msg.provider == provider {
                     Text(msg.text)
                         .font(.caption2)
-                        .foregroundColor(msg.text == "저장 완료" ? .green : .orange)
+                        .foregroundColor(msg.text == L10n.Settings.keySaved ? .green : .orange)
                 }
             }
         }
@@ -283,7 +283,7 @@ struct APIKeyInputView: View {
     private func saveKey(_ key: String, provider: AIProvider) {
         if key.hasPrefix(provider.keyPrefix) {
             let saved = provider.saveAPIKey(key)
-            saveMessage = (provider: provider, text: saved ? "저장 완료" : "저장 실패")
+            saveMessage = (provider: provider, text: saved ? L10n.Settings.keySaved : L10n.Settings.keySaveFailed)
             appState.updateAPIKeyStatus()
             if saved { onSaved?() }
         } else {
