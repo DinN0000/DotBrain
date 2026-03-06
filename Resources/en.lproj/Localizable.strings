@@ -212,7 +212,7 @@
 "menubar.confirm" = "OK";
 "menubar.fda_banner" = "Please re-grant disk access after update";
 "menubar.fda_button" = "Grant Access";
-"menubar.fda_auto_restart" = "App will restart automatically after settings change";
+"menubar.fda_auto_restart" = "After granting access, return to DotBrain";
 
 /* PARA Manage */
 "para_manage.scanning" = "Scanning folders...";

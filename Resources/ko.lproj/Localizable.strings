@@ -212,7 +212,7 @@
 "menubar.confirm" = "확인";
 "menubar.fda_banner" = "업데이트 후 디스크 접근 권한을 다시 설정해주세요";
 "menubar.fda_button" = "권한 설정";
-"menubar.fda_auto_restart" = "설정 후 앱이 자동으로 다시 시작됩니다";
+"menubar.fda_auto_restart" = "권한 허용 후 DotBrain으로 다시 돌아와 주세요";
 
 /* PARA Manage */
 "para_manage.scanning" = "폴더 스캔 중...";

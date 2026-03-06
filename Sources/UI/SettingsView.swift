@@ -699,12 +699,27 @@ struct SettingsView: View {
             process.executableURL = URL(fileURLWithPath: "/bin/bash")
             process.arguments = ["-c", "nohup bash \(scriptPath) > /tmp/dotbrain_update.log 2>&1 &"]
             try process.run()
-            Task { @MainActor in
-                try? await Task.sleep(for: .milliseconds(500))
-                NSApplication.shared.terminate(nil)
-            }
+            stopLaunchAgentForUpdate()
         } catch {
             updateError = L10n.Settings.updateFailed(error.localizedDescription)
+        }
+    }
+
+    private func stopLaunchAgentForUpdate() {
+        let uid = getuid()
+
+        // Prevent the old version from immediately respawning before install.sh boots it out.
+        Task.detached(priority: .userInitiated) {
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: "/bin/launchctl")
+            process.arguments = ["bootout", "gui/\(uid)/com.dotbrain.app"]
+            try? process.run()
+            process.waitUntilExit()
+        }
+
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(300))
+            NSApplication.shared.terminate(nil)
         }
     }
 

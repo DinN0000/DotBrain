@@ -7,6 +7,7 @@ struct InboxProcessor {
     let onProgress: ((Double, String) -> Void)?
     let onFileProgress: ((Int, Int, String) -> Void)?
     let onPhaseChange: ((ProcessingPhase) -> Void)?
+    private static let maxAutoPasses = 3
 
     struct Result {
         var processed: [ProcessedFileResult]
@@ -19,7 +20,7 @@ struct InboxProcessor {
     func process() async throws -> Result {
         onPhaseChange?(.preparing)
         let scanner = InboxScanner(pkmRoot: pkmRoot)
-        let files = scanner.scan()
+        var files = scanner.scan()
 
         guard !files.isEmpty else {
             return Result(processed: [], needsConfirmation: [], affectedFolders: [], total: 0, failed: 0)
@@ -28,15 +29,101 @@ struct InboxProcessor {
         // Warm up CLI process pool concurrently while context is being built
         let warmUpTask = Task { await AIService.shared.warmUpCLIPool() }
 
-        onProgress?(0.05, "\(files.count)개 파일 발견")
-        onFileProgress?(0, files.count, "")
-
         StatisticsService.recordActivity(
             fileName: "인박스 처리",
             category: "system",
             action: "started",
             detail: "\(files.count)개 파일"
         )
+
+        var allProcessed: [ProcessedFileResult] = []
+        var allConfirmations: [PendingConfirmation] = []
+        var allAffectedFolders: Set<String> = []
+        var discoveredPaths = Set(files)
+        var totalFailed = 0
+
+        for passIndex in 0..<Self.maxAutoPasses {
+            guard !files.isEmpty else { break }
+
+            let rangeStart = Double(passIndex) / Double(Self.maxAutoPasses)
+            let rangeEnd = Double(passIndex + 1) / Double(Self.maxAutoPasses)
+            let progressMapper: (Double, String) -> Void = { progress, status in
+                let mapped = rangeStart + progress * (rangeEnd - rangeStart)
+                if passIndex == 0 {
+                    self.onProgress?(mapped, status)
+                } else {
+                    self.onProgress?(mapped, "남은 파일 정리: \(status)")
+                }
+            }
+
+            let passResult = try await processSinglePass(
+                files: files,
+                warmUpTask: passIndex == 0 ? warmUpTask : nil,
+                onProgress: progressMapper
+            )
+
+            allProcessed.append(contentsOf: passResult.processed)
+            allConfirmations.append(contentsOf: passResult.needsConfirmation)
+            allAffectedFolders.formUnion(passResult.affectedFolders)
+            totalFailed += passResult.failed
+
+            if !passResult.needsConfirmation.isEmpty {
+                files = []
+                break
+            }
+
+            let remaining = scanner.scan()
+            guard !remaining.isEmpty else {
+                files = []
+                break
+            }
+
+            discoveredPaths.formUnion(remaining)
+
+            let passSucceeded = passResult.processed.contains(where: \.isSuccess)
+            let countChanged = remaining.count != files.count
+            guard passSucceeded || countChanged else {
+                files = remaining
+                break
+            }
+
+            files = remaining
+        }
+
+        let successCount = allProcessed.filter(\.isSuccess).count
+
+        NotificationService.sendProcessingComplete(
+            classified: successCount,
+            total: discoveredPaths.count,
+            failed: totalFailed
+        )
+
+        onFileProgress?(allProcessed.count + allConfirmations.count, allProcessed.count + allConfirmations.count, "")
+        onProgress?(1.0, "완료!")
+
+        StatisticsService.recordActivity(
+            fileName: "인박스 처리",
+            category: "system",
+            action: "completed",
+            detail: "\(successCount)/\(discoveredPaths.count)개 완료, \(totalFailed)개 실패"
+        )
+
+        return Result(
+            processed: allProcessed,
+            needsConfirmation: allConfirmations,
+            affectedFolders: allAffectedFolders,
+            total: discoveredPaths.count,
+            failed: totalFailed
+        )
+    }
+
+    private func processSinglePass(
+        files: [String],
+        warmUpTask: Task<Void, Never>?,
+        onProgress: ((Double, String) -> Void)?
+    ) async throws -> Result {
+        onProgress?(0.05, "\(files.count)개 파일 발견")
+        onFileProgress?(0, files.count, "")
 
         // Build context — run independent builders concurrently
         // Ensure note-index covers all existing folders (new folders since last update)
@@ -131,7 +218,9 @@ struct InboxProcessor {
         }
 
         // Ensure pool is ready before classification
-        await warmUpTask.value
+        if let warmUpTask {
+            await warmUpTask.value
+        }
 
         onProgress?(0.3, "AI 분류 시작...")
         onPhaseChange?(.classifying)
@@ -303,23 +392,6 @@ struct InboxProcessor {
 
         onFileProgress?(allInputs.count, allInputs.count, "")
         onProgress?(0.95, "결과 정리 중...")
-
-        // Send notification
-        NotificationService.sendProcessingComplete(
-            classified: successes.count,
-            total: files.count,
-            failed: failed
-        )
-
-        onProgress?(1.0, "완료!")
-
-        let successCount = successes.count
-        StatisticsService.recordActivity(
-            fileName: "인박스 처리",
-            category: "system",
-            action: "completed",
-            detail: "\(successCount)/\(files.count)개 완료, \(failed)개 실패"
-        )
 
         return Result(
             processed: processed,
