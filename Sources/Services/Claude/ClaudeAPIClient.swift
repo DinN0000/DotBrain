@@ -195,13 +195,10 @@ enum ClaudeAPIError: LocalizedError, RetryClassifiable {
     var isRateLimitError: Bool { statusCode == 429 }
     var isServerError: Bool { (statusCode ?? 0) >= 500 }
     var isRetryable: Bool {
+        if isRateLimitError || isServerError { return true }
         switch self {
-        case .httpError(let s), .apiError(let s, _):
-            return s == 429 || s >= 500
-        case .invalidResponse, .emptyResponse:
-            return true
-        case .noAPIKey, .invalidURL, .jsonParseFailed:
-            return false
+        case .invalidResponse, .emptyResponse: return true
+        default: return false
         }
     }
 }

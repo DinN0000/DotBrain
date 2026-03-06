@@ -233,9 +233,10 @@ actor AIService {
 
     /// Shut down CLI process pool and release URLSessions
     func shutdownAll() async {
-        await claudeCLIClient.shutdown()
-        await claudeClient.shutdown()
-        await geminiClient.shutdown()
+        async let a: () = claudeCLIClient.shutdown()
+        async let b: () = claudeClient.shutdown()
+        async let c: () = geminiClient.shutdown()
+        _ = await (a, b, c)
     }
 }
 

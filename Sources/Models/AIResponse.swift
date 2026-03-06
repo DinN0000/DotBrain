@@ -19,6 +19,8 @@ struct TokenUsage: Codable, Sendable {
     let outputTokens: Int
     let cachedTokens: Int  // Claude cache_read, Gemini = 0
     var totalTokens: Int { inputTokens + outputTokens }
+
+    static let zero = TokenUsage(inputTokens: 0, outputTokens: 0, cachedTokens: 0)
 }
 
 /// A single logged API usage entry

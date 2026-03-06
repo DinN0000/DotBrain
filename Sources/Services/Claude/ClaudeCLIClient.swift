@@ -48,24 +48,24 @@ actor ClaudeCLIClient {
     }
 
     private static func findClaudePath() -> String? {
+        // Fast path: check cache under lock (lock held briefly, not during I/O)
         cacheLock.lock()
-        defer { cacheLock.unlock() }
-
-        // Return cached result if already resolved AND still valid
         if claudePathResolved, let cached = cachedClaudePath {
             if FileManager.default.isExecutableFile(atPath: cached) {
+                cacheLock.unlock()
                 return cached
             }
-            // Cached path no longer valid (e.g. CLI upgraded, binary moved)
             cachedClaudePath = nil
             claudePathResolved = false
         }
-        if claudePathResolved { return cachedClaudePath }
+        if claudePathResolved { cacheLock.unlock(); return cachedClaudePath }
+        cacheLock.unlock()
+
+        // Slow path: resolve without lock (benign race — duplicate work produces same result)
 
         // 1. Resolve via user's shell (sources .zshrc/.bashrc explicitly)
         if let path = resolveViaShell() {
-            cachedClaudePath = path
-            claudePathResolved = true
+            cacheLock.withLock { cachedClaudePath = path; claudePathResolved = true }
             return path
         }
 
@@ -80,8 +80,7 @@ actor ClaudeCLIClient {
         ]
         for path in candidates {
             if FileManager.default.isExecutableFile(atPath: path) {
-                cachedClaudePath = path
-                claudePathResolved = true
+                cacheLock.withLock { cachedClaudePath = path; claudePathResolved = true }
                 return path
             }
         }
@@ -89,12 +88,11 @@ actor ClaudeCLIClient {
         // 3. Scan Claude versions directory for latest binary
         // (handles broken symlinks after CLI upgrade)
         if let path = findLatestVersionBinary(homeDir: homeDir) {
-            cachedClaudePath = path
-            claudePathResolved = true
+            cacheLock.withLock { cachedClaudePath = path; claudePathResolved = true }
             return path
         }
 
-        claudePathResolved = true
+        cacheLock.withLock { claudePathResolved = true }
         return nil
     }
 
@@ -363,7 +361,7 @@ actor ClaudeCLIClient {
             throw ClaudeCLIError.claudeNotFound
         }
 
-        let cliUsage = TokenUsage(inputTokens: 0, outputTokens: 0, cachedTokens: 0)
+        let cliUsage = TokenUsage.zero
 
         // Try warm process from pool (warm pool doesn't support --system-prompt)
         if systemMessage == nil, let warm = checkoutWarmProcess(model: model, claudePath: claudePath) {
