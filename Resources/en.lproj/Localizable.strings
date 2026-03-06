@@ -1,0 +1,29 @@
+/* Screen Names */
+"screen.inbox" = "Inbox";
+"screen.dashboard" = "Dashboard";
+"screen.settings" = "Settings";
+"screen.para_manage" = "Folder Management";
+"screen.search" = "Search";
+"screen.vault_inspector" = "Vault Inspector";
+"screen.ai_statistics" = "AI Statistics";
+"screen.results" = "Results";
+"screen.folder_relation_explorer" = "Folder Relations";
+
+/* Processing Phases */
+"processing.preparing" = "Preparing";
+"processing.extracting" = "Analyzing";
+"processing.classifying" = "AI Classification";
+"processing.linking" = "Linking Notes";
+"processing.processing" = "Processing";
+"processing.finishing" = "Finishing";
+
+/* Search Match Types */
+"search.tag_match" = "Tag Match";
+"search.body_match" = "Body Match";
+"search.summary_match" = "Summary Match";
+"search.title_match" = "Title Match";
+
+/* AI Provider Cost Info */
+"provider.cost_included" = "Included in subscription";
+"provider.cost_per_file" = "~$0.002 per file (Haiku 4.5)";
+"provider.free_tier" = "Free tier: 15/min, 1500/day";

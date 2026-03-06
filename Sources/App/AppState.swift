@@ -47,15 +47,15 @@ final class AppState: ObservableObject {
 
         var displayName: String {
             switch self {
-            case .inbox: return "인박스"
-            case .dashboard: return "대시보드"
-            case .settings: return "설정"
-            case .paraManage: return "폴더 관리"
-            case .search: return "검색"
-            case .vaultInspector: return "볼트 점검"
-            case .aiStatistics: return "AI 통계"
-            case .results: return "정리 결과"
-            case .folderRelationExplorer: return "폴더 짝 매칭"
+            case .inbox: return L10n.Screen.inbox
+            case .dashboard: return L10n.Screen.dashboard
+            case .settings: return L10n.Screen.settings
+            case .paraManage: return L10n.Screen.paraManage
+            case .search: return L10n.Screen.search
+            case .vaultInspector: return L10n.Screen.vaultInspector
+            case .aiStatistics: return L10n.Screen.aiStatistics
+            case .results: return L10n.Screen.results
+            case .folderRelationExplorer: return L10n.Screen.folderRelationExplorer
             default: return ""
             }
         }

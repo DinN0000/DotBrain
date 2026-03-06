@@ -1,0 +1,29 @@
+/* Screen Names */
+"screen.inbox" = "인박스";
+"screen.dashboard" = "대시보드";
+"screen.settings" = "설정";
+"screen.para_manage" = "폴더 관리";
+"screen.search" = "검색";
+"screen.vault_inspector" = "볼트 점검";
+"screen.ai_statistics" = "AI 통계";
+"screen.results" = "정리 결과";
+"screen.folder_relation_explorer" = "폴더 짝 매칭";
+
+/* Processing Phases */
+"processing.preparing" = "준비";
+"processing.extracting" = "분석";
+"processing.classifying" = "AI 분류";
+"processing.linking" = "노트 연결";
+"processing.processing" = "정리";
+"processing.finishing" = "마무리";
+
+/* Search Match Types */
+"search.tag_match" = "태그 일치";
+"search.body_match" = "본문 일치";
+"search.summary_match" = "요약 일치";
+"search.title_match" = "제목 일치";
+
+/* AI Provider Cost Info */
+"provider.cost_included" = "구독 포함";
+"provider.cost_per_file" = "파일당 약 $0.002 (Haiku 4.5)";
+"provider.free_tier" = "무료 티어: 분당 15회, 일 1500회";

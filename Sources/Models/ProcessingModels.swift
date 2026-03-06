@@ -1,12 +1,23 @@
 import Foundation
 
-enum ProcessingPhase: String {
-    case preparing = "준비"
-    case extracting = "분석"
-    case classifying = "AI 분류"
-    case linking = "노트 연결"
-    case processing = "정리"
-    case finishing = "마무리"
+enum ProcessingPhase {
+    case preparing
+    case extracting
+    case classifying
+    case linking
+    case processing
+    case finishing
+
+    var displayName: String {
+        switch self {
+        case .preparing: return L10n.Processing.preparing
+        case .extracting: return L10n.Processing.extracting
+        case .classifying: return L10n.Processing.classifying
+        case .linking: return L10n.Processing.linking
+        case .processing: return L10n.Processing.processing
+        case .finishing: return L10n.Processing.finishing
+        }
+    }
 }
 
 struct ProcessedFileResult: Identifiable {

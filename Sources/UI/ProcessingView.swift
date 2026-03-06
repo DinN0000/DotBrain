@@ -10,7 +10,7 @@ struct ProcessingView: View {
     }
 
     private var phaseBadge: String {
-        appState.processingPhase.rawValue
+        appState.processingPhase.displayName
     }
 
     var body: some View {

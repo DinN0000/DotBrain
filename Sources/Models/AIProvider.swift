@@ -27,11 +27,11 @@ enum AIProvider: String, CaseIterable, Identifiable {
     var costInfo: String {
         switch self {
         case .claudeCLI:
-            return "구독 포함"
+            return L10n.Provider.costIncluded
         case .claude:
-            return "파일당 약 $0.002 (Haiku 4.5)"
+            return L10n.Provider.costPerFile
         case .gemini:
-            return "무료 티어: 분당 15회, 일 1500회"
+            return L10n.Provider.freeTier
         }
     }
 

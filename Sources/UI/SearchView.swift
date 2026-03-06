@@ -182,7 +182,7 @@ struct SearchResultRow: View {
 
                     Spacer()
 
-                    Text(result.matchType.rawValue)
+                    Text(result.matchType.displayName)
                         .font(.caption2)
                         .foregroundColor(.secondary)
                         .padding(.horizontal, 4)

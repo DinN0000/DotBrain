@@ -44,6 +44,13 @@ if [ -f "$ICON_FILE" ]; then
     cp "$ICON_FILE" "$APP_PATH/Contents/Resources/AppIcon.icns"
 fi
 
+# Copy localization files
+for lproj in "$PROJECT_ROOT"/Resources/*.lproj; do
+    if [ -d "$lproj" ]; then
+        cp -R "$lproj" "$APP_PATH/Contents/Resources/"
+    fi
+done
+
 # Copy Info.plist (use the release one from Resources/)
 cp "$INFO_PLIST" "$APP_PATH/Contents/Info.plist"
 
