@@ -77,7 +77,8 @@
 - Architecture knowledge lives in CLAUDE.md (this file) and code comments
 - No separate docs/ directory — keep documentation close to source
 
-## Custom Commands
+## Session Commands
+These are conventions for Claude Code sessions, not .claude/commands/ files:
 - `/review` — code review against CLAUDE.md rules
 - `/check` — quick project status (build, git, release)
 - `/release` — guided release workflow

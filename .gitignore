@@ -11,6 +11,7 @@ docs/.bkit-memory.json
 docs/.pdca-status.json
 docs/.pdca-snapshots/
 run.sh
+docs/
 .claude/
 Package.resolved
 *.dmg
