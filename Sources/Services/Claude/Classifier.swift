@@ -33,23 +33,14 @@ actor Classifier {
     ) async throws -> [ClassifyResult] {
         guard !files.isEmpty else { return [] }
 
-        // Build system prompts once per batch for prompt caching
-        let stage1SystemPrompt = buildSystemPrompt(
+        // Build system prompt once for prompt caching (shared across Stage 1 and Stage 2)
+        let systemPrompt = buildSystemPrompt(
             projectContext: projectContext,
             subfolderContext: subfolderContext,
             weightedContext: weightedContext,
             areaContext: areaContext,
             tagVocabulary: tagVocabulary,
             correctionContext: correctionContext
-        )
-        let stage2SystemPrompt = buildSystemPrompt(
-            projectContext: projectContext,
-            subfolderContext: subfolderContext,
-            weightedContext: weightedContext,
-            areaContext: areaContext,
-            tagVocabulary: tagVocabulary,
-            correctionContext: correctionContext,
-            precise: true
         )
 
         // Stage 1: Haiku batch classification
@@ -91,7 +82,7 @@ actor Classifier {
                     do {
                         return try await self.classifyBatchStage1(
                             batchFiles,
-                            systemPrompt: stage1SystemPrompt
+                            systemPrompt: systemPrompt
                         )
                     } catch {
                         NSLog("[Classifier] Stage1 배치 %d 실패 (스킵): %@", idx, error.localizedDescription)
@@ -159,7 +150,7 @@ actor Classifier {
                         do {
                             let result = try await self.classifySingleStage2(
                                 file,
-                                systemPrompt: stage2SystemPrompt
+                                systemPrompt: systemPrompt
                             )
                             return (fileName, result)
                         } catch {
@@ -337,12 +328,8 @@ actor Classifier {
         weightedContext: String,
         areaContext: String,
         tagVocabulary: String,
-        correctionContext: String,
-        precise: Bool = false
+        correctionContext: String
     ) -> String {
-        let roleIntro = precise
-            ? "당신은 PARA 방법론 기반 문서 분류 전문가입니다. 이 문서를 정밀하게 분석해주세요."
-            : "당신은 PARA 방법론 기반 문서 분류 전문가입니다."
 
         let weightedSection = weightedContext.isEmpty ? "" : """
 
@@ -374,7 +361,7 @@ actor Classifier {
         """
 
         return """
-        \(roleIntro)
+        당신은 PARA 방법론 기반 문서 분류 전문가입니다.
 
         ## 활성 프로젝트 목록
         \(projectContext)
@@ -452,6 +439,8 @@ actor Classifier {
         content: String
     ) -> String {
         return """
+        이 문서를 정밀하게 분석해주세요.
+
         ## 대상 파일
         파일명: \(fileName)
 

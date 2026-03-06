@@ -52,15 +52,6 @@ actor GeminiAPIClient {
             case contents
             case generationConfig
         }
-
-        func encode(to encoder: Encoder) throws {
-            var container = encoder.container(keyedBy: CodingKeys.self)
-            if let systemInstruction = systemInstruction {
-                try container.encode(systemInstruction, forKey: .systemInstruction)
-            }
-            try container.encode(contents, forKey: .contents)
-            try container.encodeIfPresent(generationConfig, forKey: .generationConfig)
-        }
     }
 
     struct GenerateContentResponse: Decodable {
