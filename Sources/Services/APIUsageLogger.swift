@@ -86,8 +86,10 @@ actor APIUsageLogger {
     static func calculateCost(model: String, usage: TokenUsage) -> Double {
         guard let price = pricing[model] else { return 0 }
         let inputCost = Double(usage.inputTokens) * price.inputPerMillion / 1_000_000.0
+        // Cache read tokens cost 10% of input price (Anthropic prompt caching)
+        let cacheCost = Double(usage.cachedTokens) * price.inputPerMillion * 0.1 / 1_000_000.0
         let outputCost = Double(usage.outputTokens) * price.outputPerMillion / 1_000_000.0
-        return inputCost + outputCost
+        return inputCost + cacheCost + outputCost
     }
 
     // MARK: - Private Helpers

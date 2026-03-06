@@ -8,13 +8,12 @@ actor ClaudeCLIClient {
     static let fastModel = "haiku"
     static let preciseModel = "sonnet"
 
-    // MARK: - Cached State
+    // MARK: - Cached State (protected by cacheLock for thread safety)
 
-    /// Cached user shell environment (loaded once per app session)
-    private static var cachedEnvironment: [String: String]?
-    /// Cached claude binary path (resolved once per app session)
-    private static var cachedClaudePath: String?
-    private static var claudePathResolved = false
+    private static let cacheLock = NSLock()
+    private static nonisolated(unsafe) var cachedEnvironment: [String: String]?
+    private static nonisolated(unsafe) var cachedClaudePath: String?
+    private static nonisolated(unsafe) var claudePathResolved = false
 
     // MARK: - Process Pool
 
@@ -49,6 +48,9 @@ actor ClaudeCLIClient {
     }
 
     private static func findClaudePath() -> String? {
+        cacheLock.lock()
+        defer { cacheLock.unlock() }
+
         // Return cached result if already resolved AND still valid
         if claudePathResolved, let cached = cachedClaudePath {
             if FileManager.default.isExecutableFile(atPath: cached) {
@@ -129,7 +131,12 @@ actor ClaudeCLIClient {
     /// Sources .zshrc/.bashrc explicitly (no -i flag to avoid side effects).
     /// Result is cached — shell is spawned only once per app session.
     private static func loadUserShellEnvironment() -> [String: String] {
-        if let cached = cachedEnvironment { return cached }
+        cacheLock.lock()
+        if let cached = cachedEnvironment {
+            cacheLock.unlock()
+            return cached
+        }
+        cacheLock.unlock()
 
         let baseEnv = ProcessInfo.processInfo.environment
         let userShell = baseEnv["SHELL"] ?? "/bin/zsh"
@@ -153,7 +160,7 @@ actor ClaudeCLIClient {
             process.waitUntilExit()
 
             guard process.terminationStatus == 0 else {
-                cachedEnvironment = baseEnv
+                cacheLock.withLock { cachedEnvironment = baseEnv }
                 return baseEnv
             }
 
@@ -167,10 +174,10 @@ actor ClaudeCLIClient {
                 let value = String(line[line.index(after: eqIndex)...])
                 env[key] = value
             }
-            cachedEnvironment = env
+            cacheLock.withLock { cachedEnvironment = env }
             return env
         } catch {
-            cachedEnvironment = baseEnv
+            cacheLock.withLock { cachedEnvironment = baseEnv }
             return baseEnv
         }
     }
@@ -345,30 +352,36 @@ actor ClaudeCLIClient {
     // MARK: - Send Message
 
     /// Send a prompt to Claude CLI and return the text response.
-    /// Token usage is not available from CLI, so it returns nil.
+    /// Token usage is not available from CLI — returns zero-valued usage for call tracking.
     func sendMessage(
         model: String,
         maxTokens: Int,
-        userMessage: String
+        userMessage: String,
+        systemMessage: String? = nil
     ) async throws -> (String, TokenUsage?) {
         guard let claudePath = Self.findClaudePath() else {
             throw ClaudeCLIError.claudeNotFound
         }
 
-        // Try warm process from pool
-        if let warm = checkoutWarmProcess(model: model, claudePath: claudePath) {
+        let cliUsage = TokenUsage(inputTokens: 0, outputTokens: 0, cachedTokens: 0)
+
+        // Try warm process from pool (warm pool doesn't support --system-prompt)
+        if systemMessage == nil, let warm = checkoutWarmProcess(model: model, claudePath: claudePath) {
             let result = try await runWarmProcess(warm, input: userMessage)
-            return (result, nil)
+            return (result, cliUsage)
         }
 
-        // Cold start fallback
-        let arguments = ["-p", "--model", model, "--output-format", "text"]
+        // Cold start with full argument support
+        var arguments = ["-p", "--model", model, "--output-format", "text"]
+        if let system = systemMessage, !system.isEmpty {
+            arguments += ["--system-prompt", system]
+        }
         let result = try await runProcess(
             executablePath: claudePath,
             arguments: arguments,
             input: userMessage
         )
-        return (result, nil)
+        return (result, cliUsage)
     }
 
     // MARK: - Process Execution
@@ -411,7 +424,7 @@ actor ClaudeCLIClient {
 
 // MARK: - Errors
 
-enum ClaudeCLIError: LocalizedError {
+enum ClaudeCLIError: LocalizedError, RetryClassifiable {
     case claudeNotFound
     case processError(status: Int32, message: String)
     case emptyResponse
@@ -424,6 +437,15 @@ enum ClaudeCLIError: LocalizedError {
             return "Claude CLI 오류: \(message.isEmpty ? "알 수 없는 오류" : message)"
         case .emptyResponse:
             return "Claude CLI에서 빈 응답"
+        }
+    }
+
+    var isRateLimitError: Bool { false }
+    var isServerError: Bool { false }
+    var isRetryable: Bool {
+        switch self {
+        case .claudeNotFound: return false
+        case .processError, .emptyResponse: return true
         }
     }
 }

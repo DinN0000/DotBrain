@@ -6,6 +6,13 @@ struct AIResponse: Sendable {
     let usage: TokenUsage?
 }
 
+/// Protocol for AI provider errors enabling unified retry classification
+protocol RetryClassifiable: LocalizedError {
+    var isRateLimitError: Bool { get }
+    var isServerError: Bool { get }
+    var isRetryable: Bool { get }
+}
+
 /// Token usage from an AI API call
 struct TokenUsage: Codable, Sendable {
     let inputTokens: Int

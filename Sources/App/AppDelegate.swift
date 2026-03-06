@@ -32,7 +32,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationWillTerminate(_ notification: Notification) {
         let sem = DispatchSemaphore(value: 0)
         Task.detached {
-            await AIService.shared.shutdownCLIPool()
+            await AIService.shared.shutdownAll()
             sem.signal()
         }
         sem.wait(timeout: .now() + 2)
