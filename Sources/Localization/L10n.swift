@@ -386,6 +386,12 @@ enum L10n {
         static let cliPipeMode = tr("onboarding.cli_pipe_mode")
         static let cliNotFound = tr("onboarding.cli_not_found")
         static let cliInstallHint = tr("onboarding.cli_install_hint")
+        static let codexInstalled = tr("onboarding.codex_installed")
+        static let codexExecMode = tr("onboarding.codex_exec_mode")
+        static let codexAuthRequired = tr("onboarding.codex_auth_required")
+        static let codexLoginHint = tr("onboarding.codex_login_hint")
+        static let codexNotFound = tr("onboarding.codex_not_found")
+        static let codexInstallHint = tr("onboarding.codex_install_hint")
         static func apiKeyLabel(_ provider: String) -> String { tr("onboarding.api_key_label", provider) }
         static let getApiKey = tr("onboarding.get_api_key")
         static let save = tr("onboarding.save")
@@ -404,6 +410,7 @@ enum L10n {
         static let guideDragOrPaste = tr("onboarding.guide_drag_or_paste")
         static let guideOrganize = tr("onboarding.guide_organize")
         static let guideCliConnect = tr("onboarding.guide_cli_connect")
+        static let guideCodexConnect = tr("onboarding.guide_codex_connect")
         static let guideAddApiKey = tr("onboarding.guide_add_api_key")
     }
 

@@ -65,8 +65,8 @@ struct ResultsView: View {
                         // Summary card
                         ResultsSummaryCard()
 
-                        // Batch actions for pending confirmations
-                        if appState.pendingConfirmations.count > 1 {
+                        // Pending confirmations banner
+                        if !appState.pendingConfirmations.isEmpty {
                             HStack(spacing: 12) {
                                 Label(
                                     L10n.Results.confirmWaiting(appState.pendingConfirmations.count),
@@ -77,10 +77,12 @@ struct ResultsView: View {
 
                                 Spacer()
 
-                                HoverTextLink(label: L10n.Results.skipAll, color: .secondary) {
-                                    let items = appState.pendingConfirmations
-                                    for item in items {
-                                        appState.skipConfirmation(item)
+                                if appState.pendingConfirmations.count > 1 {
+                                    HoverTextLink(label: L10n.Results.skipAll, color: .secondary) {
+                                        let items = appState.pendingConfirmations
+                                        for item in items {
+                                            appState.skipConfirmation(item)
+                                        }
                                     }
                                 }
                             }

@@ -717,6 +717,12 @@ struct OnboardingView: View {
                         )
 
                         providerCard(
+                            provider: .codexCLI,
+                            badge: L10n.Onboarding.badgeSubscription,
+                            badgeColor: .blue
+                        )
+
+                        providerCard(
                             provider: .gemini,
                             badge: L10n.Onboarding.badgeFreeStart,
                             badgeColor: .green
@@ -731,25 +737,9 @@ struct OnboardingView: View {
 
                     Divider()
 
-                    if provider == .claudeCLI {
+                    if provider == .claudeCLI || provider == .codexCLI {
                         // CLI status section (no API key needed)
-                        VStack(alignment: .leading, spacing: 8) {
-                            if ClaudeCLIClient.isAvailable() {
-                                Label(L10n.Onboarding.cliInstalled, systemImage: "checkmark.circle.fill")
-                                    .font(.caption)
-                                    .foregroundColor(.green)
-                                Text(L10n.Onboarding.cliPipeMode)
-                                    .font(.caption2)
-                                    .foregroundColor(.secondary)
-                            } else {
-                                Label(L10n.Onboarding.cliNotFound, systemImage: "xmark.circle.fill")
-                                    .font(.caption)
-                                    .foregroundColor(.red)
-                                Text(L10n.Onboarding.cliInstallHint)
-                                    .font(.caption2)
-                                    .foregroundColor(.secondary)
-                            }
-                        }
+                        onboardingCLIStatus(for: provider)
                         .padding(12)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .background(Color.secondary.opacity(0.05))
@@ -935,6 +925,52 @@ struct OnboardingView: View {
             )
         }
         .buttonStyle(.plain)
+    }
+
+    @ViewBuilder
+    private func onboardingCLIStatus(for provider: AIProvider) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if provider == .claudeCLI {
+                if ClaudeCLIClient.isAvailable() {
+                    Label(L10n.Onboarding.cliInstalled, systemImage: "checkmark.circle.fill")
+                        .font(.caption)
+                        .foregroundColor(.green)
+                    Text(L10n.Onboarding.cliPipeMode)
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                } else {
+                    Label(L10n.Onboarding.cliNotFound, systemImage: "xmark.circle.fill")
+                        .font(.caption)
+                        .foregroundColor(.red)
+                    Text(L10n.Onboarding.cliInstallHint)
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
+            } else if provider == .codexCLI {
+                if appState.hasCodexCLI {
+                    Label(L10n.Onboarding.codexInstalled, systemImage: "checkmark.circle.fill")
+                        .font(.caption)
+                        .foregroundColor(.green)
+                    Text(L10n.Onboarding.codexExecMode)
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                } else if appState.codexCLIInstalled {
+                    Label(L10n.Onboarding.codexAuthRequired, systemImage: "exclamationmark.triangle.fill")
+                        .font(.caption)
+                        .foregroundColor(.orange)
+                    Text(L10n.Onboarding.codexLoginHint)
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                } else {
+                    Label(L10n.Onboarding.codexNotFound, systemImage: "xmark.circle.fill")
+                        .font(.caption)
+                        .foregroundColor(.red)
+                    Text(L10n.Onboarding.codexInstallHint)
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
+            }
+        }
     }
 
     // MARK: - Shared Components
@@ -1192,7 +1228,12 @@ struct OnboardingView: View {
                     guideRow(icon: "2.circle.fill", text: L10n.Onboarding.guideDragOrPaste)
                     guideRow(icon: "3.circle.fill", text: L10n.Onboarding.guideOrganize)
                 } else {
-                    guideRow(icon: "terminal", text: L10n.Onboarding.guideCliConnect)
+                    guideRow(
+                        icon: "terminal",
+                        text: appState.selectedProvider == .codexCLI
+                            ? L10n.Onboarding.guideCodexConnect
+                            : L10n.Onboarding.guideCliConnect
+                    )
                     guideRow(icon: "gearshape", text: L10n.Onboarding.guideAddApiKey)
                 }
             }

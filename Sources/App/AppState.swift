@@ -85,6 +85,7 @@ final class AppState: ObservableObject {
     enum BackgroundTaskKind {
         case vaultCheck
         case reorgScan
+        case inboxPostProcessing
         case initialLinkBootstrap
     }
 
@@ -97,6 +98,8 @@ final class AppState: ObservableObject {
     @Published var taskBlockedAlert: String?
     private var backgroundTask: Task<Void, Never>?
     private var pendingInitialLinkBootstrap = false
+    private var pendingInboxPostProcessPaths: Set<String> = []
+    private var pendingInboxPostProcessFolders: Set<String> = []
 
     var isAnyTaskRunning: Bool {
         isProcessing || (backgroundTaskName != nil && !backgroundTaskCompleted)
@@ -106,6 +109,14 @@ final class AppState: ObservableObject {
         if let bg = backgroundTaskName { return bg }
         if isProcessing { return "파일 처리" }
         return ""
+    }
+
+    private var pendingConfirmationBlockMessage: String {
+        let count = pendingConfirmations.count
+        if count == 1 {
+            return "확인 대기 중인 파일 1개를 먼저 처리해주세요."
+        }
+        return "확인 대기 중인 파일 \(count)개를 먼저 처리해주세요."
     }
 
     // MARK: - Reorg State (Vault Inspector)
@@ -364,6 +375,7 @@ final class AppState: ObservableObject {
     }
 
     func startVaultCheck() {
+        guard !shouldBlockForPendingConfirmations() else { return }
         guard !isAnyTaskRunning else {
             taskBlockedAlert = "'\(runningTaskDisplayName)' 진행 중입니다. 완료 또는 취소 후 다시 시도해주세요."
             return
@@ -406,6 +418,13 @@ final class AppState: ObservableObject {
             resetReorg()
             return
         }
+        if backgroundTaskKind == .initialLinkBootstrap {
+            pendingInitialLinkBootstrap = false
+        }
+        if backgroundTaskKind == .inboxPostProcessing {
+            pendingInboxPostProcessPaths.removeAll()
+            pendingInboxPostProcessFolders.removeAll()
+        }
         backgroundTask?.cancel()
         backgroundTask = nil
         backgroundTaskKind = nil
@@ -424,7 +443,83 @@ final class AppState: ObservableObject {
         }
 
         pendingInitialLinkBootstrap = true
+        maybeStartQueuedBackgroundTask()
+    }
+
+    private func enqueueInboxPostProcessing(successPaths: [String], affectedFolders: Set<String>) {
+        let normalizedPaths = Set(successPaths.filter { !$0.isEmpty })
+        guard !normalizedPaths.isEmpty else { return }
+
+        pendingInboxPostProcessPaths.formUnion(normalizedPaths)
+        if affectedFolders.isEmpty {
+            pendingInboxPostProcessFolders.formUnion(Self.affectedFolders(for: Array(normalizedPaths)))
+        } else {
+            pendingInboxPostProcessFolders.formUnion(affectedFolders)
+        }
+
+        maybeStartQueuedBackgroundTask()
+    }
+
+    private func maybeStartQueuedBackgroundTask() {
+        guard backgroundTaskName == nil else { return }
+
+        if !pendingInboxPostProcessPaths.isEmpty {
+            let filePaths = pendingInboxPostProcessPaths.sorted()
+            let folders = pendingInboxPostProcessFolders
+            pendingInboxPostProcessPaths.removeAll()
+            pendingInboxPostProcessFolders.removeAll()
+            startInboxPostProcessing(filePaths: filePaths, affectedFolders: folders)
+            return
+        }
+
         maybeStartInitialLinkBootstrap()
+    }
+
+    private func startInboxPostProcessing(filePaths: [String], affectedFolders: Set<String>) {
+        guard !filePaths.isEmpty else {
+            maybeStartInitialLinkBootstrap()
+            return
+        }
+
+        backgroundTaskKind = .inboxPostProcessing
+        backgroundTaskName = "링크 후처리"
+        backgroundTaskPhase = "새 노트 메타데이터 보완 중..."
+        backgroundTaskProgress = 0
+        backgroundTaskCompleted = false
+
+        let root = pkmRootPath
+        let pipeline = InboxPostProcessingPipeline(
+            pkmRoot: root,
+            filePaths: filePaths,
+            affectedFolders: affectedFolders
+        )
+        backgroundTask = Task.detached(priority: .utility) {
+            let result = await pipeline.run { progress in
+                Task { @MainActor in
+                    AppState.shared.backgroundTaskPhase = progress.phase
+                    AppState.shared.backgroundTaskProgress = progress.fraction
+                }
+            }
+
+            if !Task.isCancelled {
+                StatisticsService.recordActivity(
+                    fileName: "링크 후처리",
+                    category: "system",
+                    action: "completed",
+                    detail: "\(result.enrichedCount)개 보완, \(result.linksCreated)개 링크"
+                )
+            }
+
+            await MainActor.run {
+                AppState.shared.backgroundTask = nil
+                AppState.shared.backgroundTaskKind = nil
+                AppState.shared.backgroundTaskName = nil
+                AppState.shared.backgroundTaskPhase = ""
+                AppState.shared.backgroundTaskProgress = 0
+                AppState.shared.backgroundTaskCompleted = false
+                AppState.shared.maybeStartQueuedBackgroundTask()
+            }
+        }
     }
 
     private func maybeStartInitialLinkBootstrap() {
@@ -469,6 +564,7 @@ final class AppState: ObservableObject {
                 AppState.shared.backgroundTaskPhase = ""
                 AppState.shared.backgroundTaskProgress = 0
                 AppState.shared.backgroundTaskCompleted = false
+                AppState.shared.maybeStartQueuedBackgroundTask()
             }
         }
     }
@@ -573,6 +669,7 @@ final class AppState: ObservableObject {
     private var processingTask: Task<Void, Never>?
 
     func startProcessing() async {
+        guard !shouldBlockForPendingConfirmations() else { return }
         guard !isAnyTaskRunning else {
             if backgroundTaskName != nil {
                 taskBlockedAlert = "'\(runningTaskDisplayName)' 진행 중입니다. 완료 또는 취소 후 다시 시도해주세요."
@@ -638,9 +735,11 @@ final class AppState: ObservableObject {
                 processedResults = results.processed
                 affectedFolders = results.affectedFolders
                 pendingConfirmations = results.needsConfirmation
+                let successPaths = results.processed.filter(\.isSuccess).map(\.targetPath)
+                enqueueInboxPostProcessing(successPaths: successPaths, affectedFolders: results.affectedFolders)
                 currentScreen = .results
                 requestInitialLinkBootstrapIfNeeded(
-                    hasSuccessfulInboxImport: results.processed.contains(where: \.isSuccess)
+                    hasSuccessfulInboxImport: !successPaths.isEmpty
                 )
             } catch {
                 if !Task.isCancelled {
@@ -669,6 +768,7 @@ final class AppState: ObservableObject {
     }
 
     func startReorganizing() async {
+        guard !shouldBlockForPendingConfirmations() else { return }
         guard !isAnyTaskRunning else {
             if backgroundTaskName != nil {
                 taskBlockedAlert = "'\(runningTaskDisplayName)' 진행 중입니다. 완료 또는 취소 후 다시 시도해주세요."
@@ -747,6 +847,7 @@ final class AppState: ObservableObject {
 
     /// Reorganize multiple folders sequentially
     func startBatchReorganizing(folders: [(category: PARACategory, subfolder: String)]) async {
+        guard !shouldBlockForPendingConfirmations() else { return }
         guard !isAnyTaskRunning, !folders.isEmpty else {
             if isAnyTaskRunning {
                 taskBlockedAlert = "'\(runningTaskDisplayName)' 진행 중입니다. 완료 또는 취소 후 다시 시도해주세요."
@@ -940,6 +1041,10 @@ final class AppState: ObservableObject {
                 with: choice
             )
             processedResults.append(result)
+            let successPaths = result.isSuccess ? [result.targetPath] : []
+            let folders = Self.affectedFolders(for: successPaths)
+            affectedFolders.formUnion(folders)
+            enqueueInboxPostProcessing(successPaths: successPaths, affectedFolders: folders)
         } catch {
             processedResults.append(ProcessedFileResult(
                 fileName: confirmation.fileName,
@@ -996,6 +1101,10 @@ final class AppState: ObservableObject {
             let mover = FileMover(pkmRoot: pkmRootPath)
             let result = try await mover.moveFile(at: confirmation.filePath, with: classification)
             processedResults.append(result)
+            let successPaths = result.isSuccess ? [result.targetPath] : []
+            let folders = Self.affectedFolders(for: successPaths)
+            affectedFolders.formUnion(folders)
+            enqueueInboxPostProcessing(successPaths: successPaths, affectedFolders: folders)
         } catch {
             processedResults.append(ProcessedFileResult(
                 fileName: confirmation.fileName,
@@ -1075,11 +1184,11 @@ final class AppState: ObservableObject {
     }
 
     func resetToInbox() {
+        guard !shouldBlockForPendingConfirmations() else { return }
         currentScreen = .inbox
         processedResults = []
         pendingConfirmations = []
         affectedFolders = []
-        pendingInitialLinkBootstrap = false
         reorganizeCategory = nil
         reorganizeSubfolder = nil
         Task {
@@ -1088,6 +1197,7 @@ final class AppState: ObservableObject {
     }
 
     func navigateBack() {
+        guard !shouldBlockForPendingConfirmations() else { return }
         if currentScreen == .results {
             if processingOrigin == .paraManage {
                 currentScreen = .paraManage
@@ -1104,7 +1214,6 @@ final class AppState: ObservableObject {
         processedResults = []
         pendingConfirmations = []
         affectedFolders = []
-        pendingInitialLinkBootstrap = false
         navigationId = UUID()
         if currentScreen == .inbox {
             reorganizeCategory = nil
@@ -1144,7 +1253,7 @@ final class AppState: ObservableObject {
 
     private func checkConfirmationsComplete() {
         guard pendingConfirmations.isEmpty else { return }
-        maybeStartInitialLinkBootstrap()
+        maybeStartQueuedBackgroundTask()
         guard !isAutoNavigating else { return }
         isAutoNavigating = true
 
@@ -1157,6 +1266,21 @@ final class AppState: ObservableObject {
             guard pendingConfirmations.isEmpty else { return }
             navigateBack()
         }
+    }
+
+    private func shouldBlockForPendingConfirmations() -> Bool {
+        guard !pendingConfirmations.isEmpty else { return false }
+        currentScreen = .results
+        taskBlockedAlert = pendingConfirmationBlockMessage
+        return true
+    }
+
+    private static func affectedFolders(for targetPaths: [String]) -> Set<String> {
+        Set(targetPaths.compactMap { path -> String? in
+            guard !path.isEmpty else { return nil }
+            let dir = (path as NSString).deletingLastPathComponent
+            return dir.isEmpty ? nil : dir
+        })
     }
 }
 

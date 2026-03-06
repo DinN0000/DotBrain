@@ -306,6 +306,12 @@
 "onboarding.cli_pipe_mode" = "AI calls via claude -p pipe mode";
 "onboarding.cli_not_found" = "Claude CLI not found";
 "onboarding.cli_install_hint" = "Install: https://claude.com/download";
+"onboarding.codex_installed" = "Codex CLI installed";
+"onboarding.codex_exec_mode" = "AI calls via codex exec mode";
+"onboarding.codex_auth_required" = "Codex CLI authentication required";
+"onboarding.codex_login_hint" = "Run codex login in Terminal";
+"onboarding.codex_not_found" = "Codex CLI not found";
+"onboarding.codex_install_hint" = "Install: npm install -g @openai/codex";
 "onboarding.api_key_label" = "%@ API Key";
 "onboarding.get_api_key" = "Get Key";
 "onboarding.save" = "Save";
@@ -323,6 +329,7 @@
 "onboarding.guide_drag_or_paste" = "Drag files or paste with Cmd+V";
 "onboarding.guide_organize" = "Click \"Organize\" and AI will classify";
 "onboarding.guide_cli_connect" = "Connect to folders using Claude CLI";
+"onboarding.guide_codex_connect" = "Connect to folders using Codex CLI";
 "onboarding.guide_add_api_key" = "Add an API key anytime in Settings";
 
 /* Vault Inspector */
