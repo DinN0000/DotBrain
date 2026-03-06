@@ -85,6 +85,7 @@ final class AppState: ObservableObject {
     enum BackgroundTaskKind {
         case vaultCheck
         case reorgScan
+        case initialLinkBootstrap
     }
 
     @Published var backgroundTaskKind: BackgroundTaskKind?
@@ -95,6 +96,7 @@ final class AppState: ObservableObject {
     @Published var vaultCheckResult: VaultCheckResult?
     @Published var taskBlockedAlert: String?
     private var backgroundTask: Task<Void, Never>?
+    private var pendingInitialLinkBootstrap = false
 
     var isAnyTaskRunning: Bool {
         isProcessing || (backgroundTaskName != nil && !backgroundTaskCompleted)
@@ -389,6 +391,7 @@ final class AppState: ObservableObject {
 
             await MainActor.run {
                 AppState.shared.vaultCheckResult = result
+                AppState.shared.backgroundTask = nil
                 AppState.shared.backgroundTaskKind = nil
                 AppState.shared.backgroundTaskName = nil
                 AppState.shared.backgroundTaskPhase = ""
@@ -410,6 +413,64 @@ final class AppState: ObservableObject {
         backgroundTaskPhase = ""
         backgroundTaskProgress = 0
         backgroundTaskCompleted = false
+    }
+
+    private func requestInitialLinkBootstrapIfNeeded(hasSuccessfulInboxImport: Bool) {
+        guard processingOrigin == .inbox else { return }
+        guard hasSuccessfulInboxImport else { return }
+        guard InitialLinkBootstrapPipeline.needsBootstrap(pkmRoot: pkmRootPath) else {
+            pendingInitialLinkBootstrap = false
+            return
+        }
+
+        pendingInitialLinkBootstrap = true
+        maybeStartInitialLinkBootstrap()
+    }
+
+    private func maybeStartInitialLinkBootstrap() {
+        guard pendingInitialLinkBootstrap else { return }
+        guard pendingConfirmations.isEmpty else { return }
+        guard backgroundTaskName == nil else { return }
+        guard InitialLinkBootstrapPipeline.needsBootstrap(pkmRoot: pkmRootPath) else {
+            pendingInitialLinkBootstrap = false
+            return
+        }
+
+        pendingInitialLinkBootstrap = false
+        backgroundTaskKind = .initialLinkBootstrap
+        backgroundTaskName = "초기 링크 구축"
+        backgroundTaskPhase = "기존 볼트 메타데이터 보완 중..."
+        backgroundTaskProgress = 0
+        backgroundTaskCompleted = false
+
+        let root = pkmRootPath
+        let pipeline = InitialLinkBootstrapPipeline(pkmRoot: root)
+        backgroundTask = Task.detached(priority: .utility) {
+            let result = await pipeline.run { progress in
+                Task { @MainActor in
+                    AppState.shared.backgroundTaskPhase = progress.phase
+                    AppState.shared.backgroundTaskProgress = progress.fraction
+                }
+            }
+
+            if !Task.isCancelled {
+                StatisticsService.recordActivity(
+                    fileName: "초기 링크 구축",
+                    category: "system",
+                    action: "completed",
+                    detail: "\(result.enrichedCount)개 보완, \(result.linksCreated)개 링크"
+                )
+            }
+
+            await MainActor.run {
+                AppState.shared.backgroundTask = nil
+                AppState.shared.backgroundTaskKind = nil
+                AppState.shared.backgroundTaskName = nil
+                AppState.shared.backgroundTaskPhase = ""
+                AppState.shared.backgroundTaskProgress = 0
+                AppState.shared.backgroundTaskCompleted = false
+            }
+        }
     }
 
     /// Compare current vault file locations against note-index.json.
@@ -578,6 +639,9 @@ final class AppState: ObservableObject {
                 affectedFolders = results.affectedFolders
                 pendingConfirmations = results.needsConfirmation
                 currentScreen = .results
+                requestInitialLinkBootstrapIfNeeded(
+                    hasSuccessfulInboxImport: results.processed.contains(where: \.isSuccess)
+                )
             } catch {
                 if !Task.isCancelled {
                     pipelineError = InboxProcessor.friendlyErrorMessage(error)
@@ -1015,6 +1079,7 @@ final class AppState: ObservableObject {
         processedResults = []
         pendingConfirmations = []
         affectedFolders = []
+        pendingInitialLinkBootstrap = false
         reorganizeCategory = nil
         reorganizeSubfolder = nil
         Task {
@@ -1039,6 +1104,7 @@ final class AppState: ObservableObject {
         processedResults = []
         pendingConfirmations = []
         affectedFolders = []
+        pendingInitialLinkBootstrap = false
         navigationId = UUID()
         if currentScreen == .inbox {
             reorganizeCategory = nil
@@ -1078,6 +1144,7 @@ final class AppState: ObservableObject {
 
     private func checkConfirmationsComplete() {
         guard pendingConfirmations.isEmpty else { return }
+        maybeStartInitialLinkBootstrap()
         guard !isAutoNavigating else { return }
         isAutoNavigating = true
 

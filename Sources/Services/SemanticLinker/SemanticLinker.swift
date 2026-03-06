@@ -195,6 +195,16 @@ struct SemanticLinker: Sendable {
         let contextMap = await ContextMapBuilder(pkmRoot: pkmRoot).build()
         let noteNames = Set(allNotes.map { $0.name })
 
+        let folderRelationStore = FolderRelationStore(pkmRoot: pkmRoot)
+        let folderRelations = folderRelationStore.load()
+        let suppressSet = folderRelations.relations.isEmpty ? Set<String>() : folderRelationStore.suppressPairs()
+        let boostSet = folderRelations.relations.isEmpty ? Set<String>() : folderRelationStore.boostPairKeys()
+        let folderHintContext = Self.buildFolderHintSection(folderRelations)
+        let feedbackContext = LinkFeedbackStore(pkmRoot: pkmRoot).buildPromptContext()
+        let combinedHintContext = [folderHintContext, feedbackContext]
+            .filter { !$0.isEmpty }
+            .joined(separator: "\n\n")
+
         let targetNames = Set(filePaths.map {
             (($0 as NSString).lastPathComponent as NSString).deletingPathExtension
         })
@@ -216,7 +226,9 @@ struct SemanticLinker: Sendable {
             let candidates = candidateGen.generateCandidates(
                 for: note,
                 allNotes: allNotes,
-                preparedIndex: preparedIndex
+                preparedIndex: preparedIndex,
+                suppressSet: suppressSet,
+                boostSet: boostSet
             )
             if !candidates.isEmpty {
                 notesWithCandidates.append((note: note, candidates: candidates))
@@ -255,7 +267,10 @@ struct SemanticLinker: Sendable {
                     }
 
                     do {
-                        let results = try await aiFilter.filterBatch(notes: batchInput)
+                        let results = try await aiFilter.filterBatch(
+                            notes: batchInput,
+                            folderHintContext: combinedHintContext
+                        )
                         return zip(batch, results).map { (item, links) in
                             (filePath: item.note.filePath, noteName: item.note.name, links: links)
                         }
