@@ -324,6 +324,127 @@ enum L10n {
         static func noteCount(_ para: String, _ count: Int) -> String { tr("folder_relation.note_count", para, count) }
     }
 
+    // MARK: - Onboarding
+
+    enum Onboarding {
+        static let getStarted = tr("onboarding.get_started")
+        static let folderCreationFailed = tr("onboarding.folder_creation_failed")
+        static let confirm = tr("onboarding.confirm")
+        static let unknownError = tr("onboarding.unknown_error")
+        // Step 1: Permission
+        static let permissionTitle = tr("onboarding.permission_title")
+        static let permissionDesc = tr("onboarding.permission_desc")
+        static let permissionGranted = tr("onboarding.permission_granted")
+        static let permissionNeeded = tr("onboarding.permission_needed")
+        static let permissionReady = tr("onboarding.permission_ready")
+        static let permissionFallback = tr("onboarding.permission_fallback")
+        static let instructionStep1 = tr("onboarding.instruction_step1")
+        static let instructionStep2 = tr("onboarding.instruction_step2")
+        static let instructionStep3 = tr("onboarding.instruction_step3")
+        static let openSystemSettings = tr("onboarding.open_system_settings")
+        static let previous = tr("onboarding.previous")
+        static let next = tr("onboarding.next")
+        static let skip = tr("onboarding.skip")
+        // Step 2: Folder
+        static let folderTitle = tr("onboarding.folder_title")
+        static let folderDesc = tr("onboarding.folder_desc")
+        static let storagePath = tr("onboarding.storage_path")
+        static let change = tr("onboarding.change")
+        static let paraStructure = tr("onboarding.para_structure")
+        static let paraProjectMetaphor = tr("onboarding.para_project_metaphor")
+        static let paraProjectDesc = tr("onboarding.para_project_desc")
+        static let paraAreaMetaphor = tr("onboarding.para_area_metaphor")
+        static let paraAreaDesc = tr("onboarding.para_area_desc")
+        static let paraResourceMetaphor = tr("onboarding.para_resource_metaphor")
+        static let paraResourceDesc = tr("onboarding.para_resource_desc")
+        static let paraArchiveMetaphor = tr("onboarding.para_archive_metaphor")
+        static let paraArchiveDesc = tr("onboarding.para_archive_desc")
+        static let cancel = tr("onboarding.cancel")
+        static let noWritePermission = tr("onboarding.no_write_permission")
+        static func folderCreationError(_ error: String) -> String { tr("onboarding.folder_creation_error", error) }
+        static let pickVaultTitle = tr("onboarding.pick_vault_title")
+        // Step 3: Domain & Project
+        static let domainProjectTitle = tr("onboarding.domain_project_title")
+        static let domainProjectDesc = tr("onboarding.domain_project_desc")
+        static let domainProjectHint = tr("onboarding.domain_project_hint")
+        static let domainPlaceholder = tr("onboarding.domain_placeholder")
+        static func projectCount(_ count: Int) -> String { tr("onboarding.project_count", count) }
+        static let areaSummaryPlaceholder = tr("onboarding.area_summary_placeholder")
+        static let projectName = tr("onboarding.project_name")
+        static let addDomainHint = tr("onboarding.add_domain_hint")
+        static let addDomainSummaryHint = tr("onboarding.add_domain_summary_hint")
+        // Step 4: Provider + API Key
+        static let aiConnectionTitle = tr("onboarding.ai_connection_title")
+        static let aiConnectionDesc = tr("onboarding.ai_connection_desc")
+        static let badgeSubscription = tr("onboarding.badge_subscription")
+        static let badgeFreeStart = tr("onboarding.badge_free_start")
+        static let badgeApiPayment = tr("onboarding.badge_api_payment")
+        static let cliInstalled = tr("onboarding.cli_installed")
+        static let cliPipeMode = tr("onboarding.cli_pipe_mode")
+        static let cliNotFound = tr("onboarding.cli_not_found")
+        static let cliInstallHint = tr("onboarding.cli_install_hint")
+        static func apiKeyLabel(_ provider: String) -> String { tr("onboarding.api_key_label", provider) }
+        static let getApiKey = tr("onboarding.get_api_key")
+        static let save = tr("onboarding.save")
+        static let keySaved = tr("onboarding.key_saved")
+        static let keySaveFailed = tr("onboarding.key_save_failed")
+        static func keyFormatHint(_ placeholder: String) -> String { tr("onboarding.key_format_hint", placeholder) }
+        static let ready = tr("onboarding.ready")
+        // Step 5: Trial / Quick Start
+        static let vaultSetupComplete = tr("onboarding.vault_setup_complete")
+        static let allReady = tr("onboarding.all_ready")
+        static let almostDone = tr("onboarding.almost_done")
+        static let vaultReadyDesc = tr("onboarding.vault_ready_desc")
+        static let inboxReadyDesc = tr("onboarding.inbox_ready_desc")
+        static let noApiKeyDesc = tr("onboarding.no_api_key_desc")
+        static let guideClickMenubar = tr("onboarding.guide_click_menubar")
+        static let guideDragOrPaste = tr("onboarding.guide_drag_or_paste")
+        static let guideOrganize = tr("onboarding.guide_organize")
+        static let guideCliConnect = tr("onboarding.guide_cli_connect")
+        static let guideAddApiKey = tr("onboarding.guide_add_api_key")
+    }
+
+    // MARK: - Vault Inspector
+
+    enum VaultInspector {
+        static let autoRepair = tr("vault_inspector.auto_repair")
+        static let metaLinksTagsDesc = tr("vault_inspector.meta_links_tags_desc")
+        static let autoRepairHelp = tr("vault_inspector.auto_repair_help")
+        static let locationSuggestion = tr("vault_inspector.location_suggestion")
+        static let fileRelocation = tr("vault_inspector.file_relocation")
+        static let locationSuggestionHelp = tr("vault_inspector.location_suggestion_help")
+        static let aiScanning = tr("vault_inspector.ai_scanning")
+        static let relocating = tr("vault_inspector.relocating")
+        static func categoryLocationSuggestion(_ name: String) -> String { tr("vault_inspector.category_location_suggestion", name) }
+        static func filesNeedMove(_ count: Int) -> String { tr("vault_inspector.files_need_move", count) }
+        static func filesInPlace(_ count: Int) -> String { tr("vault_inspector.files_in_place", count) }
+        static let selectAll = tr("vault_inspector.select_all")
+        static let cancel = tr("vault_inspector.cancel")
+        static let execute = tr("vault_inspector.execute")
+        static let openInFinder = tr("vault_inspector.open_in_finder")
+        static let allFilesInPlace = tr("vault_inspector.all_files_in_place")
+        static func filesMoved(_ count: Int) -> String { tr("vault_inspector.files_moved", count) }
+        static func errorCount(_ count: Int) -> String { tr("vault_inspector.error_count", count) }
+        static let moveFailed = tr("vault_inspector.move_failed")
+        static let close = tr("vault_inspector.close")
+        static let brokenLinks = tr("vault_inspector.broken_links")
+        static let missingFrontmatter = tr("vault_inspector.missing_frontmatter")
+        static let paraUnclassified = tr("vault_inspector.para_unclassified")
+        static func autoRepaired(_ count: Int) -> String { tr("vault_inspector.auto_repaired", count) }
+        static func metadataEnriched(_ count: Int) -> String { tr("vault_inspector.metadata_enriched", count) }
+        static func semanticLinksCreated(_ count: Int) -> String { tr("vault_inspector.semantic_links_created", count) }
+        static let folderSummaryUpdated = tr("vault_inspector.folder_summary_updated")
+        static let vaultHealthy = tr("vault_inspector.vault_healthy")
+        static func issueCount(_ count: Int) -> String { tr("vault_inspector.issue_count", count) }
+        static let preparingScan = tr("vault_inspector.preparing_scan")
+        static let noChangedFiles = tr("vault_inspector.no_changed_files")
+        static let scanError = tr("vault_inspector.scan_error")
+        static let preparingExecution = tr("vault_inspector.preparing_execution")
+        static func errorStatus(_ error: String) -> String { tr("vault_inspector.error_status", error) }
+        static func modifiedCount(_ count: Int) -> String { tr("vault_inspector.modified_count", count) }
+        static func newCount(_ count: Int) -> String { tr("vault_inspector.new_count", count) }
+    }
+
     // MARK: - Common
 
     enum Common {

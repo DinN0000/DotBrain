@@ -88,10 +88,10 @@ struct VaultInspectorView: View {
                         HStack(spacing: 4) {
                             Image(systemName: "stethoscope")
                                 .font(.caption)
-                            Text("자동 수리")
+                            Text(L10n.VaultInspector.autoRepair)
                                 .font(.caption)
                         }
-                        Text("메타 · 링크 · 태그")
+                        Text(L10n.VaultInspector.metaLinksTagsDesc)
                             .font(.system(size: 9))
                             .foregroundColor(.secondary)
                     }
@@ -100,17 +100,17 @@ struct VaultInspectorView: View {
                 }
                 .buttonStyle(.bordered)
                 .disabled(appState.isAnyTaskRunning)
-                .help("깨진 링크, 누락 메타데이터, 태그 등 문제를 찾아 자동 복구")
+                .help(L10n.VaultInspector.autoRepairHelp)
 
                 Button(action: { startFullReorg() }) {
                     VStack(spacing: 1) {
                         HStack(spacing: 4) {
                             Image(systemName: "arrow.triangle.2.circlepath")
                                 .font(.caption)
-                            Text("위치 제안")
+                            Text(L10n.VaultInspector.locationSuggestion)
                                 .font(.caption)
                         }
-                        Text("파일 위치 재배치")
+                        Text(L10n.VaultInspector.fileRelocation)
                             .font(.system(size: 9))
                             .foregroundColor(.secondary)
                     }
@@ -119,7 +119,7 @@ struct VaultInspectorView: View {
                 }
                 .buttonStyle(.bordered)
                 .disabled(appState.isAnyTaskRunning)
-                .help("AI가 파일을 분석해서 적절한 폴더를 제안")
+                .help(L10n.VaultInspector.locationSuggestionHelp)
 
                 Spacer()
             }
@@ -129,7 +129,7 @@ struct VaultInspectorView: View {
             // Inline progress/result cards
             if appState.backgroundTaskKind == .vaultCheck {
                 taskProgressCard(
-                    title: "자동 수리",
+                    title: L10n.VaultInspector.autoRepair,
                     progress: appState.backgroundTaskProgress,
                     status: appState.backgroundTaskPhase,
                     onCancel: { appState.cancelBackgroundTask() }
@@ -157,7 +157,7 @@ struct VaultInspectorView: View {
 
             if appState.reorgPhase == .scanning || appState.reorgPhase == .executing {
                 taskProgressCard(
-                    title: appState.reorgPhase == .scanning ? "AI 스캔 중" : "위치 이동 중",
+                    title: appState.reorgPhase == .scanning ? L10n.VaultInspector.aiScanning : L10n.VaultInspector.relocating,
                     progress: appState.reorgProgress,
                     status: appState.reorgStatus,
                     onCancel: { resetReorg() }
@@ -241,7 +241,7 @@ struct VaultInspectorView: View {
 
         addMenuItem(
             to: menu,
-            title: "위치 제안",
+            title: L10n.VaultInspector.locationSuggestion,
             icon: "arrow.triangle.2.circlepath"
         ) {
             // Smart default: changed files only if any, otherwise full folder
@@ -254,7 +254,7 @@ struct VaultInspectorView: View {
 
         menu.addItem(.separator())
 
-        addMenuItem(to: menu, title: "Finder에서 열기", icon: "folder") {
+        addMenuItem(to: menu, title: L10n.VaultInspector.openInFinder, icon: "folder") {
             self.openInFinder(folder)
         }
 
@@ -275,7 +275,7 @@ struct VaultInspectorView: View {
         let menu = NSMenu()
         addMenuItem(
             to: menu,
-            title: "\(category.displayName) 전체 위치 제안",
+            title: L10n.VaultInspector.categoryLocationSuggestion(category.displayName),
             icon: "arrow.triangle.2.circlepath"
         ) {
             self.startCategoryReorg(category)
@@ -301,7 +301,7 @@ struct VaultInspectorView: View {
         return VStack(spacing: 0) {
             VStack(alignment: .leading, spacing: 4) {
                 Label(
-                    "\(movableCount)개 파일 이동 필요",
+                    L10n.VaultInspector.filesNeedMove(movableCount),
                     systemImage: "arrow.triangle.2.circlepath"
                 )
                 .font(.caption)
@@ -331,7 +331,7 @@ struct VaultInspectorView: View {
                             Image(systemName: "checkmark.circle")
                                 .font(.caption2)
                                 .foregroundColor(.green)
-                            Text("\(unchangedCount)개 파일은 현재 위치가 적절합니다")
+                            Text(L10n.VaultInspector.filesInPlace(unchangedCount))
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                         }
@@ -354,14 +354,14 @@ struct VaultInspectorView: View {
                         }
                     }
                 )) {
-                    Text("전체")
+                    Text(L10n.VaultInspector.selectAll)
                         .font(.caption)
                 }
                 .toggleStyle(.checkbox)
 
                 Spacer()
 
-                Button("취소") { resetReorg() }
+                Button(L10n.VaultInspector.cancel) { resetReorg() }
                     .font(.caption)
                     .buttonStyle(.plain)
                     .foregroundColor(.secondary)
@@ -369,7 +369,7 @@ struct VaultInspectorView: View {
                 Button(action: { executeReorgPlan() }) {
                     HStack {
                         Image(systemName: "sparkles")
-                        Text("실행")
+                        Text(L10n.VaultInspector.execute)
                     }
                     .padding(.vertical, 4)
                     .padding(.horizontal, 12)
@@ -487,7 +487,7 @@ struct VaultInspectorView: View {
                     .font(.caption)
                     .fontWeight(.medium)
                 Spacer()
-                Button("취소") { onCancel() }
+                Button(L10n.VaultInspector.cancel) { onCancel() }
                     .font(.caption2)
                     .buttonStyle(.plain)
                     .foregroundColor(.secondary)
@@ -529,7 +529,7 @@ struct VaultInspectorView: View {
                     Image(systemName: "checkmark.circle.fill")
                         .font(.caption)
                         .foregroundColor(.green)
-                    Text("모든 파일이 적절한 위치에 있습니다")
+                    Text(L10n.VaultInspector.allFilesInPlace)
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
@@ -539,7 +539,7 @@ struct VaultInspectorView: View {
                         Image(systemName: "checkmark.circle")
                             .font(.caption)
                             .foregroundColor(.green)
-                        Text("\(successCount)개 파일 이동 완료")
+                        Text(L10n.VaultInspector.filesMoved(successCount))
                             .font(.caption)
                             .fontWeight(.medium)
                             .foregroundColor(.green)
@@ -551,13 +551,13 @@ struct VaultInspectorView: View {
                         Image(systemName: "xmark.circle")
                             .font(.caption)
                             .foregroundColor(.red)
-                        Text("\(errorResults.count)건 오류")
+                        Text(L10n.VaultInspector.errorCount(errorResults.count))
                             .font(.caption)
                             .foregroundColor(.red)
                         Spacer()
                     }
                     ForEach(errorResults) { result in
-                        Text("\(result.fileName) — \(result.error ?? "이동 실패")")
+                        Text("\(result.fileName) — \(result.error ?? L10n.VaultInspector.moveFailed)")
                             .font(.caption2)
                             .foregroundColor(.secondary)
                             .padding(.leading, 22)
@@ -566,7 +566,7 @@ struct VaultInspectorView: View {
             }
             HStack {
                 Spacer()
-                Button("닫기") { resetReorg() }
+                Button(L10n.VaultInspector.close) { resetReorg() }
                     .font(.caption2)
                     .buttonStyle(.plain)
                     .foregroundColor(.secondary)
@@ -593,52 +593,52 @@ struct VaultInspectorView: View {
 
         VStack(spacing: 6) {
             if result.brokenLinks > 0 {
-                auditRow(icon: "link", label: "깨진 링크", count: result.brokenLinks, color: .orange)
+                auditRow(icon: "link", label: L10n.VaultInspector.brokenLinks, count: result.brokenLinks, color: .orange)
             }
             if result.missingFrontmatter > 0 {
-                auditRow(icon: "doc.badge.plus", label: "프론트매터 누락", count: result.missingFrontmatter, color: .orange)
+                auditRow(icon: "doc.badge.plus", label: L10n.VaultInspector.missingFrontmatter, count: result.missingFrontmatter, color: .orange)
             }
             if result.missingPARA > 0 {
-                auditRow(icon: "folder.badge.questionmark", label: "PARA 미분류", count: result.missingPARA, color: .orange)
+                auditRow(icon: "folder.badge.questionmark", label: L10n.VaultInspector.paraUnclassified, count: result.missingPARA, color: .orange)
             }
             if result.repairCount > 0 {
                 HStack(spacing: 6) {
                     Image(systemName: "wrench.and.screwdriver").font(.caption).foregroundColor(.green)
-                    Text("\(result.repairCount)건 자동 복구").font(.caption).foregroundColor(.green)
+                    Text(L10n.VaultInspector.autoRepaired(result.repairCount)).font(.caption).foregroundColor(.green)
                     Spacer()
                 }
             }
             if result.enrichCount > 0 {
                 HStack(spacing: 6) {
                     Image(systemName: "text.badge.star").font(.caption).foregroundColor(.secondary)
-                    Text("\(result.enrichCount)개 메타데이터 보완").font(.caption)
+                    Text(L10n.VaultInspector.metadataEnriched(result.enrichCount)).font(.caption)
                     Spacer()
                 }
             }
             if result.linksCreated > 0 {
                 HStack(spacing: 6) {
                     Image(systemName: "arrow.triangle.branch").font(.caption).foregroundColor(.blue)
-                    Text("\(result.linksCreated)개 시맨틱 링크 생성").font(.caption).foregroundColor(.blue)
+                    Text(L10n.VaultInspector.semanticLinksCreated(result.linksCreated)).font(.caption).foregroundColor(.blue)
                     Spacer()
                 }
             }
             if result.mocUpdated {
                 HStack(spacing: 6) {
                     Image(systemName: "doc.text.magnifyingglass").font(.caption).foregroundColor(.secondary)
-                    Text("폴더 요약 갱신 완료").font(.caption)
+                    Text(L10n.VaultInspector.folderSummaryUpdated).font(.caption)
                     Spacer()
                 }
             }
             if allClean {
                 HStack(spacing: 6) {
                     Image(systemName: "checkmark.circle.fill").font(.caption).foregroundColor(.green)
-                    Text("볼트 상태 양호").font(.caption).foregroundColor(.green)
+                    Text(L10n.VaultInspector.vaultHealthy).font(.caption).foregroundColor(.green)
                     Spacer()
                 }
             }
             HStack {
                 Spacer()
-                Button("닫기") { appState.vaultCheckResult = nil }
+                Button(L10n.VaultInspector.close) { appState.vaultCheckResult = nil }
                     .font(.caption2)
                     .buttonStyle(.plain)
                     .foregroundColor(.secondary)
@@ -656,7 +656,7 @@ struct VaultInspectorView: View {
             Image(systemName: icon).font(.caption).foregroundColor(color).frame(width: 16)
             Text(label).font(.caption)
             Spacer()
-            Text("\(count)건").font(.caption).monospacedDigit().foregroundColor(.secondary)
+            Text(L10n.VaultInspector.issueCount(count)).font(.caption).monospacedDigit().foregroundColor(.secondary)
         }
     }
 
@@ -772,11 +772,11 @@ struct VaultInspectorView: View {
 
     private func startReorgScan() {
         appState.reorgProgress = 0
-        appState.reorgStatus = "스캔 준비 중..."
+        appState.reorgStatus = L10n.VaultInspector.preparingScan
         appState.backgroundTaskKind = .reorgScan
-        appState.backgroundTaskName = "위치 제안"
+        appState.backgroundTaskName = L10n.VaultInspector.locationSuggestion
         appState.backgroundTaskProgress = 0
-        appState.backgroundTaskPhase = "스캔 준비 중..."
+        appState.backgroundTaskPhase = L10n.VaultInspector.preparingScan
         appState.backgroundTaskCompleted = false
         let root = appState.pkmRootPath
         let currentScope = appState.reorgScope
@@ -803,7 +803,7 @@ struct VaultInspectorView: View {
                         AppState.shared.reorgAnalyses = []
                         AppState.shared.reorgResults = []
                         AppState.shared.reorgPhase = .done
-                        AppState.shared.reorgStatus = "변경된 파일이 없습니다"
+                        AppState.shared.reorgStatus = L10n.VaultInspector.noChangedFiles
                         AppState.shared.backgroundTaskKind = nil
                         AppState.shared.backgroundTaskName = nil
                         AppState.shared.backgroundTaskPhase = ""
@@ -867,7 +867,7 @@ struct VaultInspectorView: View {
                 if Task.isCancelled { return }
                 await MainActor.run {
                     AppState.shared.reorgResults = [ProcessedFileResult(
-                        fileName: "스캔 오류",
+                        fileName: L10n.VaultInspector.scanError,
                         para: .archive,
                         targetPath: "",
                         tags: [],
@@ -892,11 +892,11 @@ struct VaultInspectorView: View {
 
         appState.reorgPhase = .executing
         appState.reorgProgress = 0
-        appState.reorgStatus = "실행 준비 중..."
+        appState.reorgStatus = L10n.VaultInspector.preparingExecution
         appState.backgroundTaskKind = .reorgScan
-        appState.backgroundTaskName = "위치 이동"
+        appState.backgroundTaskName = L10n.VaultInspector.relocating
         appState.backgroundTaskProgress = 0
-        appState.backgroundTaskPhase = "실행 준비 중..."
+        appState.backgroundTaskPhase = L10n.VaultInspector.preparingExecution
         appState.backgroundTaskCompleted = false
         let root = appState.pkmRootPath
         let currentScope = appState.reorgScope
@@ -958,7 +958,7 @@ struct VaultInspectorView: View {
                 }
             } catch {
                 await MainActor.run {
-                    AppState.shared.reorgStatus = "오류: \(error.localizedDescription)"
+                    AppState.shared.reorgStatus = L10n.VaultInspector.errorStatus(error.localizedDescription)
                     AppState.shared.reorgPhase = .done
                     AppState.shared.backgroundTaskKind = nil
                     AppState.shared.backgroundTaskName = nil
@@ -1052,8 +1052,8 @@ private struct VaultFolderRow: View {
         if folder.healthLabel != "good" && !folder.healthIssues.isEmpty {
             parts.append(folder.healthIssues)
         }
-        if folder.modifiedCount > 0 { parts.append("변경 \(folder.modifiedCount)개") }
-        if folder.newCount > 0 { parts.append("신규 \(folder.newCount)개") }
+        if folder.modifiedCount > 0 { parts.append(L10n.VaultInspector.modifiedCount(folder.modifiedCount)) }
+        if folder.newCount > 0 { parts.append(L10n.VaultInspector.newCount(folder.newCount)) }
         return parts.joined(separator: " · ")
     }
 
