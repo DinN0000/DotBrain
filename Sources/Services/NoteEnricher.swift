@@ -112,16 +112,24 @@ struct NoteEnricher: Sendable {
         let mdFiles = files.filter { $0.hasSuffix(".md") && !$0.hasPrefix(".") && !$0.hasPrefix("_") }
             .map { (folderPath as NSString).appendingPathComponent($0) }
 
+        return await enrichFiles(mdFiles)
+    }
+
+    /// Enrich an arbitrary list of markdown files with limited concurrency.
+    func enrichFiles(_ filePaths: [String]) async -> [EnrichResult] {
+        let uniqueFiles = Array(Set(filePaths)).sorted()
+        guard !uniqueFiles.isEmpty else { return [] }
+
         var results: [EnrichResult] = []
 
         await withTaskGroup(of: EnrichResult?.self) { group in
             var active = 0
             var index = 0
 
-            while index < mdFiles.count || !group.isEmpty {
+            while index < uniqueFiles.count || !group.isEmpty {
                 // Launch up to 3 concurrent tasks
-                while active < 3 && index < mdFiles.count {
-                    let filePath = mdFiles[index]
+                while active < 3 && index < uniqueFiles.count {
+                    let filePath = uniqueFiles[index]
                     index += 1
                     active += 1
                     group.addTask {

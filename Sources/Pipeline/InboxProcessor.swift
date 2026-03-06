@@ -301,8 +301,20 @@ struct InboxProcessor {
             await indexGenerator.updateForFolders(affectedFolders)
         }
 
-        // Semantic link: connect newly moved files with vault
+        // Fill missing metadata on newly created/updated notes before semantic linking.
         let successPaths = successes.map(\.targetPath)
+        let mdPaths = successPaths.filter { $0.hasSuffix(".md") }
+        if !mdPaths.isEmpty {
+            onProgress?(0.89, "메타데이터 보완 중...")
+            let enricher = NoteEnricher(pkmRoot: pkmRoot)
+            let enrichResults = await enricher.enrichFiles(mdPaths)
+            if enrichResults.contains(where: { $0.fieldsUpdated > 0 }), !affectedFolders.isEmpty {
+                let indexGenerator = NoteIndexGenerator(pkmRoot: pkmRoot)
+                await indexGenerator.updateForFolders(affectedFolders)
+            }
+        }
+
+        // Semantic link: connect newly moved files with vault
         if !successPaths.isEmpty {
             onProgress?(0.93, "시맨틱 연결 중...")
             let linker = SemanticLinker(pkmRoot: pkmRoot)
@@ -310,7 +322,6 @@ struct InboxProcessor {
 
             // Register content hashes for processed .md files so vault inspector
             // does not flag them as "new" on the next check
-            let mdPaths = successPaths.filter { $0.hasSuffix(".md") }
             if !mdPaths.isEmpty {
                 let cache = ContentHashCache(pkmRoot: pkmRoot)
                 await cache.load()
