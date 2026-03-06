@@ -33,6 +33,25 @@ actor Classifier {
     ) async throws -> [ClassifyResult] {
         guard !files.isEmpty else { return [] }
 
+        // Build system prompts once per batch for prompt caching
+        let stage1SystemPrompt = buildSystemPrompt(
+            projectContext: projectContext,
+            subfolderContext: subfolderContext,
+            weightedContext: weightedContext,
+            areaContext: areaContext,
+            tagVocabulary: tagVocabulary,
+            correctionContext: correctionContext
+        )
+        let stage2SystemPrompt = buildSystemPrompt(
+            projectContext: projectContext,
+            subfolderContext: subfolderContext,
+            weightedContext: weightedContext,
+            areaContext: areaContext,
+            tagVocabulary: tagVocabulary,
+            correctionContext: correctionContext,
+            precise: true
+        )
+
         // Stage 1: Haiku batch classification
         var stage1Results: [String: ClassifyResult.Stage1Item] = [:]
         let batches = stride(from: 0, to: files.count, by: batchSize).map {
@@ -72,12 +91,7 @@ actor Classifier {
                     do {
                         return try await self.classifyBatchStage1(
                             batchFiles,
-                            projectContext: projectContext,
-                            subfolderContext: subfolderContext,
-                            weightedContext: weightedContext,
-                            areaContext: areaContext,
-                            tagVocabulary: tagVocabulary,
-                            correctionContext: correctionContext
+                            systemPrompt: stage1SystemPrompt
                         )
                     } catch {
                         NSLog("[Classifier] Stage1 배치 %d 실패 (스킵): %@", idx, error.localizedDescription)
@@ -145,12 +159,7 @@ actor Classifier {
                         do {
                             let result = try await self.classifySingleStage2(
                                 file,
-                                projectContext: projectContext,
-                                subfolderContext: subfolderContext,
-                                weightedContext: weightedContext,
-                                areaContext: areaContext,
-                                tagVocabulary: tagVocabulary,
-                                correctionContext: correctionContext
+                                systemPrompt: stage2SystemPrompt
                             )
                             return (fileName, result)
                         } catch {
@@ -226,21 +235,16 @@ actor Classifier {
 
     private func classifyBatchStage1(
         _ files: [ClassifyInput],
-        projectContext: String,
-        subfolderContext: String,
-        weightedContext: String,
-        areaContext: String,
-        tagVocabulary: String,
-        correctionContext: String
+        systemPrompt: String
     ) async throws -> [String: ClassifyResult.Stage1Item] {
         // Use condensed preview (2000 chars) instead of full content (5000 chars) for Stage 1 triage
         let fileContents = files.map { file in
             (fileName: file.fileName, content: file.preview)
         }
 
-        let prompt = buildStage1Prompt(fileContents, projectContext: projectContext, subfolderContext: subfolderContext, weightedContext: weightedContext, areaContext: areaContext, tagVocabulary: tagVocabulary, correctionContext: correctionContext)
+        let userMessage = buildStage1UserMessage(fileContents)
 
-        let response = try await aiService.sendFastWithUsage(maxTokens: 4096, message: prompt)
+        let response = try await aiService.sendFastWithUsage(maxTokens: 4096, message: userMessage, systemMessage: systemPrompt)
         if let usage = response.usage {
             let model = await aiService.fastModel
             StatisticsService.logTokenUsage(operation: "classify-stage1", model: model, usage: usage)
@@ -287,25 +291,14 @@ actor Classifier {
 
     private func classifySingleStage2(
         _ file: ClassifyInput,
-        projectContext: String,
-        subfolderContext: String,
-        weightedContext: String,
-        areaContext: String,
-        tagVocabulary: String,
-        correctionContext: String
+        systemPrompt: String
     ) async throws -> ClassifyResult.Stage2Item {
-        let prompt = buildStage2Prompt(
+        let userMessage = buildStage2UserMessage(
             fileName: file.fileName,
-            content: file.content,
-            projectContext: projectContext,
-            subfolderContext: subfolderContext,
-            weightedContext: weightedContext,
-            areaContext: areaContext,
-            tagVocabulary: tagVocabulary,
-            correctionContext: correctionContext
+            content: file.content
         )
 
-        let response = try await aiService.sendPreciseWithUsage(maxTokens: 2048, message: prompt)
+        let response = try await aiService.sendPreciseWithUsage(maxTokens: 2048, message: userMessage, systemMessage: systemPrompt)
         if let usage = response.usage {
             let model = await aiService.preciseModel
             StatisticsService.logTokenUsage(operation: "classify-stage2", model: model, usage: usage)
@@ -335,18 +328,21 @@ actor Classifier {
 
     // MARK: - Prompt Builders (Korean)
 
-    private func buildStage1Prompt(
-        _ files: [(fileName: String, content: String)],
+    /// Build the static system prompt shared across Stage 1 and Stage 2.
+    /// Contains role instruction, vault context, classification rules.
+    /// Called once per classify batch for prompt caching.
+    private func buildSystemPrompt(
         projectContext: String,
         subfolderContext: String,
         weightedContext: String,
         areaContext: String,
         tagVocabulary: String,
-        correctionContext: String = ""
+        correctionContext: String,
+        precise: Bool = false
     ) -> String {
-        let fileList = files.enumerated().map { (i, f) in
-            return "[\(i)] 파일명: \(f.fileName)\n내용: \(f.content)"
-        }.joined(separator: "\n\n")
+        let roleIntro = precise
+            ? "당신은 PARA 방법론 기반 문서 분류 전문가입니다. 이 문서를 정밀하게 분석해주세요."
+            : "당신은 PARA 방법론 기반 문서 분류 전문가입니다."
 
         let weightedSection = weightedContext.isEmpty ? "" : """
 
@@ -378,7 +374,7 @@ actor Classifier {
         """
 
         return """
-        당신은 PARA 방법론 기반 문서 분류 전문가입니다.
+        \(roleIntro)
 
         ## 활성 프로젝트 목록
         \(projectContext)
@@ -415,7 +411,18 @@ actor Classifier {
         - 같은 회사/조직의 문서라도 주제가 다르면 다른 프로젝트 (또는 프로젝트 없음)
         - 확실하지 않으면 project 필드를 생략 (잘못 연결하는 것보다 비워두는 게 나음)
         - 프로젝트 이름을 태그에 넣지 말 것 (태그는 주제/기술 키워드만)
+        """
+    }
 
+    /// Build Stage 1 user message: file list + JSON array response format
+    private func buildStage1UserMessage(
+        _ files: [(fileName: String, content: String)]
+    ) -> String {
+        let fileList = files.enumerated().map { (i, f) in
+            return "[\(i)] 파일명: \(f.fileName)\n내용: \(f.content)"
+        }.joined(separator: "\n\n")
+
+        return """
         ## 분류할 파일 목록
         \(fileList)
 
@@ -439,84 +446,12 @@ actor Classifier {
         """
     }
 
-    private func buildStage2Prompt(
+    /// Build Stage 2 user message: single file content + JSON object response format
+    private func buildStage2UserMessage(
         fileName: String,
-        content: String,
-        projectContext: String,
-        subfolderContext: String,
-        weightedContext: String,
-        areaContext: String,
-        tagVocabulary: String,
-        correctionContext: String = ""
+        content: String
     ) -> String {
-        let weightedSection = weightedContext.isEmpty ? "" : """
-
-        ## 기존 문서 맥락 (가중치 기반)
-        아래 기존 문서 정보를 참고하여, 이 문서가 기존 문서와 태그나 주제가 겹치면 같은 카테고리/폴더로 분류하세요.
-        (높음) Project 문서와 겹치면 → 해당 프로젝트 연결 가중치 높음
-        (중간) Area/Resource 문서와 겹치면 → 해당 폴더 연결 가중치 중간
-        (낮음) Archive는 참고만 (낮은 가중치)
-
-        \(weightedContext)
-
-        """
-
-        let tagSection = tagVocabulary == "[]" ? "" : """
-
-        ## 기존 태그 참고
-        볼트에서 사용 중인 태그입니다. 동일한 개념이면 아래 표기를 그대로 따르세요.
-        새로운 개념의 태그는 자유롭게 생성해도 됩니다.
-        \(tagVocabulary)
-
-        """
-
-        let areaSection = areaContext.isEmpty ? "" : """
-
-        ## Area(도메인) 목록
-        아래 등록된 도메인과 소속 프로젝트를 참고하세요. Area는 여러 프로젝트를 묶는 상위 영역입니다.
-        \(areaContext)
-
-        """
-
         return """
-        당신은 PARA 방법론 기반 문서 분류 전문가입니다. 이 문서를 정밀하게 분석해주세요.
-
-        ## 활성 프로젝트 목록
-        \(projectContext)
-        \(areaSection)
-        ## 기존 하위 폴더 (이 목록의 정확한 이름만 사용)
-        \(subfolderContext)
-        각 폴더의 name, tags, summary, noteCount를 참고하여 가장 적합한 폴더를 선택하세요.
-        새 폴더가 필요하면 targetFolder에 "NEW:폴더명"을 사용하세요. 기존 폴더와 비슷한 이름이 있으면 반드시 기존 이름을 사용하세요.
-        \(weightedSection)\(tagSection)\(correctionContext.isEmpty ? "" : "\n\(correctionContext)\n")
-        ## 분류 규칙
-
-        | para | 조건 | 예시 | project 필드 |
-        |------|------|------|-------------|
-        | project | 활성 프로젝트의 직접 작업 문서 (마감 있는 작업, 체크리스트, 회의록) | 스프린트 백로그, 회의록, TODO | 필수: 정확한 프로젝트명 |
-        | area | 등록된 도메인 전반의 관리/운영 문서. 특정 프로젝트에 속하지 않지만 도메인과 관련된 문서 | 도메인 운영, 인프라 관리, 정책 문서 | 관련시만 |
-        | resource | 참고/학습/분석 자료 | 기술 가이드, API 레퍼런스, 분석 보고서 | 관련시만 |
-        | archive | 완료/비활성/오래된 문서 | 종료된 작업, 과거 회고록 | 관련시만 |
-
-        항상은 아니지만 Area는 도메인(상위 영역)이 될 수 있고 그 아래 여러 Project가 묶일 수 있음.
-
-        ## 주의사항
-
-        | 문서 유형 | 올바른 분류 | 흔한 오분류 |
-        |-----------|-----------|-----------|
-        | 프로젝트 참고자료/분석 | resource | project |
-        | 프로젝트 소개/개요/제안서 | resource | project |
-        | 프로젝트 회고/리뷰 | resource 또는 archive | project |
-        | 도메인 운영/관리 문서 | area | project |
-        | project가 아닌데 프로젝트 관련 | project 필드에 프로젝트명 기재 | project 필드 생략 |
-        | 목록에 없는 명확한 프로젝트 작업 | project (project: "제안명") | resource |
-
-        ## 프로젝트 경계 규칙
-        - project 필드는 해당 문서가 프로젝트의 **직접 작업물**이거나 **직접 참조 자료**일 때만 기재
-        - 같은 회사/조직의 문서라도 주제가 다르면 다른 프로젝트 (또는 프로젝트 없음)
-        - 확실하지 않으면 project 필드를 생략 (잘못 연결하는 것보다 비워두는 게 나음)
-        - 프로젝트 이름을 태그에 넣지 말 것 (태그는 주제/기술 키워드만)
-
         ## 대상 파일
         파일명: \(fileName)
 

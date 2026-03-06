@@ -170,7 +170,8 @@ actor AIService {
             return try await geminiClient.sendMessage(
                 model: model,
                 maxTokens: maxTokens,
-                userMessage: userMessage
+                userMessage: userMessage,
+                systemMessage: systemMessage
             )
         case .claudeCLI:
             let combined = systemMessage.map { $0 + "\n\n" + userMessage } ?? userMessage

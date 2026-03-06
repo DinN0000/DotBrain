@@ -20,8 +20,18 @@ actor GeminiAPIClient {
     // MARK: - Request/Response Types
 
     struct GenerateContentRequest: Encodable {
+        let systemInstruction: SystemInstruction?
         let contents: [Content]
         let generationConfig: GenerationConfig?
+
+        /// System instruction uses Content-like structure but without role field
+        struct SystemInstruction: Encodable {
+            let parts: [Part]
+
+            struct Part: Encodable {
+                let text: String
+            }
+        }
 
         struct Content: Encodable {
             let parts: [Part]
@@ -35,6 +45,21 @@ actor GeminiAPIClient {
         struct GenerationConfig: Encodable {
             let maxOutputTokens: Int?
             let temperature: Double?
+        }
+
+        enum CodingKeys: String, CodingKey {
+            case systemInstruction = "system_instruction"
+            case contents
+            case generationConfig
+        }
+
+        func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            if let systemInstruction = systemInstruction {
+                try container.encode(systemInstruction, forKey: .systemInstruction)
+            }
+            try container.encode(contents, forKey: .contents)
+            try container.encodeIfPresent(generationConfig, forKey: .generationConfig)
         }
     }
 
@@ -83,7 +108,8 @@ actor GeminiAPIClient {
     func sendMessage(
         model: String,
         maxTokens: Int,
-        userMessage: String
+        userMessage: String,
+        systemMessage: String? = nil
     ) async throws -> (String, TokenUsage?) {
         guard let apiKey = KeychainService.getGeminiAPIKey() else {
             throw GeminiAPIError.noAPIKey
@@ -95,7 +121,15 @@ actor GeminiAPIClient {
             throw GeminiAPIError.invalidURL
         }
 
+        let systemInstruction: GenerateContentRequest.SystemInstruction?
+        if let systemMessage = systemMessage, !systemMessage.isEmpty {
+            systemInstruction = .init(parts: [.init(text: systemMessage)])
+        } else {
+            systemInstruction = nil
+        }
+
         let request = GenerateContentRequest(
+            systemInstruction: systemInstruction,
             contents: [
                 .init(
                     parts: [.init(text: userMessage)],
