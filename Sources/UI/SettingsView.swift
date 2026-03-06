@@ -11,6 +11,7 @@ struct SettingsView: View {
     @State private var showingKey = false
     @State private var saveMessage: String?
     @State private var showOtherProvider = false
+    @State private var isChangingProvider = false
 
     // Update check state
     @State private var isCheckingUpdate = false
@@ -22,8 +23,35 @@ struct SettingsView: View {
     @State private var fdaGranted = false
 
     @State private var viewingProvider: AIProvider = .claude
+    @State private var selectedGroup: AIProviderGroup = .subscription
 
     private var activeProvider: AIProvider { appState.selectedProvider }
+
+    enum AIProviderGroup: String, CaseIterable {
+        case subscription
+        case api
+
+        var label: String {
+            switch self {
+            case .subscription: return "구독"
+            case .api: return "API"
+            }
+        }
+
+        var providers: [AIProvider] {
+            switch self {
+            case .subscription: return [.claudeCLI, .codexCLI]
+            case .api: return [.claude, .gemini]
+            }
+        }
+
+        static func group(for provider: AIProvider) -> AIProviderGroup {
+            switch provider {
+            case .claudeCLI, .codexCLI: return .subscription
+            case .claude, .gemini: return .api
+            }
+        }
+    }
 
     private var activeHasKey: Bool {
         switch activeProvider {
@@ -79,6 +107,7 @@ struct SettingsView: View {
             isStructureReady = PKMPathManager(root: appState.pkmRootPath).isInitialized()
             fdaGranted = AppState.hasFullDiskAccess()
             viewingProvider = activeProvider
+            selectedGroup = AIProviderGroup.group(for: activeProvider)
             loadKeyForProvider(viewingProvider)
         }
         .onChange(of: viewingProvider) { _ in
@@ -116,69 +145,108 @@ struct SettingsView: View {
                 }
             }
 
-            // Provider picker — segmented style
-            HStack(spacing: 0) {
-                ForEach(AIProvider.allCases) { provider in
-                    providerTab(provider)
-                }
-            }
-            .background(Color.primary.opacity(0.04))
-            .cornerRadius(6)
+            if isChangingProvider {
+                // Expanded: group tabs + provider picker
+                VStack(alignment: .leading, spacing: 8) {
+                    // Group picker — 구독 | API
+                    HStack(spacing: 0) {
+                        ForEach(AIProviderGroup.allCases, id: \.self) { group in
+                            groupTab(group)
+                        }
+                    }
+                    .background(Color.primary.opacity(0.04))
+                    .cornerRadius(6)
 
-            // Model pipeline + cost (shows viewing provider info)
-            HStack {
+                    // Provider picker within group
+                    HStack(spacing: 8) {
+                        ForEach(selectedGroup.providers) { provider in
+                            providerTab(provider)
+                        }
+                    }
+                }
+
+                // Model pipeline for viewing provider
                 Text(viewingProvider.modelPipeline)
                     .font(.caption2)
                     .foregroundColor(.secondary)
-                Spacer()
-                Text(viewingProvider.costInfo)
-                    .font(.caption2)
-                    .foregroundColor(.secondary)
-            }
 
-            // Key section: CLI shows status, API providers show key input
-            if viewingProvider == .claudeCLI || viewingProvider == .codexCLI {
-                cliStatusSection
-            } else if viewingHasKey && !isEditingKey {
-                HStack {
-                    Button(L10n.Settings.changeApiKey) {
-                        isEditingKey = true
-                        loadKeyForProvider(viewingProvider)
-                    }
-                    .font(.caption)
-                    .buttonStyle(.bordered)
-                    .controlSize(.mini)
-
-                    Button(L10n.Settings.deleteKey) { deleteKey() }
+                // Key section for viewing provider
+                if viewingProvider == .claudeCLI || viewingProvider == .codexCLI {
+                    cliStatusSection
+                } else if viewingHasKey && !isEditingKey {
+                    HStack {
+                        Button(L10n.Settings.changeApiKey) {
+                            isEditingKey = true
+                            loadKeyForProvider(viewingProvider)
+                        }
                         .font(.caption)
                         .buttonStyle(.bordered)
                         .controlSize(.mini)
 
-                    if let msg = saveMessage {
-                        Text(msg)
-                            .font(.caption2)
-                            .foregroundColor(msg == L10n.Settings.keyDeleted ? .orange : .green)
+                        Button(L10n.Settings.deleteKey) { deleteKey() }
+                            .font(.caption)
+                            .buttonStyle(.bordered)
+                            .controlSize(.mini)
+
+                        if let msg = saveMessage {
+                            Text(msg)
+                                .font(.caption2)
+                                .foregroundColor(msg == L10n.Settings.keyDeleted ? .orange : .green)
+                        }
                     }
+                } else {
+                    providerKeyInput(viewingProvider)
+                }
+
+                // Switch provider or cancel
+                HStack {
+                    if viewingProvider != activeProvider && viewingHasKey {
+                        Button(action: {
+                            withAnimation(.easeOut(duration: 0.15)) {
+                                appState.selectedProvider = viewingProvider
+                                isChangingProvider = false
+                            }
+                        }) {
+                            Text(L10n.Provider.switchTo(viewingProvider.displayName))
+                                .font(.caption)
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.small)
+                    }
+
+                    Button(L10n.Settings.cancel) {
+                        withAnimation(.easeOut(duration: 0.15)) {
+                            viewingProvider = activeProvider
+                            selectedGroup = AIProviderGroup.group(for: activeProvider)
+                            isChangingProvider = false
+                            isEditingKey = false
+                        }
+                    }
+                    .font(.caption)
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
                 }
             } else {
-                providerKeyInput(viewingProvider)
-            }
+                // Collapsed: current provider summary + status + change button
+                HStack(spacing: 8) {
+                    Text(activeProvider.modelPipeline)
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
 
-            // Switch provider (below key management)
-            if viewingProvider != activeProvider && viewingHasKey {
-                Button(action: {
-                    withAnimation(.easeOut(duration: 0.15)) {
-                        appState.selectedProvider = viewingProvider
+                    Spacer()
+
+                    Button(L10n.Settings.change) {
+                        withAnimation(.easeOut(duration: 0.15)) {
+                            viewingProvider = activeProvider
+                            selectedGroup = AIProviderGroup.group(for: activeProvider)
+                            isChangingProvider = true
+                        }
                     }
-                }) {
-                    Text(L10n.Provider.switchTo(viewingProvider.displayName))
-                        .font(.caption)
-                        .frame(maxWidth: .infinity)
+                    .buttonStyle(.bordered)
+                    .controlSize(.mini)
                 }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.small)
             }
-
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -186,10 +254,46 @@ struct SettingsView: View {
         .cornerRadius(8)
     }
 
+    private func groupTab(_ group: AIProviderGroup) -> some View {
+        let isSelected = selectedGroup == group
+        let hasActiveInGroup = group.providers.contains(activeProvider)
+
+        return Button {
+            isEditingKey = false
+            withAnimation(.easeOut(duration: 0.15)) {
+                selectedGroup = group
+                // Auto-select first provider in group, prefer active if in this group
+                if let active = group.providers.first(where: { $0 == activeProvider }) {
+                    viewingProvider = active
+                } else {
+                    viewingProvider = group.providers[0]
+                }
+            }
+        } label: {
+            HStack(spacing: 5) {
+                if hasActiveInGroup {
+                    Circle()
+                        .fill(Color.green)
+                        .frame(width: 5, height: 5)
+                }
+                Text(group.label)
+                    .font(.caption)
+                    .fontWeight(isSelected ? .bold : .medium)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 6)
+            .background(
+                RoundedRectangle(cornerRadius: 5)
+                    .fill(isSelected ? Color.accentColor.opacity(0.12) : Color.clear)
+            )
+            .foregroundColor(isSelected ? .accentColor : .secondary)
+        }
+        .buttonStyle(.plain)
+    }
+
     private func providerTab(_ provider: AIProvider) -> some View {
         let isViewing = viewingProvider == provider
         let isActiveProvider = activeProvider == provider
-        let accent = providerAccentColor(provider)
 
         return Button {
             isEditingKey = false
@@ -197,44 +301,34 @@ struct SettingsView: View {
                 viewingProvider = provider
             }
         } label: {
-            HStack(spacing: 5) {
-                // Green dot for active provider
+            HStack(spacing: 3) {
                 if isActiveProvider {
                     Circle()
                         .fill(Color.green)
-                        .frame(width: 5, height: 5)
+                        .frame(width: 4, height: 4)
                 }
 
                 Text(provider.rawValue)
-                    .font(.caption)
-                    .fontWeight(isViewing ? .bold : .medium)
+                    .font(.caption2)
+                    .fontWeight(isViewing ? .semibold : .regular)
 
                 if provider == .gemini {
                     Text(L10n.Provider.free)
-                        .font(.system(size: 8, weight: .semibold))
+                        .font(.system(size: 7, weight: .medium))
                         .foregroundColor(.secondary)
-                        .padding(.horizontal, 4)
+                        .padding(.horizontal, 3)
                         .padding(.vertical, 1)
-                        .background(Color.secondary.opacity(0.12))
-                        .cornerRadius(2)
-                }
-                if provider == .claudeCLI || provider == .codexCLI {
-                    Text(L10n.Provider.subscription)
-                        .font(.system(size: 8, weight: .semibold))
-                        .foregroundColor(.secondary)
-                        .padding(.horizontal, 4)
-                        .padding(.vertical, 1)
-                        .background(Color.secondary.opacity(0.12))
+                        .background(Color.secondary.opacity(0.1))
                         .cornerRadius(2)
                 }
             }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 6)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
             .background(
-                RoundedRectangle(cornerRadius: 5)
-                    .fill(isViewing ? accent.opacity(0.12) : Color.clear)
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(isViewing ? Color.accentColor.opacity(0.08) : Color.clear)
             )
-            .foregroundColor(isViewing ? accent : .secondary)
+            .foregroundColor(isViewing ? .accentColor : .secondary.opacity(0.7))
         }
         .buttonStyle(.plain)
     }
@@ -243,9 +337,6 @@ struct SettingsView: View {
         VStack(alignment: .leading, spacing: 6) {
             if viewingProvider == .claudeCLI {
                 if appState.hasClaudeCLI {
-                    Label(L10n.Settings.cliInstalled, systemImage: "checkmark.circle.fill")
-                        .font(.caption)
-                        .foregroundColor(.green)
                     Text(L10n.Settings.cliPipeMode)
                         .font(.caption2)
                         .foregroundColor(.secondary)
@@ -259,9 +350,6 @@ struct SettingsView: View {
                 }
             } else if viewingProvider == .codexCLI {
                 if appState.hasCodexCLI {
-                    Label("Codex CLI 인증됨", systemImage: "checkmark.circle.fill")
-                        .font(.caption)
-                        .foregroundColor(.green)
                     Text("codex exec 모드로 AI 호출")
                         .font(.caption2)
                         .foregroundColor(.secondary)

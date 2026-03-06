@@ -148,6 +148,8 @@
 "settings.key_save_failed" = "저장 실패";
 "settings.key_format_needed" = "%@... 형식 필요";
 "settings.cli_installed" = "Claude CLI 설치됨";
+"settings.authenticated" = "인증됨";
+"settings.key_registered" = "키 등록됨";
 "settings.cli_pipe_mode" = "claude -p 파이프 모드로 AI 호출";
 "settings.cli_not_found" = "Claude CLI를 찾을 수 없습니다";
 "settings.cli_install_hint" = "설치: https://claude.com/download";

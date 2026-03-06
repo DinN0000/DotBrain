@@ -148,6 +148,8 @@
 "settings.key_save_failed" = "Save failed";
 "settings.key_format_needed" = "%@... format required";
 "settings.cli_installed" = "Claude CLI installed";
+"settings.authenticated" = "Authenticated";
+"settings.key_registered" = "Key registered";
 "settings.cli_pipe_mode" = "AI calls via claude -p pipe mode";
 "settings.cli_not_found" = "Claude CLI not found";
 "settings.cli_install_hint" = "Install: https://claude.com/download";
