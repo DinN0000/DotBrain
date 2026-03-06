@@ -16,14 +16,239 @@
 "processing.linking" = "Linking Notes";
 "processing.processing" = "Processing";
 "processing.finishing" = "Finishing";
+"processing.folder_reorganizing" = "Reorganizing Folders";
+"processing.inbox_processing" = "Processing Inbox";
+"processing.cancel" = "Cancel";
+"processing.files_ready" = "%d files ready";
+"processing.linking_notes" = "Linking related notes...";
 
-/* Search Match Types */
+/* Search */
 "search.tag_match" = "Tag Match";
 "search.body_match" = "Body Match";
 "search.summary_match" = "Summary Match";
 "search.title_match" = "Title Match";
+"search.placeholder" = "Search by tag, keyword, or title";
+"search.clear_label" = "Clear search";
+"search.searching" = "Searching...";
+"search.no_results" = "No Results";
+"search.result_count" = "%d results";
+"search.description" = "Search your entire PKM\nby tag, keyword, or title";
+"search.archived" = "(Archived)";
 
-/* AI Provider Cost Info */
+/* AI Provider */
 "provider.cost_included" = "Included in subscription";
 "provider.cost_per_file" = "~$0.002 per file (Haiku 4.5)";
 "provider.free_tier" = "Free tier: 15/min, 1500/day";
+"provider.free" = "Free";
+"provider.subscription" = "Sub";
+"provider.active_label" = "Using %@";
+"provider.active" = "Active";
+"provider.activate" = "Activate";
+"provider.switch_to" = "Switch to %@";
+
+/* Dashboard */
+"dashboard.total_files" = "Total %d";
+"dashboard.urgent_folders" = "%d folders need attention";
+"dashboard.view" = "View";
+"dashboard.manual_tools" = "Manual Tools";
+"dashboard.manual_tools_desc" = "Manage folders and files directly";
+"dashboard.folder_manage" = "Folder Management";
+"dashboard.folder_manage_desc" = "Move · Create · Organize";
+"dashboard.search" = "Search";
+"dashboard.search_desc" = "Files · Tags Search";
+"dashboard.ai_manage" = "AI Management";
+"dashboard.ai_manage_desc" = "AI inspects and classifies your vault";
+"dashboard.vault_inspect" = "Vault Inspector";
+"dashboard.vault_inspect_desc" = "Diagnose · Reclassify · Organize";
+"dashboard.ai_stats" = "AI Statistics";
+"dashboard.ai_stats_desc" = "Cost · Usage · History";
+"dashboard.recent_activity" = "Recent Activity";
+"dashboard.no_activity" = "No activity recorded yet";
+"dashboard.action.classified" = "Classified";
+"dashboard.action.reorganized" = "Reorganized";
+"dashboard.action.relocated" = "Relocated";
+"dashboard.action.vault_reorganized" = "Vault Reorganized";
+"dashboard.action.deduplicated" = "Deduplicated";
+"dashboard.action.deleted" = "Deleted";
+"dashboard.action.started" = "Started";
+"dashboard.action.completed" = "Completed";
+"dashboard.action.error" = "Error";
+"dashboard.category.project" = "Project";
+"dashboard.category.area" = "Area";
+"dashboard.category.resource" = "Resource";
+"dashboard.category.archive" = "Archive";
+"dashboard.category.system" = "System";
+
+/* Inbox */
+"inbox.empty" = "Inbox is empty";
+"inbox.drag_hint" = "Drag files here or";
+"inbox.select_files" = "Select Files";
+"inbox.drop_to_add" = "Drop to add to inbox";
+"inbox.more_files" = "+%d more";
+"inbox.estimated_time" = "~%d sec";
+"inbox.add_label" = "Add files to inbox";
+"inbox.clear_label" = "Clear inbox";
+"inbox.clear_title" = "Clear Inbox";
+"inbox.clear_button" = "Clear";
+"inbox.cancel_button" = "Cancel";
+"inbox.clear_message" = "Move %d files to Trash.";
+"inbox.organize" = "Organize";
+"inbox.set_api_key" = "Set up API key first";
+"inbox.pick_vault_title" = "Select PKM Vault Folder";
+"inbox.added_count" = "%d added";
+"inbox.skipped_code" = "%d code files skipped";
+"inbox.failed_count" = "%d failed";
+"inbox.no_addable_files" = "No files can be added";
+"inbox.clear_failed" = "Inbox cleared (%d failed — files may be in use)";
+"inbox.clear_success" = "Inbox cleared (moved to Trash)";
+"inbox.pick_files_title" = "Select files to add to inbox";
+
+/* Results */
+"results.title" = "Results";
+"results.go_back" = "Go Back";
+"results.open_in_finder" = "Open in Finder";
+"results.no_files" = "No files processed";
+"results.confirm_waiting" = "%d awaiting confirmation";
+"results.skip_all" = "Skip All";
+"results.moved_to" = "Moved to %@";
+"results.deleted" = "Deleted";
+"results.error_occurred" = "Error";
+"results.files_organized" = "%d files organized";
+"results.relocated_count" = "%d relocated";
+"results.skipped_count" = "%d skipped";
+"results.error_count" = "%d errors";
+"results.waiting_count" = "%d pending";
+"results.auto_tagged" = "Tags and summaries added automatically.";
+"results.next_steps" = "Next Steps";
+"results.analyzing_folders" = "Analyzing folder status...";
+"results.all_folders_good" = "All folders are healthy";
+"results.clean_all" = "Clean All";
+"results.too_many_files" = "%d files — needs splitting";
+"results.missing_frontmatter" = "%d files missing metadata";
+"results.low_tag_diversity" = "Low tag diversity";
+"results.clean_up" = "Clean";
+"results.unmatched_project_hint" = "No matching project found. Create a new project or choose a different location.";
+"results.unmatched_project_generic" = "No matching project found. Would you like to create a new project?";
+"results.name_conflict_hint" = "A file with the same name already exists — choose a different location or skip";
+"results.misclassified_hint" = "AI recommends a different location — move or skip";
+"results.low_confidence_hint" = "Not sure where this file belongs. Please choose.";
+"results.project_name" = "Project name";
+"results.create" = "Create";
+"results.create_project" = "Create Project";
+"results.skip" = "Skip";
+"results.delete" = "Delete";
+
+/* Settings */
+"settings.ai_settings" = "AI Settings";
+"settings.change_api_key" = "Change API Key";
+"settings.delete_key" = "Delete";
+"settings.key_deleted" = "Deleted";
+"settings.key_saved" = "Saved";
+"settings.key_save_failed" = "Save failed";
+"settings.key_format_needed" = "%@... format required";
+"settings.cli_installed" = "Claude CLI installed";
+"settings.cli_pipe_mode" = "AI calls via claude -p pipe mode";
+"settings.cli_not_found" = "Claude CLI not found";
+"settings.cli_install_hint" = "Install: https://claude.com/download";
+"settings.save" = "Save";
+"settings.cancel" = "Cancel";
+"settings.pkm_folder" = "PKM Folder";
+"settings.para_confirmed" = "PARA verified";
+"settings.para_not_found" = "No PARA";
+"settings.change" = "Change";
+"settings.create_structure" = "Create Folder Structure";
+"settings.full_disk_access" = "Full Disk Access";
+"settings.granted" = "Granted";
+"settings.needed" = "Required";
+"settings.fda_description" = "Without file access permission, some folders cannot be read.\nPlease grant Full Disk Access to DotBrain in System Settings.";
+"settings.open_system_settings" = "Open System Settings";
+"settings.app_info" = "App Info";
+"settings.latest" = "Latest";
+"settings.checking_update" = "Checking...";
+"settings.check_update" = "Check for Update";
+"settings.update_available" = "Update to v%@";
+"settings.cant_read_release" = "Cannot read release info";
+"settings.check_failed" = "Check failed: %@";
+"settings.invalid_version" = "Invalid version format";
+"settings.update_failed" = "Update failed: %@";
+"settings.unknown" = "Unknown";
+"settings.onboarding" = "Onboarding";
+"settings.restart_onboarding" = "Restart Onboarding";
+"settings.help" = "Help";
+"settings.quit" = "Quit";
+"settings.help_title" = "How to Use DotBrain";
+"settings.help_step1" = "Drag files to inbox or click + to add";
+"settings.help_step2" = "Click \"Organize\" for AI-powered PARA classification";
+"settings.help_step3" = "Manage projects: create, rename, merge in Folder Management";
+"settings.help_step4" = "Search notes by tag, keyword, or title";
+"settings.para_structure" = "PARA Structure";
+"settings.para_project" = "Project — Active work with deadlines";
+"settings.para_area" = "Area — Ongoing responsibilities (health, finance)";
+"settings.para_resource" = "Resource — Reference materials";
+"settings.para_archive" = "Archive — Completed items";
+"settings.bug_report" = "Report Bug / Request Feature";
+"settings.recheck_cli" = "Recheck after install";
+"settings.pick_vault_title" = "Select PKM Vault Folder";
+
+/* AI Statistics */
+"aistats.estimated_cost" = "Estimated API Cost";
+"aistats.cost_by_operation" = "Cost by Operation";
+"aistats.recent_calls" = "Recent API Calls";
+"aistats.no_usage" = "No API usage recorded yet";
+"aistats.no_usage_hint" = "Costs will appear here after classifying files";
+"aistats.op.classify" = "Classification";
+"aistats.op.classify_stage1" = "Classification (Stage 1)";
+"aistats.op.classify_stage2" = "Classification (Stage 2)";
+"aistats.op.enrich" = "Metadata Enrichment";
+"aistats.op.moc" = "Folder Summary";
+"aistats.op.semantic_link" = "Semantic Link";
+"aistats.op.summary" = "AI Summary";
+
+/* MenuBar */
+"menubar.task_conflict" = "Task Conflict";
+"menubar.confirm" = "OK";
+"menubar.fda_banner" = "Please re-grant disk access after update";
+"menubar.fda_button" = "Grant Access";
+"menubar.fda_auto_restart" = "App will restart automatically after settings change";
+
+/* PARA Manage */
+"para_manage.scanning" = "Scanning folders...";
+"para_manage.no_folders" = "No folders";
+"para_manage.create_hint" = "Create a folder with the + button";
+"para_manage.folder_name" = "Folder name";
+"para_manage.delete_folder" = "Delete Folder";
+"para_manage.delete_button" = "Delete";
+"para_manage.delete_message" = "Move '%@' folder to Trash. You can recover it from Finder.";
+"para_manage.rename_title" = "Rename";
+"para_manage.new_name" = "New name";
+"para_manage.rename_button" = "Rename";
+"para_manage.rename_message" = "Enter a new name for '%@' folder.";
+"para_manage.move_to" = "Move to %@";
+"para_manage.complete_project" = "Complete Project";
+"para_manage.reactivate" = "Reactivate";
+"para_manage.auto_reorganize" = "Auto Organize";
+"para_manage.merge_into" = "Merge into Another Folder";
+"para_manage.rename" = "Rename";
+"para_manage.open_in_finder" = "Open in Finder";
+"para_manage.invalid_name" = "Invalid folder name";
+"para_manage.already_exists" = "'%@' already exists";
+"para_manage.folder_created" = "'%@' folder created";
+"para_manage.move_result" = "'%@' -> %@ (%d notes updated)";
+"para_manage.complete_result" = "'%@' completed -> Archive (%d notes updated)";
+"para_manage.reactivate_result" = "'%@' reactivated (%d notes updated)";
+"para_manage.rename_result" = "'%@' -> '%@' (%d notes updated)";
+"para_manage.delete_result" = "'%@' deleted (Trash)";
+"para_manage.merge_result" = "'%@' -> '%@' merged (%d files)";
+
+/* Folder Relations */
+"folder_relation.description" = "Matching folder relations helps AI classify files more accurately.";
+"folder_relation.loading" = "AI is analyzing folder relations...";
+"folder_relation.all_reviewed" = "All folder relations reviewed";
+"folder_relation.go_back" = "Go Back";
+"folder_relation.review_complete" = "%d folder pairs reviewed";
+"folder_relation.existing_link" = "Existing Link";
+"folder_relation.new_suggestion" = "New Suggestion";
+"folder_relation.note_count" = "%@ · %d notes";
+
+/* Common */
+"common.cancel" = "Cancel";

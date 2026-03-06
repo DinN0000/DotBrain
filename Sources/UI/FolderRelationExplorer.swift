@@ -31,7 +31,7 @@ struct FolderRelationExplorer: View {
 
             // Description
             if isLoading || (!candidates.isEmpty && currentIndex < candidates.count) {
-                Text("폴더 관계를 매칭하면 AI가 파일을 더 정확하게 분류합니다.")
+                Text(L10n.FolderRelation.description)
                     .font(.caption2)
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
@@ -65,7 +65,7 @@ struct FolderRelationExplorer: View {
             Spacer()
             ProgressView()
                 .controlSize(.regular)
-            Text("AI가 폴더 관계를 분석하고 있습니다...")
+            Text(L10n.FolderRelation.loading)
                 .font(.subheadline)
                 .foregroundColor(.secondary)
             Spacer()
@@ -81,9 +81,9 @@ struct FolderRelationExplorer: View {
             Image(systemName: "checkmark.circle")
                 .font(.system(size: 32))
                 .foregroundColor(.green)
-            Text("모든 폴더 관계를 검토했습니다")
+            Text(L10n.FolderRelation.allReviewed)
                 .font(.subheadline)
-            Button("돌아가기") {
+            Button(L10n.FolderRelation.goBack) {
                 appState.currentScreen = .dashboard
             }
             .buttonStyle(.plain)
@@ -101,10 +101,10 @@ struct FolderRelationExplorer: View {
             Image(systemName: "hand.thumbsup")
                 .font(.system(size: 32))
                 .foregroundColor(.green)
-            Text("\(candidates.count)개 폴더 쌍 검토 완료")
+            Text(L10n.FolderRelation.reviewComplete(candidates.count))
                 .font(.subheadline)
                 .fontWeight(.medium)
-            Button("돌아가기") {
+            Button(L10n.FolderRelation.goBack) {
                 appState.currentScreen = .dashboard
             }
             .buttonStyle(.plain)
@@ -130,7 +130,7 @@ struct FolderRelationExplorer: View {
                     HStack(spacing: 4) {
                         Image(systemName: candidate.isExisting ? "link.circle.fill" : "sparkles")
                             .font(.caption2)
-                        Text(candidate.isExisting ? "기존 연결" : "새 추천")
+                        Text(candidate.isExisting ? L10n.FolderRelation.existingLink : L10n.FolderRelation.newSuggestion)
                             .font(.caption2)
                             .fontWeight(.medium)
                     }
@@ -281,7 +281,7 @@ struct FolderRelationExplorer: View {
                     .font(.subheadline)
                     .fontWeight(.medium)
                     .lineLimit(1)
-                Text("\(para.rawValue) · \(noteCount)개 노트")
+                Text(L10n.FolderRelation.noteCount(para.rawValue, noteCount))
                     .font(.caption)
                     .foregroundColor(.secondary)
             }

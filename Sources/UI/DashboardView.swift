@@ -27,7 +27,7 @@ struct DashboardView: View {
                         Image(systemName: "doc.fill")
                             .font(.caption)
                             .foregroundColor(.secondary)
-                        Text("전체 \(stats.totalFiles)개")
+                        Text(L10n.Dashboard.totalFiles(stats.totalFiles))
                             .font(.subheadline)
                             .fontWeight(.medium)
 
@@ -51,11 +51,11 @@ struct DashboardView: View {
                             Circle()
                                 .fill(Color.red)
                                 .frame(width: 6, height: 6)
-                            Text("\(urgentFolderCount)개 폴더 점검 필요")
+                            Text(L10n.Dashboard.urgentFolders(urgentFolderCount))
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                             Spacer()
-                            Button("보기") {
+                            Button(L10n.Dashboard.view) {
                                 appState.currentScreen = .vaultInspector
                             }
                             .font(.caption)
@@ -70,22 +70,22 @@ struct DashboardView: View {
 
                     // Group 1: File operations
                     DashboardCardGroup(
-                        label: "수제 도구",
-                        description: "폴더와 파일을 직접 관리",
+                        label: L10n.Dashboard.manualTools,
+                        description: L10n.Dashboard.manualToolsDesc,
                         tint: .accentColor
                     ) {
                         DashboardHubCard(
                             icon: "folder.badge.gearshape",
-                            title: "폴더 관리",
-                            subtitle: "이동 · 생성 · 정리",
+                            title: L10n.Dashboard.folderManage,
+                            subtitle: L10n.Dashboard.folderManageDesc,
                             tint: .accentColor
                         ) {
                             appState.currentScreen = .paraManage
                         }
                         DashboardHubCard(
                             icon: "magnifyingglass",
-                            title: "검색",
-                            subtitle: "파일 · 태그 검색",
+                            title: L10n.Dashboard.searchTitle,
+                            subtitle: L10n.Dashboard.searchDesc,
                             tint: .accentColor
                         ) {
                             appState.currentScreen = .search
@@ -94,22 +94,22 @@ struct DashboardView: View {
 
                     // Group 2: AI management
                     DashboardCardGroup(
-                        label: "AI 관리",
-                        description: "AI가 볼트 전체를 점검하고 분류",
+                        label: L10n.Dashboard.aiManage,
+                        description: L10n.Dashboard.aiManageDesc,
                         tint: .accentColor
                     ) {
                         DashboardHubCard(
                             icon: "checkmark.shield",
-                            title: "볼트 점검",
-                            subtitle: "진단 · 재분류 · 정리",
+                            title: L10n.Dashboard.vaultInspect,
+                            subtitle: L10n.Dashboard.vaultInspectDesc,
                             tint: .accentColor
                         ) {
                             appState.currentScreen = .vaultInspector
                         }
                         DashboardHubCard(
                             icon: "chart.bar.xaxis",
-                            title: "AI 통계",
-                            subtitle: "비용 · 사용량 · 이력",
+                            title: L10n.Dashboard.aiStats,
+                            subtitle: L10n.Dashboard.aiStatsDesc,
                             tint: .accentColor
                         ) {
                             appState.currentScreen = .aiStatistics
@@ -118,12 +118,12 @@ struct DashboardView: View {
 
                     // Recent activity
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("최근 활동")
+                        Text(L10n.Dashboard.recentActivity)
                             .font(.subheadline)
                             .fontWeight(.medium)
 
                         if stats.recentActivity.isEmpty {
-                            Text("아직 활동 기록이 없습니다")
+                            Text(L10n.Dashboard.noActivity)
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                                 .padding(.vertical, 8)
@@ -321,26 +321,26 @@ struct DashboardView: View {
 
     private func actionLabel(for action: String) -> String {
         switch action {
-        case "classified": return "분류 완료"
-        case "reorganized": return "정리 완료"
-        case "relocated": return "위치 이동"
-        case "vault-reorganized": return "재정리 이동"
-        case "deduplicated": return "중복 제거"
-        case "deleted": return "삭제"
-        case "started": return "처리 시작"
-        case "completed": return "처리 완료"
-        case "error": return "오류"
+        case "classified": return L10n.Dashboard.classified
+        case "reorganized": return L10n.Dashboard.reorganized
+        case "relocated": return L10n.Dashboard.relocated
+        case "vault-reorganized": return L10n.Dashboard.vaultReorganized
+        case "deduplicated": return L10n.Dashboard.deduplicated
+        case "deleted": return L10n.Dashboard.deleted
+        case "started": return L10n.Dashboard.started
+        case "completed": return L10n.Dashboard.completed
+        case "error": return L10n.Dashboard.error
         default: return action
         }
     }
 
     private func categoryLabel(for category: String) -> String {
         switch category {
-        case "project": return "프로젝트"
-        case "area": return "영역"
-        case "resource": return "자료"
-        case "archive": return "아카이브"
-        case "system": return "시스템"
+        case "project": return L10n.Dashboard.catProject
+        case "area": return L10n.Dashboard.catArea
+        case "resource": return L10n.Dashboard.catResource
+        case "archive": return L10n.Dashboard.catArchive
+        case "system": return L10n.Dashboard.catSystem
         default: return category
         }
     }

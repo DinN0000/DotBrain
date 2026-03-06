@@ -109,11 +109,11 @@ struct MenuBarPopover: View {
             }
         }
         .frame(width: 360, height: 480)
-        .alert("작업 충돌", isPresented: Binding(
+        .alert(L10n.MenuBar.taskConflict, isPresented: Binding(
             get: { appState.taskBlockedAlert != nil },
             set: { if !$0 { appState.taskBlockedAlert = nil } }
         )) {
-            Button("확인", role: .cancel) {
+            Button(L10n.MenuBar.confirm, role: .cancel) {
                 appState.taskBlockedAlert = nil
             }
         } message: {
@@ -138,13 +138,13 @@ struct MenuBarPopover: View {
                     .font(.system(size: 12))
                     .foregroundColor(.orange)
 
-                Text("업데이트 후 디스크 접근 권한을 다시 설정해주세요")
+                Text(L10n.MenuBar.fdaBanner)
                     .font(.caption)
                     .fontWeight(.medium)
 
                 Spacer()
 
-                Button("권한 설정") {
+                Button(L10n.MenuBar.fdaButton) {
                     appState.openFullDiskAccessSettings()
                 }
                 .font(.caption2)
@@ -161,7 +161,7 @@ struct MenuBarPopover: View {
                 .foregroundColor(.secondary)
             }
 
-            Text("설정 후 앱이 자동으로 다시 시작됩니다")
+            Text(L10n.MenuBar.fdaAutoRestart)
                 .font(.system(size: 10))
                 .foregroundColor(.secondary)
                 .frame(maxWidth: .infinity, alignment: .leading)

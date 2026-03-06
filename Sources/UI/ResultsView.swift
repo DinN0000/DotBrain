@@ -6,8 +6,8 @@ struct ResultsView: View {
 
     private var navigateBackLabel: String {
         switch appState.processingOrigin {
-        case .paraManage: return "폴더 관리"
-        default: return "돌아가기"
+        case .paraManage: return L10n.Screen.paraManage
+        default: return L10n.Results.goBack
         }
     }
 
@@ -15,7 +15,7 @@ struct ResultsView: View {
         VStack(spacing: 0) {
             // Header
             HStack {
-                Text("정리 결과")
+                Text(L10n.Results.title)
                     .font(.headline)
 
                 Spacer()
@@ -54,7 +54,7 @@ struct ResultsView: View {
                         Image(systemName: "tray")
                             .font(.title)
                             .foregroundColor(.secondary)
-                        Text("처리된 파일이 없습니다")
+                        Text(L10n.Results.noFiles)
                             .font(.subheadline)
                             .foregroundColor(.secondary)
                     }
@@ -69,7 +69,7 @@ struct ResultsView: View {
                         if appState.pendingConfirmations.count > 1 {
                             HStack(spacing: 12) {
                                 Label(
-                                    "\(appState.pendingConfirmations.count)개 확인 대기",
+                                    L10n.Results.confirmWaiting(appState.pendingConfirmations.count),
                                     systemImage: "questionmark.circle"
                                 )
                                 .font(.caption)
@@ -77,7 +77,7 @@ struct ResultsView: View {
 
                                 Spacer()
 
-                                HoverTextLink(label: "모두 건너뛰기", color: .secondary) {
+                                HoverTextLink(label: L10n.Results.skipAll, color: .secondary) {
                                     let items = appState.pendingConfirmations
                                     for item in items {
                                         appState.skipConfirmation(item)
@@ -113,7 +113,7 @@ struct ResultsView: View {
             // Action buttons
             HStack {
                 if !appState.processedResults.isEmpty {
-                    HoverTextButton(label: "Finder에서 열기") {
+                    HoverTextButton(label: L10n.Results.openInFinder) {
                         openInFinder()
                     }
                 }
@@ -224,7 +224,7 @@ struct ResultRow: View {
                         HStack(spacing: 4) {
                             Image(systemName: result.para.icon)
                                 .font(.caption2)
-                            Text("\(result.displayTarget)로 옮겨짐")
+                            Text(L10n.Results.movedTo(result.displayTarget))
                                 .font(.caption)
                                 .foregroundColor(.purple)
                         }
@@ -237,12 +237,12 @@ struct ResultRow: View {
                             .font(.caption)
                             .foregroundColor(.secondary)
                     case .deleted:
-                        Text("삭제됨")
+                        Text(L10n.Results.deletedLabel)
                             .font(.caption)
                             .foregroundColor(.secondary)
                     case .error:
                         HStack(spacing: 4) {
-                            Text("오류 발생")
+                            Text(L10n.Results.errorOccurred)
                                 .font(.caption)
                                 .foregroundColor(.red)
                             Image(systemName: isErrorExpanded ? "chevron.up" : "chevron.down")
@@ -328,24 +328,24 @@ struct ConfirmationRow: View {
             // Contextual message
             if confirmation.reason == .unmatchedProject {
                 if let suggested = confirmation.suggestedProjectName, !suggested.isEmpty {
-                    Text("등록된 프로젝트에 \"\(suggested)\"이(가) 없습니다. 새로 만들거나 다른 위치를 선택하세요")
+                    Text(L10n.Results.unmatchedProjectHint)
                         .font(.caption)
                         .foregroundColor(.secondary)
                 } else {
-                    Text("등록된 프로젝트에 맞는 곳이 없습니다. 새 프로젝트를 만드시겠습니까?")
+                    Text(L10n.Results.unmatchedProjectHint)
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
             } else if confirmation.reason == .nameConflict {
-                Text("같은 이름의 파일이 이미 있습니다 — 다른 위치를 선택하거나 건너뛰세요")
+                Text(L10n.Results.nameConflictHint)
                     .font(.caption)
                     .foregroundColor(.secondary)
             } else if confirmation.reason == .misclassified {
-                Text("AI가 다른 위치를 추천합니다 — 이동하거나 건너뛰세요")
+                Text(L10n.Results.misclassifiedHint)
                     .font(.caption)
                     .foregroundColor(.secondary)
             } else {
-                Text("이 파일이 어디에 들어갈지 모르겠어요. 골라주세요")
+                Text(L10n.Results.lowConfidenceHint)
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
@@ -358,12 +358,12 @@ struct ConfirmationRow: View {
                 // Inline project creation
                 if showProjectCreate {
                     HStack(spacing: 4) {
-                        TextField("프로젝트 이름", text: $newProjectName)
+                        TextField(L10n.Results.projectName, text: $newProjectName)
                             .textFieldStyle(.roundedBorder)
                             .controlSize(.small)
                             .onSubmit { createProject() }
 
-                        Button("생성") { createProject() }
+                        Button(L10n.Results.create) { createProject() }
                             .buttonStyle(.borderedProminent)
                             .controlSize(.small)
                             .disabled(newProjectName.trimmingCharacters(in: .whitespaces).isEmpty)
@@ -378,7 +378,7 @@ struct ConfirmationRow: View {
                             newProjectName = confirmation.suggestedProjectName ?? ""
                             showProjectCreate = true
                         }) {
-                            Label("프로젝트 생성", systemImage: "folder.badge.plus")
+                            Label(L10n.Results.createProject, systemImage: "folder.badge.plus")
                                 .font(.caption2)
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 4)
@@ -416,11 +416,11 @@ struct ConfirmationRow: View {
             HStack(spacing: 12) {
                 Spacer()
 
-                HoverTextLink(label: "건너뛰기", color: .secondary) {
+                HoverTextLink(label: L10n.Results.skip, color: .secondary) {
                     appState.skipConfirmation(confirmation)
                 }
 
-                HoverTextLink(label: "삭제", color: .red) {
+                HoverTextLink(label: L10n.Results.delete, color: .red) {
                     appState.deleteConfirmation(confirmation)
                 }
             }
@@ -476,7 +476,7 @@ struct ResultsSummaryCard: View {
             VStack(alignment: .leading, spacing: 6) {
                 // Main result
                 Label(
-                    "\(successCount)개 파일 정리 완료",
+                    L10n.Results.filesOrganized(successCount),
                     systemImage: "checkmark.circle"
                 )
                 .font(.caption)
@@ -490,7 +490,7 @@ struct ResultsSummaryCard: View {
                             Image(systemName: "arrow.right.circle")
                                 .font(.caption2)
                                 .foregroundColor(.purple)
-                            Text("\(relocatedCount) 위치 변경")
+                            Text(L10n.Results.relocatedCount(relocatedCount))
                                 .font(.caption2)
                                 .foregroundColor(.secondary)
                         }
@@ -500,7 +500,7 @@ struct ResultsSummaryCard: View {
                             Image(systemName: "arrow.uturn.backward.circle")
                                 .font(.caption2)
                                 .foregroundColor(.orange)
-                            Text("\(skippedCount) 건너뜀")
+                            Text(L10n.Results.skippedCount(skippedCount))
                                 .font(.caption2)
                                 .foregroundColor(.secondary)
                         }
@@ -510,7 +510,7 @@ struct ResultsSummaryCard: View {
                             Image(systemName: "xmark.circle")
                                 .font(.caption2)
                                 .foregroundColor(.red)
-                            Text("\(errorCount) 오류")
+                            Text(L10n.Results.errorCount(errorCount))
                                 .font(.caption2)
                                 .foregroundColor(.secondary)
                         }
@@ -520,14 +520,14 @@ struct ResultsSummaryCard: View {
                             Image(systemName: "questionmark.circle")
                                 .font(.caption2)
                                 .foregroundColor(.orange)
-                            Text("\(appState.pendingConfirmations.count) 대기")
+                            Text(L10n.Results.waitingCount(appState.pendingConfirmations.count))
                                 .font(.caption2)
                                 .foregroundColor(.secondary)
                         }
                     }
                 }
 
-                Text("태그와 요약이 자동으로 추가되었습니다.")
+                Text(L10n.Results.autoTagged)
                     .font(.caption2)
                     .foregroundColor(.secondary)
             }
@@ -555,7 +555,7 @@ struct NextStepsSection: View {
                 Image(systemName: "lightbulb.fill")
                     .font(.caption)
                     .foregroundColor(.orange)
-                Text("다음 단계")
+                Text(L10n.Results.nextSteps)
                     .font(.caption)
                     .fontWeight(.semibold)
                     .foregroundColor(.primary)
@@ -566,13 +566,13 @@ struct NextStepsSection: View {
                 HStack {
                     ProgressView()
                         .controlSize(.mini)
-                    Text("폴더 상태 분석 중...")
+                    Text(L10n.Results.analyzingFolders)
                         .font(.caption2)
                         .foregroundColor(.secondary)
                 }
                 .padding(.vertical, 4)
             } else if healthScores.isEmpty {
-                Label("모든 폴더가 양호합니다", systemImage: "checkmark.circle")
+                Label(L10n.Results.allFoldersGood, systemImage: "checkmark.circle")
                     .font(.caption)
                     .foregroundColor(.green)
                     .padding(.vertical, 4)
@@ -582,7 +582,7 @@ struct NextStepsSection: View {
                 }
 
                 if healthScores.count > 1 {
-                    HoverTextButton(label: "모두 정리") {
+                    HoverTextButton(label: L10n.Results.cleanAll) {
                         let folders = healthScores.map {
                             (category: $0.category, subfolder: $0.folderName)
                         }
@@ -644,11 +644,11 @@ struct AffectedFolderRow: View {
         guard let first = healthScore.issues.first else { return "" }
         switch first {
         case .tooManyFiles(let count):
-            return "\(count)개 파일 — 세분화 필요"
+            return L10n.Results.tooManyFiles(count)
         case .missingFrontmatter(let count, _):
-            return "\(count)개 파일 정보 누락"
+            return L10n.Results.missingFrontmatter(count)
         case .lowTagDiversity:
-            return "태그 다양성 부족"
+            return L10n.Results.lowTagDiversity
         }
     }
 
@@ -681,7 +681,7 @@ struct AffectedFolderRow: View {
                 Spacer()
 
                 HStack(spacing: 2) {
-                    Text("정리")
+                    Text(L10n.Results.cleanUp)
                         .font(.caption2)
                     Image(systemName: "chevron.right")
                         .font(.system(size: 8))

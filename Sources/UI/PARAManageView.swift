@@ -24,7 +24,7 @@ struct PARAManageView: View {
                 Spacer()
                 ProgressView()
                     .scaleEffect(0.8)
-                Text("폴더 스캔 중...")
+                Text(L10n.PARAManage.scanning)
                     .font(.caption)
                     .foregroundColor(.secondary)
                     .padding(.top, 8)
@@ -50,10 +50,10 @@ struct PARAManageView: View {
                             // Empty state
                             if folderMap.values.allSatisfy({ $0.isEmpty }) {
                                 VStack(spacing: 8) {
-                                    Text("폴더가 없습니다")
+                                    Text(L10n.PARAManage.noFolders)
                                         .font(.subheadline)
                                         .foregroundColor(.secondary)
-                                    Text("+ 버튼으로 폴더를 생성하세요")
+                                    Text(L10n.PARAManage.createHint)
                                         .font(.caption)
                                         .foregroundColor(.secondary)
                                 }
@@ -87,35 +87,35 @@ struct PARAManageView: View {
             }
         }
         .onAppear { loadFolders() }
-        .alert("폴더 삭제", isPresented: .init(
+        .alert(L10n.PARAManage.deleteFolder, isPresented: .init(
             get: { deleteTarget != nil },
             set: { if !$0 { deleteTarget = nil } }
         )) {
-            Button("삭제", role: .destructive) {
+            Button(L10n.PARAManage.deleteButton, role: .destructive) {
                 if let target = deleteTarget {
                     performDelete(name: target.name, category: target.category)
                 }
             }
-            Button("취소", role: .cancel) {}
+            Button(L10n.Common.cancel, role: .cancel) {}
         } message: {
             if let target = deleteTarget {
-                Text("'\(target.name)' 폴더를 휴지통으로 보냅니다. Finder에서 복구할 수 있습니다.")
+                Text(L10n.PARAManage.deleteMessage(target.name))
             }
         }
-        .alert("이름 변경", isPresented: .init(
+        .alert(L10n.PARAManage.renameTitle, isPresented: .init(
             get: { renameTarget != nil },
             set: { if !$0 { renameTarget = nil } }
         )) {
-            TextField("새 이름", text: $renameNewName)
-            Button("변경") {
+            TextField(L10n.PARAManage.newName, text: $renameNewName)
+            Button(L10n.PARAManage.renameButton) {
                 if let target = renameTarget {
                     performRename(oldName: target.name, newName: renameNewName, category: target.category)
                 }
             }
-            Button("취소", role: .cancel) {}
+            Button(L10n.Common.cancel, role: .cancel) {}
         } message: {
             if let target = renameTarget {
-                Text("'\(target.name)' 폴더의 새 이름을 입력하세요.")
+                Text(L10n.PARAManage.renameMessage(target.name))
             }
         }
     }
@@ -167,7 +167,7 @@ struct PARAManageView: View {
     private func newFolderForm(category: PARACategory) -> some View {
         if newFolderCategory == category {
             HStack(spacing: 6) {
-                TextField("폴더 이름", text: $newFolderName)
+                TextField(L10n.PARAManage.folderName, text: $newFolderName)
                     .textFieldStyle(.roundedBorder)
                     .font(.caption)
                     .onSubmit { createFolder(in: category) }
@@ -209,7 +209,7 @@ struct PARAManageView: View {
             Button {
                 moveFolder(folder.name, from: category, to: target)
             } label: {
-                Label("\(target.displayName)(으)로 이동", systemImage: target.icon)
+                Label(L10n.PARAManage.moveTo(target.displayName), systemImage: target.icon)
             }
         }
 
@@ -219,7 +219,7 @@ struct PARAManageView: View {
             Button {
                 completeProject(folder.name)
             } label: {
-                Label("프로젝트 완료", systemImage: "checkmark.circle")
+                Label(L10n.PARAManage.completeProject, systemImage: "checkmark.circle")
             }
         }
 
@@ -227,14 +227,14 @@ struct PARAManageView: View {
             Button {
                 reactivateProject(folder.name)
             } label: {
-                Label("재활성화", systemImage: "arrow.uturn.left.circle")
+                Label(L10n.PARAManage.reactivate, systemImage: "arrow.uturn.left.circle")
             }
         }
 
         Button {
             startReorganize(category: category, subfolder: folder.name)
         } label: {
-            Label("자동 정리", systemImage: "sparkles")
+            Label(L10n.PARAManage.autoReorganize, systemImage: "sparkles")
         }
 
         Divider()
@@ -248,7 +248,7 @@ struct PARAManageView: View {
                     }
                 }
             } label: {
-                Label("다른 폴더에 병합", systemImage: "arrow.triangle.merge")
+                Label(L10n.PARAManage.mergeInto, systemImage: "arrow.triangle.merge")
             }
         }
 
@@ -256,13 +256,13 @@ struct PARAManageView: View {
             renameTarget = (name: folder.name, category: category)
             renameNewName = folder.name
         } label: {
-            Label("이름 변경", systemImage: "pencil")
+            Label(L10n.PARAManage.rename, systemImage: "pencil")
         }
 
         Button {
             openInFinder(folder.name, category: category)
         } label: {
-            Label("Finder에서 열기", systemImage: "folder")
+            Label(L10n.PARAManage.openInFinder, systemImage: "folder")
         }
 
         Divider()
@@ -270,7 +270,7 @@ struct PARAManageView: View {
         Button(role: .destructive) {
             deleteTarget = (name: folder.name, category: category)
         } label: {
-            Label("폴더 삭제", systemImage: "trash")
+            Label(L10n.PARAManage.deleteFolder, systemImage: "trash")
         }
     }
 
@@ -278,7 +278,7 @@ struct PARAManageView: View {
         let menu = NSMenu()
 
         for target in PARACategory.allCases where target != category {
-            addMenuItem(to: menu, title: "\(target.displayName)(으)로 이동", icon: target.icon) {
+            addMenuItem(to: menu, title: L10n.PARAManage.moveTo(target.displayName), icon: target.icon) {
                 self.moveFolder(folder.name, from: category, to: target)
             }
         }
@@ -286,17 +286,17 @@ struct PARAManageView: View {
         menu.addItem(.separator())
 
         if category == .project {
-            addMenuItem(to: menu, title: "프로젝트 완료", icon: "checkmark.circle") {
+            addMenuItem(to: menu, title: L10n.PARAManage.completeProject, icon: "checkmark.circle") {
                 completeProject(folder.name)
             }
         }
         if category == .archive {
-            addMenuItem(to: menu, title: "재활성화", icon: "arrow.uturn.left.circle") {
+            addMenuItem(to: menu, title: L10n.PARAManage.reactivate, icon: "arrow.uturn.left.circle") {
                 reactivateProject(folder.name)
             }
         }
 
-        addMenuItem(to: menu, title: "자동 정리", icon: "sparkles") {
+        addMenuItem(to: menu, title: L10n.PARAManage.autoReorganize, icon: "sparkles") {
             startReorganize(category: category, subfolder: folder.name)
         }
 
@@ -304,7 +304,7 @@ struct PARAManageView: View {
 
         let siblings = (folderMap[category] ?? []).filter { $0.name != folder.name }
         if !siblings.isEmpty {
-            let mergeItem = NSMenuItem(title: "다른 폴더에 병합", action: nil, keyEquivalent: "")
+            let mergeItem = NSMenuItem(title: L10n.PARAManage.mergeInto, action: nil, keyEquivalent: "")
             mergeItem.image = NSImage(systemSymbolName: "arrow.triangle.merge", accessibilityDescription: nil)
             let subMenu = NSMenu()
             for sibling in siblings {
@@ -316,18 +316,18 @@ struct PARAManageView: View {
             menu.addItem(mergeItem)
         }
 
-        addMenuItem(to: menu, title: "이름 변경", icon: "pencil") {
+        addMenuItem(to: menu, title: L10n.PARAManage.rename, icon: "pencil") {
             renameTarget = (name: folder.name, category: category)
             renameNewName = folder.name
         }
 
-        addMenuItem(to: menu, title: "Finder에서 열기", icon: "folder") {
+        addMenuItem(to: menu, title: L10n.PARAManage.openInFinder, icon: "folder") {
             openInFinder(folder.name, category: category)
         }
 
         menu.addItem(.separator())
 
-        addMenuItem(to: menu, title: "폴더 삭제", icon: "trash") {
+        addMenuItem(to: menu, title: L10n.PARAManage.deleteFolder, icon: "trash") {
             deleteTarget = (name: folder.name, category: category)
         }
 
@@ -419,7 +419,7 @@ struct PARAManageView: View {
         do {
             let count = try mover.moveFolder(name: name, from: source, to: target)
             isStatusError = false
-            statusMessage = "'\(name)' -> \(target.displayName) (\(count)개 노트 갱신)"
+            statusMessage = L10n.PARAManage.moveResult(name, target.displayName, count)
             loadFolders()
             clearStatusAfterDelay()
             refreshIndex(folderName: name, category: target)
@@ -446,14 +446,14 @@ struct PARAManageView: View {
 
         guard pathManager.isPathSafe(folderPath) else {
             isStatusError = true
-            statusMessage = "잘못된 폴더 이름입니다"
+            statusMessage = L10n.PARAManage.invalidName
             clearStatusAfterDelay()
             return
         }
 
         guard !fm.fileExists(atPath: folderPath) else {
             isStatusError = true
-            statusMessage = "'\(name)' 이미 존재합니다"
+            statusMessage = L10n.PARAManage.alreadyExists(name)
             clearStatusAfterDelay()
             return
         }
@@ -462,7 +462,7 @@ struct PARAManageView: View {
             try fm.createDirectory(atPath: folderPath, withIntermediateDirectories: true)
 
             isStatusError = false
-            statusMessage = "'\(name)' 폴더 생성됨"
+            statusMessage = L10n.PARAManage.folderCreated(name)
             newFolderName = ""
             newFolderCategory = nil
             loadFolders()
@@ -480,7 +480,7 @@ struct PARAManageView: View {
         do {
             let count = try manager.completeProject(name: name)
             isStatusError = false
-            statusMessage = "'\(name)' 완료 -> 아카이브 (\(count)개 노트 갱신)"
+            statusMessage = L10n.PARAManage.completeResult(name, count)
             loadFolders()
             clearStatusAfterDelay()
             refreshCategoryIndex(.project)
@@ -497,7 +497,7 @@ struct PARAManageView: View {
         do {
             let count = try manager.reactivateProject(name: name)
             isStatusError = false
-            statusMessage = "'\(name)' 재활성화됨 (\(count)개 노트 갱신)"
+            statusMessage = L10n.PARAManage.reactivateResult(name, count)
             loadFolders()
             clearStatusAfterDelay()
             refreshCategoryIndex(.archive)
@@ -516,7 +516,7 @@ struct PARAManageView: View {
         do {
             let count = try mover.renameFolder(oldName: oldName, newName: trimmed, category: category)
             isStatusError = false
-            statusMessage = "'\(oldName)' -> '\(trimmed)' (\(count)개 노트 갱신)"
+            statusMessage = L10n.PARAManage.renameResult(oldName, trimmed, count)
             loadFolders()
             clearStatusAfterDelay()
             refreshIndex(folderName: trimmed, category: category)
@@ -533,7 +533,7 @@ struct PARAManageView: View {
         do {
             try mover.deleteFolder(name: name, category: category)
             isStatusError = false
-            statusMessage = "'\(name)' 삭제됨 (휴지통)"
+            statusMessage = L10n.PARAManage.deleteResult(name)
             loadFolders()
             clearStatusAfterDelay()
             refreshCategoryIndex(category)
@@ -549,7 +549,7 @@ struct PARAManageView: View {
         do {
             let count = try mover.mergeFolder(source: source, into: target, category: category)
             isStatusError = false
-            statusMessage = "'\(source)' -> '\(target)' 병합 (\(count)개 파일)"
+            statusMessage = L10n.PARAManage.mergeResult(source, target, count)
             loadFolders()
             clearStatusAfterDelay()
             refreshIndex(folderName: target, category: category)

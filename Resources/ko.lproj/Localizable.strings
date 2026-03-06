@@ -16,14 +16,239 @@
 "processing.linking" = "노트 연결";
 "processing.processing" = "정리";
 "processing.finishing" = "마무리";
+"processing.folder_reorganizing" = "폴더 정리 중";
+"processing.inbox_processing" = "인박스 처리 중";
+"processing.cancel" = "취소";
+"processing.files_ready" = "%d개 파일 준비 완료";
+"processing.linking_notes" = "관련 노트 연결 중...";
 
-/* Search Match Types */
+/* Search */
 "search.tag_match" = "태그 일치";
 "search.body_match" = "본문 일치";
 "search.summary_match" = "요약 일치";
 "search.title_match" = "제목 일치";
+"search.placeholder" = "태그, 키워드, 제목으로 검색";
+"search.clear_label" = "검색어 지우기";
+"search.searching" = "검색 중...";
+"search.no_results" = "결과 없음";
+"search.result_count" = "%d개 결과";
+"search.description" = "태그, 키워드, 제목으로\nPKM 전체를 검색합니다";
+"search.archived" = "(아카이브)";
 
-/* AI Provider Cost Info */
+/* AI Provider */
 "provider.cost_included" = "구독 포함";
 "provider.cost_per_file" = "파일당 약 $0.002 (Haiku 4.5)";
 "provider.free_tier" = "무료 티어: 분당 15회, 일 1500회";
+"provider.free" = "무료";
+"provider.subscription" = "구독";
+"provider.active_label" = "%@ 사용 중";
+"provider.active" = "사용 중";
+"provider.activate" = "활성화";
+"provider.switch_to" = "%@(으)로 전환";
+
+/* Dashboard */
+"dashboard.total_files" = "전체 %d개";
+"dashboard.urgent_folders" = "%d개 폴더 점검 필요";
+"dashboard.view" = "보기";
+"dashboard.manual_tools" = "수제 도구";
+"dashboard.manual_tools_desc" = "폴더와 파일을 직접 관리";
+"dashboard.folder_manage" = "폴더 관리";
+"dashboard.folder_manage_desc" = "이동 · 생성 · 정리";
+"dashboard.search" = "검색";
+"dashboard.search_desc" = "파일 · 태그 검색";
+"dashboard.ai_manage" = "AI 관리";
+"dashboard.ai_manage_desc" = "AI가 볼트 전체를 점검하고 분류";
+"dashboard.vault_inspect" = "볼트 점검";
+"dashboard.vault_inspect_desc" = "진단 · 재분류 · 정리";
+"dashboard.ai_stats" = "AI 통계";
+"dashboard.ai_stats_desc" = "비용 · 사용량 · 이력";
+"dashboard.recent_activity" = "최근 활동";
+"dashboard.no_activity" = "아직 활동 기록이 없습니다";
+"dashboard.action.classified" = "분류 완료";
+"dashboard.action.reorganized" = "정리 완료";
+"dashboard.action.relocated" = "위치 이동";
+"dashboard.action.vault_reorganized" = "재정리 이동";
+"dashboard.action.deduplicated" = "중복 제거";
+"dashboard.action.deleted" = "삭제";
+"dashboard.action.started" = "처리 시작";
+"dashboard.action.completed" = "처리 완료";
+"dashboard.action.error" = "오류";
+"dashboard.category.project" = "프로젝트";
+"dashboard.category.area" = "영역";
+"dashboard.category.resource" = "자료";
+"dashboard.category.archive" = "아카이브";
+"dashboard.category.system" = "시스템";
+
+/* Inbox */
+"inbox.empty" = "인박스가 비어 있음";
+"inbox.drag_hint" = "파일을 여기에 끌어다 놓거나";
+"inbox.select_files" = "파일 선택";
+"inbox.drop_to_add" = "놓으면 인박스에 추가됩니다";
+"inbox.more_files" = "외 %d개";
+"inbox.estimated_time" = "약 %d초";
+"inbox.add_label" = "인박스 파일 추가";
+"inbox.clear_label" = "인박스 비우기";
+"inbox.clear_title" = "인박스 비우기";
+"inbox.clear_button" = "비우기";
+"inbox.cancel_button" = "취소";
+"inbox.clear_message" = "%d개 파일을 휴지통으로 보냅니다.";
+"inbox.organize" = "정리하기";
+"inbox.set_api_key" = "API 키를 먼저 설정하세요";
+"inbox.pick_vault_title" = "PKM 볼트 폴더 선택";
+"inbox.added_count" = "%d개 추가됨";
+"inbox.skipped_code" = "코드 %d개 건너뜀";
+"inbox.failed_count" = "%d개 실패";
+"inbox.no_addable_files" = "추가할 수 있는 파일이 없습니다";
+"inbox.clear_failed" = "인박스 비움 (%d개 실패 — 파일이 사용 중일 수 있습니다)";
+"inbox.clear_success" = "인박스 비움 (휴지통으로 이동)";
+"inbox.pick_files_title" = "인박스에 추가할 파일 선택";
+
+/* Results */
+"results.title" = "정리 결과";
+"results.go_back" = "돌아가기";
+"results.open_in_finder" = "Finder에서 열기";
+"results.no_files" = "처리된 파일이 없습니다";
+"results.confirm_waiting" = "%d개 확인 대기";
+"results.skip_all" = "모두 건너뛰기";
+"results.moved_to" = "%@로 옮겨짐";
+"results.deleted" = "삭제됨";
+"results.error_occurred" = "오류 발생";
+"results.files_organized" = "%d개 파일 정리 완료";
+"results.relocated_count" = "%d 위치 변경";
+"results.skipped_count" = "%d 건너뜀";
+"results.error_count" = "%d 오류";
+"results.waiting_count" = "%d 대기";
+"results.auto_tagged" = "태그와 요약이 자동으로 추가되었습니다.";
+"results.next_steps" = "다음 단계";
+"results.analyzing_folders" = "폴더 상태 분석 중...";
+"results.all_folders_good" = "모든 폴더가 양호합니다";
+"results.clean_all" = "모두 정리";
+"results.too_many_files" = "%d개 파일 — 세분화 필요";
+"results.missing_frontmatter" = "%d개 파일 정보 누락";
+"results.low_tag_diversity" = "태그 다양성 부족";
+"results.clean_up" = "정리";
+"results.unmatched_project_hint" = "등록된 프로젝트에 맞는 곳이 없습니다. 새 프로젝트를 만드시겠습니까?";
+"results.unmatched_project_generic" = "등록된 프로젝트에 맞는 곳이 없습니다. 새 프로젝트를 만드시겠습니까?";
+"results.name_conflict_hint" = "같은 이름의 파일이 이미 있습니다 — 다른 위치를 선택하거나 건너뛰세요";
+"results.misclassified_hint" = "AI가 다른 위치를 추천합니다 — 이동하거나 건너뛰세요";
+"results.low_confidence_hint" = "이 파일이 어디에 들어갈지 모르겠어요. 골라주세요";
+"results.project_name" = "프로젝트 이름";
+"results.create" = "생성";
+"results.create_project" = "프로젝트 생성";
+"results.skip" = "건너뛰기";
+"results.delete" = "삭제";
+
+/* Settings */
+"settings.ai_settings" = "AI 설정";
+"settings.change_api_key" = "API 키 변경";
+"settings.delete_key" = "삭제";
+"settings.key_deleted" = "삭제됨";
+"settings.key_saved" = "저장 완료";
+"settings.key_save_failed" = "저장 실패";
+"settings.key_format_needed" = "%@... 형식 필요";
+"settings.cli_installed" = "Claude CLI 설치됨";
+"settings.cli_pipe_mode" = "claude -p 파이프 모드로 AI 호출";
+"settings.cli_not_found" = "Claude CLI를 찾을 수 없습니다";
+"settings.cli_install_hint" = "설치: https://claude.com/download";
+"settings.save" = "저장";
+"settings.cancel" = "취소";
+"settings.pkm_folder" = "PKM 폴더";
+"settings.para_confirmed" = "PARA 확인됨";
+"settings.para_not_found" = "PARA 없음";
+"settings.change" = "변경";
+"settings.create_structure" = "폴더 구조 만들기";
+"settings.full_disk_access" = "전체 디스크 접근";
+"settings.granted" = "허용됨";
+"settings.needed" = "필요";
+"settings.fda_description" = "파일 접근 권한이 없으면 일부 폴더에서 파일을 읽지 못합니다.\n시스템 설정에서 DotBrain에 전체 디스크 접근을 허용해주세요.";
+"settings.open_system_settings" = "시스템 설정 열기";
+"settings.app_info" = "앱 정보";
+"settings.latest" = "최신";
+"settings.checking_update" = "확인 중...";
+"settings.check_update" = "업데이트 확인";
+"settings.update_available" = "v%@ 업데이트";
+"settings.cant_read_release" = "릴리즈 정보를 읽을 수 없습니다";
+"settings.check_failed" = "확인 실패: %@";
+"settings.invalid_version" = "잘못된 버전 형식";
+"settings.update_failed" = "업데이트 실패: %@";
+"settings.unknown" = "알 수 없음";
+"settings.onboarding" = "온보딩";
+"settings.restart_onboarding" = "온보딩 다시 시작";
+"settings.help" = "도움말";
+"settings.quit" = "종료";
+"settings.help_title" = "DotBrain 사용법";
+"settings.help_step1" = "인박스에 파일을 드래그하거나 + 버튼으로 추가";
+"settings.help_step2" = "\"정리하기\" 버튼을 누르면 AI가 PARA로 분류";
+"settings.help_step3" = "폴더 관리에서 프로젝트 생성/이름 변경/병합";
+"settings.help_step4" = "검색으로 태그, 키워드, 제목 기반 노트 찾기";
+"settings.para_structure" = "PARA 구조";
+"settings.para_project" = "Project — 진행 중인 일 (마감 있음)";
+"settings.para_area" = "Area — 늘 관리하는 영역 (건강, 재무)";
+"settings.para_resource" = "Resource — 참고 자료";
+"settings.para_archive" = "Archive — 완료된 것";
+"settings.bug_report" = "버그 신고 / 기능 요청";
+"settings.recheck_cli" = "설치 후 다시 확인";
+"settings.pick_vault_title" = "PKM 볼트 폴더 선택";
+
+/* AI Statistics */
+"aistats.estimated_cost" = "추정 API 비용";
+"aistats.cost_by_operation" = "작업별 비용";
+"aistats.recent_calls" = "최근 API 호출";
+"aistats.no_usage" = "아직 API 사용 기록이 없습니다";
+"aistats.no_usage_hint" = "파일을 분류하면 여기에 비용이 표시됩니다";
+"aistats.op.classify" = "분류";
+"aistats.op.classify_stage1" = "분류 (1단계)";
+"aistats.op.classify_stage2" = "분류 (2단계)";
+"aistats.op.enrich" = "메타 보완";
+"aistats.op.moc" = "폴더 요약";
+"aistats.op.semantic_link" = "시맨틱 링크";
+"aistats.op.summary" = "AI 요약";
+
+/* MenuBar */
+"menubar.task_conflict" = "작업 충돌";
+"menubar.confirm" = "확인";
+"menubar.fda_banner" = "업데이트 후 디스크 접근 권한을 다시 설정해주세요";
+"menubar.fda_button" = "권한 설정";
+"menubar.fda_auto_restart" = "설정 후 앱이 자동으로 다시 시작됩니다";
+
+/* PARA Manage */
+"para_manage.scanning" = "폴더 스캔 중...";
+"para_manage.no_folders" = "폴더가 없습니다";
+"para_manage.create_hint" = "+ 버튼으로 폴더를 생성하세요";
+"para_manage.folder_name" = "폴더 이름";
+"para_manage.delete_folder" = "폴더 삭제";
+"para_manage.delete_button" = "삭제";
+"para_manage.delete_message" = "'%@' 폴더를 휴지통으로 보냅니다. Finder에서 복구할 수 있습니다.";
+"para_manage.rename_title" = "이름 변경";
+"para_manage.new_name" = "새 이름";
+"para_manage.rename_button" = "변경";
+"para_manage.rename_message" = "'%@' 폴더의 새 이름을 입력하세요.";
+"para_manage.move_to" = "%@(으)로 이동";
+"para_manage.complete_project" = "프로젝트 완료";
+"para_manage.reactivate" = "재활성화";
+"para_manage.auto_reorganize" = "자동 정리";
+"para_manage.merge_into" = "다른 폴더에 병합";
+"para_manage.rename" = "이름 변경";
+"para_manage.open_in_finder" = "Finder에서 열기";
+"para_manage.invalid_name" = "잘못된 폴더 이름입니다";
+"para_manage.already_exists" = "'%@' 이미 존재합니다";
+"para_manage.folder_created" = "'%@' 폴더 생성됨";
+"para_manage.move_result" = "'%@' -> %@ (%d개 노트 갱신)";
+"para_manage.complete_result" = "'%@' 완료 -> 아카이브 (%d개 노트 갱신)";
+"para_manage.reactivate_result" = "'%@' 재활성화됨 (%d개 노트 갱신)";
+"para_manage.rename_result" = "'%@' -> '%@' (%d개 노트 갱신)";
+"para_manage.delete_result" = "'%@' 삭제됨 (휴지통)";
+"para_manage.merge_result" = "'%@' -> '%@' 병합 (%d개 파일)";
+
+/* Folder Relations */
+"folder_relation.description" = "폴더 관계를 매칭하면 AI가 파일을 더 정확하게 분류합니다.";
+"folder_relation.loading" = "AI가 폴더 관계를 분석하고 있습니다...";
+"folder_relation.all_reviewed" = "모든 폴더 관계를 검토했습니다";
+"folder_relation.go_back" = "돌아가기";
+"folder_relation.review_complete" = "%d개 폴더 쌍 검토 완료";
+"folder_relation.existing_link" = "기존 연결";
+"folder_relation.new_suggestion" = "새 추천";
+"folder_relation.note_count" = "%@ · %d개 노트";
+
+/* Common */
+"common.cancel" = "취소";

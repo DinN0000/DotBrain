@@ -103,12 +103,12 @@ struct SettingsView: View {
                     .font(.caption)
                     .foregroundColor(.accentColor)
                     .frame(width: 16)
-                Text("AI 설정")
+                Text(L10n.Settings.aiSettings)
                     .font(.subheadline)
                     .fontWeight(.medium)
                 Spacer()
                 if activeHasKey {
-                    Label("\(activeProvider.displayName) 사용 중", systemImage: "checkmark.circle.fill")
+                    Label(L10n.Provider.activeLabel(activeProvider.displayName), systemImage: "checkmark.circle.fill")
                         .font(.caption2)
                         .foregroundColor(.green)
                 }
@@ -139,7 +139,7 @@ struct SettingsView: View {
                 cliStatusSection
             } else if viewingHasKey && !isEditingKey {
                 HStack {
-                    Button("API 키 변경") {
+                    Button(L10n.Settings.changeApiKey) {
                         isEditingKey = true
                         loadKeyForProvider(viewingProvider)
                     }
@@ -147,7 +147,7 @@ struct SettingsView: View {
                     .buttonStyle(.bordered)
                     .controlSize(.mini)
 
-                    Button("삭제") { deleteKey() }
+                    Button(L10n.Settings.deleteKey) { deleteKey() }
                         .font(.caption)
                         .buttonStyle(.bordered)
                         .controlSize(.mini)
@@ -155,7 +155,7 @@ struct SettingsView: View {
                     if let msg = saveMessage {
                         Text(msg)
                             .font(.caption2)
-                            .foregroundColor(msg == "삭제됨" ? .orange : .green)
+                            .foregroundColor(msg == L10n.Settings.keyDeleted ? .orange : .green)
                     }
                 }
             } else {
@@ -169,7 +169,7 @@ struct SettingsView: View {
                         appState.selectedProvider = viewingProvider
                     }
                 }) {
-                    Text("\(viewingProvider.displayName)(으)로 전환")
+                    Text(L10n.Provider.switchTo(viewingProvider.displayName))
                         .font(.caption)
                         .frame(maxWidth: .infinity)
                 }
@@ -208,7 +208,7 @@ struct SettingsView: View {
                     .fontWeight(isViewing ? .bold : .medium)
 
                 if provider == .gemini {
-                    Text("무료")
+                    Text(L10n.Provider.free)
                         .font(.system(size: 8, weight: .semibold))
                         .foregroundColor(.secondary)
                         .padding(.horizontal, 4)
@@ -217,7 +217,7 @@ struct SettingsView: View {
                         .cornerRadius(2)
                 }
                 if provider == .claudeCLI {
-                    Text("구독")
+                    Text(L10n.Provider.subscription)
                         .font(.system(size: 8, weight: .semibold))
                         .foregroundColor(.secondary)
                         .padding(.horizontal, 4)
@@ -240,17 +240,17 @@ struct SettingsView: View {
     private var cliStatusSection: some View {
         VStack(alignment: .leading, spacing: 6) {
             if appState.hasClaudeCLI {
-                Label("Claude CLI 설치됨", systemImage: "checkmark.circle.fill")
+                Label(L10n.Settings.cliInstalled, systemImage: "checkmark.circle.fill")
                     .font(.caption)
                     .foregroundColor(.green)
-                Text("claude -p 파이프 모드로 AI 호출")
+                Text(L10n.Settings.cliPipeMode)
                     .font(.caption2)
                     .foregroundColor(.secondary)
             } else {
-                Label("Claude CLI를 찾을 수 없습니다", systemImage: "xmark.circle.fill")
+                Label(L10n.Settings.cliNotFound, systemImage: "xmark.circle.fill")
                     .font(.caption)
                     .foregroundColor(.red)
-                Text("설치: https://claude.com/download")
+                Text(L10n.Settings.cliInstallHint)
                     .font(.caption2)
                     .foregroundColor(.secondary)
             }
@@ -280,7 +280,7 @@ struct SettingsView: View {
             }
 
             HStack(spacing: 6) {
-                Button("저장") {
+                Button(L10n.Settings.save) {
                     saveKey()
                     if activeHasKey { isEditingKey = false }
                 }
@@ -289,7 +289,7 @@ struct SettingsView: View {
                 .disabled(keyInput.isEmpty || keyInput == "••••••••")
 
                 if isEditingKey {
-                    Button("취소") {
+                    Button(L10n.Settings.cancel) {
                         isEditingKey = false
                     }
                     .buttonStyle(.bordered)
@@ -299,7 +299,7 @@ struct SettingsView: View {
                 if let msg = saveMessage {
                     Text(msg)
                         .font(.caption2)
-                        .foregroundColor(msg == "저장 완료" ? .green : .orange)
+                        .foregroundColor(msg == L10n.Settings.keySaved ? .green : .orange)
                 }
             }
         }
@@ -309,7 +309,7 @@ struct SettingsView: View {
 
     private func pickVaultFolder() {
         let panel = NSOpenPanel()
-        panel.title = "PKM 볼트 폴더 선택"
+        panel.title = L10n.Settings.pickVaultTitle
         panel.canChooseDirectories = true
         panel.canChooseFiles = false
         panel.allowsMultipleSelection = false
@@ -337,16 +337,16 @@ struct SettingsView: View {
                     .font(.caption)
                     .foregroundColor(.accentColor)
                     .frame(width: 16)
-                Text("PKM 폴더")
+                Text(L10n.Settings.pkmFolder)
                     .font(.subheadline)
                     .fontWeight(.medium)
                 Spacer()
                 if isStructureReady {
-                    Label("PARA 확인됨", systemImage: "checkmark.circle.fill")
+                    Label(L10n.Settings.paraConfirmed, systemImage: "checkmark.circle.fill")
                         .font(.caption2)
                         .foregroundColor(.green)
                 } else {
-                    Label("PARA 없음", systemImage: "exclamationmark.triangle.fill")
+                    Label(L10n.Settings.paraNotFound, systemImage: "exclamationmark.triangle.fill")
                         .font(.caption2)
                         .foregroundColor(.orange)
                 }
@@ -365,7 +365,7 @@ struct SettingsView: View {
 
                 Spacer()
 
-                Button("변경") { pickVaultFolder() }
+                Button(L10n.Settings.change) { pickVaultFolder() }
                     .buttonStyle(.bordered)
                     .controlSize(.mini)
             }
@@ -378,7 +378,7 @@ struct SettingsView: View {
                 }) {
                     HStack(spacing: 4) {
                         Image(systemName: "folder.badge.plus")
-                        Text("폴더 구조 만들기")
+                        Text(L10n.Settings.createStructure)
                     }
                     .frame(maxWidth: .infinity)
                 }
@@ -400,25 +400,25 @@ struct SettingsView: View {
                 Image(systemName: fdaGranted ? "checkmark.shield.fill" : "lock.shield")
                     .font(.caption)
                     .foregroundColor(fdaGranted ? .green : .orange)
-                Text("전체 디스크 접근")
+                Text(L10n.Settings.fullDiskAccess)
                     .font(.subheadline)
                     .fontWeight(.medium)
 
                 Spacer()
 
                 if fdaGranted {
-                    Text("허용됨")
+                    Text(L10n.Settings.granted)
                         .font(.caption2)
                         .foregroundColor(.green)
                 } else {
-                    Text("필요")
+                    Text(L10n.Settings.needed)
                         .font(.caption2)
                         .foregroundColor(.orange)
                 }
             }
 
             if !fdaGranted {
-                Text("파일 접근 권한이 없으면 일부 폴더에서 파일을 읽지 못합니다.\n시스템 설정에서 DotBrain에 전체 디스크 접근을 허용해주세요.")
+                Text(L10n.Settings.fdaDescription)
                     .font(.caption)
                     .foregroundColor(.secondary)
                     .lineSpacing(2)
@@ -429,7 +429,7 @@ struct SettingsView: View {
                     HStack(spacing: 4) {
                         Image(systemName: "gearshape")
                             .font(.caption2)
-                        Text("시스템 설정 열기")
+                        Text(L10n.Settings.openSystemSettings)
                             .font(.caption)
                     }
                 }
@@ -446,7 +446,7 @@ struct SettingsView: View {
     // MARK: - App Info Section
 
     private var currentVersion: String {
-        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "알 수 없음"
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? L10n.Settings.unknown
     }
 
     private var appInfoSection: some View {
@@ -456,12 +456,12 @@ struct SettingsView: View {
                     .font(.caption)
                     .foregroundColor(.accentColor)
                     .frame(width: 16)
-                Text("앱 정보")
+                Text(L10n.Settings.appInfo)
                     .font(.subheadline)
                     .fontWeight(.medium)
                 Spacer()
                 if let latest = latestVersion, latest == currentVersion {
-                    Label("최신", systemImage: "checkmark.circle.fill")
+                    Label(L10n.Settings.latest, systemImage: "checkmark.circle.fill")
                         .font(.caption2)
                         .foregroundColor(.green)
                 }
@@ -485,7 +485,7 @@ struct SettingsView: View {
                         Image(systemName: "arrow.triangle.2.circlepath")
                             .font(.caption2)
                             .rotationEffect(.degrees(updateIconRotation))
-                        Text(isCheckingUpdate ? "확인 중..." : "업데이트 확인")
+                        Text(isCheckingUpdate ? L10n.Settings.checkingUpdate : L10n.Settings.checkUpdate)
                             .font(.caption)
                     }
                     .padding(.horizontal, 8)
@@ -504,7 +504,7 @@ struct SettingsView: View {
 
             if let latest = latestVersion, latest != currentVersion {
                 Button(action: { runUpdate() }) {
-                    Text("v\(latest) 업데이트")
+                    Text(L10n.Settings.updateAvailable(latest))
                         .font(.caption)
                         .frame(maxWidth: .infinity)
                 }
@@ -547,7 +547,7 @@ struct SettingsView: View {
                     await MainActor.run {
                         isUpdateAnimating = false
                         withAnimation { updateIconRotation = 0 }
-                        updateError = "릴리즈 정보를 읽을 수 없습니다"
+                        updateError = L10n.Settings.cantReadRelease
                         isCheckingUpdate = false
                     }
                 }
@@ -555,7 +555,7 @@ struct SettingsView: View {
                 await MainActor.run {
                     isUpdateAnimating = false
                     withAnimation { updateIconRotation = 0 }
-                    updateError = "확인 실패: \(error.localizedDescription)"
+                    updateError = L10n.Settings.checkFailed(error.localizedDescription)
                     isCheckingUpdate = false
                 }
             }
@@ -566,7 +566,7 @@ struct SettingsView: View {
         // Validate version string to prevent shell injection
         guard let version = latestVersion,
               version.range(of: #"^[0-9]+\.[0-9]+\.[0-9]+$"#, options: .regularExpression) != nil else {
-            updateError = "잘못된 버전 형식"
+            updateError = L10n.Settings.invalidVersion
             return
         }
         let safeTag = "v\(version)"
@@ -589,7 +589,7 @@ struct SettingsView: View {
                 NSApplication.shared.terminate(nil)
             }
         } catch {
-            updateError = "업데이트 실패: \(error.localizedDescription)"
+            updateError = L10n.Settings.updateFailed(error.localizedDescription)
         }
     }
 
@@ -602,7 +602,7 @@ struct SettingsView: View {
                     .font(.caption)
                     .foregroundColor(.accentColor)
                     .frame(width: 16)
-                Text("온보딩")
+                Text(L10n.Settings.onboarding)
                     .font(.subheadline)
                     .fontWeight(.medium)
                 Spacer()
@@ -616,7 +616,7 @@ struct SettingsView: View {
                 HStack(spacing: 4) {
                     Image(systemName: "arrow.triangle.2.circlepath")
                         .font(.caption)
-                    Text("온보딩 다시 시작")
+                    Text(L10n.Settings.restartOnboarding)
                         .font(.caption)
                 }
                 .frame(maxWidth: .infinity)
@@ -638,7 +638,7 @@ struct SettingsView: View {
                 HStack(spacing: 3) {
                     Image(systemName: "questionmark.circle")
                         .font(.caption2)
-                    Text("도움말")
+                    Text(L10n.Settings.help)
                         .font(.caption2)
                 }
             }
@@ -679,7 +679,7 @@ struct SettingsView: View {
                 HStack(spacing: 3) {
                     Image(systemName: "power")
                         .font(.caption2)
-                    Text("종료")
+                    Text(L10n.Settings.quit)
                         .font(.caption2)
                 }
             }
@@ -705,30 +705,30 @@ struct SettingsView: View {
 
     private var helpPopover: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("DotBrain 사용법")
+            Text(L10n.Settings.helpTitle)
                 .font(.subheadline)
                 .fontWeight(.semibold)
 
             VStack(alignment: .leading, spacing: 6) {
-                helpRow("1", "인박스에 파일을 드래그하거나 + 버튼으로 추가")
-                helpRow("2", "\"정리하기\" 버튼을 누르면 AI가 PARA로 분류")
-                helpRow("3", "폴더 관리에서 프로젝트 생성/이름 변경/병합")
-                helpRow("4", "검색으로 태그, 키워드, 제목 기반 노트 찾기")
+                helpRow("1", L10n.Settings.helpStep1)
+                helpRow("2", L10n.Settings.helpStep2)
+                helpRow("3", L10n.Settings.helpStep3)
+                helpRow("4", L10n.Settings.helpStep4)
             }
 
             Divider()
 
             VStack(alignment: .leading, spacing: 4) {
-                Text("PARA 구조")
+                Text(L10n.Settings.paraStructure)
                     .font(.caption)
                     .fontWeight(.medium)
-                Text("Project — 진행 중인 일 (마감 있음)")
+                Text(L10n.Settings.paraProject)
                     .font(.caption2).foregroundColor(.secondary)
-                Text("Area — 늘 관리하는 영역 (건강, 재무)")
+                Text(L10n.Settings.paraArea)
                     .font(.caption2).foregroundColor(.secondary)
-                Text("Resource — 참고 자료")
+                Text(L10n.Settings.paraResource)
                     .font(.caption2).foregroundColor(.secondary)
-                Text("Archive — 완료된 것")
+                Text(L10n.Settings.paraArchive)
                     .font(.caption2).foregroundColor(.secondary)
             }
 
@@ -741,7 +741,7 @@ struct SettingsView: View {
                 HStack(spacing: 4) {
                     Image(systemName: "arrow.up.right.square")
                         .font(.caption2)
-                    Text("버그 신고 / 기능 요청")
+                    Text(L10n.Settings.bugReport)
                         .font(.caption)
                 }
             }
@@ -791,11 +791,11 @@ struct SettingsView: View {
     private func saveKey() {
         if keyInput.hasPrefix(viewingProvider.keyPrefix) {
             let saved = viewingProvider.saveAPIKey(keyInput)
-            saveMessage = saved ? "저장 완료" : "저장 실패"
+            saveMessage = saved ? L10n.Settings.keySaved : L10n.Settings.keySaveFailed
             appState.updateAPIKeyStatus()
             clearMessageAfterDelay()
         } else {
-            saveMessage = "\(viewingProvider.keyPrefix)... 형식 필요"
+            saveMessage = L10n.Settings.keyFormatNeeded(viewingProvider.keyPrefix)
             clearMessageAfterDelay()
         }
     }
@@ -804,7 +804,7 @@ struct SettingsView: View {
         viewingProvider.deleteAPIKey()
         keyInput = ""
         appState.updateAPIKeyStatus()
-        saveMessage = "삭제됨"
+        saveMessage = L10n.Settings.keyDeleted
         clearMessageAfterDelay()
     }
 
