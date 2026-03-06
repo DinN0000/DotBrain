@@ -466,7 +466,7 @@ struct AuditRow: View {
             Text(label)
                 .font(.caption)
             Spacer()
-            Text("\(count)건")
+            Text(L10n.Dashboard.issueCount(count))
                 .font(.caption)
                 .monospacedDigit()
                 .foregroundColor(count > 0 ? .primary : .secondary)

@@ -3,7 +3,7 @@ import Foundation
 /// Centralized localization strings.
 /// Usage: `Text(L10n.Screen.inbox)` or `L10n.Processing.preparing`
 enum L10n {
-    static let bundle: Bundle = {
+    private static let bundle: Bundle = {
         // Production: .app bundle (Contents/Resources/ has .lproj)
         if Bundle.main.path(forResource: "Localizable", ofType: "strings", inDirectory: nil, forLocalization: "ko") != nil {
             return .main
@@ -27,7 +27,7 @@ enum L10n {
         NSLocalizedString(key, bundle: bundle, comment: "")
     }
 
-    static func tr(_ key: String, _ args: CVarArg...) -> String {
+    private static func tr(_ key: String, _ args: CVarArg...) -> String {
         String(format: tr(key), arguments: args)
     }
 
@@ -122,6 +122,7 @@ enum L10n {
         static let completed = tr("dashboard.action.completed")
         static let error = tr("dashboard.action.error")
         // Category labels
+        static func issueCount(_ count: Int) -> String { tr("dashboard.issue_count", count) }
         static let catProject = tr("dashboard.category.project")
         static let catArea = tr("dashboard.category.area")
         static let catResource = tr("dashboard.category.resource")
@@ -183,7 +184,7 @@ enum L10n {
         static let lowTagDiversity = tr("results.low_tag_diversity")
         static let cleanUp = tr("results.clean_up")
         // Confirmation
-        static let unmatchedProjectHint = tr("results.unmatched_project_hint")
+        static func unmatchedProjectHint(_ name: String) -> String { tr("results.unmatched_project_hint", name) }
         static let unmatchedProjectGeneric = tr("results.unmatched_project_generic")
         static let nameConflictHint = tr("results.name_conflict_hint")
         static let misclassifiedHint = tr("results.misclassified_hint")

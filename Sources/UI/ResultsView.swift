@@ -328,11 +328,11 @@ struct ConfirmationRow: View {
             // Contextual message
             if confirmation.reason == .unmatchedProject {
                 if let suggested = confirmation.suggestedProjectName, !suggested.isEmpty {
-                    Text(L10n.Results.unmatchedProjectHint)
+                    Text(L10n.Results.unmatchedProjectHint(suggested))
                         .font(.caption)
                         .foregroundColor(.secondary)
                 } else {
-                    Text(L10n.Results.unmatchedProjectHint)
+                    Text(L10n.Results.unmatchedProjectGeneric)
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }

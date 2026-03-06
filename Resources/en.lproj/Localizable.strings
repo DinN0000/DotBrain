@@ -78,6 +78,7 @@
 "dashboard.category.resource" = "Resource";
 "dashboard.category.archive" = "Archive";
 "dashboard.category.system" = "System";
+"dashboard.issue_count" = "%d issues";
 
 /* Inbox */
 "inbox.empty" = "Inbox is empty";
@@ -127,7 +128,7 @@
 "results.missing_frontmatter" = "%d files missing metadata";
 "results.low_tag_diversity" = "Low tag diversity";
 "results.clean_up" = "Clean";
-"results.unmatched_project_hint" = "No matching project found. Create a new project or choose a different location.";
+"results.unmatched_project_hint" = "\"%@\" not found in registered projects. Create a new project or choose a different location.";
 "results.unmatched_project_generic" = "No matching project found. Would you like to create a new project?";
 "results.name_conflict_hint" = "A file with the same name already exists — choose a different location or skip";
 "results.misclassified_hint" = "AI recommends a different location — move or skip";
