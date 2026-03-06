@@ -262,14 +262,14 @@ struct SettingsView: View {
                     Label("Codex CLI 인증됨", systemImage: "checkmark.circle.fill")
                         .font(.caption)
                         .foregroundColor(.green)
-                    Text("codex -q 모드로 AI 호출")
+                    Text("codex exec 모드로 AI 호출")
                         .font(.caption2)
                         .foregroundColor(.secondary)
-                } else if CodexCLIClient.isAvailable() {
+                } else if appState.codexCLIInstalled {
                     Label("Codex CLI 인증 필요", systemImage: "exclamationmark.triangle.fill")
                         .font(.caption)
                         .foregroundColor(.orange)
-                    Text("터미널에서 codex auth login 실행")
+                    Text("터미널에서 codex login 실행")
                         .font(.caption2)
                         .foregroundColor(.secondary)
                 } else {

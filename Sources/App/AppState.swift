@@ -162,6 +162,7 @@ final class AppState: ObservableObject {
     @Published var hasGeminiKey: Bool = false
     @Published var hasClaudeCLI: Bool = false
     @Published var hasCodexCLI: Bool = false
+    @Published var codexCLIInstalled: Bool = false
     @Published var needsFullDiskAccess: Bool = false
 
     private var inboxWatchdog: InboxWatchdog?
@@ -210,7 +211,8 @@ final class AppState: ObservableObject {
         hasClaudeKey = KeychainService.getAPIKey() != nil
         hasGeminiKey = KeychainService.getGeminiAPIKey() != nil
         hasClaudeCLI = ClaudeCLIClient.isAvailable()
-        hasCodexCLI = CodexCLIClient.isAvailable() && CodexCLIClient.isAuthenticated()
+        codexCLIInstalled = CodexCLIClient.isAvailable()
+        hasCodexCLI = codexCLIInstalled && CodexCLIClient.isAuthenticated()
     }
 
     // MARK: - Full Disk Access
@@ -293,7 +295,8 @@ final class AppState: ObservableObject {
         self.hasClaudeKey = KeychainService.getAPIKey() != nil
         self.hasGeminiKey = KeychainService.getGeminiAPIKey() != nil
         self.hasClaudeCLI = ClaudeCLIClient.isAvailable()
-        self.hasCodexCLI = CodexCLIClient.isAvailable() && CodexCLIClient.isAuthenticated()
+        self.codexCLIInstalled = CodexCLIClient.isAvailable()
+        self.hasCodexCLI = self.codexCLIInstalled && CodexCLIClient.isAuthenticated()
 
         if !UserDefaults.standard.bool(forKey: DefaultsKey.onboardingCompleted) {
             self.currentScreen = .onboarding

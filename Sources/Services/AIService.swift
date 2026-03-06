@@ -1,5 +1,13 @@
 import Foundation
 
+/// Shared interface for CLI-based AI providers
+protocol CLISendable: Actor {
+    func sendMessage(model: String, maxTokens: Int, userMessage: String) async throws -> (String, TokenUsage?)
+}
+
+extension ClaudeCLIClient: CLISendable {}
+extension CodexCLIClient: CLISendable {}
+
 /// Provider-agnostic AI service that routes to Claude, Gemini, or Claude CLI
 /// with adaptive rate limiting, retry logic, and provider fallback
 actor AIService {
@@ -179,16 +187,10 @@ actor AIService {
                 userMessage: userMessage,
                 systemMessage: systemMessage
             )
-        case .claudeCLI:
+        case .claudeCLI, .codexCLI:
             let combined = systemMessage.map { $0 + "\n\n" + userMessage } ?? userMessage
-            return try await claudeCLIClient.sendMessage(
-                model: model,
-                maxTokens: maxTokens,
-                userMessage: combined
-            )
-        case .codexCLI:
-            let combined = systemMessage.map { $0 + "\n\n" + userMessage } ?? userMessage
-            return try await codexCLIClient.sendMessage(
+            let client: any CLISendable = provider == .claudeCLI ? claudeCLIClient : codexCLIClient
+            return try await client.sendMessage(
                 model: model,
                 maxTokens: maxTokens,
                 userMessage: combined
