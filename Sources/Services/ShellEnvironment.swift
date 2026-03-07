@@ -5,6 +5,17 @@ import Foundation
 /// to avoid duplication across ClaudeCLIClient and CodexCLIClient.
 enum ShellEnvironment {
 
+    // MARK: - Process Timeout
+
+    /// Schedule process termination after a duration. Cancel the returned task when the process exits normally.
+    @discardableResult
+    static func scheduleTermination(of process: Process, after duration: Duration) -> Task<Void, Never> {
+        Task.detached {
+            try? await Task.sleep(for: duration)
+            if process.isRunning { process.terminate() }
+        }
+    }
+
     // MARK: - Cached State
 
     private static let cacheLock = NSLock()
@@ -32,9 +43,8 @@ enum ShellEnvironment {
         do {
             try process.run()
 
-            DispatchQueue.global().asyncAfter(deadline: .now() + 5) {
-                if process.isRunning { process.terminate() }
-            }
+            let timeout = scheduleTermination(of: process, after: .seconds(5))
+            defer { timeout.cancel() }
 
             process.waitUntilExit()
 
@@ -79,9 +89,8 @@ enum ShellEnvironment {
         do {
             try process.run()
 
-            DispatchQueue.global().asyncAfter(deadline: .now() + 5) {
-                if process.isRunning { process.terminate() }
-            }
+            let timeout = scheduleTermination(of: process, after: .seconds(5))
+            defer { timeout.cancel() }
 
             process.waitUntilExit()
 

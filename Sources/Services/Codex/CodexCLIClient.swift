@@ -111,9 +111,8 @@ actor CodexCLIClient {
 
             try process.run()
 
-            DispatchQueue.global().asyncAfter(deadline: .now() + 180) {
-                if process.isRunning { process.terminate() }
-            }
+            let timeout = ShellEnvironment.scheduleTermination(of: process, after: .seconds(180))
+            defer { timeout.cancel() }
 
             if let data = input.data(using: .utf8) {
                 inputPipe.fileHandleForWriting.write(data)

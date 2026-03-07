@@ -197,9 +197,8 @@ actor ClaudeCLIClient {
     private func runWarmProcess(_ p: PooledProcess, input: String) async throws -> String {
         try await Task.detached(priority: .userInitiated) {
             // Timeout: terminate if still running after 120s
-            DispatchQueue.global().asyncAfter(deadline: .now() + 120) {
-                if p.process.isRunning { p.process.terminate() }
-            }
+            let timeout = ShellEnvironment.scheduleTermination(of: p.process, after: .seconds(120))
+            defer { timeout.cancel() }
 
             if let data = input.data(using: .utf8) {
                 p.stdinPipe.fileHandleForWriting.write(data)
