@@ -200,7 +200,7 @@ struct FolderRelationAnalyzer: Sendable {
             let response = try await AIService.shared.sendFastWithUsage(message: prompt)
             if let usage = response.usage {
                 let model = await AIService.shared.fastModel
-                StatisticsService.logTokenUsage(operation: "folder-relation-analyze", model: model, usage: usage)
+                StatisticsService.logTokenUsage(operation: "folder-relation-analyze", model: model, usage: usage, isEstimated: response.isEstimated)
             }
             return parseAIResponse(response.text, candidates: candidates)
         } catch {

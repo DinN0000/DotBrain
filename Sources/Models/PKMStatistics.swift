@@ -9,6 +9,19 @@ struct PKMStatistics {
     var duplicatesFound: Int = 0
 }
 
+extension Date {
+    private static let relativeFormatter: RelativeDateTimeFormatter = {
+        let f = RelativeDateTimeFormatter()
+        f.unitsStyle = .abbreviated
+        return f
+    }()
+
+    /// Abbreviated relative string, e.g. "3m ago"
+    var relativeFormatted: String {
+        Self.relativeFormatter.localizedString(for: self, relativeTo: Date())
+    }
+}
+
 struct ActivityEntry: Identifiable {
     let id = UUID()
     let fileName: String

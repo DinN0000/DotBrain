@@ -126,6 +126,7 @@ struct DashboardView: View {
                             Text(L10n.Dashboard.noActivity)
                                 .font(.caption)
                                 .foregroundColor(.secondary)
+                                .frame(maxWidth: .infinity, alignment: .leading)
                                 .padding(.vertical, 8)
                         } else {
                             ForEach(stats.recentActivity.prefix(10)) { entry in
@@ -346,9 +347,7 @@ struct DashboardView: View {
     }
 
     private func relativeDate(_ date: Date) -> String {
-        let formatter = RelativeDateTimeFormatter()
-        formatter.unitsStyle = .abbreviated
-        return formatter.localizedString(for: date, relativeTo: Date())
+        date.relativeFormatted
     }
 
     private func fullDate(_ date: Date) -> String {

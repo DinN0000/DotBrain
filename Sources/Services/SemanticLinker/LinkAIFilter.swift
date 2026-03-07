@@ -55,7 +55,7 @@ struct LinkAIFilter: Sendable {
         let response = try await aiService.sendFastWithUsage(maxTokens: 8192, message: prompt)
         if let usage = response.usage {
             let model = await aiService.fastModel
-            StatisticsService.logTokenUsage(operation: "semantic-link", model: model, usage: usage)
+            StatisticsService.logTokenUsage(operation: "semantic-link", model: model, usage: usage, isEstimated: response.isEstimated)
         }
 
         return parseBatchResponse(response.text, notes: notes, maxResultsPerNote: maxResultsPerNote)
@@ -102,7 +102,7 @@ struct LinkAIFilter: Sendable {
         let response = try await aiService.sendFastWithUsage(message: prompt)
         if let usage = response.usage {
             let model = await aiService.fastModel
-            StatisticsService.logTokenUsage(operation: "semantic-link", model: model, usage: usage)
+            StatisticsService.logTokenUsage(operation: "semantic-link", model: model, usage: usage, isEstimated: response.isEstimated)
         }
 
         return parseSingleResponse(response.text, candidates: candidates, maxResults: maxResults)
@@ -153,7 +153,7 @@ struct LinkAIFilter: Sendable {
         let response = try await aiService.sendFastWithUsage(maxTokens: 2048, message: prompt)
         if let usage = response.usage {
             let model = await aiService.fastModel
-            StatisticsService.logTokenUsage(operation: "semantic-link-context", model: model, usage: usage)
+            StatisticsService.logTokenUsage(operation: "semantic-link-context", model: model, usage: usage, isEstimated: response.isEstimated)
         }
 
         return parseContextOnlyResponse(response.text, notes: notes)

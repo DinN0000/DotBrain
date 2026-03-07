@@ -30,7 +30,7 @@ actor APIUsageLogger {
     // MARK: - Logging
 
     /// Log a single API usage entry with automatic cost calculation
-    func log(operation: String, model: String, usage: TokenUsage) {
+    func log(operation: String, model: String, usage: TokenUsage, isEstimated: Bool = false) {
         ensureLoaded()
 
         let cost = Self.calculateCost(model: model, usage: usage)
@@ -42,7 +42,8 @@ actor APIUsageLogger {
             inputTokens: usage.inputTokens,
             outputTokens: usage.outputTokens,
             cachedTokens: usage.cachedTokens,
-            cost: cost
+            cost: cost,
+            isEstimated: isEstimated
         )
         entries.append(entry)
         save()
@@ -77,6 +78,51 @@ actor APIUsageLogger {
         ensureLoaded()
         let sorted = entries.sorted { $0.timestamp > $1.timestamp }
         return Array(sorted.prefix(limit))
+    }
+
+    // MARK: - Monthly Queries
+
+    /// All monthly aggregations in a single pass (avoids repeated filtering)
+    struct MonthlySummary {
+        var totalCost: Double = 0
+        var totalTokens: Int = 0
+        var costByOperation: [String: Double] = [:]
+        var tokensByOperation: [String: Int] = [:]
+        var recentEntries: [APIUsageEntry] = []
+    }
+
+    func monthlySummary(year: Int, month: Int, recentLimit: Int = 20) -> MonthlySummary {
+        ensureLoaded()
+        let cal = Calendar.current
+        var summary = MonthlySummary()
+        var monthly: [APIUsageEntry] = []
+
+        for entry in entries {
+            let comps = cal.dateComponents([.year, .month], from: entry.timestamp)
+            guard comps.year == year && comps.month == month else { continue }
+            summary.totalCost += entry.cost
+            summary.totalTokens += entry.totalTokens
+            summary.costByOperation[entry.operation, default: 0] += entry.cost
+            summary.tokensByOperation[entry.operation, default: 0] += entry.totalTokens
+            monthly.append(entry)
+        }
+
+        monthly.sort { $0.timestamp > $1.timestamp }
+        summary.recentEntries = Array(monthly.prefix(recentLimit))
+        return summary
+    }
+
+    /// Returns the earliest entry date, or nil if no entries (cached after first call)
+    private var cachedEarliestDate: Date?
+    private var earliestDateComputed = false
+
+    func earliestEntryDate() -> Date? {
+        ensureLoaded()
+        if !earliestDateComputed {
+            cachedEarliestDate = entries.min(by: { $0.timestamp < $1.timestamp })?.timestamp
+            earliestDateComputed = true
+        }
+        return cachedEarliestDate
     }
 
     // MARK: - Cost Calculation (static for external use)

@@ -241,12 +241,11 @@ actor ClaudeCLIClient {
             throw ClaudeCLIError.claudeNotFound
         }
 
-        let cliUsage = TokenUsage.zero
-
         // Try warm process from pool (warm pool doesn't support --system-prompt)
         if systemMessage == nil, let warm = checkoutWarmProcess(model: model, claudePath: claudePath) {
             let result = try await runWarmProcess(warm, input: userMessage)
-            return (result, cliUsage)
+            let estimatedUsage = Self.estimateTokenUsage(input: userMessage, output: result, systemMessage: nil)
+            return (result, estimatedUsage)
         }
 
         // Cold start with full argument support
@@ -259,7 +258,19 @@ actor ClaudeCLIClient {
             arguments: arguments,
             input: userMessage
         )
-        return (result, cliUsage)
+        let estimatedUsage = Self.estimateTokenUsage(input: userMessage, output: result, systemMessage: systemMessage)
+        return (result, estimatedUsage)
+    }
+
+    // MARK: - Token Estimation
+
+    /// Estimate token usage from text lengths (CLI does not return token counts).
+    /// Korean ~1.5 chars/token, English ~4 chars/token. Uses conservative 2 chars/token blend.
+    static func estimateTokenUsage(input: String, output: String, systemMessage: String?) -> TokenUsage {
+        let systemLen = systemMessage?.count ?? 0
+        let inputTokens = max(1, (input.count + systemLen) / 2)
+        let outputTokens = max(1, output.count / 2)
+        return TokenUsage(inputTokens: inputTokens, outputTokens: outputTokens, cachedTokens: 0)
     }
 
     // MARK: - Process Execution

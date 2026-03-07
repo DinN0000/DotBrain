@@ -57,7 +57,7 @@ struct NoteEnricher: Sendable {
         let response = try await aiService.sendFastWithUsage(message: prompt)
         if let usage = response.usage {
             let model = await aiService.fastModel
-            StatisticsService.logTokenUsage(operation: "enrich", model: model, usage: usage)
+            StatisticsService.logTokenUsage(operation: "enrich", model: model, usage: usage, isEstimated: response.isEstimated)
         }
 
         // Parse AI response
