@@ -238,7 +238,7 @@ actor Classifier {
         let response = try await aiService.sendFastWithUsage(maxTokens: 4096, message: userMessage, systemMessage: systemPrompt)
         if let usage = response.usage {
             let model = await aiService.fastModel
-            StatisticsService.logTokenUsage(operation: "classify-stage1", model: model, usage: usage)
+            StatisticsService.logTokenUsage(operation: "classify-stage1", model: model, usage: usage, isEstimated: response.isEstimated)
         }
 
         var results: [String: ClassifyResult.Stage1Item] = [:]
@@ -292,7 +292,7 @@ actor Classifier {
         let response = try await aiService.sendPreciseWithUsage(maxTokens: 2048, message: userMessage, systemMessage: systemPrompt)
         if let usage = response.usage {
             let model = await aiService.preciseModel
-            StatisticsService.logTokenUsage(operation: "classify-stage2", model: model, usage: usage)
+            StatisticsService.logTokenUsage(operation: "classify-stage2", model: model, usage: usage, isEstimated: response.isEstimated)
         }
 
         if let item = parseJSONSafe(Stage2RawItem.self, from: response.text),

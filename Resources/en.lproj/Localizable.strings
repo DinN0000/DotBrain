@@ -194,17 +194,24 @@
 "settings.pick_vault_title" = "Select PKM Vault Folder";
 
 /* AI Statistics */
-"aistats.estimated_cost" = "Estimated API Cost";
-"aistats.cost_by_operation" = "Cost by Operation";
-"aistats.recent_calls" = "Recent API Calls";
-"aistats.no_usage" = "No API usage recorded yet";
-"aistats.no_usage_hint" = "Costs will appear here after classifying files";
+"aistats.estimated_cost" = "Est. Cost";
+"aistats.estimated_tokens" = "Est. Tokens";
+"aistats.cost_by_operation" = "By Operation";
+"aistats.recent_calls" = "Recent Calls";
+"aistats.no_usage" = "No usage recorded yet";
+"aistats.no_usage_hint" = "Usage will appear here after classifying files";
+"aistats.estimated" = "est.";
+"aistats.estimate_disclaimer" = "Estimates based on model pricing. Actual billing may differ.";
+"aistats.estimate_disclaimer_cli" = "CLI usage is estimated from prompt length.";
+"aistats.year_suffix" = " ";
+"aistats.month_suffix" = " ";
 "aistats.op.classify" = "Classification";
 "aistats.op.classify_stage1" = "Classification (Stage 1)";
 "aistats.op.classify_stage2" = "Classification (Stage 2)";
 "aistats.op.enrich" = "Metadata Enrichment";
 "aistats.op.moc" = "Folder Summary";
 "aistats.op.semantic_link" = "Semantic Link";
+"aistats.op.folder_relation" = "Folder Relation";
 "aistats.op.summary" = "AI Summary";
 
 /* MenuBar */

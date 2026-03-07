@@ -226,14 +226,16 @@ actor AIService {
 
     /// Send using the fast model and return full AIResponse with token usage
     func sendFastWithUsage(maxTokens: Int = 4096, message: String, systemMessage: String? = nil) async throws -> AIResponse {
+        let isCLI = currentProvider == .claudeCLI || currentProvider == .codexCLI
         let (text, usage) = try await sendMessage(model: fastModel, maxTokens: maxTokens, userMessage: message, systemMessage: systemMessage)
-        return AIResponse(text: text, usage: usage)
+        return AIResponse(text: text, usage: usage, isEstimated: isCLI)
     }
 
     /// Send using the precise model and return full AIResponse with token usage
     func sendPreciseWithUsage(maxTokens: Int = 2048, message: String, systemMessage: String? = nil) async throws -> AIResponse {
+        let isCLI = currentProvider == .claudeCLI || currentProvider == .codexCLI
         let (text, usage) = try await sendMessage(model: preciseModel, maxTokens: maxTokens, userMessage: message, systemMessage: systemMessage)
-        return AIResponse(text: text, usage: usage)
+        return AIResponse(text: text, usage: usage, isEstimated: isCLI)
     }
 
     // MARK: - Pool Lifecycle

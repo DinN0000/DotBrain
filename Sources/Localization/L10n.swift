@@ -258,10 +258,16 @@ enum L10n {
 
     enum AIStats {
         static let estimatedCost = tr("aistats.estimated_cost")
+        static let estimatedTokens = tr("aistats.estimated_tokens")
         static let costByOperation = tr("aistats.cost_by_operation")
         static let recentCalls = tr("aistats.recent_calls")
         static let noUsage = tr("aistats.no_usage")
         static let noUsageHint = tr("aistats.no_usage_hint")
+        static let estimated = tr("aistats.estimated")
+        static let estimateDisclaimer = tr("aistats.estimate_disclaimer")
+        static let estimateDisclaimerCLI = tr("aistats.estimate_disclaimer_cli")
+        static let yearSuffix = tr("aistats.year_suffix")
+        static let monthSuffix = tr("aistats.month_suffix")
         // Operation labels
         static let opClassify = tr("aistats.op.classify")
         static let opClassifyStage1 = tr("aistats.op.classify_stage1")
@@ -269,6 +275,7 @@ enum L10n {
         static let opEnrich = tr("aistats.op.enrich")
         static let opMoc = tr("aistats.op.moc")
         static let opSemanticLink = tr("aistats.op.semantic_link")
+        static let opFolderRelation = tr("aistats.op.folder_relation")
         static let opSummary = tr("aistats.op.summary")
     }
 

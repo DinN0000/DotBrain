@@ -163,7 +163,7 @@ struct FileMover {
                 aiSummary = aiResponse.text
                 if let usage = aiResponse.usage {
                     let model = await AIService.shared.fastModel
-                    StatisticsService.logTokenUsage(operation: "summary", model: model, usage: usage)
+                    StatisticsService.logTokenUsage(operation: "summary", model: model, usage: usage, isEstimated: aiResponse.isEstimated)
                 }
             } catch {
                 // AI 요약 실패 시 원본 텍스트 앞부분 사용

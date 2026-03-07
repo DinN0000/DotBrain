@@ -70,12 +70,12 @@ class StatisticsService {
     }
 
     /// Log actual token usage with real cost calculation
-    static func logTokenUsage(operation: String, model: String, usage: TokenUsage) {
+    static func logTokenUsage(operation: String, model: String, usage: TokenUsage, isEstimated: Bool = false) {
         guard let root = sharedPkmRoot else { return }
         let cost = APIUsageLogger.calculateCost(model: model, usage: usage)
         Task {
             let logger = APIUsageLogger(pkmRoot: root)
-            await logger.log(operation: operation, model: model, usage: usage)
+            await logger.log(operation: operation, model: model, usage: usage, isEstimated: isEstimated)
         }
         addApiCost(cost)
     }

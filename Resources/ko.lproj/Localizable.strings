@@ -194,17 +194,24 @@
 "settings.pick_vault_title" = "PKM 볼트 폴더 선택";
 
 /* AI Statistics */
-"aistats.estimated_cost" = "추정 API 비용";
-"aistats.cost_by_operation" = "작업별 비용";
-"aistats.recent_calls" = "최근 API 호출";
-"aistats.no_usage" = "아직 API 사용 기록이 없습니다";
-"aistats.no_usage_hint" = "파일을 분류하면 여기에 비용이 표시됩니다";
+"aistats.estimated_cost" = "예상 비용";
+"aistats.estimated_tokens" = "예상 토큰";
+"aistats.cost_by_operation" = "작업별";
+"aistats.recent_calls" = "최근 호출";
+"aistats.no_usage" = "아직 사용 내역이 없습니다";
+"aistats.no_usage_hint" = "파일을 분류하면 여기에 표시됩니다";
+"aistats.estimated" = "추정";
+"aistats.estimate_disclaimer" = "모델 가격표 기준 추정치입니다. 실제 청구와 다를 수 있습니다.";
+"aistats.estimate_disclaimer_cli" = "CLI 사용분은 프롬프트 길이 기반 추정입니다.";
+"aistats.year_suffix" = "년";
+"aistats.month_suffix" = "월";
 "aistats.op.classify" = "분류";
 "aistats.op.classify_stage1" = "분류 (1단계)";
 "aistats.op.classify_stage2" = "분류 (2단계)";
 "aistats.op.enrich" = "메타 보완";
 "aistats.op.moc" = "폴더 요약";
 "aistats.op.semantic_link" = "시맨틱 링크";
+"aistats.op.folder_relation" = "폴더 관계 분석";
 "aistats.op.summary" = "AI 요약";
 
 /* MenuBar */
