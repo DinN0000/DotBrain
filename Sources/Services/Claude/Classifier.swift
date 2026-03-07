@@ -4,8 +4,10 @@ import Foundation
 /// Supports Claude (Haiku/Sonnet) and Gemini (Flash/Pro)
 actor Classifier {
     private let aiService = AIService.shared
-    private let batchSize = 5
-    private let confidenceThreshold = 0.8
+    private let maxBatchSize = 25
+    private let confidenceThreshold = 0.6
+    private let estimatedTokensPerFile = 200
+    private let maxOutputTokens = 8192
 
     private static let numericPrefixRegex = try? NSRegularExpression(
         pattern: #"^[1-4][\s_\-]?(?:Project|Area|Resource|Archive)/?"#,
@@ -43,8 +45,9 @@ actor Classifier {
             correctionContext: correctionContext
         )
 
-        // Stage 1: Haiku batch classification
+        // Stage 1: Haiku batch classification (dynamic batch size based on file count)
         var stage1Results: [String: ClassifyResult.Stage1Item] = [:]
+        let batchSize = min(files.count, maxBatchSize)
         let batches = stride(from: 0, to: files.count, by: batchSize).map {
             Array(files[$0..<min($0 + batchSize, files.count)])
         }
@@ -235,7 +238,8 @@ actor Classifier {
 
         let userMessage = buildStage1UserMessage(fileContents)
 
-        let response = try await aiService.sendFastWithUsage(maxTokens: 4096, message: userMessage, systemMessage: systemPrompt)
+        let dynamicMaxTokens = min(maxOutputTokens, max(4096, files.count * estimatedTokensPerFile))
+        let response = try await aiService.sendFastWithUsage(maxTokens: dynamicMaxTokens, message: userMessage, systemMessage: systemPrompt)
         if let usage = response.usage {
             let model = await aiService.fastModel
             StatisticsService.logTokenUsage(operation: "classify-stage1", model: model, usage: usage, isEstimated: response.isEstimated)
@@ -428,8 +432,14 @@ actor Classifier {
         ]
 
         각 파일에 대해 정확히 하나의 객체를 반환하세요. tags는 최대 5개, 한국어 또는 영어 혼용 가능합니다.
-        confidence는 분류 확신도입니다 (0.0=모름, 1.0=확실).
         summary는 이 문서가 무엇에 관한 것인지 구체적으로 한 줄로 요약하세요 (후속 노트 연결에 사용됩니다).
+
+        confidence 기준:
+        - 0.9~1.0: 기존 폴더와 명확히 매칭됨
+        - 0.7~0.8: 카테고리는 확실하지만 폴더 선택이 약간 불확실
+        - 0.5~0.6: 카테고리 자체가 애매함
+        - 0.0~0.4: 분류 불가
+        기존 폴더 목록에 적합한 폴더가 있으면 confidence를 0.8 이상으로 주세요.
         """
     }
 
@@ -459,7 +469,13 @@ actor Classifier {
         }
 
         tags는 최대 5개, summary는 한국어로 작성하세요.
-        confidence는 분류 확신도입니다 (0.0=모름, 1.0=확실).
+
+        confidence 기준:
+        - 0.9~1.0: 기존 폴더와 명확히 매칭됨
+        - 0.7~0.8: 카테고리는 확실하지만 폴더 선택이 약간 불확실
+        - 0.5~0.6: 카테고리 자체가 애매함
+        - 0.0~0.4: 분류 불가
+        기존 폴더 목록에 적합한 폴더가 있으면 confidence를 0.8 이상으로 주세요.
         """
     }
 
