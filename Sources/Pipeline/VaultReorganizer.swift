@@ -69,11 +69,11 @@ struct VaultReorganizer {
         )
 
         // 0-0.1: Collect files
-        onProgress?(0.0, "파일 수집 중...")
+        onProgress?(0.0, L10n.VaultInspector.scanCollectingFiles)
         let collected = collectFiles()
 
         guard !collected.isEmpty else {
-            onProgress?(1.0, "완료!")
+            onProgress?(1.0, L10n.VaultInspector.scanCompleted)
             StatisticsService.recordActivity(
                 fileName: "전체 재정리",
                 category: "system",
@@ -89,7 +89,7 @@ struct VaultReorganizer {
         onProgress?(0.1, "\(filesToProcess.count)개 파일 발견")
 
         // 0.1-0.2: Build project context
-        onProgress?(0.1, "프로젝트 컨텍스트 로드 중...")
+        onProgress?(0.1, L10n.VaultInspector.scanProjectContextLoading)
         let noteIndex = PKMPathManager(root: pkmRoot).loadNoteIndex()
         let contextBuilder = ProjectContextBuilder(pkmRoot: pkmRoot, noteIndex: noteIndex)
         let projectContext = contextBuilder.buildProjectContext()
@@ -98,10 +98,10 @@ struct VaultReorganizer {
         let weightedContext = contextBuilder.buildWeightedContext()
         let areaContext = contextBuilder.buildAreaContext()
 
-        onProgress?(0.2, "프로젝트 컨텍스트 로드 완료")
+        onProgress?(0.2, L10n.VaultInspector.scanProjectContextLoaded)
 
         // 0.2-0.4: Extract content in parallel
-        onProgress?(0.2, "파일 내용 추출 중...")
+        onProgress?(0.2, L10n.VaultInspector.scanExtractingContents(0, filesToProcess.count))
         let inputs: [ClassifyInput] = await withTaskGroup(
             of: ClassifyInput.self,
             returning: [ClassifyInput].self
@@ -109,12 +109,21 @@ struct VaultReorganizer {
             var collected: [ClassifyInput] = []
             collected.reserveCapacity(filesToProcess.count)
             var activeTasks = 0
+            var completedExtractions = 0
             let maxConcurrent = 5
+
+            func reportExtractionProgress() {
+                let total = max(filesToProcess.count, 1)
+                let progress = 0.2 + (Double(completedExtractions) / Double(total) * 0.2)
+                onProgress?(progress, L10n.VaultInspector.scanExtractingContents(completedExtractions, filesToProcess.count))
+            }
 
             for entry in filesToProcess {
                 if activeTasks >= maxConcurrent {
                     if let result = await group.next() {
                         collected.append(result)
+                        completedExtractions += 1
+                        reportExtractionProgress()
                     }
                     activeTasks -= 1
                 }
@@ -134,6 +143,8 @@ struct VaultReorganizer {
 
             for await input in group {
                 collected.append(input)
+                completedExtractions += 1
+                reportExtractionProgress()
             }
 
             // Preserve original order for stable classification
@@ -148,7 +159,7 @@ struct VaultReorganizer {
         onProgress?(0.4, "\(inputs.count)개 파일 내용 추출 완료")
 
         // 0.4-0.9: Classify with AI
-        onProgress?(0.4, "AI 분류 시작...")
+        onProgress?(0.4, L10n.VaultInspector.scanAIClassificationStarting)
         let classifier = Classifier()
         let correctionContext = CorrectionMemory.buildPromptContext(pkmRoot: pkmRoot)
         let classifications = try await classifier.classifyFiles(
@@ -167,7 +178,7 @@ struct VaultReorganizer {
         )
 
         // 0.9-1.0: Compare current vs recommended
-        onProgress?(0.9, "분류 결과 비교 중...")
+        onProgress?(0.9, L10n.VaultInspector.scanComparingResults)
         var analyses: [FileAnalysis] = []
 
         for (index, (classification, entry)) in zip(classifications, filesToProcess).enumerated() {
@@ -198,7 +209,7 @@ struct VaultReorganizer {
             }
         }
 
-        onProgress?(1.0, "스캔 완료! \(analyses.count)개 파일 이동 필요")
+        onProgress?(1.0, L10n.VaultInspector.scanCompleteNeedMove(analyses.count))
 
         StatisticsService.recordActivity(
             fileName: "전체 재정리",
@@ -309,7 +320,7 @@ struct VaultReorganizer {
             failed: failedCount
         )
 
-        onProgress?(1.0, "완료!")
+        onProgress?(1.0, L10n.VaultInspector.scanCompleted)
         return results
     }
 

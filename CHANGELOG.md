@@ -1,5 +1,12 @@
 # Changelog
 
+## v2.16.2 — Reorg + Inbox Progress UX (2026-03-11)
+- fix: 위치 제안 Stage 1 대배치 응답이 불안정할 때 자동으로 배치를 분할 재시도해 0건으로 조용히 끝나는 문제 완화
+- ux: 위치 제안 진행 문구를 단계별로 세분화하고, 재시도 상태를 루프처럼 보이지 않게 정리
+- ux: 위치 제안 결과가 0건일 때도 상태 메시지가 유지되도록 개선
+- ux: 인박스 정리 진행 문구도 추출/분류/이동/마무리 단계로 세분화하고 한영 로컬라이즈 적용
+- ux: ProcessingView 상태 문구를 2줄까지 표시해 긴 진행 메시지가 잘리지 않도록 개선
+
 ## v2.14.1 — Security: Remove Sensitive Info (2026-03-05)
 - security: 소스코드에서 내부 제품명/고객사명 제거 (OnboardingView, AICompanionService, FolderReorganizer)
 - security: README.md, MANUAL.md에서 내부 프로젝트명(DOJANG) 제거

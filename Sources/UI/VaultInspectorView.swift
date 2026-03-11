@@ -167,11 +167,12 @@ struct VaultInspectorView: View {
 
             if appState.reorgPhase == .done {
                 let hasErrors = appState.reorgResults.contains(where: \.isError)
+                let hasExecutionResults = !appState.reorgResults.isEmpty
                 reorgResultCard
                     .padding(.top, 4)
                     .transition(.opacity)
                     .onAppear {
-                        guard !hasErrors else { return }
+                        guard !hasErrors, hasExecutionResults else { return }
                         Task { @MainActor in
                             try? await Task.sleep(for: .seconds(4))
                             guard appState.reorgPhase == .done else { return }
@@ -529,7 +530,7 @@ struct VaultInspectorView: View {
                     Image(systemName: "checkmark.circle.fill")
                         .font(.caption)
                         .foregroundColor(.green)
-                    Text(L10n.VaultInspector.allFilesInPlace)
+                    Text(appState.reorgStatus.isEmpty ? L10n.VaultInspector.allFilesInPlace : appState.reorgStatus)
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
@@ -1125,4 +1126,3 @@ private struct VaultFolderRow: View {
         .onHover { isHovered = $0 }
     }
 }
-

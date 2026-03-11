@@ -52,7 +52,7 @@ struct InboxProcessor {
                 if passIndex == 0 {
                     self.onProgress?(mapped, status)
                 } else {
-                    self.onProgress?(mapped, "남은 파일 정리: \(status)")
+                    self.onProgress?(mapped, L10n.Processing.processingRemaining(status))
                 }
             }
 
@@ -99,7 +99,7 @@ struct InboxProcessor {
         )
 
         onFileProgress?(allProcessed.count + allConfirmations.count, allProcessed.count + allConfirmations.count, "")
-        onProgress?(1.0, "완료!")
+        onProgress?(1.0, L10n.Processing.completed)
 
         StatisticsService.recordActivity(
             fileName: "인박스 처리",
@@ -122,7 +122,7 @@ struct InboxProcessor {
         warmUpTask: Task<Void, Never>?,
         onProgress: ((Double, String) -> Void)?
     ) async throws -> Result {
-        onProgress?(0.05, "\(files.count)개 파일 발견")
+        onProgress?(0.05, L10n.Processing.foundFiles(files.count))
         onFileProgress?(0, files.count, "")
 
         // Build context — run independent builders concurrently
@@ -153,10 +153,12 @@ struct InboxProcessor {
         let areaContext = contexts[3]
         let correctionContext = contexts[4]
 
-        onProgress?(0.1, "프로젝트 컨텍스트 로드 완료")
+        onProgress?(0.08, L10n.Processing.loadingProjectContext)
+        onProgress?(0.1, L10n.Processing.projectContextLoaded)
 
         // Extract content from all files — parallel using TaskGroup
         onPhaseChange?(.extracting)
+        onProgress?(0.1, L10n.Processing.extractingContents(0, files.count))
         let inputs: [ClassifyInput] = await withTaskGroup(
             of: ClassifyInput.self,
             returning: [ClassifyInput].self
@@ -164,12 +166,21 @@ struct InboxProcessor {
             var collected: [ClassifyInput] = []
             collected.reserveCapacity(files.count)
             var activeTasks = 0
+            var completedExtractions = 0
             let maxConcurrent = 5
+
+            func reportExtractionProgress() {
+                let total = max(files.count, 1)
+                let progress = 0.1 + (Double(completedExtractions) / Double(total) * 0.2)
+                onProgress?(progress, L10n.Processing.extractingContents(completedExtractions, files.count))
+            }
 
             for filePath in files {
                 if activeTasks >= maxConcurrent {
                     if let result = await group.next() {
                         collected.append(result)
+                        completedExtractions += 1
+                        reportExtractionProgress()
                     }
                     activeTasks -= 1
                 }
@@ -189,6 +200,8 @@ struct InboxProcessor {
 
             for await input in group {
                 collected.append(input)
+                completedExtractions += 1
+                reportExtractionProgress()
             }
 
             // Preserve original file order for stable classification
@@ -198,7 +211,7 @@ struct InboxProcessor {
             }
         }
 
-        onProgress?(0.3, "\(inputs.count)개 파일 내용 추출 완료")
+        onProgress?(0.3, L10n.Processing.extractingContents(inputs.count, files.count))
 
         // Separate media files (image+video) from text files — media skips AI classification
         // Also separate files with existing para: frontmatter — they skip AI classification too
@@ -222,7 +235,7 @@ struct InboxProcessor {
             await warmUpTask.value
         }
 
-        onProgress?(0.3, "AI 분류 시작...")
+        onProgress?(0.3, L10n.Processing.aiClassificationStarting)
         onPhaseChange?(.classifying)
 
         // Classify only text files with AI
@@ -282,7 +295,7 @@ struct InboxProcessor {
         // Classifications ready for move (semantic linking happens post-move)
         onPhaseChange?(.linking)
         let enrichedClassifications = allClassifications
-        onProgress?(0.7, "파일 이동 준비 중...")
+        onProgress?(0.7, L10n.Processing.preparingMove)
 
         // Move files
         onPhaseChange?(.processing)
@@ -294,7 +307,7 @@ struct InboxProcessor {
         for (i, (classification, input)) in zip(enrichedClassifications, allInputs).enumerated() {
             if Task.isCancelled { throw CancellationError() }
             let progress = 0.7 + Double(i) / Double(max(enrichedClassifications.count, 1)) * 0.25
-            onProgress?(progress, "\(input.fileName) 이동 중...")
+            onProgress?(progress, L10n.Processing.movingFile(input.fileName))
             onFileProgress?(i, allInputs.count, input.fileName)
 
             // Low confidence: ask user
@@ -391,7 +404,7 @@ struct InboxProcessor {
         }
 
         onFileProgress?(allInputs.count, allInputs.count, "")
-        onProgress?(0.95, "결과 정리 중...")
+        onProgress?(0.95, L10n.Processing.finalizingResults)
 
         return Result(
             processed: processed,

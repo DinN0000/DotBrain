@@ -19,8 +19,19 @@
 "processing.folder_reorganizing" = "Reorganizing Folders";
 "processing.inbox_processing" = "Processing Inbox";
 "processing.cancel" = "Cancel";
+"processing.starting" = "Starting...";
 "processing.files_ready" = "%d files ready";
 "processing.linking_notes" = "Linking related notes...";
+"processing.found_files" = "%d files found";
+"processing.loading_project_context" = "Loading project context...";
+"processing.project_context_loaded" = "Project context loaded";
+"processing.extracting_contents" = "Extracting file contents... (%d/%d)";
+"processing.ai_classification_starting" = "Starting AI classification...";
+"processing.processing_remaining" = "Processing remaining files: %@";
+"processing.preparing_move" = "Preparing file moves...";
+"processing.moving_file" = "Moving %@...";
+"processing.finalizing_results" = "Finalizing results...";
+"processing.completed" = "Completed!";
 
 /* Search */
 "search.tag_match" = "Tag Match";
@@ -370,6 +381,23 @@
 "vault_inspector.vault_healthy" = "Vault is healthy";
 "vault_inspector.issue_count" = "%d issues";
 "vault_inspector.preparing_scan" = "Preparing scan...";
+"vault_inspector.scan_collecting_files" = "Collecting files...";
+"vault_inspector.scan_project_context_loading" = "Loading project context...";
+"vault_inspector.scan_project_context_loaded" = "Project context loaded";
+"vault_inspector.scan_extracting_contents" = "Extracting file contents... (%d/%d)";
+"vault_inspector.scan_ai_classification_starting" = "Starting AI classification...";
+"vault_inspector.scan_comparing_results" = "Comparing classification results...";
+"vault_inspector.scan_complete_need_move" = "Scan complete! %d files need to move";
+"vault_inspector.scan_completed" = "Completed!";
+"vault_inspector.stage1_preparing" = "Preparing Stage 1... (%d files, %d batches)";
+"vault_inspector.stage1_in_progress" = "Stage 1 in progress... (batch %d/%d, %d files)";
+"vault_inspector.stage1_completed" = "Stage 1 complete... (%d/%d batches)";
+"vault_inspector.stage1_retry_split" = "Retrying Stage 1 response... (batch %d/%d, %d files -> %d+%d)";
+"vault_inspector.stage1_retry_split_compact" = "Retrying Stage 1 response... (%d files -> %d+%d)";
+"vault_inspector.stage2_preparing" = "Preparing precise reclassification... (%d files)";
+"vault_inspector.stage2_in_progress" = "Precise reclassification... (%d/%d)";
+"vault_inspector.stage2_skipped" = "Finalizing without precise reclassification...";
+"vault_inspector.finalizing_results" = "Finalizing results...";
 "vault_inspector.no_changed_files" = "No changed files";
 "vault_inspector.scan_error" = "Scan Error";
 "vault_inspector.preparing_execution" = "Preparing execution...";

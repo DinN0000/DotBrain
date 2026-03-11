@@ -57,8 +57,19 @@ enum L10n {
         static let folderReorganizing = tr("processing.folder_reorganizing")
         static let inboxProcessing = tr("processing.inbox_processing")
         static let cancel = tr("processing.cancel")
+        static let starting = tr("processing.starting")
         static func filesReady(_ count: Int) -> String { tr("processing.files_ready", count) }
         static let linkingNotes = tr("processing.linking_notes")
+        static func foundFiles(_ count: Int) -> String { tr("processing.found_files", count) }
+        static let loadingProjectContext = tr("processing.loading_project_context")
+        static let projectContextLoaded = tr("processing.project_context_loaded")
+        static func extractingContents(_ completed: Int, _ total: Int) -> String { tr("processing.extracting_contents", completed, total) }
+        static let aiClassificationStarting = tr("processing.ai_classification_starting")
+        static func processingRemaining(_ status: String) -> String { tr("processing.processing_remaining", status) }
+        static let preparingMove = tr("processing.preparing_move")
+        static func movingFile(_ fileName: String) -> String { tr("processing.moving_file", fileName) }
+        static let finalizingResults = tr("processing.finalizing_results")
+        static let completed = tr("processing.completed")
     }
 
     // MARK: - Search
@@ -454,6 +465,23 @@ enum L10n {
         static let vaultHealthy = tr("vault_inspector.vault_healthy")
         static func issueCount(_ count: Int) -> String { tr("vault_inspector.issue_count", count) }
         static let preparingScan = tr("vault_inspector.preparing_scan")
+        static let scanCollectingFiles = tr("vault_inspector.scan_collecting_files")
+        static let scanProjectContextLoading = tr("vault_inspector.scan_project_context_loading")
+        static let scanProjectContextLoaded = tr("vault_inspector.scan_project_context_loaded")
+        static func scanExtractingContents(_ completed: Int, _ total: Int) -> String { tr("vault_inspector.scan_extracting_contents", completed, total) }
+        static let scanAIClassificationStarting = tr("vault_inspector.scan_ai_classification_starting")
+        static let scanComparingResults = tr("vault_inspector.scan_comparing_results")
+        static func scanCompleteNeedMove(_ count: Int) -> String { tr("vault_inspector.scan_complete_need_move", count) }
+        static let scanCompleted = tr("vault_inspector.scan_completed")
+        static func stage1Preparing(_ fileCount: Int, _ batchCount: Int) -> String { tr("vault_inspector.stage1_preparing", fileCount, batchCount) }
+        static func stage1InProgress(_ batch: Int, _ total: Int, _ fileCount: Int) -> String { tr("vault_inspector.stage1_in_progress", batch, total, fileCount) }
+        static func stage1Completed(_ completed: Int, _ total: Int) -> String { tr("vault_inspector.stage1_completed", completed, total) }
+        static func stage1RetrySplit(_ batch: Int, _ total: Int, _ from: Int, _ left: Int, _ right: Int) -> String { tr("vault_inspector.stage1_retry_split", batch, total, from, left, right) }
+        static func stage1RetrySplitCompact(_ from: Int, _ left: Int, _ right: Int) -> String { tr("vault_inspector.stage1_retry_split_compact", from, left, right) }
+        static func stage2Preparing(_ count: Int) -> String { tr("vault_inspector.stage2_preparing", count) }
+        static func stage2InProgress(_ completed: Int, _ total: Int) -> String { tr("vault_inspector.stage2_in_progress", completed, total) }
+        static let stage2Skipped = tr("vault_inspector.stage2_skipped")
+        static let finalizingResults = tr("vault_inspector.finalizing_results")
         static let noChangedFiles = tr("vault_inspector.no_changed_files")
         static let scanError = tr("vault_inspector.scan_error")
         static let preparingExecution = tr("vault_inspector.preparing_execution")

@@ -98,8 +98,9 @@ struct ProcessingView: View {
                 Text(appState.processingStatus)
                     .font(.subheadline)
                     .foregroundColor(.secondary)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 24)
             }
 
         case .linking:

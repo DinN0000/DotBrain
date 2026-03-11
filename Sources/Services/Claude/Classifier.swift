@@ -9,6 +9,20 @@ actor Classifier {
     private let estimatedTokensPerFile = 200
     private let maxOutputTokens = 8192
 
+    private enum Stage1BatchError: LocalizedError {
+        case emptyResponse
+        case partialResponse(expected: Int, actual: Int)
+
+        var errorDescription: String? {
+            switch self {
+            case .emptyResponse:
+                return "Stage 1 returned no valid items"
+            case .partialResponse(let expected, let actual):
+                return "Stage 1 returned \(actual)/\(expected) valid items"
+            }
+        }
+    }
+
     private static let numericPrefixRegex = try? NSRegularExpression(
         pattern: #"^[1-4][\s_\-]?(?:Project|Area|Resource|Archive)/?"#,
         options: .caseInsensitive
@@ -58,6 +72,7 @@ actor Classifier {
         let maxConcurrentBatches = 3
 
         let totalBatches = batches.count
+        onProgress?(0.0, L10n.VaultInspector.stage1Preparing(files.count, totalBatches))
         stage1Results = await withTaskGroup(
             of: [String: ClassifyResult.Stage1Item].self,
             returning: [String: ClassifyResult.Stage1Item].self
@@ -82,32 +97,20 @@ actor Classifier {
                 let idx = batchIndex
                 let batchFiles = batch
                 group.addTask {
-                    do {
-                        return try await self.classifyBatchStage1(
-                            batchFiles,
-                            systemPrompt: systemPrompt
-                        )
-                    } catch {
-                        NSLog("[Classifier] Stage1 배치 %d 실패 (스킵): %@", idx, error.localizedDescription)
-                        // Return defaults for failed batch files
-                        var fallback: [String: ClassifyResult.Stage1Item] = [:]
-                        for file in batchFiles {
-                            fallback[file.fileName] = ClassifyResult.Stage1Item(
-                                fileName: file.fileName,
-                                para: .resource,
-                                tags: [],
-                                summary: "",
-                                confidence: 0,
-                                project: nil,
-                                targetFolder: nil
-                            )
-                        }
-                        return fallback
-                    }
+                    await self.classifyBatchStage1Recovering(
+                        batchFiles,
+                        systemPrompt: systemPrompt,
+                        batchIndex: idx,
+                        totalBatches: totalBatches,
+                        onProgress: onProgress
+                    )
                 }
                 activeTasks += 1
                 batchIndex += 1
-                onProgress?(Double(completedBatches) / Double(totalBatches) * 0.6, "배치 \(idx + 1)/\(totalBatches) 분류 중...")
+                onProgress?(
+                    Double(completedBatches) / Double(totalBatches) * 0.6,
+                    L10n.VaultInspector.stage1InProgress(idx + 1, totalBatches, batchFiles.count)
+                )
             }
 
             for await results in group {
@@ -115,7 +118,10 @@ actor Classifier {
                     combined[key] = value
                 }
                 completedBatches += 1
-                onProgress?(Double(completedBatches) / Double(totalBatches) * 0.6, "Stage 1: 배치 \(completedBatches)/\(totalBatches) 완료")
+                onProgress?(
+                    Double(completedBatches) / Double(totalBatches) * 0.6,
+                    L10n.VaultInspector.stage1Completed(completedBatches, totalBatches)
+                )
             }
             return combined
         }
@@ -129,6 +135,8 @@ actor Classifier {
         var stage2Results: [String: ClassifyResult.Stage2Item] = [:]
 
         if !uncertainFiles.isEmpty {
+            onProgress?(0.6, L10n.VaultInspector.stage2Preparing(uncertainFiles.count))
+
             // Stage 2: Process uncertain files concurrently (max 3)
             // Uses non-throwing TaskGroup — individual file failures fall back to Stage 1 result
             let maxConcurrentStage2 = 3
@@ -138,13 +146,22 @@ actor Classifier {
                 returning: [String: ClassifyResult.Stage2Item].self
             ) { group in
                 var activeTasks = 0
+                var completedStage2 = 0
                 var combined: [String: ClassifyResult.Stage2Item] = [:]
+
+                func reportStage2Progress() {
+                    let total = max(uncertainFiles.count, 1)
+                    let progress = 0.6 + (Double(completedStage2) / Double(total) * 0.3)
+                    onProgress?(progress, L10n.VaultInspector.stage2InProgress(completedStage2, uncertainFiles.count))
+                }
 
                 for file in uncertainFiles {
                     if activeTasks >= maxConcurrentStage2 {
                         if let (fileName, result) = await group.next() {
                             if let result { combined[fileName] = result }
                             activeTasks -= 1
+                            completedStage2 += 1
+                            reportStage2Progress()
                         }
                     }
 
@@ -166,12 +183,16 @@ actor Classifier {
 
                 for await (fileName, result) in group {
                     if let result { combined[fileName] = result }
+                    completedStage2 += 1
+                    reportStage2Progress()
                 }
                 return combined
             }
+        } else {
+            onProgress?(0.75, L10n.VaultInspector.stage2Skipped)
         }
 
-        onProgress?(0.9, "결과 정리 중...")
+        onProgress?(0.9, L10n.VaultInspector.finalizingResults)
 
         // Combine results with project validation
         return files.map { file in
@@ -227,6 +248,75 @@ actor Classifier {
 
     // MARK: - Stage 1: Haiku Batch
 
+    private func classifyBatchStage1Recovering(
+        _ files: [ClassifyInput],
+        systemPrompt: String,
+        batchIndex: Int,
+        totalBatches: Int,
+        onProgress: ((Double, String) -> Void)?,
+        splitDepth: Int = 0
+    ) async -> [String: ClassifyResult.Stage1Item] {
+        do {
+            return try await classifyBatchStage1(files, systemPrompt: systemPrompt)
+        } catch {
+            NSLog(
+                "[Classifier] Stage1 배치 %d 실패 (depth=%d, files=%d): %@",
+                batchIndex,
+                splitDepth,
+                files.count,
+                error.localizedDescription
+            )
+
+            guard files.count > 1 else {
+                let file = files[0]
+                NSLog("[Classifier] Stage1 단일 파일 폴백 사용: %@", file.fileName)
+                return [file.fileName: fallbackStage1Item(for: file)]
+            }
+
+            let midpoint = files.count / 2
+            let left = Array(files[..<midpoint])
+            let right = Array(files[midpoint...])
+            let baseProgress = Double(batchIndex) / Double(max(totalBatches, 1)) * 0.6
+
+            onProgress?(
+                baseProgress,
+                splitDepth == 0
+                    ? L10n.VaultInspector.stage1RetrySplit(batchIndex + 1, totalBatches, files.count, left.count, right.count)
+                    : L10n.VaultInspector.stage1RetrySplitCompact(files.count, left.count, right.count)
+            )
+
+            let leftResults = await classifyBatchStage1Recovering(
+                left,
+                systemPrompt: systemPrompt,
+                batchIndex: batchIndex,
+                totalBatches: totalBatches,
+                onProgress: onProgress,
+                splitDepth: splitDepth + 1
+            )
+            let rightResults = await classifyBatchStage1Recovering(
+                right,
+                systemPrompt: systemPrompt,
+                batchIndex: batchIndex,
+                totalBatches: totalBatches,
+                onProgress: onProgress,
+                splitDepth: splitDepth + 1
+            )
+            return leftResults.merging(rightResults) { _, new in new }
+        }
+    }
+
+    private func fallbackStage1Item(for file: ClassifyInput) -> ClassifyResult.Stage1Item {
+        ClassifyResult.Stage1Item(
+            fileName: file.fileName,
+            para: .resource,
+            tags: [],
+            summary: "",
+            confidence: 0,
+            project: nil,
+            targetFolder: nil
+        )
+    }
+
     private func classifyBatchStage1(
         _ files: [ClassifyInput],
         systemPrompt: String
@@ -246,37 +336,31 @@ actor Classifier {
         }
 
         var results: [String: ClassifyResult.Stage1Item] = [:]
-        if let items = parseJSONSafe([Stage1RawItem].self, from: response.text) {
-            if items.isEmpty {
-                NSLog("[Classifier] Stage1 JSON parsed but empty array — response: %@", String(response.text.prefix(200)))
-            }
-            for item in items {
-                guard let para = PARACategory(rawValue: item.para), !item.fileName.isEmpty else { continue }
-                results[item.fileName] = ClassifyResult.Stage1Item(
-                    fileName: item.fileName,
-                    para: para,
-                    tags: Array((item.tags ?? []).prefix(5)),
-                    summary: item.summary ?? "",
-                    confidence: max(0, min(1, item.confidence ?? 0)),
-                    project: item.project,
-                    targetFolder: item.targetFolder.map { stripNewPrefix(stripParaPrefix($0)) }
-                )
-            }
-        } else {
+        guard let items = parseJSONSafe([Stage1RawItem].self, from: response.text) else {
             NSLog("[Classifier] Stage1 JSON parse failed — response: %@", String(response.text.prefix(200)))
+            throw Stage1BatchError.emptyResponse
         }
 
-        // Fill missing with default
-        for file in files where results[file.fileName] == nil {
-            results[file.fileName] = ClassifyResult.Stage1Item(
-                fileName: file.fileName,
-                para: .resource,
-                tags: [],
-                summary: "",
-                confidence: 0,
-                project: nil,
-                targetFolder: nil
+        if items.isEmpty {
+            NSLog("[Classifier] Stage1 JSON parsed but empty array — response: %@", String(response.text.prefix(200)))
+            throw Stage1BatchError.emptyResponse
+        }
+
+        for item in items {
+            guard let para = PARACategory(rawValue: item.para), !item.fileName.isEmpty else { continue }
+            results[item.fileName] = ClassifyResult.Stage1Item(
+                fileName: item.fileName,
+                para: para,
+                tags: Array((item.tags ?? []).prefix(5)),
+                summary: item.summary ?? "",
+                confidence: max(0, min(1, item.confidence ?? 0)),
+                project: item.project,
+                targetFolder: item.targetFolder.map { stripNewPrefix(stripParaPrefix($0)) }
             )
+        }
+
+        if results.count != files.count {
+            throw Stage1BatchError.partialResponse(expected: files.count, actual: results.count)
         }
 
         return results

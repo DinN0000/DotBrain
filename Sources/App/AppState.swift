@@ -693,7 +693,7 @@ final class AppState: ObservableObject {
 
         isProcessing = true
         processingProgress = 0
-        processingStatus = "시작 중..."
+        processingStatus = L10n.Processing.starting
         processingCurrentFile = ""
         processingCompletedCount = 0
         processingTotalCount = 0
@@ -783,7 +783,7 @@ final class AppState: ObservableObject {
 
         isProcessing = true
         processingProgress = 0
-        processingStatus = "시작 중..."
+        processingStatus = L10n.Processing.starting
         processingCurrentFile = ""
         processingCompletedCount = 0
         processingTotalCount = 0
@@ -861,7 +861,7 @@ final class AppState: ObservableObject {
 
         isProcessing = true
         processingProgress = 0
-        processingStatus = "시작 중..."
+        processingStatus = L10n.Processing.starting
         processingCurrentFile = ""
         processingCompletedCount = 0
         processingTotalCount = 0
