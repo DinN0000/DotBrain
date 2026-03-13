@@ -384,10 +384,11 @@ struct SemanticLinker: Sendable {
 
         for (_, entry) in index.notes {
             let baseName = ((entry.path as NSString).lastPathComponent as NSString).deletingPathExtension
-            let folderName = (entry.folder as NSString).lastPathComponent
-
             let filePath = rootPrefix + entry.path
             let para = PARACategory(rawValue: entry.para) ?? .archive
+            let folderName = entry.folder == para.folderName
+                ? para.displayName
+                : (entry.folder as NSString).lastPathComponent
 
             // Read file for existingRelated parsing (skip when only tags/folders needed)
             let existingRelated: Set<String>
@@ -429,6 +430,33 @@ struct SemanticLinker: Sendable {
         let rootPrefix = canonicalRoot.hasSuffix("/") ? canonicalRoot : canonicalRoot + "/"
 
         for (para, basePath) in categories {
+            if let rootFiles = try? fm.contentsOfDirectory(atPath: basePath) {
+                let folderRelPath = para.folderName
+                for file in rootFiles {
+                    guard file.hasSuffix(".md"), !file.hasPrefix("."), !file.hasPrefix("_") else { continue }
+                    let filePath = (basePath as NSString).appendingPathComponent(file)
+                    guard let content = try? String(contentsOfFile: filePath, encoding: .utf8) else { continue }
+
+                    let (frontmatter, body) = Frontmatter.parse(markdown: content)
+                    let baseName = (file as NSString).deletingPathExtension
+                        .precomposedStringWithCanonicalMapping
+
+                    let existingRelated = parseExistingRelatedNames(body)
+
+                    notes.append(LinkCandidateGenerator.NoteInfo(
+                        name: baseName,
+                        filePath: filePath,
+                        tags: frontmatter.tags,
+                        summary: frontmatter.summary ?? "",
+                        project: frontmatter.project,
+                        folderName: para.displayName,
+                        folderRelPath: folderRelPath,
+                        para: para,
+                        existingRelated: existingRelated
+                    ))
+                }
+            }
+
             guard let folders = try? fm.contentsOfDirectory(atPath: basePath) else { continue }
             for folder in folders {
                 guard !folder.hasPrefix("."), !folder.hasPrefix("_") else { continue }

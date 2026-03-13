@@ -60,6 +60,7 @@ struct NoteIndexGenerator: Sendable {
             let folderName = (folderPath as NSString).lastPathComponent
             let para = PARACategory.fromPath(folderPath) ?? .archive
             let relFolder = relativePath(folderPath)
+            let includeFolderEntry = folderPath != pathManager.paraPath(for: para)
 
             // Remove old notes belonging to this folder
             let keysToRemove = index.notes.keys.filter { index.notes[$0]?.folder == relFolder }
@@ -71,7 +72,8 @@ struct NoteIndexGenerator: Sendable {
             let (folderEntry, noteEntries) = scanFolder(
                 folderPath: folderPath,
                 folderName: folderName,
-                para: para
+                para: para,
+                includeFolderEntry: includeFolderEntry
             )
 
             if let folderEntry {
@@ -117,6 +119,16 @@ struct NoteIndexGenerator: Sendable {
         var allNotes: [String: NoteIndexEntry] = [:]
 
         for (para, basePath) in categories {
+            let (_, rootNoteEntries) = scanFolder(
+                folderPath: basePath,
+                folderName: (basePath as NSString).lastPathComponent,
+                para: para,
+                includeFolderEntry: false
+            )
+            for (notePath, noteEntry) in rootNoteEntries {
+                allNotes[notePath] = noteEntry
+            }
+
             guard let entries = try? fm.contentsOfDirectory(atPath: basePath) else { continue }
 
             for entry in entries.sorted() {
@@ -129,7 +141,8 @@ struct NoteIndexGenerator: Sendable {
                 let (folderEntry, noteEntries) = scanFolder(
                     folderPath: folderPath,
                     folderName: entry,
-                    para: para
+                    para: para,
+                    includeFolderEntry: true
                 )
 
                 let relFolder = relativePath(folderPath)
@@ -158,7 +171,8 @@ struct NoteIndexGenerator: Sendable {
     private func scanFolder(
         folderPath: String,
         folderName: String,
-        para: PARACategory
+        para: PARACategory,
+        includeFolderEntry: Bool
     ) -> (FolderIndexEntry?, [(String, NoteIndexEntry)]) {
         let fm = FileManager.default
         guard let entries = try? fm.contentsOfDirectory(atPath: folderPath) else {
@@ -214,6 +228,10 @@ struct NoteIndexGenerator: Sendable {
             if let summary = frontmatter.summary, !summary.isEmpty {
                 summaries.append(summary)
             }
+        }
+
+        guard includeFolderEntry else {
+            return (nil, noteEntries)
         }
 
         // Top 10 tags by frequency

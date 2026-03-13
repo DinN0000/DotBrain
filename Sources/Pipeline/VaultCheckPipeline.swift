@@ -15,6 +15,7 @@ struct VaultCheckPipeline {
     ) async -> VaultCheckResult {
         var repairCount = 0
         var enrichCount = 0
+        var manuallyProcessedCount = 0
 
         StatisticsService.recordActivity(
             fileName: "볼트 점검",
@@ -52,8 +53,24 @@ struct VaultCheckPipeline {
         if Task.isCancelled { return .empty }
         onProgress(Progress(phase: "자동 복구 중...", fraction: 0.20))
 
+        // Phase 2.5: Manually placed note repair (20% -> 25%)
+        if !report.manualPlacementCandidates.isEmpty {
+            onProgress(Progress(phase: L10n.VaultInspector.manualRepairing, fraction: 0.21))
+            let manualRepairer = ManualPlacementRepairer(pkmRoot: pkmRoot)
+            let manualResult = await manualRepairer.process(filePaths: report.manualPlacementCandidates) { progress, status in
+                onProgress(Progress(
+                    phase: status,
+                    fraction: 0.20 + progress * 0.05
+                ))
+            }
+            manuallyProcessedCount = manualResult.processedCount
+            enrichCount += manualResult.processedCount
+        }
+        if Task.isCancelled { return .empty }
+        onProgress(Progress(phase: L10n.VaultInspector.manualRepairing, fraction: 0.25))
+
         // Check all .md files for changes (single batch actor call)
-        onProgress(Progress(phase: "변경 파일 확인 중...", fraction: 0.20))
+        onProgress(Progress(phase: "변경 파일 확인 중...", fraction: 0.25))
         let allMdFiles = Self.collectAllMdFiles(pm: pm)
         let fileStatuses = await cache.checkFiles(allMdFiles)
         let changedFiles = Set(fileStatuses.filter { $0.value != .unchanged }.map { $0.key })
@@ -163,7 +180,7 @@ struct VaultCheckPipeline {
             fileName: "볼트 점검",
             category: "system",
             action: "completed",
-            detail: "\(report.totalIssues)건 발견, \(repairCount)건 복구, \(enrichCount)개 보완, \(linkResult.linksCreated)개 링크"
+            detail: "\(report.totalIssues)건 발견, \(repairCount)건 복구, \(enrichCount)개 보완(직접 추가 \(manuallyProcessedCount)개), \(linkResult.linksCreated)개 링크"
         )
 
         return VaultCheckResult(

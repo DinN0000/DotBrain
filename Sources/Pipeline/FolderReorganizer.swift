@@ -99,44 +99,7 @@ struct FolderReorganizer {
 
         // Extract content — parallel using TaskGroup
         onPhaseChange?(.extracting)
-        let inputs: [ClassifyInput] = await withTaskGroup(
-            of: ClassifyInput.self,
-            returning: [ClassifyInput].self
-        ) { group in
-            var collected: [ClassifyInput] = []
-            collected.reserveCapacity(uniqueFiles.count)
-            var activeTasks = 0
-            let maxConcurrent = 5
-
-            for filePath in uniqueFiles {
-                if activeTasks >= maxConcurrent {
-                    if let result = await group.next() {
-                        collected.append(result)
-                    }
-                    activeTasks -= 1
-                }
-                group.addTask {
-                    let content = self.extractContent(from: filePath)
-                    let fileName = (filePath as NSString).lastPathComponent
-                    let preview = FileContentExtractor.extractPreview(from: filePath, content: content)
-                    return ClassifyInput(
-                        filePath: filePath,
-                        content: content,
-                        fileName: fileName,
-                        preview: preview
-                    )
-                }
-                activeTasks += 1
-            }
-
-            for await input in group {
-                collected.append(input)
-            }
-            let fileIndex = Dictionary(uniqueKeysWithValues: uniqueFiles.enumerated().map { ($1, $0) })
-            return collected.sorted { a, b in
-                (fileIndex[a.filePath] ?? Int.max) < (fileIndex[b.filePath] ?? Int.max)
-            }
-        }
+        let inputs = await ClassifyInputLoader.load(filePaths: uniqueFiles)
 
         onProgress?(0.3, "\(inputs.count)개 파일 내용 추출 완료")
 
@@ -564,11 +527,4 @@ struct FolderReorganizer {
             tags: classification.tags
         )
     }
-
-    // MARK: - Content Extraction
-
-    private func extractContent(from filePath: String) -> String {
-        FileContentExtractor.extract(from: filePath)
-    }
-
 }

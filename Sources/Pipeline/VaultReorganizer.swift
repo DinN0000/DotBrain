@@ -102,59 +102,14 @@ struct VaultReorganizer {
 
         // 0.2-0.4: Extract content in parallel
         onProgress?(0.2, L10n.VaultInspector.scanExtractingContents(0, filesToProcess.count))
-        let inputs: [ClassifyInput] = await withTaskGroup(
-            of: ClassifyInput.self,
-            returning: [ClassifyInput].self
-        ) { group in
-            var collected: [ClassifyInput] = []
-            collected.reserveCapacity(filesToProcess.count)
-            var activeTasks = 0
-            var completedExtractions = 0
-            let maxConcurrent = 5
-
-            func reportExtractionProgress() {
-                let total = max(filesToProcess.count, 1)
-                let progress = 0.2 + (Double(completedExtractions) / Double(total) * 0.2)
-                onProgress?(progress, L10n.VaultInspector.scanExtractingContents(completedExtractions, filesToProcess.count))
+        let inputs = await ClassifyInputLoader.load(
+            filePaths: filesToProcess.map(\.filePath),
+            onProgress: { completed, total in
+                let safeTotal = max(total, 1)
+                let progress = 0.2 + (Double(completed) / Double(safeTotal) * 0.2)
+                onProgress?(progress, L10n.VaultInspector.scanExtractingContents(completed, total))
             }
-
-            for entry in filesToProcess {
-                if activeTasks >= maxConcurrent {
-                    if let result = await group.next() {
-                        collected.append(result)
-                        completedExtractions += 1
-                        reportExtractionProgress()
-                    }
-                    activeTasks -= 1
-                }
-                group.addTask {
-                    let content = self.extractContent(from: entry.filePath)
-                    let fileName = (entry.filePath as NSString).lastPathComponent
-                    let preview = FileContentExtractor.extractPreview(from: entry.filePath, content: content)
-                    return ClassifyInput(
-                        filePath: entry.filePath,
-                        content: content,
-                        fileName: fileName,
-                        preview: preview
-                    )
-                }
-                activeTasks += 1
-            }
-
-            for await input in group {
-                collected.append(input)
-                completedExtractions += 1
-                reportExtractionProgress()
-            }
-
-            // Preserve original order for stable classification
-            let pathIndex = Dictionary(
-                uniqueKeysWithValues: filesToProcess.enumerated().map { ($1.filePath, $0) }
-            )
-            return collected.sorted { a, b in
-                (pathIndex[a.filePath] ?? Int.max) < (pathIndex[b.filePath] ?? Int.max)
-            }
-        }
+        )
 
         onProgress?(0.4, "\(inputs.count)개 파일 내용 추출 완료")
 
@@ -392,10 +347,5 @@ struct VaultReorganizer {
         }
 
         return results
-    }
-
-    /// Extract text content from a file, handling binary files via BinaryExtractor.
-    private func extractContent(from filePath: String) -> String {
-        FileContentExtractor.extract(from: filePath)
     }
 }

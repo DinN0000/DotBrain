@@ -77,6 +77,7 @@
 "dashboard.no_activity" = "아직 활동 기록이 없습니다";
 "dashboard.action.classified" = "분류 완료";
 "dashboard.action.reorganized" = "정리 완료";
+"dashboard.action.manual_repaired" = "직접 추가 정리";
 "dashboard.action.relocated" = "위치 이동";
 "dashboard.action.vault_reorganized" = "재정리 이동";
 "dashboard.action.deduplicated" = "중복 제거";
@@ -198,6 +199,12 @@
 "settings.para_structure" = "PARA 구조";
 "settings.para_project" = "Project — 진행 중인 일 (마감 있음)";
 "settings.para_area" = "Area — 늘 관리하는 영역 (건강, 재무)";
+"vault_inspector.manual_repairing" = "직접 추가 노트 정리 중...";
+"vault_inspector.manual_repair_preparing" = "위치 유지 메타데이터 정리 준비 중...";
+"vault_inspector.manual_repair_extracting" = "직접 추가 노트 내용 읽는 중...";
+"vault_inspector.manual_repair_extracting_progress" = "직접 추가 노트 내용 읽는 중... (%d/%d)";
+"vault_inspector.manual_repair_classifying" = "직접 추가 노트 메타데이터 분석 중...";
+"vault_inspector.manual_repair_processing_progress" = "직접 추가 노트 정리 중... (%d/%d)";
 "settings.para_resource" = "Resource — 참고 자료";
 "settings.para_archive" = "Archive — 완료된 것";
 "settings.bug_report" = "버그 신고 / 기능 요청";

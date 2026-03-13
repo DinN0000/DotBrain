@@ -6,6 +6,7 @@ struct AuditReport {
     var missingFrontmatter: [String]
     var untaggedFiles: [String]
     var missingPARA: [String]
+    var manualPlacementCandidates: [String]
     var nfdFiles: [NFDFile]
     var totalScanned: Int
 
@@ -54,6 +55,7 @@ struct VaultAuditor {
         var missingFrontmatter: [String] = []
         var untaggedFiles: [String] = []
         var missingPARA: [String] = []
+        var manualPlacementCandidates: [String] = []
 
         let wikiLinkPattern = try! NSRegularExpression(
             pattern: "\\[\\[([^\\]]+)\\]\\]",
@@ -82,6 +84,10 @@ struct VaultAuditor {
             // Check PARA field
             if frontmatter.para == nil {
                 missingPARA.append(filePath)
+            }
+
+            if needsManualPlacementTrack(filePath: filePath, frontmatter: frontmatter) {
+                manualPlacementCandidates.append(filePath)
             }
 
             // Find all [[WikiLink]] references in the body
@@ -131,6 +137,7 @@ struct VaultAuditor {
             missingFrontmatter: missingFrontmatter,
             untaggedFiles: untaggedFiles,
             missingPARA: missingPARA,
+            manualPlacementCandidates: Array(Set(manualPlacementCandidates)).sorted(),
             nfdFiles: nfdFiles,
             totalScanned: files.count
         )
@@ -380,6 +387,38 @@ struct VaultAuditor {
     /// Infer PARA category from a file's path
     private func inferCategory(from path: String) -> PARACategory {
         PARACategory.fromPath(path) ?? .resource
+    }
+
+    /// Directly-created PARA notes need a richer repair track than the minimal auditor.
+    private func needsManualPlacementTrack(filePath: String, frontmatter: Frontmatter) -> Bool {
+        guard PARACategory.fromPath(filePath) != nil else {
+            return false
+        }
+
+        let hasCoreMetadata = frontmatter.para != nil
+            && frontmatter.created != nil
+            && frontmatter.status != nil
+            && frontmatter.source != nil
+        if isDirectChildOfPARARoot(filePath) {
+            return !hasCoreMetadata || !hasMeaningfulSummary(frontmatter.summary)
+        }
+
+        return !hasCoreMetadata
+    }
+
+    private func isDirectChildOfPARARoot(_ path: String) -> Bool {
+        let normalized = URL(fileURLWithPath: path).standardizedFileURL.path
+        let components = normalized.split(separator: "/").map(String.init)
+
+        guard let paraIndex = components.firstIndex(where: { PARACategory(folderPrefix: $0) != nil }) else {
+            return false
+        }
+
+        return components.count == paraIndex + 2
+    }
+
+    private func hasMeaningfulSummary(_ summary: String?) -> Bool {
+        !(summary ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     /// Find the closest matching note name for a broken link target

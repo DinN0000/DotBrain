@@ -300,6 +300,7 @@ struct DashboardView: View {
         switch action {
         case "classified": return "checkmark.circle.fill"
         case "reorganized": return "arrow.triangle.2.circlepath"
+        case "manual-repaired": return "wand.and.stars"
         case "relocated": return "arrow.right.circle.fill"
         case "vault-reorganized": return "arrow.triangle.swap"
         case "deduplicated": return "doc.on.doc.fill"
@@ -313,7 +314,7 @@ struct DashboardView: View {
 
     private func activityColor(for action: String) -> Color {
         switch action {
-        case "classified", "reorganized", "completed": return .green
+        case "classified", "reorganized", "manual-repaired", "completed": return .green
         case "deleted": return .red
         case "error": return .red
         default: return .secondary
@@ -324,6 +325,7 @@ struct DashboardView: View {
         switch action {
         case "classified": return L10n.Dashboard.classified
         case "reorganized": return L10n.Dashboard.reorganized
+        case "manual-repaired": return L10n.Dashboard.manualRepaired
         case "relocated": return L10n.Dashboard.relocated
         case "vault-reorganized": return L10n.Dashboard.vaultReorganized
         case "deduplicated": return L10n.Dashboard.deduplicated

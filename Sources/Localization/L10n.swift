@@ -125,6 +125,7 @@ enum L10n {
         // Action labels
         static let classified = tr("dashboard.action.classified")
         static let reorganized = tr("dashboard.action.reorganized")
+        static let manualRepaired = tr("dashboard.action.manual_repaired")
         static let relocated = tr("dashboard.action.relocated")
         static let vaultReorganized = tr("dashboard.action.vault_reorganized")
         static let deduplicated = tr("dashboard.action.deduplicated")
@@ -482,6 +483,12 @@ enum L10n {
         static func stage2InProgress(_ completed: Int, _ total: Int) -> String { tr("vault_inspector.stage2_in_progress", completed, total) }
         static let stage2Skipped = tr("vault_inspector.stage2_skipped")
         static let finalizingResults = tr("vault_inspector.finalizing_results")
+        static let manualRepairing = tr("vault_inspector.manual_repairing")
+        static let manualRepairPreparing = tr("vault_inspector.manual_repair_preparing")
+        static let manualRepairExtracting = tr("vault_inspector.manual_repair_extracting")
+        static func manualRepairExtractingProgress(_ completed: Int, _ total: Int) -> String { tr("vault_inspector.manual_repair_extracting_progress", completed, total) }
+        static let manualRepairClassifying = tr("vault_inspector.manual_repair_classifying")
+        static func manualRepairProcessingProgress(_ completed: Int, _ total: Int) -> String { tr("vault_inspector.manual_repair_processing_progress", completed, total) }
         static let noChangedFiles = tr("vault_inspector.no_changed_files")
         static let scanError = tr("vault_inspector.scan_error")
         static let preparingExecution = tr("vault_inspector.preparing_execution")
