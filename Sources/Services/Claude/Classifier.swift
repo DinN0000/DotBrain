@@ -9,6 +9,15 @@ actor Classifier {
     private let estimatedTokensPerFile = 200
     private let maxOutputTokens = 8192
 
+    private struct ProviderTuning {
+        let stage1PreviewLength: Int
+        let stage1CharBudget: Int
+        let stage1MaxFilesPerBatch: Int
+        let stage1Concurrency: Int
+        let stage2Concurrency: Int
+        let stage2ContentLimit: Int?
+    }
+
     private enum Stage1BatchError: LocalizedError {
         case emptyResponse
         case partialResponse(expected: Int, actual: Int)
@@ -48,6 +57,8 @@ actor Classifier {
         onProgress: ((Double, String) -> Void)? = nil
     ) async throws -> [ClassifyResult] {
         guard !files.isEmpty else { return [] }
+        let provider = currentProvider()
+        let tuning = tuning(for: provider)
 
         // Build system prompt once for prompt caching (shared across Stage 1 and Stage 2)
         let systemPrompt = buildSystemPrompt(
@@ -61,15 +72,12 @@ actor Classifier {
 
         // Stage 1: Haiku batch classification (dynamic batch size based on file count)
         var stage1Results: [String: ClassifyResult.Stage1Item] = [:]
-        let batchSize = min(files.count, maxBatchSize)
-        let batches = stride(from: 0, to: files.count, by: batchSize).map {
-            Array(files[$0..<min($0 + batchSize, files.count)])
-        }
+        let batches = makeStage1Batches(files, tuning: tuning)
 
         // Stage 1: Process batches concurrently (max 3 concurrent API calls)
         // Uses non-throwing TaskGroup — individual batch failures are caught and skipped
         // so a single 429 doesn't kill the entire scan
-        let maxConcurrentBatches = 3
+        let maxConcurrentBatches = tuning.stage1Concurrency
 
         let totalBatches = batches.count
         onProgress?(0.0, L10n.VaultInspector.stage1Preparing(files.count, totalBatches))
@@ -139,7 +147,7 @@ actor Classifier {
 
             // Stage 2: Process uncertain files concurrently (max 3)
             // Uses non-throwing TaskGroup — individual file failures fall back to Stage 1 result
-            let maxConcurrentStage2 = 3
+            let maxConcurrentStage2 = tuning.stage2Concurrency
 
             stage2Results = await withTaskGroup(
                 of: (String, ClassifyResult.Stage2Item?).self,
@@ -170,7 +178,8 @@ actor Classifier {
                         do {
                             let result = try await self.classifySingleStage2(
                                 file,
-                                systemPrompt: systemPrompt
+                                systemPrompt: systemPrompt,
+                                contentLimit: tuning.stage2ContentLimit
                             )
                             return (fileName, result)
                         } catch {
@@ -321,9 +330,12 @@ actor Classifier {
         _ files: [ClassifyInput],
         systemPrompt: String
     ) async throws -> [String: ClassifyResult.Stage1Item] {
+        let provider = currentProvider()
+        let previewLimit = tuning(for: provider).stage1PreviewLength
+
         // Use condensed preview (2000 chars) instead of full content (5000 chars) for Stage 1 triage
         let fileContents = files.map { file in
-            (fileName: file.fileName, content: file.preview)
+            (fileName: file.fileName, content: String(file.preview.prefix(previewLimit)))
         }
 
         let userMessage = buildStage1UserMessage(fileContents)
@@ -370,11 +382,12 @@ actor Classifier {
 
     private func classifySingleStage2(
         _ file: ClassifyInput,
-        systemPrompt: String
+        systemPrompt: String,
+        contentLimit: Int? = nil
     ) async throws -> ClassifyResult.Stage2Item {
         let userMessage = buildStage2UserMessage(
             fileName: file.fileName,
-            content: file.content
+            content: contentLimit.map { String(file.content.prefix($0)) } ?? file.content
         )
 
         let response = try await aiService.sendPreciseWithUsage(maxTokens: 2048, message: userMessage, systemMessage: systemPrompt)
@@ -561,6 +574,78 @@ actor Classifier {
         - 0.0~0.4: 분류 불가
         기존 폴더 목록에 적합한 폴더가 있으면 confidence를 0.8 이상으로 주세요.
         """
+    }
+
+    private func currentProvider() -> AIProvider {
+        if let saved = UserDefaults.standard.string(forKey: AppState.DefaultsKey.selectedProvider),
+           let provider = AIProvider(rawValue: saved) {
+            return provider
+        }
+        return .claudeCLI
+    }
+
+    private func tuning(for provider: AIProvider) -> ProviderTuning {
+        switch provider {
+        case .claudeCLI:
+            return ProviderTuning(
+                stage1PreviewLength: 1600,
+                stage1CharBudget: 12000,
+                stage1MaxFilesPerBatch: 12,
+                stage1Concurrency: 2,
+                stage2Concurrency: 2,
+                stage2ContentLimit: 4500
+            )
+        case .codexCLI:
+            return ProviderTuning(
+                stage1PreviewLength: 1400,
+                stage1CharBudget: 10000,
+                stage1MaxFilesPerBatch: 10,
+                stage1Concurrency: 2,
+                stage2Concurrency: 2,
+                stage2ContentLimit: 4000
+            )
+        case .claude, .gemini:
+            return ProviderTuning(
+                stage1PreviewLength: 2000,
+                stage1CharBudget: 50000,
+                stage1MaxFilesPerBatch: maxBatchSize,
+                stage1Concurrency: 3,
+                stage2Concurrency: 3,
+                stage2ContentLimit: nil
+            )
+        }
+    }
+
+    private func makeStage1Batches(
+        _ files: [ClassifyInput],
+        tuning: ProviderTuning
+    ) -> [[ClassifyInput]] {
+        guard !files.isEmpty else { return [] }
+
+        var batches: [[ClassifyInput]] = []
+        var currentBatch: [ClassifyInput] = []
+        var currentChars = 0
+
+        for file in files {
+            let previewChars = min(file.preview.count, tuning.stage1PreviewLength)
+            let wouldExceedCharBudget = currentChars + previewChars > tuning.stage1CharBudget
+            let wouldExceedFileLimit = currentBatch.count >= tuning.stage1MaxFilesPerBatch
+
+            if !currentBatch.isEmpty && (wouldExceedCharBudget || wouldExceedFileLimit) {
+                batches.append(currentBatch)
+                currentBatch = []
+                currentChars = 0
+            }
+
+            currentBatch.append(file)
+            currentChars += previewChars
+        }
+
+        if !currentBatch.isEmpty {
+            batches.append(currentBatch)
+        }
+
+        return batches
     }
 
     // MARK: - JSON Parsing

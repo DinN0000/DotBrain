@@ -1,5 +1,11 @@
 # Changelog
 
+## v2.16.7 — CLI Stability Release (2026-03-23)
+- fix: Claude CLI / Codex CLI stdin write를 throwing 경로로 통일해 broken pipe를 일반 오류로 처리
+- fix: 프로세스 전역에서 `SIGPIPE`를 무시해 파이프 오류가 앱 종료로 이어지지 않도록 수정
+- perf: CLI provider는 입력 크기 기반 동적 배치와 provider별 동시성/본문 제한을 적용해 대량 인박스에서도 속도와 안정성을 같이 확보
+- chore: 릴리즈 버전을 `Info.plist`와 `npm/package.json`에 `2.16.7`로 동기화
+
 ## v2.16.2 — Reorg + Inbox Progress UX (2026-03-11)
 - fix: 위치 제안 Stage 1 대배치 응답이 불안정할 때 자동으로 배치를 분할 재시도해 0건으로 조용히 끝나는 문제 완화
 - ux: 위치 제안 진행 문구를 단계별로 세분화하고, 재시도 상태를 루프처럼 보이지 않게 정리

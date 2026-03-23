@@ -142,6 +142,15 @@ enum ShellEnvironment {
         return trimmed
     }
 
+    /// Write prompt data into a child process stdin and close it.
+    /// Uses the throwing FileHandle API so broken pipes surface as normal Swift errors.
+    static func writeProcessInput(_ input: String, to handle: FileHandle) throws {
+        if let data = input.data(using: .utf8), !data.isEmpty {
+            try handle.write(contentsOf: data)
+        }
+        try? handle.close()
+    }
+
     /// Shell command to explicitly source RC files without interactive mode.
     private static var rcSourceCommand: String {
         "[ -f ~/.zprofile ] && . ~/.zprofile 2>/dev/null; [ -f ~/.bash_profile ] && . ~/.bash_profile 2>/dev/null; [ -f ~/.zshrc ] && . ~/.zshrc 2>/dev/null; [ -f ~/.bashrc ] && . ~/.bashrc 2>/dev/null"

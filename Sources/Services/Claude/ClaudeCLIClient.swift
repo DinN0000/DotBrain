@@ -200,10 +200,15 @@ actor ClaudeCLIClient {
             let timeout = ShellEnvironment.scheduleTermination(of: p.process, after: .seconds(120))
             defer { timeout.cancel() }
 
-            if let data = input.data(using: .utf8) {
-                p.stdinPipe.fileHandleForWriting.write(data)
+            do {
+                try ShellEnvironment.writeProcessInput(input, to: p.stdinPipe.fileHandleForWriting)
+            } catch {
+                if p.process.isRunning { p.process.terminate() }
+                throw ClaudeCLIError.processError(
+                    status: -1,
+                    message: "입력 전송 실패: \(error.localizedDescription)"
+                )
             }
-            p.stdinPipe.fileHandleForWriting.closeFile()
 
             return try Self.collectProcessOutput(
                 process: p.process,
@@ -297,10 +302,15 @@ actor ClaudeCLIClient {
 
             try process.run()
 
-            if let data = input.data(using: .utf8) {
-                inputPipe.fileHandleForWriting.write(data)
+            do {
+                try ShellEnvironment.writeProcessInput(input, to: inputPipe.fileHandleForWriting)
+            } catch {
+                if process.isRunning { process.terminate() }
+                throw ClaudeCLIError.processError(
+                    status: -1,
+                    message: "입력 전송 실패: \(error.localizedDescription)"
+                )
             }
-            inputPipe.fileHandleForWriting.closeFile()
 
             return try Self.collectProcessOutput(
                 process: process,

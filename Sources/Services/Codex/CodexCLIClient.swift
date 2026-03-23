@@ -114,10 +114,15 @@ actor CodexCLIClient {
             let timeout = ShellEnvironment.scheduleTermination(of: process, after: .seconds(180))
             defer { timeout.cancel() }
 
-            if let data = input.data(using: .utf8) {
-                inputPipe.fileHandleForWriting.write(data)
+            do {
+                try ShellEnvironment.writeProcessInput(input, to: inputPipe.fileHandleForWriting)
+            } catch {
+                if process.isRunning { process.terminate() }
+                throw CodexCLIError.processError(
+                    status: -1,
+                    message: "입력 전송 실패: \(error.localizedDescription)"
+                )
             }
-            inputPipe.fileHandleForWriting.closeFile()
 
             return try ShellEnvironment.collectProcessOutput(
                 process: process,
@@ -126,7 +131,8 @@ actor CodexCLIClient {
                 errorFactory: { CodexCLIError.processError(status: $0, message: $1) },
                 emptyErrorFactory: { CodexCLIError.emptyResponse }
             )
-        }.value
+        }
+        .value
     }
 }
 

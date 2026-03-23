@@ -1,5 +1,6 @@
 import AppKit
 import Combine
+import Darwin
 import SwiftUI
 
 @MainActor
@@ -10,6 +11,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var cancellables = Set<AnyCancellable>()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // Child-process pipe failures should surface as EPIPE errors, not terminate the app.
+        signal(SIGPIPE, SIG_IGN)
+
+        // Menu bar apps should remain resident even when no regular window is open.
+        ProcessInfo.processInfo.disableAutomaticTermination("DotBrain menubar app")
+        ProcessInfo.processInfo.disableSuddenTermination()
+
         setupStatusItem()
         setupPopover()
         observeStateForIcon()
@@ -35,7 +43,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             await AIService.shared.shutdownAll()
             sem.signal()
         }
-        sem.wait(timeout: .now() + 2)
+        _ = sem.wait(timeout: .now() + 2)
     }
 
     private func setupStatusItem() {
