@@ -20,8 +20,8 @@ enum AIProvider: String, CaseIterable, Identifiable {
 
     var modelPipeline: String {
         switch self {
-        case .claudeCLI: return "Haiku 4.5 → Sonnet 4.5"
-        case .codexCLI: return "Spark → 5.3 Codex"
+        case .claudeCLI: return "Claude CLI default"
+        case .codexCLI: return "Codex CLI default"
         case .claude: return "Haiku 4.5 → Sonnet 4.5"
         case .gemini: return "Flash → Pro"
         }

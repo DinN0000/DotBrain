@@ -5,8 +5,8 @@ import Foundation
 /// Requires Codex CLI to be installed and authenticated via `codex login`.
 actor CodexCLIClient {
 
-    static let fastModel = "gpt-5.3-codex-spark"
-    static let preciseModel = "gpt-5.3-codex"
+    static let fastModel = "Codex CLI default (fast path)"
+    static let preciseModel = "Codex CLI default (precise path)"
 
     // MARK: - Cached State
 
@@ -79,7 +79,12 @@ actor CodexCLIClient {
             throw CodexCLIError.notAuthenticated
         }
 
-        let arguments = ["exec", "-m", model, "--full-auto"]
+        let arguments = [
+            "exec",
+            "--sandbox", "read-only",
+            "--skip-git-repo-check",
+            "--ephemeral",
+        ]
         let result = try await runProcess(
             executablePath: codexPath,
             arguments: arguments,

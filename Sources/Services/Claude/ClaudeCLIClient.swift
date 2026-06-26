@@ -5,8 +5,8 @@ import Foundation
 /// Requires Claude CLI to be installed on the system.
 actor ClaudeCLIClient {
 
-    static let fastModel = "haiku"
-    static let preciseModel = "sonnet"
+    static let fastModel = "Claude CLI default (fast path)"
+    static let preciseModel = "Claude CLI default (precise path)"
 
     // MARK: - Cached State (protected by cacheLock for thread safety)
 
@@ -37,7 +37,6 @@ actor ClaudeCLIClient {
 
     private var pool: [PooledProcess] = []
     private let poolSize = 2
-    private let poolModel = ClaudeCLIClient.preciseModel
 
     // MARK: - Availability Check (sync, for AIProvider.hasAPIKey)
 
@@ -153,10 +152,7 @@ actor ClaudeCLIClient {
         NSLog("[ClaudeCLI] Pool shut down")
     }
 
-    private func checkoutWarmProcess(model: String, claudePath: String) -> PooledProcess? {
-        // Pool only holds sonnet processes
-        guard model == poolModel else { return nil }
-
+    private func checkoutWarmProcess(claudePath: String) -> PooledProcess? {
         while let p = pool.first {
             pool.removeFirst()
             if p.isAlive && !p.isStale {
@@ -175,7 +171,12 @@ actor ClaudeCLIClient {
     private func spawnPooledProcess(claudePath: String) -> PooledProcess? {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: claudePath)
-        process.arguments = ["-p", "--model", poolModel, "--output-format", "text"]
+        process.arguments = [
+            "-p",
+            "--output-format", "text",
+            "--tools", "",
+            "--no-session-persistence",
+        ]
         process.environment = ShellEnvironment.loadUserEnvironment()
 
         let stdinPipe = Pipe()
@@ -247,14 +248,19 @@ actor ClaudeCLIClient {
         }
 
         // Try warm process from pool (warm pool doesn't support --system-prompt)
-        if systemMessage == nil, let warm = checkoutWarmProcess(model: model, claudePath: claudePath) {
+        if systemMessage == nil, let warm = checkoutWarmProcess(claudePath: claudePath) {
             let result = try await runWarmProcess(warm, input: userMessage)
             let estimatedUsage = Self.estimateTokenUsage(input: userMessage, output: result, systemMessage: nil)
             return (result, estimatedUsage)
         }
 
         // Cold start with full argument support
-        var arguments = ["-p", "--model", model, "--output-format", "text"]
+        var arguments = [
+            "-p",
+            "--output-format", "text",
+            "--tools", "",
+            "--no-session-persistence",
+        ]
         if let system = systemMessage, !system.isEmpty {
             arguments += ["--system-prompt", system]
         }
@@ -301,6 +307,9 @@ actor ClaudeCLIClient {
             process.standardError = errorPipe
 
             try process.run()
+
+            let timeout = ShellEnvironment.scheduleTermination(of: process, after: .seconds(120))
+            defer { timeout.cancel() }
 
             do {
                 try ShellEnvironment.writeProcessInput(input, to: inputPipe.fileHandleForWriting)
