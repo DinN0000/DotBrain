@@ -5,6 +5,7 @@ struct VaultInspectorView: View {
 
     @State private var folders: [FolderInfo] = []
     @State private var isLoading = true
+    @State private var folderLoadTask: Task<Void, Never>?
 
     // Vault check state managed by AppState
 
@@ -27,14 +28,14 @@ struct VaultInspectorView: View {
             guard !categoryFolders.isEmpty else { continue }
             items.append(FlatItem(id: "header-\(category.rawValue)", kind: .header(category, categoryFolders.count)))
             for folder in categoryFolders {
-                items.append(FlatItem(id: folder.id.uuidString, kind: .folder(folder)))
+                items.append(FlatItem(id: folder.id, kind: .folder(folder)))
             }
         }
         return items
     }
 
     struct FolderInfo: Identifiable {
-        let id = UUID()
+        var id: String { path }
         let name: String
         let path: String
         let category: PARACategory
@@ -73,7 +74,9 @@ struct VaultInspectorView: View {
             }
         }
         .onDisappear {
-            // Reorg task continues in background — results persist in AppState
+            // Reorg task continues in background — only the view-local folder scan is cancelled.
+            folderLoadTask?.cancel()
+            folderLoadTask = nil
         }
     }
 
@@ -664,23 +667,24 @@ struct VaultInspectorView: View {
     // MARK: - Actions
 
     private func loadFolders() {
+        folderLoadTask?.cancel()
         let root = appState.pkmRootPath
-        isLoading = true
+        if folders.isEmpty { isLoading = true }
 
-        Task.detached(priority: .utility) {
+        folderLoadTask = Task.detached(priority: .utility) {
             let pathManager = PKMPathManager(root: root)
             let fm = FileManager.default
-            let hashCache = ContentHashCache(pkmRoot: root)
-            await hashCache.load()
 
-            // Collect all .md file paths and their folder info in one pass
+            // Collect the inexpensive folder metadata first so the UI never waits on hashing.
             var folderFiles: [String: (name: String, category: PARACategory, files: [String])] = [:]
 
             for category in PARACategory.allCases {
+                if Task.isCancelled { return }
                 let basePath = pathManager.paraPath(for: category)
                 guard let entries = try? fm.contentsOfDirectory(atPath: basePath) else { continue }
 
                 for entry in entries.sorted() {
+                    if Task.isCancelled { return }
                     guard !entry.hasPrefix("."), !entry.hasPrefix("_") else { continue }
                     let folderPath = (basePath as NSString).appendingPathComponent(entry)
                     var isDir: ObjCBool = false
@@ -698,50 +702,75 @@ struct VaultInspectorView: View {
                 }
             }
 
-            // Single batch call to check all files at once
-            let allFiles = folderFiles.values.flatMap { $0.files }
-            let allStatuses = await hashCache.checkFiles(allFiles)
-
-            // Build folder info from batch results
-            let noteIndex = pathManager.loadNoteIndex()
-            var result: [FolderInfo] = []
-            for (folderPath, info) in folderFiles.sorted(by: { $0.key < $1.key }) {
-                var fileCount = 0
-                var modifiedCount = 0
-                var newCount = 0
-                for file in info.files {
-                    fileCount += 1
-                    switch allStatuses[file] {
-                    case .modified: modifiedCount += 1
-                    case .new: newCount += 1
-                    default: break
+            func buildResult(
+                statuses: [String: ContentHashCache.FileStatus]?,
+                includeHealth: Bool,
+                noteIndex: NoteIndex?
+            ) -> [FolderInfo] {
+                var result: [FolderInfo] = []
+                for (folderPath, info) in folderFiles.sorted(by: { $0.key < $1.key }) {
+                    if Task.isCancelled { return [] }
+                    var fileCount = 0
+                    var modifiedCount = 0
+                    var newCount = 0
+                    for file in info.files {
+                        fileCount += 1
+                        switch statuses?[file] {
+                        case .modified: modifiedCount += 1
+                        case .new: newCount += 1
+                        default: break
+                        }
                     }
+                    let folderKey = "\(info.category.folderName)/\(info.name)"
+                    let summary = noteIndex?.folders[folderKey]?.summary ?? ""
+
+                    let health = includeHealth
+                        ? FolderHealthAnalyzer.analyze(
+                            folderPath: folderPath,
+                            folderName: info.name,
+                            category: info.category
+                        )
+                        : nil
+                    let issuesText = health?.issues.map(\.localizedDescription).joined(separator: "\n") ?? ""
+
+                    result.append(FolderInfo(
+                        name: info.name,
+                        path: folderPath,
+                        category: info.category,
+                        fileCount: fileCount,
+                        modifiedCount: modifiedCount,
+                        newCount: newCount,
+                        summary: summary,
+                        healthLabel: health?.label ?? "pending",
+                        healthIssues: issuesText
+                    ))
                 }
-                let folderKey = "\(info.category.folderName)/\(info.name)"
-                let summary = noteIndex?.folders[folderKey]?.summary ?? ""
-
-                let health = FolderHealthAnalyzer.analyze(
-                    folderPath: folderPath, folderName: info.name, category: info.category
-                )
-                let issuesText = health.issues.map(\.localizedDescription).joined(separator: "\n")
-
-                result.append(FolderInfo(
-                    name: info.name,
-                    path: folderPath,
-                    category: info.category,
-                    fileCount: fileCount,
-                    modifiedCount: modifiedCount,
-                    newCount: newCount,
-                    summary: summary,
-                    healthLabel: health.label,
-                    healthIssues: issuesText
-                ))
+                return result
             }
 
-            let loaded = result
+            let initial = buildResult(statuses: nil, includeHealth: false, noteIndex: nil)
+            guard !Task.isCancelled else { return }
             await MainActor.run {
-                folders = loaded
+                folders = initial
                 isLoading = false
+            }
+
+            // Hash comparisons can be expensive for large vaults. Enrich the visible list later.
+            let noteIndex = pathManager.loadNoteIndex()
+            let hashCache = ContentHashCache(pkmRoot: root)
+            await hashCache.load()
+            let allFiles = folderFiles.values.flatMap { $0.files }
+            let allStatuses = await hashCache.checkFiles(allFiles)
+            guard !Task.isCancelled else { return }
+            let enriched = buildResult(
+                statuses: allStatuses,
+                includeHealth: true,
+                noteIndex: noteIndex
+            )
+            guard !Task.isCancelled else { return }
+            await MainActor.run {
+                folders = enriched
+                folderLoadTask = nil
             }
         }
     }
@@ -1030,22 +1059,9 @@ private struct VaultFolderRow: View {
     let action: () -> Void
     @State private var isHovered = false
 
-    private var orgHealthColor: Color {
-        switch folder.healthLabel {
-        case "urgent": return .red
-        case "attention": return .orange
-        default: return .green
-        }
-    }
-
-    private var modHealthColor: Color {
-        if folder.healthRatio > 0.8 { return .green }
-        if folder.healthRatio > 0.5 { return .orange }
-        return .red
-    }
-
     private var hasIssue: Bool {
-        folder.healthLabel != "good" || folder.healthRatio <= 0.8
+        folder.healthLabel != "pending" &&
+        (folder.healthLabel != "good" || folder.healthRatio <= 0.8)
     }
 
     private var issueText: String {

@@ -104,6 +104,7 @@ actor ContentHashCache {
             return []
         }
         while let element = enumerator.nextObject() as? String {
+            if Task.isCancelled { break }
             guard element.hasSuffix(".md") else { continue }
             let fullPath = (folderPath as NSString).appendingPathComponent(element)
             let fileName = (element as NSString).lastPathComponent
@@ -129,6 +130,7 @@ actor ContentHashCache {
     func checkFiles(_ filePaths: [String]) -> [String: FileStatus] {
         var results: [String: FileStatus] = [:]
         for path in filePaths {
+            if Task.isCancelled { break }
             results[path] = checkFile(path)
         }
         return results
