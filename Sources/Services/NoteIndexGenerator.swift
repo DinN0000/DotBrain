@@ -165,6 +165,48 @@ struct NoteIndexGenerator: Sendable {
         save(index)
     }
 
+    /// Remove index entries for folders that no longer exist on disk.
+    /// Incremental `updateForFolders` only re-scans dirty folders, so deleted
+    /// folders leave stale folder/note entries behind and pollute index-first
+    /// context. Call this during vault checks to keep the index consistent.
+    /// Mirrors `FolderRelationStore.pruneStale`.
+    func pruneStale(existingFolders: Set<String>) {
+        guard var index = loadExisting() else { return }
+
+        // Notes directly under a PARA category root (not in a subfolder) are
+        // keyed by the category relpath, which is never in existingFolders.
+        let categoryRoots: Set<String> = Set([
+            pathManager.projectsPath,
+            pathManager.areaPath,
+            pathManager.resourcePath,
+            pathManager.archivePath,
+        ].map { relativePath($0) })
+
+        let normalized = Set(existingFolders.map { $0.precomposedStringWithCanonicalMapping })
+        func isLive(_ folder: String) -> Bool {
+            let key = folder.precomposedStringWithCanonicalMapping
+            return categoryRoots.contains(key) || normalized.contains(key)
+        }
+
+        let folderCountBefore = index.folders.count
+        let noteCountBefore = index.notes.count
+
+        index.folders = index.folders.filter { isLive($0.key) }
+        index.notes = index.notes.filter { isLive($0.value.folder) }
+
+        let prunedFolders = folderCountBefore - index.folders.count
+        let prunedNotes = noteCountBefore - index.notes.count
+        guard prunedFolders + prunedNotes > 0 else { return }
+
+        save(NoteIndex(
+            version: NoteIndexGenerator.currentVersion,
+            updated: Self.timestamp(),
+            folders: index.folders,
+            notes: index.notes
+        ))
+        NSLog("[NoteIndexGenerator] Pruned %d stale folders, %d stale notes", prunedFolders, prunedNotes)
+    }
+
     // MARK: - Private Helpers
 
     /// Scan a single folder, returning its folder entry and all note entries

@@ -39,6 +39,7 @@ struct VaultCheckPipeline {
         let pm = PKMPathManager(root: pkmRoot)
         let existingFolders = Self.collectExistingFolders(pm: pm)
         FolderRelationStore(pkmRoot: pkmRoot).pruneStale(existingFolders: existingFolders)
+        NoteIndexGenerator(pkmRoot: pkmRoot).pruneStale(existingFolders: existingFolders)
 
         // Phase 2: Repair (10% -> 20%)
         var repairedFiles: [String] = []
