@@ -7,12 +7,14 @@ struct ProjectContextBuilder {
 
     private let pathManager: PKMPathManager
     private let registry: ProjectRegistry.Registry?
+    private let descriptions: FolderDescriptionStore.Store
 
     init(pkmRoot: String, noteIndex: NoteIndex? = nil) {
         self.pkmRoot = pkmRoot
         self.noteIndex = noteIndex
         self.pathManager = PKMPathManager(root: pkmRoot)
         self.registry = ProjectRegistry.load(pkmRoot: pkmRoot)
+        self.descriptions = FolderDescriptionStore.load(pkmRoot: pkmRoot)
     }
 
     /// Build project context string for classifier prompts
@@ -27,7 +29,8 @@ struct ProjectContextBuilder {
                 let areaValue = index.notes.values
                     .first(where: { $0.folder == folderKey && $0.area != nil })?.area
                 let areaStr = areaValue.map { " (Area: \($0))" } ?? ""
-                lines.append("- \(name): \(folder.summary) [\(tags)]\(areaStr)")
+                let summary = descriptions.description(for: name, category: .project) ?? folder.summary
+                lines.append("- \(name): \(summary) [\(tags)]\(areaStr)")
             }
             if !lines.isEmpty { return lines.joined(separator: "\n") }
         }
@@ -47,8 +50,12 @@ struct ProjectContextBuilder {
         var lines: [String] = []
         for (areaName, areaInfo) in registry.areas.sorted(by: { $0.key < $1.key }) {
             for (projectName, projectInfo) in areaInfo.projects.sorted(by: { $0.key < $1.key }) {
-                let areaSummary = areaInfo.summary.isEmpty ? areaName : "\(areaName) — \(areaInfo.summary)"
-                lines.append("- \(projectName): \(projectInfo.summary) (Area: \(areaSummary))")
+                let areaDescription = descriptions.description(for: areaName, category: .area)
+                    ?? areaInfo.summary
+                let areaSummary = areaDescription.isEmpty ? areaName : "\(areaName) — \(areaDescription)"
+                let projectSummary = descriptions.description(for: projectName, category: .project)
+                    ?? projectInfo.summary
+                lines.append("- \(projectName): \(projectSummary) (Area: \(areaSummary))")
             }
         }
 
@@ -79,12 +86,18 @@ struct ProjectContextBuilder {
                let mdFile = files.sorted().first(where: { $0.hasSuffix(".md") && !$0.hasPrefix(".") && !$0.hasPrefix("_") }),
                let content = try? String(contentsOfFile: (projectDir as NSString).appendingPathComponent(mdFile), encoding: .utf8) {
                 let (frontmatter, _) = Frontmatter.parse(markdown: content)
-                let summary = frontmatter.summary ?? ""
+                let summary = descriptions.description(for: entry, category: .project)
+                    ?? frontmatter.summary
+                    ?? ""
                 let tags = frontmatter.tags.isEmpty ? "" : frontmatter.tags.joined(separator: ", ")
                 let areaStr = frontmatter.area.map { " (Area: \($0))" } ?? ""
                 lines.append("- \(entry): \(summary) [\(tags)]\(areaStr)")
             } else {
-                lines.append("- \(entry)")
+                if let summary = descriptions.description(for: entry, category: .project) {
+                    lines.append("- \(entry): \(summary)")
+                } else {
+                    lines.append("- \(entry)")
+                }
             }
         }
 
@@ -114,7 +127,9 @@ struct ProjectContextBuilder {
             var lines: [String] = []
             for (area, projects) in areaProjects.sorted(by: { $0.key < $1.key }) {
                 let detail = projects.isEmpty ? "(프로젝트 없음)" : projects.sorted().joined(separator: ", ")
-                lines.append("- \(area): \(detail)")
+                let summary = descriptions.description(for: area, category: .area)
+                    .map { " — \($0)" } ?? ""
+                lines.append("- \(area)\(summary): \(detail)")
             }
             if !lines.isEmpty { return lines.joined(separator: "\n") }
         }
@@ -134,7 +149,8 @@ struct ProjectContextBuilder {
         var lines: [String] = []
         for (areaName, areaInfo) in registry.areas.sorted(by: { $0.key < $1.key }) {
             let projects = areaInfo.projects.keys.sorted()
-            let summaryStr = areaInfo.summary.isEmpty ? "" : " — \(areaInfo.summary)"
+            let summary = descriptions.description(for: areaName, category: .area) ?? areaInfo.summary
+            let summaryStr = summary.isEmpty ? "" : " — \(summary)"
             let detail = projects.isEmpty ? "(프로젝트 없음)" : projects.joined(separator: ", ")
             lines.append("- \(areaName)\(summaryStr): \(detail)")
         }
@@ -155,7 +171,11 @@ struct ProjectContextBuilder {
             var isDir: ObjCBool = false
             guard fm.fileExists(atPath: areaDir, isDirectory: &isDir), isDir.boolValue else { continue }
             guard pathManager.isPathSafe(areaDir) else { continue }
-            lines.append("- \(entry)")
+            if let summary = descriptions.description(for: entry, category: .area) {
+                lines.append("- \(entry) — \(summary)")
+            } else {
+                lines.append("- \(entry)")
+            }
         }
 
         return lines.isEmpty ? "" : lines.joined(separator: "\n")
@@ -190,13 +210,18 @@ struct ProjectContextBuilder {
             for name in folderNames.sorted() {
                 var entry: [String: Any] = ["name": name]
 
+                if let category = PARACategory(rawValue: category),
+                   let description = descriptions.description(for: name, category: category) {
+                    entry["summary"] = description
+                }
+
                 if let index = noteIndex {
                     let folderKey = "\(paraPrefix)/\(name)"
                     if let folderInfo = index.folders[folderKey] {
                         if !folderInfo.tags.isEmpty {
                             entry["tags"] = folderInfo.tags
                         }
-                        if !folderInfo.summary.isEmpty {
+                        if entry["summary"] == nil, !folderInfo.summary.isEmpty {
                             entry["summary"] = folderInfo.summary
                         }
                     }

@@ -58,6 +58,7 @@ enum L10n {
         static let inboxProcessing = tr("processing.inbox_processing")
         static let cancel = tr("processing.cancel")
         static let starting = tr("processing.starting")
+        static let interpretingInstruction = tr("processing.interpreting_instruction")
         static func filesReady(_ count: Int) -> String { tr("processing.files_ready", count) }
         static let linkingNotes = tr("processing.linking_notes")
         static func foundFiles(_ count: Int) -> String { tr("processing.found_files", count) }
@@ -167,6 +168,7 @@ enum L10n {
         static func clearFailed(_ count: Int) -> String { tr("inbox.clear_failed", count) }
         static let clearSuccess = tr("inbox.clear_success")
         static let pickFilesTitle = tr("inbox.pick_files_title")
+        static let instructionPlaceholder = tr("inbox.instruction_placeholder")
     }
 
     // MARK: - Results
@@ -329,8 +331,33 @@ enum L10n {
         static func completeResult(_ name: String, _ count: Int) -> String { tr("para_manage.complete_result", name, count) }
         static func reactivateResult(_ name: String, _ count: Int) -> String { tr("para_manage.reactivate_result", name, count) }
         static func renameResult(_ old: String, _ new: String, _ count: Int) -> String { tr("para_manage.rename_result", old, new, count) }
+        static func descriptionUpdated(_ name: String) -> String { tr("para_manage.description_updated", name) }
         static func deleteResult(_ name: String) -> String { tr("para_manage.delete_result", name) }
         static func mergeResult(_ source: String, _ target: String, _ count: Int) -> String { tr("para_manage.merge_result", source, target, count) }
+    }
+
+    // MARK: - Natural Command
+
+    enum NaturalCommand {
+        static let placeholder = tr("natural_command.placeholder")
+        static let plan = tr("natural_command.plan")
+        static let execute = tr("natural_command.execute")
+        static let processInbox = tr("natural_command.process_inbox")
+        static func processInboxToFolder(_ name: String, _ category: String) -> String { tr("natural_command.process_inbox_to_folder", name, category) }
+        static func createFolder(_ name: String, _ category: String) -> String { tr("natural_command.create_folder", name, category) }
+        static func renameFolder(_ old: String, _ new: String) -> String { tr("natural_command.rename_folder", old, new) }
+        static func moveFolder(_ name: String, _ source: String, _ target: String) -> String { tr("natural_command.move_folder", name, source, target) }
+        static func updateFolderDescription(_ name: String, _ description: String) -> String { tr("natural_command.update_folder_description", name, description) }
+        static func completeProject(_ name: String) -> String { tr("natural_command.complete_project", name) }
+        static func reactivateProject(_ name: String) -> String { tr("natural_command.reactivate_project", name) }
+        static let unsupported = tr("natural_command.unsupported")
+        static let invalidResponse = tr("natural_command.invalid_response")
+        static let missingArgument = tr("natural_command.missing_argument")
+        static func folderNotFound(_ name: String) -> String { tr("natural_command.folder_not_found", name) }
+        static let invalidFolderName = tr("natural_command.invalid_folder_name")
+        static let emptyInbox = tr("natural_command.empty_inbox")
+        static func fileNotFound(_ name: String) -> String { tr("natural_command.file_not_found", name) }
+        static let noMatchingFiles = tr("natural_command.no_matching_files")
     }
 
     // MARK: - Folder Relations

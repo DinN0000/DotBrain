@@ -10,6 +10,7 @@ struct InboxStatusView: View {
     @State private var isBounceAnimating = false
     @State private var cachedInboxFiles: [URL] = []
     @State private var showClearConfirmation = false
+    @State private var inboxInstruction = ""
 
     private var hasFiles: Bool { appState.inboxFileCount > 0 }
 
@@ -236,6 +237,30 @@ struct InboxStatusView: View {
             }
             .padding(.horizontal, 20)
 
+            HStack(spacing: 6) {
+                Image(systemName: "text.bubble")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                TextField(L10n.Inbox.instructionPlaceholder, text: $inboxInstruction)
+                    .textFieldStyle(.plain)
+                    .font(.caption)
+                    .onSubmit(processWithInstruction)
+                Button(action: processWithInstruction) {
+                    Image(systemName: "arrow.up.circle.fill")
+                }
+                .buttonStyle(.plain)
+                .disabled(
+                    inboxInstruction.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+                    !appState.hasAPIKey
+                )
+                .accessibilityLabel(L10n.NaturalCommand.execute)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 7)
+            .background(Color.primary.opacity(0.04))
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .padding(.horizontal, 24)
+
             Button(action: {
                 Task { await appState.startProcessing() }
             }) {
@@ -290,6 +315,13 @@ struct InboxStatusView: View {
         if size < 1024 { return "\(size)B" }
         if size < 1024 * 1024 { return "\(size / 1024)KB" }
         return String(format: "%.1fMB", Double(size) / 1_048_576)
+    }
+
+    private func processWithInstruction() {
+        let instruction = inboxInstruction.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !instruction.isEmpty, appState.hasAPIKey else { return }
+        inboxInstruction = ""
+        Task { await appState.startProcessing(instruction: instruction) }
     }
 
     // MARK: - PKM Root Picker

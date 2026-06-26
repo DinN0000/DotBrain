@@ -20,6 +20,7 @@
 "processing.inbox_processing" = "인박스 처리 중";
 "processing.cancel" = "취소";
 "processing.starting" = "시작 중...";
+"processing.interpreting_instruction" = "정리 조건 해석 중...";
 "processing.files_ready" = "%d개 파일 준비 완료";
 "processing.linking_notes" = "관련 노트 연결 중...";
 "processing.found_files" = "%d개 파일 발견";
@@ -115,6 +116,28 @@
 "inbox.clear_failed" = "인박스 비움 (%d개 실패 — 파일이 사용 중일 수 있습니다)";
 "inbox.clear_success" = "인박스 비움 (휴지통으로 이동)";
 "inbox.pick_files_title" = "인박스에 추가할 파일 선택";
+"inbox.instruction_placeholder" = "정리 조건 입력 (예: SCOPE 파일만)";
+
+/* Natural Command */
+"natural_command.placeholder" = "자연어로 명령하세요 (예: 자료 폴더로 옮겨줘)";
+"natural_command.plan" = "명령 해석";
+"natural_command.execute" = "실행";
+"natural_command.process_inbox" = "인박스 파일을 분류하고 정리합니다.";
+"natural_command.process_inbox_to_folder" = "인박스 파일을 ‘%@’ 폴더(%@)로 정리합니다.";
+"natural_command.create_folder" = "‘%@’ 폴더를 %@에 만듭니다.";
+"natural_command.rename_folder" = "‘%@’ 폴더 이름을 ‘%@’(으)로 바꿉니다.";
+"natural_command.move_folder" = "‘%@’ 폴더를 %@에서 %@로 옮깁니다.";
+"natural_command.update_folder_description" = "‘%@’ 폴더 설명을 ‘%@’(으)로 바꿉니다.";
+"natural_command.complete_project" = "‘%@’ 프로젝트를 완료하고 보관합니다.";
+"natural_command.reactivate_project" = "‘%@’ 프로젝트를 다시 활성화합니다.";
+"natural_command.unsupported" = "한 번에 실행 가능한 폴더 또는 인박스 명령으로 다시 입력해주세요.";
+"natural_command.invalid_response" = "명령을 안전하게 해석하지 못했습니다. 다시 입력해주세요.";
+"natural_command.missing_argument" = "명령에 필요한 폴더나 카테고리가 빠졌습니다.";
+"natural_command.folder_not_found" = "‘%@’ 폴더를 현재 목록에서 찾지 못했습니다.";
+"natural_command.invalid_folder_name" = "사용할 수 없는 폴더 이름입니다.";
+"natural_command.empty_inbox" = "정리할 인박스 파일이 없습니다.";
+"natural_command.file_not_found" = "인박스에서 ‘%@’ 파일을 찾지 못했습니다.";
+"natural_command.no_matching_files" = "정리 조건에 맞는 인박스 파일이 없습니다.";
 
 /* Results */
 "results.title" = "정리 결과";
@@ -265,6 +288,7 @@
 "para_manage.complete_result" = "'%@' 완료 -> 아카이브 (%d개 노트 갱신)";
 "para_manage.reactivate_result" = "'%@' 재활성화됨 (%d개 노트 갱신)";
 "para_manage.rename_result" = "'%@' -> '%@' (%d개 노트 갱신)";
+"para_manage.description_updated" = "‘%@’ 폴더 설명을 변경했습니다.";
 "para_manage.delete_result" = "'%@' 삭제됨 (휴지통)";
 "para_manage.merge_result" = "'%@' -> '%@' 병합 (%d개 파일)";
 

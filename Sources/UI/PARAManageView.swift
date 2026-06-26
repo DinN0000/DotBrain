@@ -20,6 +20,15 @@ struct PARAManageView: View {
 
             Divider()
 
+            NaturalCommandBar(
+                context: naturalCommandContext,
+                onConfirm: executeNaturalCommand
+            )
+            .padding(.horizontal)
+            .padding(.vertical, 8)
+
+            Divider()
+
             if isLoading {
                 Spacer()
                 ProgressView()
@@ -87,6 +96,11 @@ struct PARAManageView: View {
             }
         }
         .onAppear { loadFolders() }
+        .onDisappear {
+            loadTask?.cancel()
+            loadTask = nil
+            isLoading = false
+        }
         .alert(L10n.PARAManage.deleteFolder, isPresented: .init(
             get: { deleteTarget != nil },
             set: { if !$0 { deleteTarget = nil } }
@@ -383,6 +397,7 @@ struct PARAManageView: View {
         guard let entries = try? fm.contentsOfDirectory(atPath: basePath) else { return [] }
 
         let noteIndex = pathManager.loadNoteIndex()
+        let descriptions = FolderDescriptionStore.load(pkmRoot: pkmRoot)
         let categoryFolder = (basePath as NSString).lastPathComponent
 
         var results: [FolderEntry] = []
@@ -403,7 +418,9 @@ struct PARAManageView: View {
             }
 
             let folderKey = "\(categoryFolder)/\(entry)"
-            let summary = noteIndex?.folders[folderKey]?.summary ?? ""
+            let summary = descriptions.description(for: entry, category: category)
+                ?? noteIndex?.folders[folderKey]?.summary
+                ?? ""
 
             results.append(FolderEntry(
                 name: entry,
@@ -432,7 +449,11 @@ struct PARAManageView: View {
     }
 
     private func createFolder(in category: PARACategory) {
-        let raw = newFolderName.trimmingCharacters(in: .whitespaces)
+        createFolder(named: newFolderName, in: category)
+    }
+
+    private func createFolder(named input: String, in category: PARACategory) {
+        let raw = input.trimmingCharacters(in: .whitespaces)
         // Sanitize: strip path separators, .., null bytes, enforce 255-char limit
         let name = raw.components(separatedBy: "/")
             .filter { $0 != ".." && $0 != "." && !$0.isEmpty }
@@ -468,6 +489,77 @@ struct PARAManageView: View {
             loadFolders()
             clearStatusAfterDelay()
             refreshCategoryIndex(category)
+        } catch {
+            isStatusError = true
+            statusMessage = error.localizedDescription
+            clearStatusAfterDelay()
+        }
+    }
+
+    private func naturalCommandContext() -> NaturalCommandContext {
+        let folders = folderMap.flatMap { category, entries in
+            entries.map {
+                NaturalCommandFolder(
+                    name: $0.name,
+                    category: category,
+                    description: $0.summary.isEmpty ? nil : $0.summary
+                )
+            }
+        }
+        return NaturalCommandContext(
+            surface: .folderManagement,
+            inboxCount: appState.inboxFileCount,
+            folders: folders
+        )
+    }
+
+    private func executeNaturalCommand(_ plan: NaturalCommandPlan) {
+        switch plan.action {
+        case .createFolder:
+            guard let name = plan.folderName, let category = plan.category else { return }
+            createFolder(named: name, in: category)
+        case .renameFolder:
+            guard let oldName = plan.folderName,
+                  let newName = plan.newName,
+                  let category = plan.category else { return }
+            performRename(oldName: oldName, newName: newName, category: category)
+        case .moveFolder:
+            guard let name = plan.folderName,
+                  let source = plan.sourceCategory,
+                  let target = plan.targetCategory else { return }
+            moveFolder(name, from: source, to: target)
+        case .updateFolderDescription:
+            guard let name = plan.folderName,
+                  let description = plan.description,
+                  let category = plan.category else { return }
+            updateFolderDescription(name: name, description: description, category: category)
+        case .completeProject:
+            guard let name = plan.folderName else { return }
+            completeProject(name)
+        case .reactivateProject:
+            guard let name = plan.folderName else { return }
+            reactivateProject(name)
+        case .processInbox, .processInboxToFolder, .unsupported:
+            break
+        }
+    }
+
+    private func updateFolderDescription(
+        name: String,
+        description: String,
+        category: PARACategory
+    ) {
+        do {
+            try FolderDescriptionStore.set(
+                description,
+                for: name,
+                category: category,
+                pkmRoot: appState.pkmRootPath
+            )
+            isStatusError = false
+            statusMessage = L10n.PARAManage.descriptionUpdated(name)
+            loadFolders()
+            clearStatusAfterDelay()
         } catch {
             isStatusError = true
             statusMessage = error.localizedDescription
@@ -714,4 +806,3 @@ private struct CategoryHeaderView: View {
         .animation(.easeOut(duration: 0.12), value: isHovered)
     }
 }
-

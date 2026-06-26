@@ -1,0 +1,175 @@
+import XCTest
+@testable import DotBrain
+
+final class NaturalCommandServiceTests: XCTestCase {
+    private let folders = [
+        NaturalCommandFolder(name: "DotBrain", category: .project),
+        NaturalCommandFolder(name: "Swift", category: .resource),
+        NaturalCommandFolder(name: "Old Project", category: .archive),
+    ]
+
+    func testDecodeAcceptsJSONInsideCodeFence() async throws {
+        let raw = """
+        ```json
+        {"action":"moveFolder","category":null,"sourceCategory":"project","targetCategory":"resource","folderName":"DotBrain","newName":null}
+        ```
+        """
+
+        let plan = try await NaturalCommandService.shared.decodePlan(raw)
+
+        XCTAssertEqual(plan.action, .moveFolder)
+        XCTAssertEqual(plan.folderName, "DotBrain")
+        XCTAssertEqual(plan.targetCategory, .resource)
+    }
+
+    func testInboxRejectsFolderMutation() async throws {
+        let plan = NaturalCommandPlan(
+            action: .createFolder,
+            category: .project,
+            sourceCategory: nil,
+            targetCategory: nil,
+            folderName: "New Project",
+            newName: nil
+        )
+        let context = NaturalCommandContext(surface: .inbox, inboxCount: 1, folders: [])
+
+        do {
+            _ = try await NaturalCommandService.shared.validate(plan, context: context)
+            XCTFail("Expected an unsupported command error")
+        } catch NaturalCommandError.unsupported {
+            // Expected.
+        }
+    }
+
+    func testMoveUsesCanonicalExistingFolderName() async throws {
+        let plan = NaturalCommandPlan(
+            action: .moveFolder,
+            category: nil,
+            sourceCategory: .project,
+            targetCategory: .area,
+            folderName: "dotbrain",
+            newName: nil
+        )
+        let context = NaturalCommandContext(
+            surface: .folderManagement,
+            inboxCount: 0,
+            folders: folders
+        )
+
+        let validated = try await NaturalCommandService.shared.validate(plan, context: context)
+
+        XCTAssertEqual(validated.folderName, "DotBrain")
+        XCTAssertEqual(validated.sourceCategory, .project)
+        XCTAssertEqual(validated.targetCategory, .area)
+    }
+
+    func testRejectsPathLikeNewFolderName() async throws {
+        let plan = NaturalCommandPlan(
+            action: .createFolder,
+            category: .resource,
+            sourceCategory: nil,
+            targetCategory: nil,
+            folderName: "../escape",
+            newName: nil
+        )
+        let context = NaturalCommandContext(
+            surface: .folderManagement,
+            inboxCount: 0,
+            folders: folders
+        )
+
+        do {
+            _ = try await NaturalCommandService.shared.validate(plan, context: context)
+            XCTFail("Expected an invalid folder name error")
+        } catch NaturalCommandError.invalidFolderName {
+            // Expected.
+        }
+    }
+
+    func testEmptyInboxCannotBeProcessed() async throws {
+        let plan = NaturalCommandPlan(
+            action: .processInbox,
+            category: nil,
+            sourceCategory: nil,
+            targetCategory: nil,
+            folderName: nil,
+            newName: nil
+        )
+        let context = NaturalCommandContext(surface: .inbox, inboxCount: 0, folders: [])
+
+        do {
+            _ = try await NaturalCommandService.shared.validate(plan, context: context)
+            XCTFail("Expected an unavailable command error")
+        } catch NaturalCommandError.unavailable {
+            // Expected.
+        }
+    }
+
+    func testInboxCanTargetAnExistingFolder() async throws {
+        let plan = NaturalCommandPlan(
+            action: .processInboxToFolder,
+            category: nil,
+            sourceCategory: nil,
+            targetCategory: .project,
+            folderName: "dotbrain",
+            newName: nil
+        )
+        let context = NaturalCommandContext(
+            surface: .inbox,
+            inboxCount: 3,
+            folders: folders
+        )
+
+        let validated = try await NaturalCommandService.shared.validate(plan, context: context)
+
+        XCTAssertEqual(validated.folderName, "DotBrain")
+        XCTAssertEqual(validated.targetCategory, .project)
+    }
+
+    func testProjectDescriptionCanBeUpdated() async throws {
+        let plan = NaturalCommandPlan(
+            action: .updateFolderDescription,
+            category: .project,
+            sourceCategory: nil,
+            targetCategory: nil,
+            folderName: "dotbrain",
+            newName: nil,
+            description: "  macOS 지식 관리 앱  "
+        )
+        let context = NaturalCommandContext(
+            surface: .folderManagement,
+            inboxCount: 0,
+            folders: folders
+        )
+
+        let validated = try await NaturalCommandService.shared.validate(plan, context: context)
+
+        XCTAssertEqual(validated.folderName, "DotBrain")
+        XCTAssertEqual(validated.category, .project)
+        XCTAssertEqual(validated.description, "macOS 지식 관리 앱")
+    }
+
+    func testResourceDescriptionUpdateIsRejected() async throws {
+        let plan = NaturalCommandPlan(
+            action: .updateFolderDescription,
+            category: .resource,
+            sourceCategory: nil,
+            targetCategory: nil,
+            folderName: "Swift",
+            newName: nil,
+            description: "Swift 참고 자료"
+        )
+        let context = NaturalCommandContext(
+            surface: .folderManagement,
+            inboxCount: 0,
+            folders: folders
+        )
+
+        do {
+            _ = try await NaturalCommandService.shared.validate(plan, context: context)
+            XCTFail("Expected an unsupported command error")
+        } catch NaturalCommandError.unsupported {
+            // Expected.
+        }
+    }
+}

@@ -7,6 +7,8 @@ struct InboxProcessor {
     let onProgress: ((Double, String) -> Void)?
     let onFileProgress: ((Int, Int, String) -> Void)?
     let onPhaseChange: ((ProcessingPhase) -> Void)?
+    var forcedDestination: InboxDestination? = nil
+    var includedFileNames: Set<String>? = nil
     private static let maxAutoPasses = 3
 
     struct Result {
@@ -20,7 +22,7 @@ struct InboxProcessor {
     func process() async throws -> Result {
         onPhaseChange?(.preparing)
         let scanner = InboxScanner(pkmRoot: pkmRoot)
-        var files = scanner.scan()
+        var files = filterSelectedFiles(scanner.scan())
 
         guard !files.isEmpty else {
             return Result(processed: [], needsConfirmation: [], affectedFolders: [], total: 0, failed: 0)
@@ -72,7 +74,7 @@ struct InboxProcessor {
                 break
             }
 
-            let remaining = scanner.scan()
+            let remaining = filterSelectedFiles(scanner.scan())
             guard !remaining.isEmpty else {
                 files = []
                 break
@@ -115,6 +117,13 @@ struct InboxProcessor {
             total: discoveredPaths.count,
             failed: totalFailed
         )
+    }
+
+    private func filterSelectedFiles(_ paths: [String]) -> [String] {
+        guard let includedFileNames else { return paths }
+        return paths.filter {
+            includedFileNames.contains(($0 as NSString).lastPathComponent)
+        }
     }
 
     private func processSinglePass(
@@ -294,7 +303,15 @@ struct InboxProcessor {
 
         // Classifications ready for move (semantic linking happens post-move)
         onPhaseChange?(.linking)
-        let enrichedClassifications = allClassifications
+        let enrichedClassifications = allClassifications.map { classification in
+            guard let destination = forcedDestination else { return classification }
+            var forced = classification
+            forced.para = destination.category
+            forced.targetFolder = destination.folderName
+            forced.project = destination.category == .project ? destination.folderName : nil
+            forced.confidence = 1.0
+            return forced
+        }
         onProgress?(0.7, L10n.Processing.preparingMove)
 
         // Move files

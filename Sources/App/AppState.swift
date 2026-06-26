@@ -668,7 +668,7 @@ final class AppState: ObservableObject {
 
     private var processingTask: Task<Void, Never>?
 
-    func startProcessing() async {
+    func startProcessing(instruction: String? = nil) async {
         guard !shouldBlockForPendingConfirmations() else { return }
         guard !isAnyTaskRunning else {
             if backgroundTaskName != nil {
@@ -707,29 +707,74 @@ final class AppState: ObservableObject {
 
         processingTask = Task { @MainActor in
             defer { isProcessing = false }
-            let processor = InboxProcessor(
-                pkmRoot: pkmRootPath,
-                onProgress: { [weak self] progress, status in
-                    Task { @MainActor in
-                        self?.processingProgress = progress
-                        self?.processingStatus = status
-                    }
-                },
-                onFileProgress: { [weak self] completed, total, fileName in
-                    Task { @MainActor in
-                        self?.processingCompletedCount = completed
-                        self?.processingTotalCount = total
-                        self?.processingCurrentFile = fileName
-                    }
-                },
-                onPhaseChange: { [weak self] phase in
-                    Task { @MainActor in
-                        self?.processingPhase = phase
-                    }
-                }
-            )
 
             do {
+                var resolvedDestination: InboxDestination?
+                var includedFileNames: Set<String>?
+                if let instruction = instruction?.trimmingCharacters(in: .whitespacesAndNewlines),
+                   !instruction.isEmpty {
+                    processingStatus = L10n.Processing.interpretingInstruction
+                    let inboxPaths = InboxScanner(pkmRoot: pkmRootPath).scan()
+                    processingTotalCount = inboxPaths.count
+                    let pathManager = PKMPathManager(root: pkmRootPath)
+                    let fileManager = FileManager.default
+                    var folders: [NaturalCommandFolder] = []
+                    for category in PARACategory.allCases {
+                        let basePath = pathManager.paraPath(for: category)
+                        guard let entries = try? fileManager.contentsOfDirectory(atPath: basePath) else { continue }
+                        for entry in entries where !entry.hasPrefix(".") && !entry.hasPrefix("_") {
+                            let path = (basePath as NSString).appendingPathComponent(entry)
+                            var isDirectory: ObjCBool = false
+                            guard fileManager.fileExists(atPath: path, isDirectory: &isDirectory),
+                                  isDirectory.boolValue else { continue }
+                            folders.append(NaturalCommandFolder(name: entry, category: category))
+                        }
+                    }
+                    let context = NaturalCommandContext(
+                        surface: .inbox,
+                        inboxCount: inboxPaths.count,
+                        folders: folders,
+                        inboxFileNames: inboxPaths.map { ($0 as NSString).lastPathComponent }
+                    )
+                    let plan = try await NaturalCommandService.shared.plan(instruction, context: context)
+                    guard !Task.isCancelled else { return }
+                    if plan.action == .processInboxToFolder,
+                       let category = plan.targetCategory,
+                       let folderName = plan.folderName {
+                        resolvedDestination = InboxDestination(category: category, folderName: folderName)
+                    }
+                    var selected = Set(context.inboxFileNames)
+                    if let included = plan.includedFileNames { selected = Set(included) }
+                    if let excluded = plan.excludedFileNames { selected.subtract(excluded) }
+                    guard !selected.isEmpty else {
+                        throw NaturalCommandError.unavailable(L10n.NaturalCommand.noMatchingFiles)
+                    }
+                    includedFileNames = selected
+                }
+
+                let processor = InboxProcessor(
+                    pkmRoot: pkmRootPath,
+                    onProgress: { [weak self] progress, status in
+                        Task { @MainActor in
+                            self?.processingProgress = progress
+                            self?.processingStatus = status
+                        }
+                    },
+                    onFileProgress: { [weak self] completed, total, fileName in
+                        Task { @MainActor in
+                            self?.processingCompletedCount = completed
+                            self?.processingTotalCount = total
+                            self?.processingCurrentFile = fileName
+                        }
+                    },
+                    onPhaseChange: { [weak self] phase in
+                        Task { @MainActor in
+                            self?.processingPhase = phase
+                        }
+                    },
+                    forcedDestination: resolvedDestination,
+                    includedFileNames: includedFileNames
+                )
                 let results = try await processor.process()
                 guard !Task.isCancelled else { return }
                 processedResults = results.processed
@@ -743,7 +788,9 @@ final class AppState: ObservableObject {
                 )
             } catch {
                 if !Task.isCancelled {
-                    pipelineError = InboxProcessor.friendlyErrorMessage(error)
+                    pipelineError = error is NaturalCommandError
+                        ? error.localizedDescription
+                        : InboxProcessor.friendlyErrorMessage(error)
                     currentScreen = .results
                 }
             }

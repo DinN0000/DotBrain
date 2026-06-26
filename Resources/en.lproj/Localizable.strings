@@ -20,6 +20,7 @@
 "processing.inbox_processing" = "Processing Inbox";
 "processing.cancel" = "Cancel";
 "processing.starting" = "Starting...";
+"processing.interpreting_instruction" = "Interpreting organization instructions...";
 "processing.files_ready" = "%d files ready";
 "processing.linking_notes" = "Linking related notes...";
 "processing.found_files" = "%d files found";
@@ -115,6 +116,28 @@
 "inbox.clear_failed" = "Inbox cleared (%d failed — files may be in use)";
 "inbox.clear_success" = "Inbox cleared (moved to Trash)";
 "inbox.pick_files_title" = "Select files to add to inbox";
+"inbox.instruction_placeholder" = "Organization instruction (e.g. SCOPE files only)";
+
+/* Natural Command */
+"natural_command.placeholder" = "Type a command (e.g. move this folder to Resources)";
+"natural_command.plan" = "Interpret command";
+"natural_command.execute" = "Run";
+"natural_command.process_inbox" = "Classify and organize the Inbox files.";
+"natural_command.process_inbox_to_folder" = "Organize the Inbox files into ‘%@’ in %@.";
+"natural_command.create_folder" = "Create ‘%@’ in %@.";
+"natural_command.rename_folder" = "Rename ‘%@’ to ‘%@’.";
+"natural_command.move_folder" = "Move ‘%@’ from %@ to %@.";
+"natural_command.update_folder_description" = "Change the description of ‘%@’ to ‘%@’.";
+"natural_command.complete_project" = "Complete and archive ‘%@’.";
+"natural_command.reactivate_project" = "Reactivate ‘%@’.";
+"natural_command.unsupported" = "Enter one supported Inbox or folder command at a time.";
+"natural_command.invalid_response" = "The command could not be interpreted safely. Try again.";
+"natural_command.missing_argument" = "A required folder or category is missing.";
+"natural_command.folder_not_found" = "‘%@’ was not found in the current folder list.";
+"natural_command.invalid_folder_name" = "That folder name cannot be used.";
+"natural_command.empty_inbox" = "There are no Inbox files to organize.";
+"natural_command.file_not_found" = "‘%@’ was not found in the Inbox.";
+"natural_command.no_matching_files" = "No Inbox files match the instruction.";
 
 /* Results */
 "results.title" = "Results";
@@ -265,6 +288,7 @@
 "para_manage.complete_result" = "'%@' completed -> Archive (%d notes updated)";
 "para_manage.reactivate_result" = "'%@' reactivated (%d notes updated)";
 "para_manage.rename_result" = "'%@' -> '%@' (%d notes updated)";
+"para_manage.description_updated" = "Updated the description of ‘%@’.";
 "para_manage.delete_result" = "'%@' deleted (Trash)";
 "para_manage.merge_result" = "'%@' -> '%@' merged (%d files)";
 

@@ -40,6 +40,15 @@ struct PARAMover {
         }
         try fm.moveItem(atPath: sourceDir, toPath: destinationDir)
 
+        let destinationName = (destinationDir as NSString).lastPathComponent
+        try? FolderDescriptionStore.move(
+            name: safeName,
+            from: source,
+            to: target,
+            newName: destinationName,
+            pkmRoot: pkmRoot
+        )
+
         // Update WikiLink references across the vault
         if target == .archive {
             markReferencesCompleted(folderName: safeName)
@@ -68,6 +77,7 @@ struct PARAMover {
 
         let folderURL = URL(fileURLWithPath: folderPath)
         try fm.trashItem(at: folderURL, resultingItemURL: nil)
+        try? FolderDescriptionStore.remove(name: safeName, category: category, pkmRoot: pkmRoot)
     }
 
     // MARK: - Merge
@@ -172,6 +182,7 @@ struct PARAMover {
 
         // Remove now-empty source folder
         try? fm.removeItem(atPath: sourceDir)
+        try? FolderDescriptionStore.remove(name: safeSource, category: category, pkmRoot: pkmRoot)
 
         return movedCount
     }
@@ -220,6 +231,13 @@ struct PARAMover {
 
         // Move (rename) the folder
         try fm.moveItem(atPath: oldDir, toPath: newDir)
+        try? FolderDescriptionStore.move(
+            name: safeOld,
+            from: category,
+            to: category,
+            newName: safeNew,
+            pkmRoot: pkmRoot
+        )
 
         // Update WikiLink references across the vault
         markInVault(pattern: "[[\(safeOld)]]", replacement: "[[\(safeNew)]]")

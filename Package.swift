@@ -20,5 +20,10 @@ let package = Package(
                 .process("../Resources")
             ]
         ),
+        .testTarget(
+            name: "DotBrainTests",
+            dependencies: ["DotBrain"],
+            path: "Tests"
+        ),
     ]
 )

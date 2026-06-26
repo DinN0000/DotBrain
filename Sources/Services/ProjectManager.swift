@@ -48,14 +48,25 @@ struct ProjectManager {
 
         // Move folder to 4_Archive/
         let archiveDir = (pathManager.archivePath as NSString).appendingPathComponent(safeName)
+        let destinationName: String
         if fm.fileExists(atPath: archiveDir) {
             let timestamp = Int(Date().timeIntervalSince1970)
             let newName = "\(safeName)_\(timestamp)"
             let newDir = (pathManager.archivePath as NSString).appendingPathComponent(newName)
             try fm.moveItem(atPath: projectDir, toPath: newDir)
+            destinationName = newName
         } else {
             try fm.moveItem(atPath: projectDir, toPath: archiveDir)
+            destinationName = safeName
         }
+
+        try? FolderDescriptionStore.move(
+            name: safeName,
+            from: .project,
+            to: .archive,
+            newName: destinationName,
+            pkmRoot: pkmRoot
+        )
 
         // Mark references in other notes with "(완료됨)"
         markReferencesCompleted(projectName: safeName)
@@ -86,6 +97,12 @@ struct ProjectManager {
 
         let updatedCount = try updateAllNotes(in: archiveDir, status: .active, para: .project)
         try fm.moveItem(atPath: archiveDir, toPath: projectDir)
+        try? FolderDescriptionStore.move(
+            name: safeName,
+            from: .archive,
+            to: .project,
+            pkmRoot: pkmRoot
+        )
 
         unmarkReferencesCompleted(projectName: safeName)
 
