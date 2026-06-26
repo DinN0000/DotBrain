@@ -40,6 +40,12 @@ function runSilent(cmd) {
   return run(cmd, { silent: true, ignoreError: true }).trim();
 }
 
+function removeLegacyLoginItem() {
+  // Older/manual installs may also be registered in System Settings > Login Items.
+  // LaunchAgent is DotBrain's canonical startup mechanism; keeping both can launch twice.
+  runSilent(`osascript -e 'tell application "System Events" to delete login item "${APP_NAME}"'`);
+}
+
 function httpsGet(url, maxRedirects = 5) {
   return new Promise((resolve, reject) => {
     const request = (reqUrl, remaining) => {
@@ -98,6 +104,7 @@ function uninstall() {
   // Unload LaunchAgent
   const uid = runSilent("id -u");
   runSilent(`launchctl bootout gui/${uid}/${PLIST_NAME}`);
+  removeLegacyLoginItem();
 
   // Remove app
   if (existsSync(APP_PATH)) {
@@ -282,6 +289,8 @@ async function installFromBinary(binaryUrl, iconUrl, tag) {
 function setupLaunchAgent() {
   log("\nSetting up auto-start (LaunchAgent)...");
 
+  removeLegacyLoginItem();
+
   mkdirSync(LAUNCHAGENT_DIR, { recursive: true });
 
   const plistContent = `<?xml version="1.0" encoding="UTF-8"?>
@@ -309,6 +318,7 @@ function setupLaunchAgent() {
   writeFileSync(PLIST_PATH, plistContent);
 
   const uid = runSilent("id -u");
+  runSilent(`launchctl bootout gui/${uid}/${PLIST_NAME}`);
   runSilent(`launchctl bootstrap gui/${uid} "${PLIST_PATH}"`);
   log("Auto-start registered.");
 }
