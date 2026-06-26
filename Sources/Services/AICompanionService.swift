@@ -6,7 +6,7 @@ import Foundation
 enum AICompanionService {
 
     /// Bump this when companion file content changes — triggers overwrite on existing vaults
-    static let version = 13
+    static let version = 14
 
     /// Generate all AI companion files in the PKM root (first-time only)
     static func generateAll(pkmRoot: String) throws {
@@ -231,7 +231,7 @@ enum AICompanionService {
     ```
     _Inbox/       → 새 파일 대기 (DotBrain이 자동 처리, 수정 금지)
     1_Project/    → 진행 중인 프로젝트 (목표 + 기한 있음)
-    2_Area/       → 지속 관리 영역 (기한 없는 책임)
+    2_Area/       → 지속 책임·갱신 영역 (운영 기준·정책 등 계속 관리하는 문서)
     3_Resource/   → 참고 자료 (관심사, 학습 자료)
     4_Archive/    → 완료/비활성 항목
     _Assets/      → 전역 첨부파일
@@ -300,7 +300,8 @@ enum AICompanionService {
 
     ### 충돌 처리
     - **이름 충돌**: 대상에 같은 파일명이 있으면 사용자 확인
-    - **중복 콘텐츠**: SHA256 일치 시 태그 병합 후 자동 삭제
+    - **중복 콘텐츠**: 본문 SHA256가 정확히 일치할 때만 태그 병합 후 자동 삭제(휴지통)
+    - **유사하지만 다른 문서**: 자동 삭제/병합하지 않고 원본 보존. 필요 시 요약·색인·비교 문서로 취합(원본 유지)
 
     ---
 
@@ -328,7 +329,7 @@ enum AICompanionService {
 
     **para** — PARA 카테고리
     - `project`: 해당 프로젝트의 **직접적인 작업 문서**만 (액션 아이템, 마감 관련). 반드시 `project` 필드에 프로젝트명 기재.
-    - `area`: 기한 없이 지속 관리하는 영역 (운영, 모니터링, 건강)
+    - `area`: 지속적으로 책임지고 관리·갱신하는 영역 (운영 기준, 정책, 장기 상태 문서). 프로젝트가 끝나도 남으며, 단발 참고자료(resource)와 구분
     - `resource`: 참고 자료, 학습 자료, 가이드, 레퍼런스
     - `archive`: 완료되었거나 더 이상 활성이 아닌 항목
 
@@ -609,6 +610,7 @@ enum AICompanionService {
     - `_Inbox/` 수정 금지 (DotBrain이 자동 처리)
     - 코드 파일 생성 금지 (DotBrain이 인박스에서 필터링)
     - 기존 태그 삭제 금지
+    - 유사하지만 다른 문서를 중복으로 보고 삭제/병합 금지 (본문이 정확히 같은 파일만 중복; 나머지는 원본 보존)
     - 개발 작업은 이 PKM 폴더 밖에서
     """
 
@@ -630,7 +632,7 @@ enum AICompanionService {
     ## Structure
     - `_Inbox/`: Auto-processed by DotBrain (**do not modify**)
     - `1_Project/`: Active projects with goals and deadlines
-    - `2_Area/`: Ongoing responsibilities without deadlines
+    - `2_Area/`: Ongoing responsibility areas you actively maintain and update (operating standards, policies, long-lived status) — not one-off references
     - `3_Resource/`: Reference materials and interests
     - `4_Archive/`: Completed or inactive items
     - `_Assets/`: Global attachments (binary files)
