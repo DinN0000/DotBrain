@@ -8,6 +8,13 @@ struct NoteEnricher: Sendable {
 
     /// Enrich a single note's frontmatter by filling empty fields with AI analysis
     func enrichNote(at filePath: String) async throws -> EnrichResult {
+        // Folder entity pages are synthesized by FolderSynthesizer, not enriched
+        let baseName = ((filePath as NSString).lastPathComponent as NSString).deletingPathExtension
+        let parentName = ((filePath as NSString).deletingLastPathComponent as NSString).lastPathComponent
+        if baseName.precomposedStringWithCanonicalMapping == parentName.precomposedStringWithCanonicalMapping {
+            return EnrichResult(filePath: filePath, fieldsUpdated: 0)
+        }
+
         // Use smart extraction — reads structure, not just prefix
         let smartContent = FileContentExtractor.extract(from: filePath, maxLength: maxContentLength)
         guard !smartContent.hasPrefix("[읽기 실패") else {

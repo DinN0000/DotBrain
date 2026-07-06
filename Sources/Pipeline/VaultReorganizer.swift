@@ -314,8 +314,11 @@ struct VaultReorganizer {
             let category = PARACategory.fromPath(folderPath) ?? .resource
 
             guard let entries = try? fm.contentsOfDirectory(atPath: folderPath) else { return [] }
+            let folderNoteFileName = "\(folderName).md".precomposedStringWithCanonicalMapping
             for entry in entries.sorted() {
                 guard !entry.hasPrefix("."), !entry.hasPrefix("_") else { continue }
+                // Folder entity pages are synthesized in place, never moved
+                guard entry.precomposedStringWithCanonicalMapping != folderNoteFileName else { continue }
                 let filePath = (folderPath as NSString).appendingPathComponent(entry)
                 var fileIsDir: ObjCBool = false
                 guard fm.fileExists(atPath: filePath, isDirectory: &fileIsDir),
@@ -341,9 +344,12 @@ struct VaultReorganizer {
                 }
 
                 guard let entries = try? fm.contentsOfDirectory(atPath: folderPath) else { continue }
+                let folderNoteFileName = "\(folder).md".precomposedStringWithCanonicalMapping
 
                 for entry in entries.sorted() {
                     guard !entry.hasPrefix("."), !entry.hasPrefix("_") else { continue }
+                    // Folder entity pages are synthesized in place, never moved
+                    guard entry.precomposedStringWithCanonicalMapping != folderNoteFileName else { continue }
 
                     let filePath = (folderPath as NSString).appendingPathComponent(entry)
                     var fileIsDir: ObjCBool = false
