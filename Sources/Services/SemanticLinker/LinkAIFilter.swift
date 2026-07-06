@@ -18,7 +18,8 @@ struct LinkAIFilter: Sendable {
 
         let noteDescriptions = notes.enumerated().map { (i, note) in
             let candidateList = note.candidates.enumerated().map { (j, c) in
-                "  [\(j)] \(c.name) — \(c.tags.prefix(3).joined(separator: ", ")) — \(c.summary)"
+                let hubMark = c.isHub ? " [폴더 허브]" : ""
+                return "  [\(j)] \(c.name)\(hubMark) — \(c.tags.prefix(3).joined(separator: ", ")) — \(c.summary)"
             }.joined(separator: "\n")
 
             return """
@@ -47,6 +48,8 @@ struct LinkAIFilter: Sendable {
            - "project": 같은 프로젝트/업무 관련
            - "reference": 참고/비교할 수 있는 자료
            - "related": 주제가 비슷한 문서
+        6. 같은 폴더를 가리키는 개별 노트와 [폴더 허브]가 모두 후보면 허브를 선택.
+           다른 폴더의 개별 노트 직접 링크는 prerequisite/reference처럼 구체적 이유가 있을 때만.
 
         ## 응답 (순수 JSON, 코드블록 없이)
         [{"noteIndex": 0, "links": [{"index": 0, "context": "~하려면 참고", "relation": "reference"}]}]

@@ -61,20 +61,23 @@ struct SemanticLinker: Sendable {
             .filter { !$0.isEmpty }
             .joined(separator: "\n\n")
 
-        // Determine which notes to process
+        // Determine which notes to process. Hub notes are never link sources —
+        // their outgoing links are the synthesis (핵심 노트) plus the
+        // mechanical hub-to-hub writes below.
+        let sourceNotes = allNotes.filter { $0.name != $0.folderName }
         let targetNotes: [LinkCandidateGenerator.NoteInfo]
         if let changed = changedFiles {
             let changedNames = Set(changed.map {
                 (($0 as NSString).lastPathComponent as NSString).deletingPathExtension
             })
             // Include changed notes + notes that already reference changed notes
-            targetNotes = allNotes.filter { note in
+            targetNotes = sourceNotes.filter { note in
                 changedNames.contains(note.name) ||
                 !note.existingRelated.isDisjoint(with: changedNames)
             }
             NSLog("[SemanticLinker] Incremental: %d/%d notes targeted", targetNotes.count, allNotes.count)
         } else {
-            targetNotes = allNotes
+            targetNotes = sourceNotes
         }
 
         let candidateGen = LinkCandidateGenerator()
@@ -192,6 +195,15 @@ struct SemanticLinker: Sendable {
             }
         }
 
+        // Hub-to-hub links from boosted folder relations (mechanical, no AI)
+        let hubWrites = writeHubToHubLinks(
+            boostPairs: folderRelationStore.boostPairs(),
+            writer: writer,
+            noteNames: noteNames
+        )
+        modifiedFiles.formUnion(hubWrites.modifiedFiles)
+        linksCreated += hubWrites.linksCreated
+
         onProgress?(1.0, "시맨틱 링크 완료: \(notesLinked)개 노트, \(linksCreated)개 링크")
 
         return LinkResult(
@@ -200,6 +212,51 @@ struct SemanticLinker: Sendable {
             linksCreated: linksCreated,
             modifiedFiles: modifiedFiles
         )
+    }
+
+    /// Write reciprocal "related" links between the hub notes of boosted
+    /// folder pairs. Returns the files written and the link count.
+    private func writeHubToHubLinks(
+        boostPairs: [(source: String, target: String, hint: String?)],
+        writer: RelatedNotesWriter,
+        noteNames: Set<String>
+    ) -> (modifiedFiles: Set<String>, linksCreated: Int) {
+        guard !boostPairs.isEmpty else { return ([], 0) }
+
+        let fm = FileManager.default
+        let canonicalRoot = URL(fileURLWithPath: pkmRoot).resolvingSymlinksInPath().path
+        let rootPrefix = canonicalRoot.hasSuffix("/") ? canonicalRoot : canonicalRoot + "/"
+        var modifiedFiles = Set<String>()
+        var linksCreated = 0
+
+        for pair in boostPairs {
+            let sourceName = (pair.source as NSString).lastPathComponent
+            let targetName = (pair.target as NSString).lastPathComponent
+            guard sourceName != targetName else { continue }
+
+            let sourceHub = rootPrefix + pair.source + "/" + sourceName + ".md"
+            let targetHub = rootPrefix + pair.target + "/" + targetName + ".md"
+            guard fm.fileExists(atPath: sourceHub), fm.fileExists(atPath: targetHub) else { continue }
+
+            let context = pair.hint ?? "관련 폴더"
+            do {
+                let forward = [LinkAIFilter.FilteredLink(name: targetName, context: context, relation: "related")]
+                if try writer.writeRelatedNotes(filePath: sourceHub, newLinks: forward, noteNames: noteNames) {
+                    modifiedFiles.insert(sourceHub)
+                    linksCreated += 1
+                }
+                let backward = [LinkAIFilter.FilteredLink(name: sourceName, context: context, relation: "related")]
+                if try writer.writeRelatedNotes(filePath: targetHub, newLinks: backward, noteNames: noteNames) {
+                    modifiedFiles.insert(targetHub)
+                    linksCreated += 1
+                }
+            } catch {
+                NSLog("[SemanticLinker] 허브 링크 기록 실패: %@ <> %@ — %@",
+                      sourceName, targetName, error.localizedDescription)
+            }
+        }
+
+        return (modifiedFiles, linksCreated)
     }
 
     func linkNotes(filePaths: [String], onProgress: ((Double, String) -> Void)? = nil) async -> LinkResult {
@@ -222,7 +279,10 @@ struct SemanticLinker: Sendable {
         let targetNames = Set(filePaths.map {
             (($0 as NSString).lastPathComponent as NSString).deletingPathExtension
         })
-        let targetNotes = allNotes.filter { targetNames.contains($0.name) }
+        // Hub notes are synthesis targets, not link sources
+        let targetNotes = allNotes.filter {
+            targetNames.contains($0.name) && $0.name != $0.folderName
+        }
 
         guard !targetNotes.isEmpty else {
             return LinkResult(tagsNormalized: tagResult, notesLinked: 0, linksCreated: 0)

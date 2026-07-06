@@ -19,6 +19,7 @@ struct LinkCandidateGenerator: Sendable {
         let summary: String
         let tags: [String]
         let score: Double
+        var isHub: Bool = false
     }
 
     struct PreparedIndex {
@@ -172,14 +173,24 @@ struct LinkCandidateGenerator: Sendable {
                 score += 2.0
             }
 
-            // Minimum score threshold for meaningful connections
-            guard score >= 2.0 else { continue }
+            // Hub-centric topology: folder hub notes are first-class link
+            // targets, direct cross-folder note-to-note links need a
+            // stronger signal
+            let otherIsHub = other.name == other.folderName
+            if otherIsHub {
+                score += 1.5
+            }
+
+            let crossFolder = other.folderRelPath != note.folderRelPath
+            let threshold: Double = (crossFolder && !otherIsHub) ? 3.5 : 2.0
+            guard score >= threshold else { continue }
 
             candidates.append(Candidate(
                 name: other.name,
                 summary: other.summary,
                 tags: other.tags,
-                score: score
+                score: score,
+                isHub: otherIsHub
             ))
         }
 
