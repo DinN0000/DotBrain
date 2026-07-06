@@ -75,22 +75,36 @@ struct TopicMatcher: Sendable {
 
     /// Code-level guardrails for AI proposals: members must exist in the note
     /// index (hallucination filter), survive the threshold, and the slug must
-    /// not collide with a live or tombstoned topic.
+    /// not collide with a live or tombstoned topic — or with an earlier
+    /// proposal in the same batch (upsert dedupes by id, so a duplicate would
+    /// silently overwrite the first topic).
     static func validateProposals(
         _ proposals: [TopicMatchResponse.Proposal],
         existingNotePaths: Set<String>,
         existingTopicIds: Set<String>,
         deletedTopicIds: Set<String>
     ) -> [TopicMatchResponse.Proposal] {
-        proposals.compactMap { proposal in
+        var batchIds = Set<String>()
+        return proposals.compactMap { proposal in
             let id = slug(from: proposal.name)
-            guard !deletedTopicIds.contains(id), !existingTopicIds.contains(id) else { return nil }
+            guard !deletedTopicIds.contains(id), !existingTopicIds.contains(id),
+                  !batchIds.contains(id) else { return nil }
             let realMembers = proposal.members.filter { existingNotePaths.contains($0) }
             guard realMembers.count >= newTopicMemberThreshold else { return nil }
+            batchIds.insert(id)
             return TopicMatchResponse.Proposal(
                 name: proposal.name, members: realMembers, keywords: proposal.keywords
             )
         }
+    }
+
+    /// Single-component page filename stem. sanitizeFolderName preserves "/"
+    /// (multi-depth folders), but topic pages live flat in _Wiki/, so slashes
+    /// collapse to "-"; names that sanitize to nothing fall back to the id.
+    static func pageName(from name: String, id: String, pathManager: PKMPathManager) -> String {
+        let flattened = pathManager.sanitizeFolderName(name)
+            .replacingOccurrences(of: "/", with: "-")
+        return flattened.isEmpty ? id : flattened
     }
 
     static func parseResponse(_ text: String) -> TopicMatchResponse? {
@@ -248,11 +262,11 @@ extension TopicMatcher {
         let pathManager = PKMPathManager(root: pkmRoot)
         for proposal in proposals {
             let id = Self.slug(from: proposal.name)
-            let safeName = pathManager.sanitizeFolderName(proposal.name)
-            let pagePath = "_Wiki/\(safeName).md"
+            let pageName = Self.pageName(from: proposal.name, id: id, pathManager: pathManager)
+            let pagePath = "_Wiki/\(pageName).md"
             guard !index.topics.contains(where: { $0.pagePath == pagePath }) else { continue }
             index.topics.append(Topic(
-                id: id, name: safeName, pagePath: pagePath,
+                id: id, name: pageName, pagePath: pagePath,
                 members: proposal.members,
                 keywords: proposal.keywords.map { $0.lowercased() },
                 summary: "", membersHash: "",

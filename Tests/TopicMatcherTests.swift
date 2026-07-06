@@ -69,6 +69,33 @@ final class TopicMatcherTests: XCTestCase {
             existingTopicIds: ["dead-topic"], deletedTopicIds: []).isEmpty)
     }
 
+    func testValidateProposalsDeduplicatesSlugsWithinBatch() {
+        let notes: Set<String> = ["a.md", "b.md", "c.md"]
+        let proposals = [
+            TopicMatchResponse.Proposal(name: "Swift Concurrency", members: Array(notes),
+                                        keywords: []),
+            TopicMatchResponse.Proposal(name: "Swift-Concurrency", members: Array(notes),
+                                        keywords: []),
+        ]
+        let valid = TopicMatcher.validateProposals(
+            proposals, existingNotePaths: notes,
+            existingTopicIds: [], deletedTopicIds: [])
+        XCTAssertEqual(valid.map(\.name), ["Swift Concurrency"], "동일 슬러그는 첫 제안만 생존")
+    }
+
+    // MARK: page name
+
+    func testPageNameFlattensSlashesAndFallsBackToId() {
+        let pm = PKMPathManager(root: "/tmp/vault")
+        XCTAssertEqual(TopicMatcher.pageName(from: "CI/CD", id: "ci-cd", pathManager: pm),
+                       "CI-CD", "슬래시는 단일 파일명 컴포넌트로 평탄화")
+        XCTAssertEqual(TopicMatcher.pageName(from: "Swift Concurrency", id: "swift-concurrency",
+                                             pathManager: pm), "Swift Concurrency")
+        XCTAssertEqual(TopicMatcher.pageName(from: "///", id: "topic", pathManager: pm),
+                       "topic", "전부 소거되면 id로 폴백")
+        XCTAssertEqual(TopicMatcher.pageName(from: "../..", id: "topic", pathManager: pm), "topic")
+    }
+
     // MARK: response parsing
 
     func testParseResponseExtractsJsonFromProse() {
