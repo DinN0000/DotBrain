@@ -162,6 +162,9 @@ struct ResultRow: View {
     let result: ProcessedFileResult
     @State private var isHovered = false
     @State private var isErrorExpanded = false
+    @State private var rowHoverDebouncer = HoverDebouncer()
+    @State private var nameHoverDebouncer = HoverDebouncer()
+    @State private var errorHoverDebouncer = HoverDebouncer()
 
     private var iconName: String {
         switch result.status {
@@ -206,12 +209,15 @@ struct ResultRow: View {
                                 }
                             }
                         }
-                        .onHover { inside in
+                        .debouncedHover(nameHoverDebouncer) { inside in
                             guard result.isSuccess else { return }
                             isHovered = inside
                             if inside { NSCursor.pointingHand.push() } else { NSCursor.pop() }
                         }
-                        .onDisappear { if isHovered { NSCursor.pop() } }
+                        .onDisappear {
+                            nameHoverDebouncer.cancel()
+                            if isHovered { NSCursor.pop() }
+                        }
 
                     switch result.status {
                     case .success:
@@ -256,7 +262,7 @@ struct ResultRow: View {
                                 isErrorExpanded.toggle()
                             }
                         }
-                        .onHover { inside in
+                        .debouncedHover(errorHoverDebouncer) { inside in
                             if inside { NSCursor.pointingHand.push() } else { NSCursor.pop() }
                         }
                     }
@@ -265,6 +271,8 @@ struct ResultRow: View {
                 Spacer()
             }
             .onDisappear {
+                rowHoverDebouncer.cancel()
+                errorHoverDebouncer.cancel()
                 if isHovered { NSCursor.pop() }
             }
 
@@ -288,7 +296,7 @@ struct ResultRow: View {
                 .fill(isHovered ? Color.primary.opacity(0.04) : Color.clear)
         )
         .animation(.easeOut(duration: 0.15), value: isHovered)
-        .onHover { isHovered = $0 }
+        .debouncedHover(rowHoverDebouncer) { isHovered = $0 }
     }
 }
 
@@ -299,6 +307,7 @@ struct ConfirmationRow: View {
     @State private var isConfirming = false
     @State private var showProjectCreate = false
     @State private var newProjectName = ""
+    @State private var hoverDebouncer = HoverDebouncer()
 
     private var sortedOptions: [ClassifyResult] {
         let paraOrder: [PARACategory] = [.project, .area, .resource, .archive]
@@ -435,7 +444,7 @@ struct ConfirmationRow: View {
                 .strokeBorder(Color.primary.opacity(isHovered ? 0.12 : 0), lineWidth: 1)
         )
         .animation(.easeOut(duration: 0.15), value: isHovered)
-        .onHover { isHovered = $0 }
+        .debouncedHover(hoverDebouncer) { isHovered = $0 }
     }
 
     private func createProject() {
@@ -625,6 +634,7 @@ struct AffectedFolderRow: View {
     let healthScore: FolderHealthAnalyzer.HealthScore
     @EnvironmentObject var appState: AppState
     @State private var isHovered = false
+    @State private var hoverDebouncer = HoverDebouncer()
 
     private var healthColor: Color {
         switch healthScore.label {
@@ -700,11 +710,14 @@ struct AffectedFolderRow: View {
         }
         .buttonStyle(.plain)
         .animation(.easeOut(duration: 0.12), value: isHovered)
-        .onHover { inside in
+        .debouncedHover(hoverDebouncer) { inside in
             isHovered = inside
             if inside { NSCursor.pointingHand.push() } else { NSCursor.pop() }
         }
-        .onDisappear { if isHovered { NSCursor.pop() } }
+        .onDisappear {
+            hoverDebouncer.cancel()
+            if isHovered { NSCursor.pop() }
+        }
     }
 }
 
@@ -715,6 +728,7 @@ struct ClickableFileName: View {
     let name: String
     let action: () -> Void
     @State private var isHovered = false
+    @State private var hoverDebouncer = HoverDebouncer()
 
     var body: some View {
         Text(name)
@@ -722,11 +736,14 @@ struct ClickableFileName: View {
             .lineLimit(1)
             .underline(isHovered)
             .onTapGesture(perform: action)
-            .onHover { inside in
+            .debouncedHover(hoverDebouncer) { inside in
                 isHovered = inside
                 if inside { NSCursor.pointingHand.push() } else { NSCursor.pop() }
             }
-            .onDisappear { if isHovered { NSCursor.pop() } }
+            .onDisappear {
+                hoverDebouncer.cancel()
+                if isHovered { NSCursor.pop() }
+            }
             .animation(.easeOut(duration: 0.1), value: isHovered)
     }
 }
@@ -736,6 +753,7 @@ struct HoverPARAButton: View {
     let para: PARACategory
     let action: () -> Void
     @State private var isHovered = false
+    @State private var hoverDebouncer = HoverDebouncer()
 
     var body: some View {
         Button(action: action) {
@@ -749,7 +767,7 @@ struct HoverPARAButton: View {
         .opacity(isHovered ? 1.0 : 0.8)
         .scaleEffect(isHovered ? 1.03 : 1.0)
         .animation(.easeOut(duration: 0.12), value: isHovered)
-        .onHover { isHovered = $0 }
+        .debouncedHover(hoverDebouncer) { isHovered = $0 }
     }
 }
 
@@ -759,6 +777,7 @@ struct HoverTextLink: View {
     let color: Color
     let action: () -> Void
     @State private var isHovered = false
+    @State private var hoverDebouncer = HoverDebouncer()
 
     var body: some View {
         Button(action: action) {
@@ -770,11 +789,14 @@ struct HoverTextLink: View {
         }
         .buttonStyle(.plain)
         .animation(.easeOut(duration: 0.1), value: isHovered)
-        .onHover { inside in
+        .debouncedHover(hoverDebouncer) { inside in
             isHovered = inside
             if inside { NSCursor.pointingHand.push() } else { NSCursor.pop() }
         }
-        .onDisappear { if isHovered { NSCursor.pop() } }
+        .onDisappear {
+            hoverDebouncer.cancel()
+            if isHovered { NSCursor.pop() }
+        }
     }
 }
 
@@ -783,6 +805,7 @@ struct HoverTextButton: View {
     let label: String
     let action: () -> Void
     @State private var isHovered = false
+    @State private var hoverDebouncer = HoverDebouncer()
 
     var body: some View {
         Button(action: action) {
@@ -792,7 +815,7 @@ struct HoverTextButton: View {
         .controlSize(.small)
         .opacity(isHovered ? 1.0 : 0.85)
         .animation(.easeOut(duration: 0.12), value: isHovered)
-        .onHover { isHovered = $0 }
+        .debouncedHover(hoverDebouncer) { isHovered = $0 }
     }
 }
 

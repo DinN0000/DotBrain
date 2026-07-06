@@ -421,6 +421,7 @@ struct DashboardHubCard: View {
     let action: () -> Void
 
     @State private var isHovered = false
+    @State private var hoverDebouncer = HoverDebouncer()
 
     var body: some View {
         Button(action: action) {
@@ -457,7 +458,7 @@ struct DashboardHubCard: View {
         .buttonStyle(.plain)
         .disabled(isDisabled)
         .opacity(isDisabled ? 0.5 : 1)
-        .onHover { isHovered = $0 }
+        .debouncedHover(hoverDebouncer) { isHovered = $0 }
         .animation(.easeOut(duration: 0.15), value: isHovered)
     }
 }

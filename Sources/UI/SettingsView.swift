@@ -19,6 +19,7 @@ struct SettingsView: View {
     @State private var updateError: String?
     @State private var updateIconRotation: Double = 0
     @State private var updateCheckHovered = false
+    @State private var updateCheckHoverDebouncer = HoverDebouncer()
     @State private var isUpdateAnimating = false
     @State private var fdaGranted = false
 
@@ -613,7 +614,7 @@ struct SettingsView: View {
                 .buttonStyle(.plain)
                 .foregroundColor(.accentColor)
                 .disabled(isCheckingUpdate)
-                .onHover { updateCheckHovered = $0 }
+                .debouncedHover(updateCheckHoverDebouncer) { updateCheckHovered = $0 }
                 .animation(.easeInOut(duration: 0.15), value: updateCheckHovered)
             }
 

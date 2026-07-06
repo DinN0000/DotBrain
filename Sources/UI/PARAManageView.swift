@@ -727,6 +727,7 @@ private struct PARAFolderRow: View {
     let summary: String
     let category: PARACategory
     @State private var isHovered = false
+    @State private var hoverDebouncer = HoverDebouncer()
 
     var body: some View {
         HStack(spacing: 8) {
@@ -767,7 +768,7 @@ private struct PARAFolderRow: View {
                 .fill(isHovered ? Color.primary.opacity(0.04) : Color.primary.opacity(0.02))
         )
         .animation(.easeOut(duration: 0.12), value: isHovered)
-        .onHover { isHovered = $0 }
+        .debouncedHover(hoverDebouncer) { isHovered = $0 }
     }
 }
 
@@ -778,6 +779,7 @@ private struct CategoryHeaderView: View {
     let count: Int
     let onTap: () -> Void
     @State private var isHovered = false
+    @State private var hoverDebouncer = HoverDebouncer()
 
     var body: some View {
         HStack(spacing: 4) {
@@ -802,7 +804,7 @@ private struct CategoryHeaderView: View {
         )
         .contentShape(Rectangle())
         .onTapGesture { onTap() }
-        .onHover { isHovered = $0 }
+        .debouncedHover(hoverDebouncer) { isHovered = $0 }
         .animation(.easeOut(duration: 0.12), value: isHovered)
     }
 }

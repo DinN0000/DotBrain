@@ -1070,6 +1070,7 @@ private struct VaultFolderRow: View {
     let folder: VaultInspectorView.FolderInfo
     let action: () -> Void
     @State private var isHovered = false
+    @State private var hoverDebouncer = HoverDebouncer()
 
     private var hasIssue: Bool {
         folder.healthLabel != "pending" &&
@@ -1151,6 +1152,6 @@ private struct VaultFolderRow: View {
         .contentShape(Rectangle())
         .onTapGesture { action() }
         .animation(.easeOut(duration: 0.12), value: isHovered)
-        .onHover { isHovered = $0 }
+        .debouncedHover(hoverDebouncer) { isHovered = $0 }
     }
 }

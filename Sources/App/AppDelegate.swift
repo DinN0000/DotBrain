@@ -6,7 +6,7 @@ import SwiftUI
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem?
-    private var popover: NSPopover?
+    private var popoverLifecycle: PopoverLifecycle?
     private let appState = AppState.shared
     private var cancellables = Set<AnyCancellable>()
 
@@ -58,14 +58,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func setupPopover() {
-        let popover = NSPopover()
-        popover.contentSize = NSSize(width: 360, height: 480)
-        popover.behavior = .transient
-        popover.contentViewController = NSHostingController(
-            rootView: MenuBarPopover()
-                .environmentObject(appState)
-        )
-        self.popover = popover
+        let appState = self.appState
+        popoverLifecycle = PopoverLifecycle(makeContent: {
+            NSHostingController(
+                rootView: MenuBarPopover()
+                    .environmentObject(appState)
+            )
+        })
     }
 
     private func observeStateForIcon() {
@@ -124,7 +123,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func togglePopover() {
-        guard let popover = popover else { return }
+        guard let popover = popoverLifecycle?.popover else { return }
 
         if popover.isShown {
             popover.performClose(nil)
@@ -134,9 +133,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func openPopover() {
-        guard let popover = popover, let button = statusItem?.button, !popover.isShown else { return }
+        guard let lifecycle = popoverLifecycle, let button = statusItem?.button,
+              !lifecycle.popover.isShown else { return }
 
-        popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+        lifecycle.prepareForShow()
+        lifecycle.popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
         NSApp.activate(ignoringOtherApps: true)
 
         Task {

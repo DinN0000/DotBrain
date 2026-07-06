@@ -7,6 +7,7 @@ struct InboxStatusView: View {
     @State private var dropFeedback: String?
     @State private var bounceAnimation = false
     @State private var isButtonHovered = false
+    @State private var buttonHoverDebouncer = HoverDebouncer()
     @State private var isBounceAnimating = false
     @State private var cachedInboxFiles: [URL] = []
     @State private var showClearConfirmation = false
@@ -278,7 +279,7 @@ struct InboxStatusView: View {
             .padding(.horizontal, 24)
             .scaleEffect(isButtonHovered ? 1.02 : 1.0)
             .animation(.easeOut(duration: 0.1), value: isButtonHovered)
-            .onHover { isButtonHovered = $0 }
+            .debouncedHover(buttonHoverDebouncer) { isButtonHovered = $0 }
             .disabled(!appState.hasAPIKey)
 
             if !appState.hasAPIKey {
