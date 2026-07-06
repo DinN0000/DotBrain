@@ -6,7 +6,7 @@ import Foundation
 enum AICompanionService {
 
     /// Bump this when companion file content changes — triggers overwrite on existing vaults
-    static let version = 16
+    static let version = 17
 
     /// Generate all AI companion files in the PKM root (first-time only)
     static func generateAll(pkmRoot: String) throws {
@@ -226,6 +226,15 @@ enum AICompanionService {
     - 폴더별 요약 태그 포함
     - 파일 분류/이동 시 자동으로 갱신됨
     - 볼트 전체를 파악하려면 개별 파일 대신 이 인덱스를 먼저 읽으세요
+
+    ---
+
+    ## 주제 위키 (_Wiki/)
+
+    - `_Wiki/` 주제 페이지 = DotBrain이 여러 노트를 종합한 최신 이해 (## 현재 이해 / ## 모순 / ## 노후 / ## 타임라인 / ## 멤버 노트)
+    - 조사 시 개별 노트보다 주제 페이지의 "현재 이해"를 먼저 읽을 것
+    - `.meta/topic-index.json` — 주제 카탈로그 (id, 멤버, 요약)
+    - 마커(<!-- DotBrain:start/end -->) 안은 DotBrain 관리 영역 — 수정 금지, 마커 밖은 자유
 
     ---
 
@@ -607,6 +616,13 @@ enum AICompanionService {
     - `[[위키링크]]` 형식 사용
     - context는 `"~하려면"`, `"~할 때"`, `"~와 비교할 때"` 형식으로 작성
     - 자기 자신은 포함하지 않음
+
+    ## 주제 위키 (_Wiki/)
+
+    - `_Wiki/` 주제 페이지 = DotBrain이 여러 노트를 종합한 최신 이해 (## 현재 이해 / ## 모순 / ## 노후 / ## 타임라인 / ## 멤버 노트)
+    - 조사 시 개별 노트보다 주제 페이지의 "현재 이해"를 먼저 읽을 것
+    - `.meta/topic-index.json` — 주제 카탈로그 (id, 멤버, 요약)
+    - 마커(<!-- DotBrain:start/end -->) 안은 DotBrain 관리 영역 — 수정 금지, 마커 밖은 자유
 
     ## 금지 사항
 
