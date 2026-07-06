@@ -2,6 +2,76 @@ import XCTest
 @testable import DotBrain
 
 final class NoteIndexGeneratorTests: XCTestCase {
+
+    // MARK: - Folder summary from entity page
+
+    private func makeVault() throws -> URL {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("DotBrain-NoteIndexSummaryTests-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(
+            at: root.appendingPathComponent("1_Project/X"),
+            withIntermediateDirectories: true
+        )
+        return root
+    }
+
+    private func writeMemberNotes(in folder: URL) throws {
+        let a = "---\npara: project\ntags: [\"one\"]\nsummary: 노트 A 요약\n---\n본문 A"
+        let b = "---\npara: project\ntags: [\"two\"]\nsummary: 노트 B 요약\n---\n본문 B"
+        try a.write(to: folder.appendingPathComponent("a.md"), atomically: true, encoding: .utf8)
+        try b.write(to: folder.appendingPathComponent("b.md"), atomically: true, encoding: .utf8)
+    }
+
+    func testFolderSummaryComesFromEntityPageOverview() async throws {
+        let root = try makeVault()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let folder = root.appendingPathComponent("1_Project/X")
+        try writeMemberNotes(in: folder)
+
+        let entityPage = """
+        ---
+        para: project
+        summary: 프론트매터 요약
+        ---
+        \(FolderNotePage.markerStart)
+        <!-- dotbrain-synthesis-hash: h1 -->
+        ## 개요
+        지갑 연결 Kit 프로젝트. Phase 2 진행 중.
+
+        ### 핵심 노트
+        - [[a]] — 문제 정의
+        \(FolderNotePage.markerEnd)
+        """
+        try entityPage.write(to: folder.appendingPathComponent("X.md"), atomically: true, encoding: .utf8)
+
+        await NoteIndexGenerator(pkmRoot: root.path).updateForFolders([folder.path])
+
+        let indexURL = root.appendingPathComponent(".meta/note-index.json")
+        let index = try JSONDecoder().decode(NoteIndex.self, from: Data(contentsOf: indexURL))
+        XCTAssertEqual(
+            index.folders["1_Project/X"]?.summary,
+            "지갑 연결 Kit 프로젝트. Phase 2 진행 중.",
+            "folder summary must come from the entity page overview"
+        )
+    }
+
+    func testFolderSummaryFallsBackToNoteSummariesWithoutMarkers() async throws {
+        let root = try makeVault()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let folder = root.appendingPathComponent("1_Project/X")
+        try writeMemberNotes(in: folder)
+
+        await NoteIndexGenerator(pkmRoot: root.path).updateForFolders([folder.path])
+
+        let indexURL = root.appendingPathComponent(".meta/note-index.json")
+        let index = try JSONDecoder().decode(NoteIndex.self, from: Data(contentsOf: indexURL))
+        XCTAssertEqual(
+            index.folders["1_Project/X"]?.summary,
+            "노트 A 요약; 노트 B 요약",
+            "without markers the prefix(3) summary join must be preserved"
+        )
+    }
+
     func testPruneStaleRemovesEntriesForDeletedFolders() async throws {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("DotBrain-NoteIndexPruneTests-\(UUID().uuidString)")

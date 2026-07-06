@@ -267,6 +267,8 @@ struct NoteIndexGenerator: Sendable {
         }
 
         let relFolder = relativePath(folderPath)
+        let folderNoteFileName = "\(folderName).md".precomposedStringWithCanonicalMapping
+        var folderNoteContent: String?
         var noteEntries: [(String, NoteIndexEntry)] = []
         var tagCounts: [String: Int] = [:]
         var summaries: [String] = []
@@ -278,16 +280,26 @@ struct NoteIndexGenerator: Sendable {
                   !entry.hasPrefix("_") else { continue }
 
             let filePath = (folderPath as NSString).appendingPathComponent(entry)
-            guard let handle = FileHandle(forReadingAtPath: filePath) else { continue }
-            let data = handle.readData(ofLength: 4096)
-            handle.closeFile()
-            // readData may cut in the middle of a multi-byte UTF-8 character;
-            // try trimming up to 3 trailing bytes to recover a valid string
+            let isFolderNote = entry.precomposedStringWithCanonicalMapping == folderNoteFileName
+
             var content: String?
-            for trim in 0...min(3, data.count) {
-                if let s = String(data: data.dropLast(trim), encoding: .utf8) {
-                    content = s
-                    break
+            if isFolderNote {
+                // Entity page: the marker section may sit past the 4KB window,
+                // so this one file is read in full for overview extraction
+                content = try? String(contentsOfFile: filePath, encoding: .utf8)
+                folderNoteContent = content
+            }
+            if content == nil {
+                guard let handle = FileHandle(forReadingAtPath: filePath) else { continue }
+                let data = handle.readData(ofLength: 4096)
+                handle.closeFile()
+                // readData may cut in the middle of a multi-byte UTF-8 character;
+                // try trimming up to 3 trailing bytes to recover a valid string
+                for trim in 0...min(3, data.count) {
+                    if let s = String(data: data.dropLast(trim), encoding: .utf8) {
+                        content = s
+                        break
+                    }
                 }
             }
             guard let content else { continue }
@@ -327,9 +339,12 @@ struct NoteIndexGenerator: Sendable {
             .prefix(10)
             .map { $0.key }
 
-        // Folder summary: combine first few note summaries or use count
+        // Folder summary: entity page overview wins; otherwise combine first
+        // few note summaries or use count
         let folderSummary: String
-        if noteEntries.isEmpty {
+        if let folderNoteContent, let overview = FolderNotePage.overview(from: folderNoteContent) {
+            folderSummary = overview
+        } else if noteEntries.isEmpty {
             folderSummary = "\(folderName) (\(para.rawValue))"
         } else if summaries.isEmpty {
             folderSummary = "\(noteEntries.count) notes"
