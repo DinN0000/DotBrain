@@ -1,5 +1,17 @@
 import Foundation
 
+/// Prompt-context inputs shared by Stage 1 and Stage 2 classification.
+/// Adding a new prompt ingredient = one field here, consumed in
+/// buildSystemPrompt — call sites without it are untouched.
+struct ClassificationContext {
+    var projectContext: String
+    var subfolderContext: String
+    var weightedContext: String = ""
+    var areaContext: String = ""
+    var tagVocabulary: String = "[]"
+    var correctionContext: String = ""
+}
+
 /// 2-stage document classifier (Fast batch → Precise for uncertain)
 /// Supports Claude (Haiku/Sonnet) and Gemini (Flash/Pro)
 actor Classifier {
@@ -46,13 +58,8 @@ actor Classifier {
     /// Classify files using 2-stage approach
     func classifyFiles(
         _ files: [ClassifyInput],
-        projectContext: String,
-        subfolderContext: String,
+        context: ClassificationContext,
         projectNames: [String],
-        weightedContext: String = "",
-        areaContext: String = "",
-        tagVocabulary: String = "[]",
-        correctionContext: String = "",
         pkmRoot: String = "",
         userGuidance: String? = nil,
         forcedCategory: PARACategory? = nil,
@@ -65,12 +72,7 @@ actor Classifier {
 
         // Build system prompt once for prompt caching (shared across Stage 1 and Stage 2)
         let systemPrompt = buildSystemPrompt(
-            projectContext: projectContext,
-            subfolderContext: subfolderContext,
-            weightedContext: weightedContext,
-            areaContext: areaContext,
-            tagVocabulary: tagVocabulary,
-            correctionContext: correctionContext,
+            context: context,
             userGuidance: userGuidance,
             forcedCategory: forcedCategory
         )
@@ -490,12 +492,7 @@ actor Classifier {
     /// Contains role instruction, vault context, classification rules.
     /// Called once per classify batch for prompt caching.
     private func buildSystemPrompt(
-        projectContext: String,
-        subfolderContext: String,
-        weightedContext: String,
-        areaContext: String,
-        tagVocabulary: String,
-        correctionContext: String,
+        context: ClassificationContext,
         userGuidance: String?,
         forcedCategory: PARACategory?
     ) -> String {
@@ -504,7 +501,7 @@ actor Classifier {
             forcedCategory: forcedCategory
         )
 
-        let weightedSection = weightedContext.isEmpty ? "" : """
+        let weightedSection = context.weightedContext.isEmpty ? "" : """
 
         ## 기존 문서 맥락 (가중치 기반)
         아래 기존 문서 정보를 참고하여, 새 문서가 기존 문서와 태그나 주제가 겹치면 같은 카테고리/폴더로 분류하세요.
@@ -512,24 +509,24 @@ actor Classifier {
         (중간) Area/Resource 문서와 겹치면 → 해당 폴더 연결 가중치 중간
         (낮음) Archive는 참고만 (낮은 가중치)
 
-        \(weightedContext)
+        \(context.weightedContext)
 
         """
 
-        let tagSection = tagVocabulary == "[]" ? "" : """
+        let tagSection = context.tagVocabulary == "[]" ? "" : """
 
         ## 기존 태그 참고
         볼트에서 사용 중인 태그입니다. 동일한 개념이면 아래 표기를 그대로 따르세요.
         새로운 개념의 태그는 자유롭게 생성해도 됩니다.
-        \(tagVocabulary)
+        \(context.tagVocabulary)
 
         """
 
-        let areaSection = areaContext.isEmpty ? "" : """
+        let areaSection = context.areaContext.isEmpty ? "" : """
 
         ## Area(도메인) 목록
         아래 등록된 도메인과 소속 프로젝트를 참고하세요. Area는 지속적으로 책임지고 관리·갱신하는 영역이며, 여러 프로젝트를 묶는 상위 영역이기도 합니다.
-        \(areaContext)
+        \(context.areaContext)
 
         """
 
@@ -537,13 +534,13 @@ actor Classifier {
         당신은 PARA 방법론 기반 문서 분류 전문가입니다.
         \(directiveSection)
         ## 활성 프로젝트 목록
-        \(projectContext)
+        \(context.projectContext)
         \(areaSection)
         ## 기존 하위 폴더 (이 목록의 정확한 이름만 사용)
-        \(subfolderContext)
+        \(context.subfolderContext)
         각 폴더의 name, tags, summary, noteCount를 참고하여 가장 적합한 폴더를 선택하세요.
         새 폴더가 필요하면 targetFolder에 "NEW:폴더명"을 사용하세요. 기존 폴더와 비슷한 이름이 있으면 반드시 기존 이름을 사용하세요.
-        \(weightedSection)\(tagSection)\(correctionContext.isEmpty ? "" : "\n\(correctionContext)\n")
+        \(weightedSection)\(tagSection)\(context.correctionContext.isEmpty ? "" : "\n\(context.correctionContext)\n")
         ## 분류 규칙
 
         | para | 조건 | 예시 | project 필드 |

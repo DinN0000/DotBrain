@@ -62,13 +62,15 @@ struct ManualPlacementRepairer: Sendable {
         do {
             classifications = try await Classifier().classifyFiles(
                 inputs,
-                projectContext: projectContext,
-                subfolderContext: subfolderContext,
+                context: ClassificationContext(
+                    projectContext: projectContext,
+                    subfolderContext: subfolderContext,
+                    weightedContext: weightedContext,
+                    areaContext: areaContext,
+                    tagVocabulary: tagVocabulary,
+                    correctionContext: correctionContext
+                ),
                 projectNames: projectNames,
-                weightedContext: weightedContext,
-                areaContext: areaContext,
-                tagVocabulary: tagVocabulary,
-                correctionContext: correctionContext,
                 pkmRoot: pkmRoot,
                 onProgress: { progress, status in
                     onProgress?(0.30 + progress * 0.45, status)

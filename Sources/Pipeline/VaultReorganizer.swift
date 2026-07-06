@@ -119,12 +119,14 @@ struct VaultReorganizer {
         let correctionContext = CorrectionMemory.buildPromptContext(pkmRoot: pkmRoot)
         let classifications = try await classifier.classifyFiles(
             inputs,
-            projectContext: projectContext,
-            subfolderContext: subfolderContext,
+            context: ClassificationContext(
+                projectContext: projectContext,
+                subfolderContext: subfolderContext,
+                weightedContext: weightedContext,
+                areaContext: areaContext,
+                correctionContext: correctionContext
+            ),
             projectNames: projectNames,
-            weightedContext: weightedContext,
-            areaContext: areaContext,
-            correctionContext: correctionContext,
             pkmRoot: pkmRoot,
             onProgress: { [onProgress] progress, status in
                 let mapped = 0.4 + progress * 0.5

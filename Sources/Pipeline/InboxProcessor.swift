@@ -302,13 +302,15 @@ struct InboxProcessor {
         } else {
             textClassifications = try await classifier.classifyFiles(
                 textInputs,
-                projectContext: projectContext,
-                subfolderContext: subfolderContext,
+                context: ClassificationContext(
+                    projectContext: projectContext,
+                    subfolderContext: subfolderContext,
+                    weightedContext: weightedContext,
+                    areaContext: areaContext,
+                    tagVocabulary: tagVocabulary,
+                    correctionContext: correctionContext
+                ),
                 projectNames: projectNames,
-                weightedContext: weightedContext,
-                areaContext: areaContext,
-                tagVocabulary: tagVocabulary,
-                correctionContext: correctionContext,
                 pkmRoot: pkmRoot,
                 userGuidance: userGuidance,
                 forcedCategory: forcedDestination?.categoryConstraint,

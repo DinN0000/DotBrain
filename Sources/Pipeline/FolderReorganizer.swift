@@ -111,11 +111,13 @@ struct FolderReorganizer {
         let correctionContext = CorrectionMemory.buildPromptContext(pkmRoot: pkmRoot)
         let classifications = try await classifier.classifyFiles(
             inputs,
-            projectContext: projectContext,
-            subfolderContext: subfolderContext,
+            context: ClassificationContext(
+                projectContext: projectContext,
+                subfolderContext: subfolderContext,
+                weightedContext: weightedContext,
+                correctionContext: correctionContext
+            ),
             projectNames: projectNames,
-            weightedContext: weightedContext,
-            correctionContext: correctionContext,
             pkmRoot: pkmRoot,
             onProgress: { [onProgress] progress, status in
                 let mappedProgress = 0.3 + progress * 0.4
