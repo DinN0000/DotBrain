@@ -71,6 +71,22 @@ struct InboxPostProcessingPipeline {
             }
         }
 
+        // Topic synthesis — the topic-level compounding point: new notes
+        // revise cross-folder topic understanding (_Wiki pages)
+        if !mdPaths.isEmpty && !Task.isCancelled {
+            onProgress?(Progress(fraction: 0.88, phase: "주제 페이지 갱신 중..."))
+            let outcome = await TopicMatcher(pkmRoot: pkmRoot).assign(newNotePaths: mdPaths)
+            if !outcome.affectedTopicIds.isEmpty {
+                let relChanged = Set(mdPaths.compactMap {
+                    TopicMatcher.relativePath($0, pkmRoot: pkmRoot)
+                })
+                _ = await TopicSynthesizer(pkmRoot: pkmRoot).synthesize(
+                    topicIds: outcome.affectedTopicIds,
+                    changedNotePaths: relChanged
+                )
+            }
+        }
+
         // Skip the hash save on cancellation — persisting stale hashes here
         // would overwrite what a newer pipeline has already recorded
         if (!mdPaths.isEmpty || !synthesized.isEmpty) && !Task.isCancelled {
