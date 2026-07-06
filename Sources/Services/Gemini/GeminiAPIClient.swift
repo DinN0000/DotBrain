@@ -67,6 +67,7 @@ actor GeminiAPIClient {
 
         struct Candidate: Decodable {
             let content: Content?
+            let finishReason: String?
 
             struct Content: Decodable {
                 let parts: [Part]?
@@ -183,6 +184,11 @@ actor GeminiAPIClient {
             )
         }
 
+        if geminiResponse.candidates?.first?.finishReason == "MAX_TOKENS" {
+            // A truncated JSON payload must not be parsed as a normal response
+            throw GeminiAPIError.truncated
+        }
+
         let text = geminiResponse.text
         if text.isEmpty {
             throw GeminiAPIError.emptyResponse
@@ -206,6 +212,7 @@ enum GeminiAPIError: LocalizedError, RetryClassifiable {
     case invalidURL
     case invalidResponse
     case emptyResponse
+    case truncated
     case httpError(status: Int)
     case apiError(status: Int, message: String)
 
@@ -219,6 +226,8 @@ enum GeminiAPIError: LocalizedError, RetryClassifiable {
             return "잘못된 응답"
         case .emptyResponse:
             return "빈 응답"
+        case .truncated:
+            return "응답이 max_tokens 한도에서 잘렸습니다"
         case .httpError(let status):
             return "HTTP 오류: \(status)"
         case .apiError(_, let message):

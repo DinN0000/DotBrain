@@ -172,7 +172,7 @@ actor APIUsageLogger {
             encoder.dateEncodingStrategy = .iso8601
             encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
             let data = try encoder.encode(entries)
-            try data.write(to: URL(fileURLWithPath: logPath))
+            try data.write(to: URL(fileURLWithPath: logPath), options: .atomic)
         } catch {
             // Silently fail -- logging is best-effort
         }

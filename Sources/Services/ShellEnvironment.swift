@@ -46,6 +46,9 @@ enum ShellEnvironment {
             let timeout = scheduleTermination(of: process, after: .seconds(5))
             defer { timeout.cancel() }
 
+            // Read before waiting: a child writing more than the 64KB pipe
+            // buffer blocks forever if nobody drains it before waitUntilExit
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()
             process.waitUntilExit()
 
             guard process.terminationStatus == 0 else {
@@ -53,7 +56,6 @@ enum ShellEnvironment {
                 return baseEnv
             }
 
-            let data = pipe.fileHandleForReading.readDataToEndOfFile()
             let output = String(data: data, encoding: .utf8) ?? ""
 
             var env = baseEnv
@@ -92,11 +94,12 @@ enum ShellEnvironment {
             let timeout = scheduleTermination(of: process, after: .seconds(5))
             defer { timeout.cancel() }
 
+            // Read before waiting (see loadUserEnvironment)
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()
             process.waitUntilExit()
 
             guard process.terminationStatus == 0 else { return nil }
 
-            let data = pipe.fileHandleForReading.readDataToEndOfFile()
             let output = String(data: data, encoding: .utf8)?
                 .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
 
@@ -122,13 +125,31 @@ enum ShellEnvironment {
         errorFactory: (Int32, String) -> Error,
         emptyErrorFactory: () -> Error
     ) throws -> String {
-        let outputData = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
-        let errorData = stderrPipe.fileHandleForReading.readDataToEndOfFile()
+        // Drain stderr concurrently while stdout is read — sequential reads
+        // deadlock when the child fills the 64KB stderr pipe buffer before
+        // closing stdout
+        let errorLock = NSLock()
+        var errorData = Data()
+        stderrPipe.fileHandleForReading.readabilityHandler = { handle in
+            let chunk = handle.availableData
+            if chunk.isEmpty {
+                handle.readabilityHandler = nil
+            } else {
+                errorLock.withLock { errorData.append(chunk) }
+            }
+        }
 
+        let outputData = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
         process.waitUntilExit()
 
+        stderrPipe.fileHandleForReading.readabilityHandler = nil
+        if let tail = try? stderrPipe.fileHandleForReading.readToEnd(), !tail.isEmpty {
+            errorLock.withLock { errorData.append(tail) }
+        }
+
         if process.terminationStatus != 0 {
-            let errorOutput = String(data: errorData, encoding: .utf8) ?? ""
+            let snapshot = errorLock.withLock { errorData }
+            let errorOutput = String(data: snapshot, encoding: .utf8) ?? ""
             throw errorFactory(process.terminationStatus, String(errorOutput.prefix(500)))
         }
 

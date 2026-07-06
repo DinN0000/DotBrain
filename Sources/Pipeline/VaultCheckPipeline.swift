@@ -39,7 +39,7 @@ struct VaultCheckPipeline {
         let pm = PKMPathManager(root: pkmRoot)
         let existingFolders = Self.collectExistingFolders(pm: pm)
         FolderRelationStore(pkmRoot: pkmRoot).pruneStale(existingFolders: existingFolders)
-        NoteIndexGenerator(pkmRoot: pkmRoot).pruneStale(existingFolders: existingFolders)
+        await NoteIndexGenerator(pkmRoot: pkmRoot).pruneStale(existingFolders: existingFolders)
 
         // Phase 2: Repair (10% -> 20%)
         var repairedFiles: [String] = []
@@ -91,6 +91,10 @@ struct VaultCheckPipeline {
             var index = 0
 
             while index < filesToEnrich.count || !group.isEmpty {
+                if Task.isCancelled {
+                    group.cancelAll()
+                    break
+                }
                 while active < 3 && index < filesToEnrich.count {
                     let path = filesToEnrich[index]
                     index += 1
@@ -143,7 +147,11 @@ struct VaultCheckPipeline {
         let currentSnapshot = linkDetector.buildCurrentSnapshot(allNotes: allNotesForSnapshot)
 
         if let prev = previousSnapshot {
-            let noteInfoMap = Dictionary(uniqueKeysWithValues: allNotesForSnapshot.map { ($0.name, $0) })
+            // uniquingKeysWith: same-named notes in different folders must not trap
+            let noteInfoMap = Dictionary(
+                allNotesForSnapshot.map { ($0.name, $0) },
+                uniquingKeysWith: { first, _ in first }
+            )
             let removals = linkDetector.detectRemovals(
                 previous: prev, current: currentSnapshot, noteInfoMap: noteInfoMap
             )
@@ -173,8 +181,10 @@ struct VaultCheckPipeline {
         let finalSnapshot = linkDetector.buildCurrentSnapshot(allNotes: allNotesForSnapshot)
         linkDetector.saveSnapshot(finalSnapshot)
 
-        // Update hashes for all changed files (including index/SemanticLinker modifications) and save
-        await cache.updateHashes(Array(allChangedFiles))
+        // Update hashes for all changed files plus everything the linker and
+        // tag normalizer wrote — unhashed writes trigger pointless AI
+        // re-processing on the next check
+        await cache.updateHashes(Array(allChangedFiles.union(linkResult.modifiedFiles)))
         await cache.save()
 
         StatisticsService.recordActivity(
@@ -216,7 +226,9 @@ struct VaultCheckPipeline {
         return Array(files)
     }
 
-    /// Collect all existing folder relative paths (for pruning stale relations)
+    /// Collect all existing folder relative paths (for pruning stale relations).
+    /// Recurses into nested subfolders (vault allows depth 3) — a depth-1 scan
+    /// would mark live nested folders as stale and prune their index entries.
     private static func collectExistingFolders(pm: PKMPathManager) -> Set<String> {
         let fm = FileManager.default
         let canonicalRoot = URL(fileURLWithPath: pm.root).resolvingSymlinksInPath().path
@@ -224,12 +236,16 @@ struct VaultCheckPipeline {
         var folders = Set<String>()
 
         for basePath in [pm.projectsPath, pm.areaPath, pm.resourcePath, pm.archivePath] {
-            guard let entries = try? fm.contentsOfDirectory(atPath: basePath) else { continue }
-            for entry in entries {
-                guard !entry.hasPrefix("."), !entry.hasPrefix("_") else { continue }
-                let folderPath = (basePath as NSString).appendingPathComponent(entry)
+            guard let enumerator = fm.enumerator(atPath: basePath) else { continue }
+            while let element = enumerator.nextObject() as? String {
+                let name = (element as NSString).lastPathComponent
+                let folderPath = (basePath as NSString).appendingPathComponent(element)
                 var isDir: ObjCBool = false
                 guard fm.fileExists(atPath: folderPath, isDirectory: &isDir), isDir.boolValue else { continue }
+                if name.hasPrefix(".") || name.hasPrefix("_") {
+                    enumerator.skipDescendants()
+                    continue
+                }
                 let canonical = URL(fileURLWithPath: folderPath).resolvingSymlinksInPath().path
                 if canonical.hasPrefix(rootPrefix) {
                     folders.insert(String(canonical.dropFirst(rootPrefix.count))

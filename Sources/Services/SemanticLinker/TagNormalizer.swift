@@ -10,6 +10,9 @@ struct TagNormalizer: Sendable {
     struct Result {
         var filesModified: Int = 0
         var tagsAdded: Int = 0
+        /// Paths written by this run — callers must re-hash these in
+        /// ContentHashCache or the next vault check re-processes them
+        var modifiedFiles: [String] = []
     }
 
     func normalize() throws -> Result {
@@ -36,6 +39,7 @@ struct TagNormalizer: Sendable {
                     if try addTagIfMissing(filePath: filePath, content: content, tag: project) {
                         result.filesModified += 1
                         result.tagsAdded += 1
+                        result.modifiedFiles.append(filePath)
                     }
                 }
             }
@@ -65,6 +69,7 @@ struct TagNormalizer: Sendable {
                     if try addTagIfMissing(filePath: filePath, content: content, tag: projectName) {
                         result.filesModified += 1
                         result.tagsAdded += 1
+                        result.modifiedFiles.append(filePath)
                     }
                 }
             }

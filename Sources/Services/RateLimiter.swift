@@ -48,16 +48,25 @@ actor RateLimiter {
 
     /// Wait until it's safe to make an API request for the given provider.
     /// Selects the earliest available slot and reserves it.
+    ///
+    /// State copied before an await must never be written back afterwards:
+    /// another task can extend the backoff or reserve slots during the
+    /// suspension, and a stale write would erase that (429 storms).
     func acquire(for provider: AIProvider) async {
-        var ps = getState(for: provider)
-
-        // Wait for backoff period if active, then clear it
-        if let backoffUntil = ps.backoffUntil, ContinuousClock.now < backoffUntil {
-            let waitTime = backoffUntil - ContinuousClock.now
+        // Wait out the backoff, re-reading state on every wake so extensions
+        // by concurrent recordFailure calls are honored
+        while let backoffUntil = getState(for: provider).backoffUntil {
+            let now = ContinuousClock.now
+            if now >= backoffUntil { break }
+            let waitTime = backoffUntil - now
             NSLog("[RateLimiter] %@ backoff 대기: %@", provider.rawValue, "\(waitTime)")
             try? await Task.sleep(for: waitTime)
+        }
+
+        // Fresh read; no await between here and the slot reservation commit
+        var ps = getState(for: provider)
+        if let backoffUntil = ps.backoffUntil, ContinuousClock.now >= backoffUntil {
             ps.backoffUntil = nil
-            state[provider] = ps
         }
 
         // Find the slot with the earliest available time
@@ -76,7 +85,7 @@ actor RateLimiter {
         ps.slotNextAvailable[earliestIndex] = waitUntil + ps.minInterval
         state[provider] = ps
 
-        // Sleep if needed
+        // Sleep if needed (no state writes after this suspension)
         let sleepDuration = waitUntil - now
         if sleepDuration > .zero {
             try? await Task.sleep(for: sleepDuration)

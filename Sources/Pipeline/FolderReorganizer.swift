@@ -125,11 +125,41 @@ struct FolderReorganizer {
 
         // Compare and process
         onPhaseChange?(.processing)
+        var needsConfirmation: [PendingConfirmation] = []
         for (i, (classification, input)) in zip(classifications, inputs).enumerated() {
             if Task.isCancelled { throw CancellationError() }
             let progress = 0.7 + Double(i) / Double(max(classifications.count, 1)) * 0.25
             onProgress?(progress, "\(input.fileName) 처리 중...")
             onFileProgress?(i, inputs.count, input.fileName)
+
+            // Low confidence (including confidence-0 AI failure fallbacks):
+            // never auto-move — ask the user, keep the file in place
+            if classification.confidence < 0.5 {
+                needsConfirmation.append(PendingConfirmation(
+                    fileName: input.fileName,
+                    filePath: input.filePath,
+                    content: String(input.content.prefix(500)),
+                    options: InboxProcessor.generateOptions(for: classification, projectNames: projectNames)
+                ))
+                continue
+            }
+
+            // Never create new project folders from reorganization (same rule
+            // as VaultReorganizer) — ask the user instead
+            if classification.para == .project && classification.project == nil {
+                needsConfirmation.append(PendingConfirmation(
+                    fileName: input.fileName,
+                    filePath: input.filePath,
+                    content: String(input.content.prefix(500)),
+                    options: InboxProcessor.generateUnmatchedProjectOptions(
+                        for: classification,
+                        projectNames: projectNames
+                    ),
+                    reason: .unmatchedProject,
+                    suggestedProjectName: classification.suggestedProject ?? ""
+                ))
+                continue
+            }
 
             let currentCategory = category
             let currentFolder = subfolder
@@ -138,6 +168,19 @@ struct FolderReorganizer {
             let targetCategory = classification.para
 
             let locationMatches = targetCategory == currentCategory && targetFolder == currentFolder
+
+            // A normal response with an empty targetFolder would move the file
+            // to the bare category root — keep it in place instead
+            if !locationMatches && targetFolder.isEmpty && targetCategory != .project {
+                processed.append(ProcessedFileResult(
+                    fileName: input.fileName,
+                    para: classification.para,
+                    targetPath: input.filePath,
+                    tags: classification.tags,
+                    status: .error("대상 폴더 미확정 — 원위치 유지")
+                ))
+                continue
+            }
 
             if locationMatches {
                 // Location correct — replace frontmatter with DotBrain format
@@ -244,7 +287,7 @@ struct FolderReorganizer {
 
         return Result(
             processed: processed,
-            needsConfirmation: [],
+            needsConfirmation: needsConfirmation,
             total: files.count
         )
     }

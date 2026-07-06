@@ -81,32 +81,46 @@ enum KeychainService {
         return SymmetricKey(data: hash)
     }
 
-    private static func loadStore() -> [String: String] {
+    /// Distinguishes "no store yet" from "store exists but can't be read" —
+    /// treating an unreadable store as empty would overwrite the other
+    /// provider's key on the next save
+    private enum StoreLoadResult {
+        case empty
+        case loaded([String: String])
+        case unreadable
+    }
+
+    /// Serializes read-modify-write cycles on keys.enc
+    private static let storeLock = NSLock()
+
+    private static func loadStoreResult() -> StoreLoadResult {
         guard FileManager.default.fileExists(atPath: storageURL.path) else {
-            return [:]
+            return .empty
+        }
+        guard let data = try? Data(contentsOf: storageURL) else {
+            return .unreadable
         }
 
         // Try V2 key first
-        if let key = encryptionKey(), let store = decryptStore(using: key) {
-            return store
+        if let key = encryptionKey(), let store = decryptStore(data: data, using: key) {
+            return .loaded(store)
         }
 
         // Fallback: try V1 key and auto-migrate to V2
-        if let keyV1 = encryptionKeyV1(), let store = decryptStore(using: keyV1) {
+        if let keyV1 = encryptionKeyV1(), let store = decryptStore(data: data, using: keyV1) {
             NSLog("[SecureStore] V1 → V2 키 마이그레이션 중...")
             if saveStore(store) {
                 NSLog("[SecureStore] V1 → V2 키 마이그레이션 완료")
             }
-            return store
+            return .loaded(store)
         }
 
         NSLog("[SecureStore] 복호화 실패 (V1, V2 모두)")
-        return [:]
+        return .unreadable
     }
 
-    private static func decryptStore(using key: SymmetricKey) -> [String: String]? {
+    private static func decryptStore(data: Data, using key: SymmetricKey) -> [String: String]? {
         do {
-            let data = try Data(contentsOf: storageURL)
             let box = try AES.GCM.SealedBox(combined: data)
             let decrypted = try AES.GCM.open(box, using: key)
             return try? JSONDecoder().decode([String: String].self, from: decrypted)
@@ -136,19 +150,46 @@ enum KeychainService {
     }
 
     private static func getValue(forKey key: String) -> String? {
-        loadStore()[key]
+        storeLock.withLock {
+            if case .loaded(let store) = loadStoreResult() { return store[key] }
+            return nil
+        }
     }
 
     private static func saveValue(_ value: String, forKey key: String) -> Bool {
-        var store = loadStore()
-        store[key] = value
-        return saveStore(store)
+        storeLock.withLock {
+            switch loadStoreResult() {
+            case .loaded(var store):
+                store[key] = value
+                return saveStore(store)
+            case .empty:
+                return saveStore([key: value])
+            case .unreadable:
+                // Preserve the original ciphertext (recoverable if the cause
+                // is transient) and start a fresh store with just this key
+                let backupURL = storageURL.deletingLastPathComponent()
+                    .appendingPathComponent("keys.enc.bak")
+                try? FileManager.default.removeItem(at: backupURL)
+                try? FileManager.default.moveItem(at: storageURL, to: backupURL)
+                NSLog("[SecureStore] 읽기 불가 스토어를 keys.enc.bak으로 보존 후 재생성")
+                return saveStore([key: value])
+            }
+        }
     }
 
     private static func deleteValue(forKey key: String) -> Bool {
-        var store = loadStore()
-        store.removeValue(forKey: key)
-        return saveStore(store)
+        storeLock.withLock {
+            switch loadStoreResult() {
+            case .loaded(var store):
+                store.removeValue(forKey: key)
+                return saveStore(store)
+            case .empty:
+                return true
+            case .unreadable:
+                // Never overwrite a store we couldn't read just to delete one key
+                return false
+            }
+        }
     }
 
     // MARK: - Hardware UUID

@@ -6,7 +6,7 @@ import Foundation
 enum AICompanionService {
 
     /// Bump this when companion file content changes — triggers overwrite on existing vaults
-    static let version = 14
+    static let version = 15
 
     /// Generate all AI companion files in the PKM root (first-time only)
     static func generateAll(pkmRoot: String) throws {
@@ -68,7 +68,7 @@ enum AICompanionService {
         for (fileName, content) in files {
             do {
                 let path = (pkmRoot as NSString).appendingPathComponent(fileName)
-                let wrapped = "\(markerStart)\n\(content)\n\(markerEnd)"
+                let wrapped = "\(markerStart)\n\(content.trimmingCharacters(in: .whitespacesAndNewlines))\n\(markerEnd)"
 
                 if fm.fileExists(atPath: path) {
                     try replaceMarkerSection(at: path, with: wrapped)
@@ -100,7 +100,7 @@ enum AICompanionService {
             ] {
                 do {
                     let path = (agentsDir as NSString).appendingPathComponent("\(name).md")
-                    let wrapped = "\(markerStart)\n\(content)\n\(markerEnd)"
+                    let wrapped = "\(markerStart)\n\(content.trimmingCharacters(in: .whitespacesAndNewlines))\n\(markerEnd)"
                     if fm.fileExists(atPath: path) {
                         try replaceMarkerSection(at: path, with: wrapped)
                     } else {
@@ -129,7 +129,7 @@ enum AICompanionService {
                 let skillsDir = (pkmRoot as NSString).appendingPathComponent(".claude/skills/\(skillName)")
                 try fm.createDirectory(atPath: skillsDir, withIntermediateDirectories: true)
                 let skillPath = (skillsDir as NSString).appendingPathComponent("SKILL.md")
-                let wrappedSkill = "\(markerStart)\n\(skillBody)\n\(markerEnd)"
+                let wrappedSkill = "\(markerStart)\n\(skillBody.trimmingCharacters(in: .whitespacesAndNewlines))\n\(markerEnd)"
                 if fm.fileExists(atPath: skillPath) {
                     try replaceMarkerSection(at: skillPath, with: wrappedSkill)
                 } else {
@@ -173,8 +173,8 @@ enum AICompanionService {
             // Markers found — replace only between them (inclusive)
             var updated = existing
             updated.replaceSubrange(startRange.lowerBound..<endRange.upperBound, with: newSection)
-            // Remove trailing newline duplication
-            updated = updated.replacingOccurrences(of: "\n\n\n", with: "\n\n")
+            // No global blank-line collapsing here: it would rewrite user
+            // content outside the markers. Sections are trimmed at wrap time.
             try updated.write(toFile: path, atomically: true, encoding: .utf8)
         } else {
             // No markers — prepend DotBrain section, keep entire existing content as user section
@@ -748,7 +748,7 @@ enum AICompanionService {
         for (name, content) in agents {
             let path = (agentsDir as NSString).appendingPathComponent("\(name).md")
             if !fm.fileExists(atPath: path) {
-                let wrapped = "\(markerStart)\n\(content)\n\(markerEnd)"
+                let wrapped = "\(markerStart)\n\(content.trimmingCharacters(in: .whitespacesAndNewlines))\n\(markerEnd)"
                 try wrapped.write(toFile: path, atomically: true, encoding: .utf8)
             }
         }
@@ -1613,7 +1613,7 @@ enum AICompanionService {
             try fm.createDirectory(atPath: skillsDir, withIntermediateDirectories: true)
             let path = (skillsDir as NSString).appendingPathComponent("SKILL.md")
             if !fm.fileExists(atPath: path) {
-                let wrapped = "\(markerStart)\n\(skillBody)\n\(markerEnd)"
+                let wrapped = "\(markerStart)\n\(skillBody.trimmingCharacters(in: .whitespacesAndNewlines))\n\(markerEnd)"
                 try wrapped.write(toFile: path, atomically: true, encoding: .utf8)
             }
         }

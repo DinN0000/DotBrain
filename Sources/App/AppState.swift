@@ -97,6 +97,11 @@ final class AppState: ObservableObject {
     @Published var vaultCheckResult: VaultCheckResult?
     @Published var taskBlockedAlert: String?
     private var backgroundTask: Task<Void, Never>?
+    /// Incremented on every background task start/cancel. Detached pipeline
+    /// callbacks capture their generation and are ignored if a newer task
+    /// has taken over — a cancelled pipeline's completion block must not
+    /// reset the state of the task that replaced it.
+    private var backgroundTaskGeneration = 0
     private var pendingInitialLinkBootstrap = false
     private var pendingInboxPostProcessPaths: Set<String> = []
     private var pendingInboxPostProcessFolders: Set<String> = []
@@ -170,7 +175,17 @@ final class AppState: ObservableObject {
         }
     }
 
-    var hasAPIKey: Bool { selectedProvider.hasAPIKey() }
+    /// Reads cached @Published flags only — AIProvider.hasAPIKey() can spawn
+    /// a login shell for CLI providers, which must never happen during
+    /// SwiftUI body evaluation on the main actor.
+    var hasAPIKey: Bool {
+        switch selectedProvider {
+        case .claude: return hasClaudeKey
+        case .gemini: return hasGeminiKey
+        case .claudeCLI: return hasClaudeCLI
+        case .codexCLI: return hasCodexCLI
+        }
+    }
     @Published var hasClaudeKey: Bool = false
     @Published var hasGeminiKey: Bool = false
     @Published var hasClaudeCLI: Bool = false
@@ -223,9 +238,24 @@ final class AppState: ObservableObject {
     func updateAPIKeyStatus() {
         hasClaudeKey = KeychainService.getAPIKey() != nil
         hasGeminiKey = KeychainService.getGeminiAPIKey() != nil
-        hasClaudeCLI = ClaudeCLIClient.isAvailable()
-        codexCLIInstalled = CodexCLIClient.isAvailable()
-        hasCodexCLI = codexCLIInstalled && CodexCLIClient.isAuthenticated()
+        refreshCLIAvailability()
+    }
+
+    /// CLI detection can spawn a login shell (seconds on cache miss) — keep it
+    /// off the main actor and publish results when they arrive.
+    private func refreshCLIAvailability(onFinished: (@MainActor () -> Void)? = nil) {
+        Task.detached(priority: .userInitiated) {
+            let claudeCLI = ClaudeCLIClient.isAvailable()
+            let codexInstalled = CodexCLIClient.isAvailable()
+            let codexAuthenticated = codexInstalled && CodexCLIClient.isAuthenticated()
+            await MainActor.run {
+                let state = AppState.shared
+                state.hasClaudeCLI = claudeCLI
+                state.codexCLIInstalled = codexInstalled
+                state.hasCodexCLI = codexAuthenticated
+                onFinished?()
+            }
+        }
     }
 
     // MARK: - Full Disk Access
@@ -307,11 +337,14 @@ final class AppState: ObservableObject {
 
         self.hasClaudeKey = KeychainService.getAPIKey() != nil
         self.hasGeminiKey = KeychainService.getGeminiAPIKey() != nil
-        self.hasClaudeCLI = ClaudeCLIClient.isAvailable()
-        self.codexCLIInstalled = CodexCLIClient.isAvailable()
-        self.hasCodexCLI = self.codexCLIInstalled && CodexCLIClient.isAuthenticated()
+        // CLI availability is resolved asynchronously below — detection may
+        // spawn a login shell (seconds) and must not block app startup.
+        self.hasClaudeCLI = false
+        self.codexCLIInstalled = false
+        self.hasCodexCLI = false
 
-        if !UserDefaults.standard.bool(forKey: DefaultsKey.onboardingCompleted) {
+        let onboardingCompleted = UserDefaults.standard.bool(forKey: DefaultsKey.onboardingCompleted)
+        if !onboardingCompleted {
             self.currentScreen = .onboarding
         } else {
             // Check Full Disk Access after onboarding (may be revoked after app update)
@@ -320,9 +353,20 @@ final class AppState: ObservableObject {
             if !FileManager.default.fileExists(atPath: pkmRootPath) {
                 // PKM folder was deleted — send user to settings to recreate
                 self.currentScreen = .settings
-            } else if !self.hasAPIKey {
+            } else if selectedProvider.needsAPIKey && !self.hasAPIKey {
                 self.currentScreen = .settings
             }
+        }
+
+        // CLI providers: decide the missing-key screen redirect only after
+        // async detection finishes, so startup never blocks on a shell spawn.
+        refreshCLIAvailability {
+            let state = AppState.shared
+            guard onboardingCompleted,
+                  !state.selectedProvider.needsAPIKey,
+                  state.currentScreen == .inbox,
+                  !state.hasAPIKey else { return }
+            state.currentScreen = .settings
         }
 
         // Resolve vault bookmark for persistent folder access
@@ -390,25 +434,25 @@ final class AppState: ObservableObject {
 
         let root = pkmRootPath
         let pipeline = VaultCheckPipeline(pkmRoot: root)
+        backgroundTaskGeneration += 1
+        let generation = backgroundTaskGeneration
         backgroundTask = Task.detached(priority: .utility) {
             // Detect manual file moves before any DotBrain operations
             Self.detectManualMoves(pkmRoot: root)
 
             let result = await pipeline.run { progress in
                 Task { @MainActor in
-                    AppState.shared.backgroundTaskPhase = progress.phase
-                    AppState.shared.backgroundTaskProgress = progress.fraction
+                    AppState.shared.updateBackgroundProgress(
+                        phase: progress.phase, fraction: progress.fraction, generation: generation
+                    )
                 }
             }
 
             await MainActor.run {
-                AppState.shared.vaultCheckResult = result
-                AppState.shared.backgroundTask = nil
-                AppState.shared.backgroundTaskKind = nil
-                AppState.shared.backgroundTaskName = nil
-                AppState.shared.backgroundTaskPhase = ""
-                AppState.shared.backgroundTaskProgress = 0
-                AppState.shared.backgroundTaskCompleted = false
+                if AppState.shared.backgroundTaskGeneration == generation {
+                    AppState.shared.vaultCheckResult = result
+                }
+                AppState.shared.clearBackgroundTaskState(ifCurrent: generation)
             }
         }
     }
@@ -425,6 +469,7 @@ final class AppState: ObservableObject {
             pendingInboxPostProcessPaths.removeAll()
             pendingInboxPostProcessFolders.removeAll()
         }
+        backgroundTaskGeneration += 1
         backgroundTask?.cancel()
         backgroundTask = nil
         backgroundTaskKind = nil
@@ -493,11 +538,14 @@ final class AppState: ObservableObject {
             filePaths: filePaths,
             affectedFolders: affectedFolders
         )
+        backgroundTaskGeneration += 1
+        let generation = backgroundTaskGeneration
         backgroundTask = Task.detached(priority: .utility) {
             let result = await pipeline.run { progress in
                 Task { @MainActor in
-                    AppState.shared.backgroundTaskPhase = progress.phase
-                    AppState.shared.backgroundTaskProgress = progress.fraction
+                    AppState.shared.updateBackgroundProgress(
+                        phase: progress.phase, fraction: progress.fraction, generation: generation
+                    )
                 }
             }
 
@@ -511,12 +559,8 @@ final class AppState: ObservableObject {
             }
 
             await MainActor.run {
-                AppState.shared.backgroundTask = nil
-                AppState.shared.backgroundTaskKind = nil
-                AppState.shared.backgroundTaskName = nil
-                AppState.shared.backgroundTaskPhase = ""
-                AppState.shared.backgroundTaskProgress = 0
-                AppState.shared.backgroundTaskCompleted = false
+                guard AppState.shared.backgroundTaskGeneration == generation else { return }
+                AppState.shared.clearBackgroundTaskState(ifCurrent: generation)
                 AppState.shared.maybeStartQueuedBackgroundTask()
             }
         }
@@ -540,11 +584,14 @@ final class AppState: ObservableObject {
 
         let root = pkmRootPath
         let pipeline = InitialLinkBootstrapPipeline(pkmRoot: root)
+        backgroundTaskGeneration += 1
+        let generation = backgroundTaskGeneration
         backgroundTask = Task.detached(priority: .utility) {
             let result = await pipeline.run { progress in
                 Task { @MainActor in
-                    AppState.shared.backgroundTaskPhase = progress.phase
-                    AppState.shared.backgroundTaskProgress = progress.fraction
+                    AppState.shared.updateBackgroundProgress(
+                        phase: progress.phase, fraction: progress.fraction, generation: generation
+                    )
                 }
             }
 
@@ -558,12 +605,8 @@ final class AppState: ObservableObject {
             }
 
             await MainActor.run {
-                AppState.shared.backgroundTask = nil
-                AppState.shared.backgroundTaskKind = nil
-                AppState.shared.backgroundTaskName = nil
-                AppState.shared.backgroundTaskPhase = ""
-                AppState.shared.backgroundTaskProgress = 0
-                AppState.shared.backgroundTaskCompleted = false
+                guard AppState.shared.backgroundTaskGeneration == generation else { return }
+                AppState.shared.clearBackgroundTaskState(ifCurrent: generation)
                 AppState.shared.maybeStartQueuedBackgroundTask()
             }
         }
@@ -640,6 +683,22 @@ final class AppState: ObservableObject {
     }
 
     func clearBackgroundTaskCompletion() {
+        backgroundTaskKind = nil
+        backgroundTaskName = nil
+        backgroundTaskPhase = ""
+        backgroundTaskProgress = 0
+        backgroundTaskCompleted = false
+    }
+
+    private func updateBackgroundProgress(phase: String, fraction: Double, generation: Int) {
+        guard generation == backgroundTaskGeneration else { return }
+        backgroundTaskPhase = phase
+        backgroundTaskProgress = fraction
+    }
+
+    private func clearBackgroundTaskState(ifCurrent generation: Int) {
+        guard generation == backgroundTaskGeneration else { return }
+        backgroundTask = nil
         backgroundTaskKind = nil
         backgroundTaskName = nil
         backgroundTaskPhase = ""

@@ -46,6 +46,7 @@ actor ClaudeAPIClient {
     struct MessageResponse: Decodable {
         let content: [ContentBlock]
         let usage: Usage?
+        let stop_reason: String?
 
         struct ContentBlock: Decodable {
             let type: String
@@ -139,6 +140,10 @@ actor ClaudeAPIClient {
         }
 
         let messageResponse = try JSONDecoder().decode(MessageResponse.self, from: data)
+        if messageResponse.stop_reason == "max_tokens" {
+            // A truncated JSON payload must not be parsed as a normal response
+            throw ClaudeAPIError.truncated
+        }
         let text = messageResponse.text
         guard !text.isEmpty else {
             throw ClaudeAPIError.emptyResponse
@@ -161,6 +166,7 @@ enum ClaudeAPIError: LocalizedError, RetryClassifiable {
     case invalidURL
     case invalidResponse
     case emptyResponse
+    case truncated
     case httpError(status: Int)
     case apiError(status: Int, message: String)
     case jsonParseFailed(raw: String)
@@ -175,6 +181,8 @@ enum ClaudeAPIError: LocalizedError, RetryClassifiable {
             return "잘못된 응답"
         case .emptyResponse:
             return "빈 응답"
+        case .truncated:
+            return "응답이 max_tokens 한도에서 잘렸습니다"
         case .httpError(let status):
             return "HTTP 오류: \(status)"
         case .apiError(_, let message):

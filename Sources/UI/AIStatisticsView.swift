@@ -300,7 +300,8 @@ struct AIStatisticsView: View {
         isLoading = true
 
         Task.detached(priority: .utility) {
-            let logger = APIUsageLogger(pkmRoot: root)
+            // Shared instance: sees in-memory entries not yet flushed to disk
+            let logger = StatisticsService.usageLogger(for: root)
             let summary = await logger.monthlySummary(year: year, month: month)
             let earliest = await logger.earliestEntryDate()
 

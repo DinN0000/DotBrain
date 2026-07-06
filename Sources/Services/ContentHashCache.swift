@@ -59,7 +59,7 @@ actor ContentHashCache {
             let encoder = JSONEncoder()
             encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
             let data = try encoder.encode(cache)
-            try data.write(to: URL(fileURLWithPath: cachePath))
+            try data.write(to: URL(fileURLWithPath: cachePath), options: .atomic)
         } catch {
             // Silently fail -- cache is a best-effort optimization
         }

@@ -135,8 +135,10 @@ actor Classifier {
         }
 
         // Stage 2: Sonnet for uncertain files
+        // All stage result maps are keyed by filePath — fileName collides when
+        // different folders contain same-named files (회의록.md, README.md)
         let uncertainFiles = files.filter { file in
-            guard let s1 = stage1Results[file.fileName] else { return true }
+            guard let s1 = stage1Results[file.filePath] else { return true }
             return s1.confidence < confidenceThreshold
         }
 
@@ -165,14 +167,15 @@ actor Classifier {
 
                 for file in uncertainFiles {
                     if activeTasks >= maxConcurrentStage2 {
-                        if let (fileName, result) = await group.next() {
-                            if let result { combined[fileName] = result }
+                        if let (filePath, result) = await group.next() {
+                            if let result { combined[filePath] = result }
                             activeTasks -= 1
                             completedStage2 += 1
                             reportStage2Progress()
                         }
                     }
 
+                    let key = file.filePath
                     let fileName = file.fileName
                     group.addTask {
                         do {
@@ -181,17 +184,17 @@ actor Classifier {
                                 systemPrompt: systemPrompt,
                                 contentLimit: tuning.stage2ContentLimit
                             )
-                            return (fileName, result)
+                            return (key, result)
                         } catch {
                             NSLog("[Classifier] Stage2 %@ 실패 (Stage1 결과 사용): %@", fileName, error.localizedDescription)
-                            return (fileName, nil)
+                            return (key, nil)
                         }
                     }
                     activeTasks += 1
                 }
 
-                for await (fileName, result) in group {
-                    if let result { combined[fileName] = result }
+                for await (filePath, result) in group {
+                    if let result { combined[filePath] = result }
                     completedStage2 += 1
                     reportStage2Progress()
                 }
@@ -206,8 +209,8 @@ actor Classifier {
         // Combine results with project validation
         return files.map { file in
             var result: ClassifyResult
-            let s2 = stage2Results[file.fileName]
-            let s1 = stage1Results[file.fileName]
+            let s2 = stage2Results[file.filePath]
+            let s1 = stage1Results[file.filePath]
 
             // Capture raw project name before fuzzy matching
             let rawProject = s2?.project ?? s1?.project
@@ -279,7 +282,7 @@ actor Classifier {
             guard files.count > 1 else {
                 let file = files[0]
                 NSLog("[Classifier] Stage1 단일 파일 폴백 사용: %@", file.fileName)
-                return [file.fileName: fallbackStage1Item(for: file)]
+                return [file.filePath: fallbackStage1Item(for: file)]
             }
 
             let midpoint = files.count / 2
@@ -358,9 +361,30 @@ actor Classifier {
             throw Stage1BatchError.emptyResponse
         }
 
+        // Map response items back to inputs via the [i] index; fileName is
+        // only a fallback and only when unique within the batch
+        var uniqueNameToPath: [String: String] = [:]
+        var duplicateNames: Set<String> = []
+        for file in files {
+            if uniqueNameToPath[file.fileName] != nil {
+                duplicateNames.insert(file.fileName)
+            } else {
+                uniqueNameToPath[file.fileName] = file.filePath
+            }
+        }
+        for name in duplicateNames { uniqueNameToPath[name] = nil }
+
         for item in items {
-            guard let para = PARACategory(rawValue: item.para), !item.fileName.isEmpty else { continue }
-            results[item.fileName] = ClassifyResult.Stage1Item(
+            guard let para = PARACategory(rawValue: item.para) else { continue }
+            let filePath: String
+            if let id = item.id, files.indices.contains(id) {
+                filePath = files[id].filePath
+            } else if !item.fileName.isEmpty, let path = uniqueNameToPath[item.fileName] {
+                filePath = path
+            } else {
+                continue
+            }
+            results[filePath] = ClassifyResult.Stage1Item(
                 fileName: item.fileName,
                 para: para,
                 tags: Array((item.tags ?? []).prefix(5)),
@@ -519,6 +543,7 @@ actor Classifier {
         반드시 아래 JSON 배열만 출력하세요. 설명이나 마크다운 코드블록 없이 순수 JSON만 반환합니다.
         [
           {
+            "id": 파일 번호 ([i]의 i 값을 그대로 반환),
             "fileName": "파일명",
             "para": "project" | "area" | "resource" | "archive",
             "tags": ["태그1", "태그2"],
@@ -653,6 +678,7 @@ actor Classifier {
 
     /// Raw JSON types for decoding (using String for para to allow validation)
     private struct Stage1RawItem: Decodable {
+        var id: Int?
         let fileName: String
         let para: String
         var tags: [String]?

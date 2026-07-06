@@ -111,14 +111,30 @@ struct FileMover {
 
         if let dupPath = dupPath {
             StatisticsService.incrementDuplicates()
+            // Companion note is named after the EXISTING asset, not the
+            // incoming file — the two names differ when the duplicate arrived
+            // under another name or was renamed by resolveConflict
             let dupFileName = (dupPath as NSString).lastPathComponent
-            let companionPath = (targetDir as NSString).appendingPathComponent("\(fileName).md")
-            mergeTags(classification.tags, into: companionPath)
+            let dupExt = URL(fileURLWithPath: dupFileName).pathExtension.lowercased()
+            let dupIsMedia = BinaryExtractor.imageExtensions.contains(dupExt)
+                || BinaryExtractor.videoExtensions.contains(dupExt)
+            var resultPath = dupPath
+            if !dupIsMedia {
+                let companionPath = (targetDir as NSString).appendingPathComponent("\(dupFileName).md")
+                if fm.fileExists(atPath: companionPath) {
+                    if !mergeTags(classification.tags, into: companionPath) {
+                        NSLog("[FileMover] 태그 병합 실패: %@", companionPath)
+                    }
+                    resultPath = companionPath
+                } else {
+                    NSLog("[FileMover] 중복 병합: 동반 노트 없음 — %@", companionPath)
+                }
+            }
             try fm.trashItem(at: URL(fileURLWithPath: filePath), resultingItemURL: nil)
             return ProcessedFileResult(
                 fileName: fileName,
                 para: classification.para,
-                targetPath: companionPath,
+                targetPath: resultPath,
                 tags: classification.tags,
                 status: .deduplicated("중복 — \(dupFileName)와 병합됨")
             )
@@ -178,11 +194,14 @@ struct FileMover {
             relatedNotes: classification.relatedNotes
         )
 
-        let mdPath = (targetDir as NSString).appendingPathComponent("\(fileName).md")
+        // Name the companion after the resolved asset (report_2.pdf → report_2.pdf.md)
+        // so an existing companion for a same-named asset is never overwritten
+        let assetName = (resolvedAssetPath as NSString).lastPathComponent
+        let mdPath = resolveConflict((targetDir as NSString).appendingPathComponent("\(assetName).md"))
         try mdContent.write(toFile: mdPath, atomically: true, encoding: .utf8)
 
         return ProcessedFileResult(
-            fileName: fileName,
+            fileName: assetName,
             para: classification.para,
             targetPath: mdPath,
             tags: classification.tags

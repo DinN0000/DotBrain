@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
-import { execSync } from "node:child_process";
-import { existsSync, mkdirSync, rmSync, writeFileSync, unlinkSync } from "node:fs";
+import { execSync, execFileSync } from "node:child_process";
+import { existsSync, mkdirSync, rmSync, writeFileSync, unlinkSync, cpSync, readdirSync, chmodSync } from "node:fs";
 import { homedir, platform } from "node:os";
 import { join } from "node:path";
 import https from "node:https";
@@ -38,6 +38,22 @@ function run(cmd, opts = {}) {
 
 function runSilent(cmd) {
   return run(cmd, { silent: true, ignoreError: true }).trim();
+}
+
+// Array-arg exec (no shell): required whenever an argument comes from the
+// filesystem (volume names, paths) — string interpolation into a shell is
+// a command-injection vector
+function runArgs(cmd, args, opts = {}) {
+  try {
+    return execFileSync(cmd, args, { encoding: "utf8", stdio: "pipe", ...opts });
+  } catch {
+    if (!opts.ignoreError) throw new Error(`Command failed: ${cmd} ${args.join(" ")}`);
+    return "";
+  }
+}
+
+function runSilentArgs(cmd, args) {
+  return runArgs(cmd, args, { ignoreError: true }).trim();
 }
 
 function removeLegacyLoginItem() {
@@ -136,15 +152,18 @@ async function installFromDmg(dmgUrl, tag) {
 
     // Mount DMG
     log("Mounting DMG...");
-    const mountOutput = runSilent(`hdiutil attach "${dmgPath}" -nobrowse -readonly`);
+    const mountOutput = runSilentArgs("hdiutil", ["attach", dmgPath, "-nobrowse", "-readonly"]);
     const parsedMount = mountOutput.split("\n").pop().split("\t").pop().trim();
 
     if (parsedMount && existsSync(join(parsedMount, APP_BUNDLE))) {
       activeMountPoint = parsedMount;
     } else {
-      // Try finding the mount point
-      const volumes = runSilent("ls /Volumes").split("\n");
-      const dotbrainVol = volumes.find((v) => v.includes(APP_NAME));
+      // Try finding the mount point (whitelist the name — volume names come
+      // from the filesystem and must never reach a shell)
+      const volumes = readdirSync("/Volumes");
+      const dotbrainVol = volumes.find(
+        (v) => v.includes(APP_NAME) && /^[\w .-]+$/.test(v)
+      );
       if (!dotbrainVol) {
         error("Failed to mount DMG or find DotBrain.app inside it.");
       }
@@ -155,9 +174,9 @@ async function installFromDmg(dmgUrl, tag) {
   } finally {
     // Unmount DMG if still mounted
     if (activeMountPoint) {
-      runSilent(`hdiutil detach "${activeMountPoint}" -quiet`);
+      runSilentArgs("hdiutil", ["detach", activeMountPoint, "-quiet"]);
     }
-    runSilent(`rm -rf "${tmpDir}"`);
+    rmSync(tmpDir, { recursive: true, force: true });
   }
 }
 
@@ -179,10 +198,10 @@ function copyFromMount(mountPoint) {
   if (existsSync(APP_PATH)) {
     rmSync(APP_PATH, { recursive: true, force: true });
   }
-  run(`cp -R "${srcApp}" "${APP_PATH}"`, { silent: true });
+  cpSync(srcApp, APP_PATH, { recursive: true });
 
   // Remove quarantine
-  runSilent(`xattr -cr "${APP_PATH}"`);
+  runSilentArgs("xattr", ["-cr", APP_PATH]);
 
   log(`Installed: ${APP_PATH}`);
   return true;
@@ -198,7 +217,7 @@ async function installFromBinary(binaryUrl, iconUrl, tag) {
   try {
     const binaryPath = join(tmpDir, APP_NAME);
     await downloadFile(binaryUrl, binaryPath);
-    execSync(`chmod +x "${binaryPath}"`);
+    chmodSync(binaryPath, 0o755);
 
     // Stop running instance
     const uid = runSilent("id -u");
@@ -217,14 +236,14 @@ async function installFromBinary(binaryUrl, iconUrl, tag) {
     mkdirSync(macosDir, { recursive: true });
     mkdirSync(resourcesDir, { recursive: true });
 
-    execSync(`cp "${binaryPath}" "${EXECUTABLE}"`);
+    cpSync(binaryPath, EXECUTABLE);
 
     // Download icon
     if (iconUrl) {
       try {
         const iconPath = join(tmpDir, "AppIcon.icns");
         await downloadFile(iconUrl, iconPath);
-        execSync(`cp "${iconPath}" "${join(resourcesDir, "AppIcon.icns")}"`);
+        cpSync(iconPath, join(resourcesDir, "AppIcon.icns"));
       } catch {
         log("Warning: Icon download failed, continuing with default icon.");
       }
@@ -280,7 +299,7 @@ async function installFromBinary(binaryUrl, iconUrl, tag) {
 
     log(`Installed: ${APP_PATH}`);
   } finally {
-    runSilent(`rm -rf "${tmpDir}"`);
+    rmSync(tmpDir, { recursive: true, force: true });
   }
 }
 

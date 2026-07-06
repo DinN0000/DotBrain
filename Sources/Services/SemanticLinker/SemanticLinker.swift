@@ -13,6 +13,10 @@ struct SemanticLinker: Sendable {
         var tagsNormalized: TagNormalizer.Result
         var notesLinked: Int
         var linksCreated: Int
+        /// Every file written by this run (tag normalization + forward and
+        /// reverse link writes) — callers re-hash these in ContentHashCache
+        /// so the next vault check doesn't re-process them
+        var modifiedFiles: Set<String> = []
     }
 
     // MARK: - Public API
@@ -39,7 +43,7 @@ struct SemanticLinker: Sendable {
         onProgress?(0.2, "\(allNotes.count)개 노트 인덱스 완료")
 
         guard !allNotes.isEmpty else {
-            return LinkResult(tagsNormalized: tagResult, notesLinked: 0, linksCreated: 0)
+            return LinkResult(tagsNormalized: tagResult, notesLinked: 0, linksCreated: 0, modifiedFiles: Set(tagResult.modifiedFiles))
         }
 
         // Load folder relations for scoring (pre-compute sets to avoid per-note disk I/O)
@@ -92,7 +96,7 @@ struct SemanticLinker: Sendable {
         onProgress?(0.3, "\(notesWithCandidates.count)개 노트에 후보 생성 완료")
 
         guard !notesWithCandidates.isEmpty else {
-            return LinkResult(tagsNormalized: tagResult, notesLinked: 0, linksCreated: 0)
+            return LinkResult(tagsNormalized: tagResult, notesLinked: 0, linksCreated: 0, modifiedFiles: Set(tagResult.modifiedFiles))
         }
 
         let aiFilter = LinkAIFilter()
@@ -149,7 +153,7 @@ struct SemanticLinker: Sendable {
         onProgress?(0.8, "관련 노트 기록 중...")
 
         let writer = RelatedNotesWriter()
-        let notePathMap = Dictionary(uniqueKeysWithValues: allNotes.map { ($0.name, $0.filePath) })
+        let notePathMap = Self.buildNotePathMap(allNotes)
 
         var reverseLinks: [String: [(name: String, context: String, relation: String)]] = [:]
         for entry in allLinks {
@@ -161,10 +165,13 @@ struct SemanticLinker: Sendable {
 
         var notesLinked = 0
         var linksCreated = 0
+        var modifiedFiles = Set(tagResult.modifiedFiles)
 
         for entry in allLinks where !entry.links.isEmpty {
             do {
-                try writer.writeRelatedNotes(filePath: entry.filePath, newLinks: entry.links, noteNames: noteNames)
+                if try writer.writeRelatedNotes(filePath: entry.filePath, newLinks: entry.links, noteNames: noteNames) {
+                    modifiedFiles.insert(entry.filePath)
+                }
                 notesLinked += 1
                 linksCreated += entry.links.count
             } catch {
@@ -176,7 +183,9 @@ struct SemanticLinker: Sendable {
             guard let targetPath = notePathMap[targetName] else { continue }
             let reverseFilteredLinks = sources.map { LinkAIFilter.FilteredLink(name: $0.name, context: $0.context, relation: $0.relation) }
             do {
-                try writer.writeRelatedNotes(filePath: targetPath, newLinks: reverseFilteredLinks, noteNames: noteNames)
+                if try writer.writeRelatedNotes(filePath: targetPath, newLinks: reverseFilteredLinks, noteNames: noteNames) {
+                    modifiedFiles.insert(targetPath)
+                }
                 linksCreated += reverseFilteredLinks.count
             } catch {
                 NSLog("[SemanticLinker] 역방향 링크 기록 실패: %@ — %@", targetName, error.localizedDescription)
@@ -185,7 +194,12 @@ struct SemanticLinker: Sendable {
 
         onProgress?(1.0, "시맨틱 링크 완료: \(notesLinked)개 노트, \(linksCreated)개 링크")
 
-        return LinkResult(tagsNormalized: tagResult, notesLinked: notesLinked, linksCreated: linksCreated)
+        return LinkResult(
+            tagsNormalized: tagResult,
+            notesLinked: notesLinked,
+            linksCreated: linksCreated,
+            modifiedFiles: modifiedFiles
+        )
     }
 
     func linkNotes(filePaths: [String], onProgress: ((Double, String) -> Void)? = nil) async -> LinkResult {
@@ -218,7 +232,7 @@ struct SemanticLinker: Sendable {
         let preparedIndex = candidateGen.prepareIndex(allNotes: allNotes, mocEntries: contextMap.entries)
         let aiFilter = LinkAIFilter()
         let writer = RelatedNotesWriter()
-        let notePathMap = Dictionary(uniqueKeysWithValues: allNotes.map { ($0.name, $0.filePath) })
+        let notePathMap = Self.buildNotePathMap(allNotes)
 
         // Build candidates for all target notes
         var notesWithCandidates: [(note: LinkCandidateGenerator.NoteInfo, candidates: [LinkCandidateGenerator.Candidate])] = []
@@ -303,10 +317,13 @@ struct SemanticLinker: Sendable {
         // Write forward links
         var notesLinked = 0
         var linksCreated = 0
+        var modifiedFiles = Set<String>()
 
         for entry in allLinks where !entry.links.isEmpty {
             do {
-                try writer.writeRelatedNotes(filePath: entry.filePath, newLinks: entry.links, noteNames: noteNames)
+                if try writer.writeRelatedNotes(filePath: entry.filePath, newLinks: entry.links, noteNames: noteNames) {
+                    modifiedFiles.insert(entry.filePath)
+                }
                 notesLinked += 1
                 linksCreated += entry.links.count
             } catch {
@@ -319,7 +336,9 @@ struct SemanticLinker: Sendable {
             guard let targetPath = notePathMap[targetName] else { continue }
             let reverseFilteredLinks = sources.map { LinkAIFilter.FilteredLink(name: $0.name, context: $0.context, relation: $0.relation) }
             do {
-                try writer.writeRelatedNotes(filePath: targetPath, newLinks: reverseFilteredLinks, noteNames: noteNames)
+                if try writer.writeRelatedNotes(filePath: targetPath, newLinks: reverseFilteredLinks, noteNames: noteNames) {
+                    modifiedFiles.insert(targetPath)
+                }
                 linksCreated += reverseFilteredLinks.count
             } catch {
                 NSLog("[SemanticLinker] 역방향 링크 기록 실패: %@ — %@", targetName, error.localizedDescription)
@@ -328,7 +347,12 @@ struct SemanticLinker: Sendable {
 
         onProgress?(1.0, "시맨틱 링크 완료: \(notesLinked)개 노트, \(linksCreated)개 링크")
 
-        return LinkResult(tagsNormalized: tagResult, notesLinked: notesLinked, linksCreated: linksCreated)
+        return LinkResult(
+            tagsNormalized: tagResult,
+            notesLinked: notesLinked,
+            linksCreated: linksCreated,
+            modifiedFiles: modifiedFiles
+        )
     }
 
     // MARK: - Folder Hint
@@ -360,6 +384,12 @@ struct SemanticLinker: Sendable {
     ]
 
     // MARK: - Private
+
+    /// Same-named notes in different folders are legal in a PARA vault;
+    /// first-wins keeps behavior consistent with name-based [[wiki-link]] resolution.
+    static func buildNotePathMap(_ allNotes: [LinkCandidateGenerator.NoteInfo]) -> [String: String] {
+        Dictionary(allNotes.map { ($0.name, $0.filePath) }, uniquingKeysWith: { first, _ in first })
+    }
 
     func buildNoteIndex(skipRelated: Bool = false) -> [LinkCandidateGenerator.NoteInfo] {
         // Try index-first: load note-index.json

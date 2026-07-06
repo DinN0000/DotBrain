@@ -17,6 +17,10 @@ struct InboxProcessor {
         var affectedFolders: Set<String>
         var total: Int
         var failed: Int
+        /// Source paths that failed to move — the multi-pass loop must not
+        /// rescan these (they stay in place and would be re-classified,
+        /// double-counting failures and doubling AI cost)
+        var failedPaths: [String] = []
     }
 
     func process() async throws -> Result {
@@ -43,6 +47,7 @@ struct InboxProcessor {
         var allAffectedFolders: Set<String> = []
         var discoveredPaths = Set(files)
         var totalFailed = 0
+        var permanentlyFailedPaths = Set<String>()
 
         for passIndex in 0..<Self.maxAutoPasses {
             guard !files.isEmpty else { break }
@@ -68,13 +73,17 @@ struct InboxProcessor {
             allConfirmations.append(contentsOf: passResult.needsConfirmation)
             allAffectedFolders.formUnion(passResult.affectedFolders)
             totalFailed += passResult.failed
+            permanentlyFailedPaths.formUnion(passResult.failedPaths)
 
             if !passResult.needsConfirmation.isEmpty {
                 files = []
                 break
             }
 
+            // Failed files stay in place — rescanning them re-classifies at
+            // double AI cost and double-counts the failure
             let remaining = filterSelectedFiles(scanner.scan())
+                .filter { !permanentlyFailedPaths.contains($0) }
             guard !remaining.isEmpty else {
                 files = []
                 break
@@ -227,13 +236,13 @@ struct InboxProcessor {
         let mediaExtensions = BinaryExtractor.imageExtensions.union(BinaryExtractor.videoExtensions)
         var mediaInputs: [ClassifyInput] = []
         var textInputs: [ClassifyInput] = []
-        var preClassifiedInputs: [(input: ClassifyInput, para: PARACategory)] = []
+        var preClassifiedInputs: [(input: ClassifyInput, frontmatter: Frontmatter)] = []
         for input in inputs {
             let ext = URL(fileURLWithPath: input.filePath).pathExtension.lowercased()
             if mediaExtensions.contains(ext) {
                 mediaInputs.append(input)
-            } else if let existingPara = Self.extractParaFromContent(input.content) {
-                preClassifiedInputs.append((input: input, para: existingPara))
+            } else if let frontmatter = Self.extractClassifiedFrontmatter(input.content) {
+                preClassifiedInputs.append((input: input, frontmatter: frontmatter))
             } else {
                 textInputs.append(input)
             }
@@ -284,17 +293,36 @@ struct InboxProcessor {
             )
         }
 
-        // Pre-classified files (existing para: frontmatter) — skip AI, confidence 1.0
-        let preClassifiedResults = preClassifiedInputs.map { item in
-            ClassifyResult(
-                para: item.para,
-                tags: [],
-                summary: "",
+        // Pre-classified files (existing para: frontmatter) — skip AI, confidence 1.0.
+        // The declared project/tags/summary must carry over: dropping the
+        // project sends self-classified project notes into the
+        // unmatched-project confirmation even though they name their project.
+        let preClassifiedResults = preClassifiedInputs.map { item -> ClassifyResult in
+            let frontmatter = item.frontmatter
+            let para = frontmatter.para ?? .resource
+            let declaredProject = frontmatter.project?.trimmingCharacters(in: .whitespaces)
+            let matchedProject = declaredProject.flatMap { declared -> String? in
+                guard !declared.isEmpty else { return nil }
+                let normalized = declared.precomposedStringWithCanonicalMapping
+                return projectNames.first {
+                    $0.precomposedStringWithCanonicalMapping
+                        .caseInsensitiveCompare(normalized) == .orderedSame
+                }
+            }
+            var result = ClassifyResult(
+                para: para,
+                tags: frontmatter.tags,
+                summary: frontmatter.summary ?? "",
                 targetFolder: "",
-                project: nil,
+                project: matchedProject,
                 confidence: 1.0,
                 relatedNotes: []
             )
+            if para == .project && matchedProject == nil {
+                // Surface the declared name in the confirmation UI
+                result.suggestedProject = declaredProject
+            }
+            return result
         }
 
         // Merge: media first, then pre-classified, then text (preserves pairing with inputs)
@@ -320,6 +348,7 @@ struct InboxProcessor {
         var processed: [ProcessedFileResult] = []
         var needsConfirmation: [PendingConfirmation] = []
         var failed = 0
+        var failedPaths: [String] = []
 
         for (i, (classification, input)) in zip(enrichedClassifications, allInputs).enumerated() {
             if Task.isCancelled { throw CancellationError() }
@@ -333,7 +362,7 @@ struct InboxProcessor {
                     fileName: input.fileName,
                     filePath: input.filePath,
                     content: String(input.content.prefix(500)),
-                    options: generateOptions(for: classification, projectNames: projectNames)
+                    options: Self.generateOptions(for: classification, projectNames: projectNames)
                 ))
                 continue
             }
@@ -345,7 +374,7 @@ struct InboxProcessor {
                     fileName: input.fileName,
                     filePath: input.filePath,
                     content: String(input.content.prefix(500)),
-                    options: generateUnmatchedProjectOptions(
+                    options: Self.generateUnmatchedProjectOptions(
                         for: classification,
                         projectNames: projectNames
                     ),
@@ -362,7 +391,7 @@ struct InboxProcessor {
                     fileName: input.fileName,
                     filePath: input.filePath,
                     content: String(input.content.prefix(500)),
-                    options: generateOptions(for: classification, projectNames: projectNames),
+                    options: Self.generateOptions(for: classification, projectNames: projectNames),
                     reason: .nameConflict
                 ))
                 continue
@@ -403,6 +432,7 @@ struct InboxProcessor {
                     detail: Self.friendlyErrorMessage(error)
                 )
                 failed += 1
+                failedPaths.append(input.filePath)
             }
         }
 
@@ -428,7 +458,8 @@ struct InboxProcessor {
             needsConfirmation: needsConfirmation,
             affectedFolders: affectedFolders,
             total: files.count,
-            failed: failed
+            failed: failed,
+            failedPaths: failedPaths
         )
     }
 
@@ -530,7 +561,8 @@ struct InboxProcessor {
     }
 
     /// Generate options for files classified as project but with no matching project
-    private func generateUnmatchedProjectOptions(
+    /// (static: shared with FolderReorganizer)
+    static func generateUnmatchedProjectOptions(
         for base: ClassifyResult,
         projectNames: [String]
     ) -> [ClassifyResult] {
@@ -573,7 +605,8 @@ struct InboxProcessor {
     }
 
     /// Generate alternative classification options for uncertain files
-    private func generateOptions(for base: ClassifyResult, projectNames: [String]) -> [ClassifyResult] {
+    /// (static: shared with FolderReorganizer)
+    static func generateOptions(for base: ClassifyResult, projectNames: [String]) -> [ClassifyResult] {
         var options: [ClassifyResult] = [base]
 
         // Add alternative PARA categories
@@ -592,9 +625,10 @@ struct InboxProcessor {
         return options
     }
 
-    /// Extract existing para: value from frontmatter content
-    private static func extractParaFromContent(_ content: String) -> PARACategory? {
-        Frontmatter.parse(markdown: content).frontmatter.para
+    /// Frontmatter with an explicit para: — the file classified itself
+    private static func extractClassifiedFrontmatter(_ content: String) -> Frontmatter? {
+        let frontmatter = Frontmatter.parse(markdown: content).frontmatter
+        return frontmatter.para != nil ? frontmatter : nil
     }
 
     /// Ensure note-index.json covers all existing PARA folders.
@@ -613,13 +647,19 @@ struct InboxProcessor {
 
         var missingFolderPaths: Set<String> = []
         for (category, basePath) in categories {
-            guard let entries = try? fm.contentsOfDirectory(atPath: basePath) else { continue }
-            for entry in entries {
-                guard !entry.hasPrefix("."), !entry.hasPrefix("_") else { continue }
-                let folderPath = (basePath as NSString).appendingPathComponent(entry)
+            // Recurse: nested subfolders (depth 2-3) have index keys like
+            // "1_Project/A/B" and would never match a depth-1 scan
+            guard let enumerator = fm.enumerator(atPath: basePath) else { continue }
+            while let element = enumerator.nextObject() as? String {
+                let name = (element as NSString).lastPathComponent
+                let folderPath = (basePath as NSString).appendingPathComponent(element)
                 var isDir: ObjCBool = false
                 guard fm.fileExists(atPath: folderPath, isDirectory: &isDir), isDir.boolValue else { continue }
-                let relKey = "\(category.folderName)/\(entry)"
+                if name.hasPrefix(".") || name.hasPrefix("_") {
+                    enumerator.skipDescendants()
+                    continue
+                }
+                let relKey = "\(category.folderName)/\(element)".precomposedStringWithCanonicalMapping
                 if !indexedFolders.contains(relKey) {
                     missingFolderPaths.insert(folderPath)
                 }

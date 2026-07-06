@@ -49,9 +49,9 @@ struct ProjectAliasRegistry {
         // Pretty-print for human readability
         if let pretty = try? JSONSerialization.jsonObject(with: data),
            let prettyData = try? JSONSerialization.data(withJSONObject: pretty, options: [.prettyPrinted, .sortedKeys]) {
-            try? prettyData.write(to: URL(fileURLWithPath: path))
+            try? prettyData.write(to: URL(fileURLWithPath: path), options: .atomic)
         } else {
-            try? data.write(to: URL(fileURLWithPath: path))
+            try? data.write(to: URL(fileURLWithPath: path), options: .atomic)
         }
     }
 }

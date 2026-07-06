@@ -33,6 +33,9 @@ struct InboxPostProcessingPipeline {
             let indexGenerator = NoteIndexGenerator(pkmRoot: pkmRoot)
             await indexGenerator.updateForFolders(folders)
         }
+        if Task.isCancelled {
+            return Result(enrichedCount: 0, linkedNotes: 0, linksCreated: 0)
+        }
 
         var enrichedCount = 0
         if !mdPaths.isEmpty {
@@ -46,15 +49,20 @@ struct InboxPostProcessingPipeline {
                 await indexGenerator.updateForFolders(folders)
             }
         }
+        if Task.isCancelled {
+            return Result(enrichedCount: enrichedCount, linkedNotes: 0, linksCreated: 0)
+        }
 
         onProgress?(Progress(fraction: 0.7, phase: "시맨틱 연결 중..."))
         let linkResult = await SemanticLinker(pkmRoot: pkmRoot).linkNotes(filePaths: successPaths)
 
-        if !mdPaths.isEmpty {
+        // Skip the hash save on cancellation — persisting stale hashes here
+        // would overwrite what a newer pipeline has already recorded
+        if !mdPaths.isEmpty && !Task.isCancelled {
             onProgress?(Progress(fraction: 0.9, phase: "해시 캐시 저장 중..."))
             let cache = ContentHashCache(pkmRoot: pkmRoot)
             await cache.load()
-            await cache.updateHashes(mdPaths)
+            await cache.updateHashes(mdPaths + Array(linkResult.modifiedFiles))
             await cache.save()
         }
 

@@ -15,12 +15,14 @@ actor AIService {
     private init() {}
 
     /// Current provider (read from UserDefaults)
+    /// Fallback must match AppState.init and Classifier.currentProvider —
+    /// a mismatch routes calls to a provider the user never configured
     private var currentProvider: AIProvider {
         if let saved = UserDefaults.standard.string(forKey: AppState.DefaultsKey.selectedProvider),
            let provider = AIProvider(rawValue: saved) {
             return provider
         }
-        return .gemini
+        return .claudeCLI
     }
 
     /// Alternate provider for fallback

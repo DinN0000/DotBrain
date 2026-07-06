@@ -2,7 +2,7 @@ import XCTest
 @testable import DotBrain
 
 final class NoteIndexGeneratorTests: XCTestCase {
-    func testPruneStaleRemovesEntriesForDeletedFolders() throws {
+    func testPruneStaleRemovesEntriesForDeletedFolders() async throws {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("DotBrain-NoteIndexPruneTests-\(UUID().uuidString)")
         let metaDir = root.appendingPathComponent(".meta")
@@ -41,7 +41,7 @@ final class NoteIndexGeneratorTests: XCTestCase {
         let indexPath = metaDir.appendingPathComponent("note-index.json")
         try JSONEncoder().encode(index).write(to: indexPath)
 
-        NoteIndexGenerator(pkmRoot: root.path).pruneStale(existingFolders: ["1_Project/scope-connect"])
+        await NoteIndexGenerator(pkmRoot: root.path).pruneStale(existingFolders: ["1_Project/scope-connect"])
 
         let pruned = try JSONDecoder().decode(NoteIndex.self, from: Data(contentsOf: indexPath))
 

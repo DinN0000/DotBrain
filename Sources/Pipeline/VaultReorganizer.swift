@@ -144,6 +144,16 @@ struct VaultReorganizer {
                 continue
             }
 
+            // Skip AI-failure fallbacks (confidence 0) and empty targets —
+            // both would plan a move to the bare category root
+            if classification.confidence <= 0 {
+                continue
+            }
+            if classification.para != .project
+                && classification.targetFolder.trimmingCharacters(in: .whitespaces).isEmpty {
+                continue
+            }
+
             // For matched project files, use project name as targetFolder
             // so needsMove correctly reflects actual destination
             var adjusted = classification
@@ -197,6 +207,11 @@ struct VaultReorganizer {
 
             // Double-check: never create new project folders (should be filtered in scan already)
             if analysis.recommended.para == .project && analysis.recommended.project == nil {
+                continue
+            }
+            // Double-check: never move to a bare category root
+            if analysis.recommended.para != .project
+                && analysis.recommended.targetFolder.trimmingCharacters(in: .whitespaces).isEmpty {
                 continue
             }
 

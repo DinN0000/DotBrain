@@ -9,7 +9,28 @@ class StatisticsService {
     }
 
     private let pkmRoot: String
-    static var sharedPkmRoot: String?  // Set by AppState on init
+
+    /// Set by AppState on init; read from detached pipeline tasks, so the
+    /// backing store needs a lock
+    private static let rootLock = NSLock()
+    private static var _sharedPkmRoot: String?
+    static var sharedPkmRoot: String? {
+        get { rootLock.withLock { _sharedPkmRoot } }
+        set { rootLock.withLock { _sharedPkmRoot = newValue } }
+    }
+
+    /// One APIUsageLogger per vault root — per-call instances each do their
+    /// own load-modify-write and lose concurrent entries
+    private static let loggerLock = NSLock()
+    private static var loggerCache: [String: APIUsageLogger] = [:]
+    static func usageLogger(for root: String) -> APIUsageLogger {
+        loggerLock.withLock {
+            if let logger = loggerCache[root] { return logger }
+            let logger = APIUsageLogger(pkmRoot: root)
+            loggerCache[root] = logger
+            return logger
+        }
+    }
 
     /// Actor for atomic read-modify-write on UserDefaults (replaces DispatchQueue serial)
     private static let atomicActor = StatisticsActor()
@@ -73,8 +94,8 @@ class StatisticsService {
     static func logTokenUsage(operation: String, model: String, usage: TokenUsage, isEstimated: Bool = false) {
         guard let root = sharedPkmRoot else { return }
         let cost = APIUsageLogger.calculateCost(model: model, usage: usage)
+        let logger = usageLogger(for: root)
         Task {
-            let logger = APIUsageLogger(pkmRoot: root)
             await logger.log(operation: operation, model: model, usage: usage, isEstimated: isEstimated)
         }
         addApiCost(cost)
@@ -87,12 +108,18 @@ class StatisticsService {
         var count = 0
         while let element = enumerator.nextObject() as? String {
             let name = (element as NSString).lastPathComponent
-            if !name.hasPrefix(".") && !name.hasPrefix("_") {
+            let fullPath = (dirPath as NSString).appendingPathComponent(element)
+            if name.hasPrefix(".") || name.hasPrefix("_") {
+                // Skip whole hidden/underscore subtrees (matches collectAllMdFiles)
                 var isDir: ObjCBool = false
-                let fullPath = (dirPath as NSString).appendingPathComponent(element)
-                if fm.fileExists(atPath: fullPath, isDirectory: &isDir), !isDir.boolValue {
-                    count += 1
+                if fm.fileExists(atPath: fullPath, isDirectory: &isDir), isDir.boolValue {
+                    enumerator.skipDescendants()
                 }
+                continue
+            }
+            var isDir: ObjCBool = false
+            if fm.fileExists(atPath: fullPath, isDirectory: &isDir), !isDir.boolValue {
+                count += 1
             }
         }
         return count

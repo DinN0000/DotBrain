@@ -40,6 +40,10 @@ struct Frontmatter {
     var area: String?
     var projects: [String]?
     var file: FileMetadata?
+    /// Raw lines of frontmatter keys this parser doesn't own (Obsidian
+    /// aliases, cssclasses, user-defined properties, ...). Preserved verbatim
+    /// so parse→stringify rewrites never drop user metadata.
+    var unknownRawLines: [String] = []
 
     static let frontmatterRegex = try! NSRegularExpression(
         pattern: "^---\\r?\\n([\\s\\S]*?)\\r?\\n---\\r?\\n?",
@@ -63,22 +67,62 @@ struct Frontmatter {
         return (frontmatter, body)
     }
 
+    /// Frontmatter keys this parser owns; anything else is preserved verbatim
+    private static let recognizedKeys: Set<String> = [
+        "para", "tags", "created", "status", "summary", "source",
+        "project", "area", "projects", "file",
+    ]
+
     /// Lightweight YAML parser (no external deps, frontmatter-level only)
     private static func parseYamlSimple(_ yaml: String) -> Frontmatter {
         var fm = Frontmatter(tags: [])
         var currentKey = ""
         var currentArray: [String]?
         var currentObj: [String: String]?
+        var collectingUnknown = false
+        var blockScalarKey: String?
+        var blockScalarLines: [String] = []
+
+        func flushPending() {
+            if let arr = currentArray {
+                applyValue(to: &fm, key: currentKey, array: arr)
+                currentArray = nil
+            }
+            if let obj = currentObj {
+                applyObject(to: &fm, key: currentKey, obj: obj)
+                currentObj = nil
+            }
+            if let key = blockScalarKey {
+                applyScalar(to: &fm, key: key, value: blockScalarLines.joined(separator: "\n"))
+                blockScalarKey = nil
+                blockScalarLines = []
+            }
+            collectingUnknown = false
+        }
 
         for line in yaml.split(separator: "\n", omittingEmptySubsequences: false) {
             let trimmed = line.trimmingCharacters(in: .init(charactersIn: "\r"))
 
             if trimmed.isEmpty { continue }
 
+            let isContinuation = trimmed.first == " " || trimmed.first == "\t"
+
+            // Unknown-key block: keep every continuation line byte-for-byte
+            if collectingUnknown, isContinuation || trimmed.hasPrefix("- ") {
+                fm.unknownRawLines.append(trimmed)
+                continue
+            }
+
+            // Block scalar body (summary: >- etc.) for a recognized key
+            if blockScalarKey != nil, isContinuation {
+                blockScalarLines.append(trimmed.trimmingCharacters(in: .whitespaces))
+                continue
+            }
+
             // Array item (  - value)
             if trimmed.hasPrefix("  - "), currentArray != nil {
                 let value = String(trimmed.dropFirst(4)).trimmingCharacters(in: .whitespaces)
-                currentArray?.append(value)
+                currentArray?.append(unescapeYAML(value))
                 continue
             }
 
@@ -89,21 +133,13 @@ struct Frontmatter {
                         .trimmingCharacters(in: .whitespaces)
                     let val = trimmed[trimmed.index(after: colonIdx)...]
                         .trimmingCharacters(in: .whitespaces)
-                        .trimmingCharacters(in: .init(charactersIn: "\"'"))
-                    currentObj?[key] = val
+                    currentObj?[key] = unescapeYAML(val)
                 }
                 continue
             }
 
-            // Save previous array/object
-            if let arr = currentArray {
-                applyValue(to: &fm, key: currentKey, array: arr)
-                currentArray = nil
-            }
-            if let obj = currentObj {
-                applyObject(to: &fm, key: currentKey, obj: obj)
-                currentObj = nil
-            }
+            // Save previous array/object/block scalar
+            flushPending()
 
             // Top-level key: value — find first colon outside quotes
             guard let colonIdx = findFirstUnquotedColon(in: trimmed) else { continue }
@@ -112,6 +148,13 @@ struct Frontmatter {
 
             currentKey = key
 
+            // Keys we don't own are collected raw and re-emitted by stringify()
+            if !recognizedKeys.contains(key) {
+                collectingUnknown = true
+                fm.unknownRawLines.append(trimmed)
+                continue
+            }
+
             if rawValue.isEmpty {
                 // Could be array or object on next lines
                 currentArray = []
@@ -119,32 +162,68 @@ struct Frontmatter {
                 continue
             }
 
+            // Block scalar indicator — body lines follow, joined with newlines
+            if ["|", ">", "|-", ">-", "|+", ">+"].contains(rawValue) {
+                blockScalarKey = key
+                blockScalarLines = []
+                continue
+            }
+
             // Inline array [a, b, c]
             if rawValue.hasPrefix("[") && rawValue.hasSuffix("]") {
                 let inner = String(rawValue.dropFirst().dropLast())
                 let items = inner.split(separator: ",").map {
-                    $0.trimmingCharacters(in: .whitespaces)
-                        .trimmingCharacters(in: .init(charactersIn: "\"'"))
+                    unescapeYAML($0.trimmingCharacters(in: .whitespaces))
                 }
                 applyValue(to: &fm, key: key, array: items)
                 continue
             }
 
             // Scalar value
-            let cleaned = rawValue
-                .trimmingCharacters(in: .init(charactersIn: "\"'"))
-            applyScalar(to: &fm, key: key, value: cleaned)
+            applyScalar(to: &fm, key: key, value: unescapeYAML(rawValue))
         }
 
         // Flush remaining
-        if let arr = currentArray {
-            applyValue(to: &fm, key: currentKey, array: arr)
-        }
-        if let obj = currentObj {
-            applyObject(to: &fm, key: currentKey, obj: obj)
-        }
+        flushPending()
 
         return fm
+    }
+
+    /// Inverse of escapeYAML. Strips one layer of quoting and unescapes;
+    /// unquoted values are returned untouched (a bare trailing quote or
+    /// apostrophe is real content, not quoting).
+    private static func unescapeYAML(_ raw: String) -> String {
+        if raw.count >= 2, raw.hasPrefix("\""), raw.hasSuffix("\"") {
+            let inner = raw.dropFirst().dropLast()
+            var result = ""
+            result.reserveCapacity(inner.count)
+            var pendingEscape = false
+            for ch in inner {
+                if pendingEscape {
+                    switch ch {
+                    case "n": result.append("\n")
+                    case "r": result.append("\r")
+                    case "t": result.append("\t")
+                    case "\"", "\\": result.append(ch)
+                    default:
+                        result.append("\\")
+                        result.append(ch)
+                    }
+                    pendingEscape = false
+                } else if ch == "\\" {
+                    pendingEscape = true
+                } else {
+                    result.append(ch)
+                }
+            }
+            if pendingEscape { result.append("\\") }
+            return result
+        }
+        if raw.count >= 2, raw.hasPrefix("'"), raw.hasSuffix("'") {
+            return String(raw.dropFirst().dropLast())
+                .replacingOccurrences(of: "''", with: "'")
+        }
+        return raw
     }
 
     /// Find first colon that is not inside single or double quotes
@@ -197,24 +276,32 @@ struct Frontmatter {
 
     // MARK: - Stringify
 
-    /// Escape a string for safe YAML output
-    private static func escapeYAML(_ value: String) -> String {
-        let needsQuoting = value.contains(":") || value.contains("#") ||
-            value.contains("\"") || value.contains("'") ||
-            value.contains("\n") || value.contains("\r") ||
-            value.hasPrefix(" ") || value.hasSuffix(" ") ||
-            value.hasPrefix("[") || value.hasPrefix("{") ||
-            value == "true" || value == "false" ||
-            value == "null" || value == "yes" || value == "no"
-
-        guard needsQuoting else { return value }
-
+    /// Always double-quote and escape a value for YAML output
+    private static func quoteYAML(_ value: String) -> String {
         let escaped = value
             .replacingOccurrences(of: "\\", with: "\\\\")
             .replacingOccurrences(of: "\"", with: "\\\"")
             .replacingOccurrences(of: "\n", with: "\\n")
             .replacingOccurrences(of: "\r", with: "\\r")
         return "\"\(escaped)\""
+    }
+
+    /// Escape a string for safe YAML output (quotes only when needed)
+    private static func escapeYAML(_ value: String) -> String {
+        // Leading YAML indicators (aliases, anchors, block markers, ...)
+        // break strict parsers like Obsidian's unless quoted
+        let leadingIndicator = value.first.map { "-?*&!|>%@`,".contains($0) } ?? false
+        let needsQuoting = value.contains(":") || value.contains("#") ||
+            value.contains("\"") || value.contains("'") ||
+            value.contains("\n") || value.contains("\r") ||
+            value.hasPrefix(" ") || value.hasSuffix(" ") ||
+            value.hasPrefix("[") || value.hasPrefix("{") ||
+            leadingIndicator ||
+            value == "true" || value == "false" ||
+            value == "null" || value == "yes" || value == "no"
+
+        guard needsQuoting else { return value }
+        return quoteYAML(value)
     }
 
     /// Convert frontmatter to YAML string (with --- delimiters)
@@ -225,11 +312,7 @@ struct Frontmatter {
             lines.append("para: \(para.rawValue)")
         }
         if !tags.isEmpty {
-            let escapedTags = tags.map { tag in
-                let escaped = tag.replacingOccurrences(of: "\\", with: "\\\\")
-                                 .replacingOccurrences(of: "\"", with: "\\\"")
-                return "\"\(escaped)\""
-            }
+            let escapedTags = tags.map { Frontmatter.quoteYAML($0) }
             lines.append("tags: [\(escapedTags.joined(separator: ", "))]")
         }
         if let created = created {
@@ -260,6 +343,7 @@ struct Frontmatter {
             lines.append("  format: \(Frontmatter.escapeYAML(file.format))")
             lines.append("  size_kb: \(file.sizeKB)")
         }
+        lines.append(contentsOf: unknownRawLines)
 
         lines.append("---")
         return lines.joined(separator: "\n")
@@ -283,6 +367,7 @@ struct Frontmatter {
         if existing.area != nil { merged.area = existing.area }
         if let p = existing.projects, !p.isEmpty { merged.projects = p }
         if existing.file != nil { merged.file = existing.file }
+        if !existing.unknownRawLines.isEmpty { merged.unknownRawLines = existing.unknownRawLines }
 
         return merged.stringify() + "\n" + body
     }

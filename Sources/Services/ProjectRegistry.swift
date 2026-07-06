@@ -47,7 +47,7 @@ struct ProjectRegistry {
             return
         }
         do {
-            try data.write(to: URL(fileURLWithPath: path))
+            try data.write(to: URL(fileURLWithPath: path), options: .atomic)
         } catch {
             NSLog("[ProjectRegistry] 저장 실패: %@", error.localizedDescription)
         }

@@ -88,6 +88,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 self?.updateMenuBarIcon()
             }
             .store(in: &cancellables)
+
+        // menuBarFace reads backgroundTaskName — background pipelines must
+        // also refresh the icon, not just inbox processing
+        appState.$backgroundTaskName
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in
+                self?.updateMenuBarIcon()
+            }
+            .store(in: &cancellables)
     }
 
     private func updateMenuBarIcon() {

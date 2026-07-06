@@ -333,7 +333,13 @@ struct OnboardingView: View {
             guard step == 1 else { return }
             fdaGranted = AppState.hasFullDiskAccess()
             while !fdaGranted && step == 1 {
-                try? await Task.sleep(for: .seconds(1))
+                // Exit on cancellation — swallowing it turns this into a
+                // main-actor busy loop once the popover closes
+                do {
+                    try await Task.sleep(for: .seconds(1))
+                } catch {
+                    return
+                }
                 fdaGranted = AppState.hasFullDiskAccess()
             }
         }
@@ -931,7 +937,7 @@ struct OnboardingView: View {
     private func onboardingCLIStatus(for provider: AIProvider) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             if provider == .claudeCLI {
-                if ClaudeCLIClient.isAvailable() {
+                if appState.hasClaudeCLI {
                     Label(L10n.Onboarding.cliInstalled, systemImage: "checkmark.circle.fill")
                         .font(.caption)
                         .foregroundColor(.green)
@@ -1278,6 +1284,9 @@ struct OnboardingView: View {
     private func completeOnboarding() {
         UserDefaults.standard.set(true, forKey: AppState.DefaultsKey.onboardingCompleted)
         UserDefaults.standard.removeObject(forKey: AppState.DefaultsKey.onboardingStep)
+        // Without this, every API usage log in the first session is dropped
+        // (logTokenUsage guards on sharedPkmRoot)
+        StatisticsService.sharedPkmRoot = appState.pkmRootPath
         AICompanionService.updateIfNeeded(pkmRoot: appState.pkmRootPath)
         appState.setupWatchdog()
         appState.currentScreen = .inbox

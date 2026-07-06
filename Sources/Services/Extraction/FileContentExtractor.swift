@@ -60,7 +60,16 @@ enum FileContentExtractor {
         // Read up to 1MB for analysis (covers most markdown notes)
         let chunkSize = 1024 * 1024
         let data = handle.readData(ofLength: chunkSize)
-        guard let fullText = String(data: data, encoding: .utf8), !fullText.isEmpty else {
+        // readData may cut in the middle of a multi-byte UTF-8 character;
+        // try trimming up to 3 trailing bytes to recover a valid string
+        var decoded: String?
+        for trim in 0...min(3, data.count) {
+            if let s = String(data: data.dropLast(trim), encoding: .utf8) {
+                decoded = s
+                break
+            }
+        }
+        guard let fullText = decoded, !fullText.isEmpty else {
             return "[읽기 실패: \((filePath as NSString).lastPathComponent)]"
         }
 

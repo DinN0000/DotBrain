@@ -179,19 +179,25 @@ struct VaultAuditor {
             }
             var modified = false
             for replacement in replacements {
+                var replacedThis = false
                 let oldLink = "[[\(replacement.target)]]"
                 let newLink = "[[\(replacement.suggestion)]]"
                 if content.contains(oldLink) {
                     content = content.replacingOccurrences(of: oldLink, with: newLink)
-                    modified = true
-                    linksFixed += 1
+                    replacedThis = true
                 }
                 // Also handle pipe alias variant
                 let oldPipePrefix = "[[\(replacement.target)|"
                 let newPipePrefix = "[[\(replacement.suggestion)|"
                 if content.contains(oldPipePrefix) {
                     content = content.replacingOccurrences(of: oldPipePrefix, with: newPipePrefix)
-                    // Already counted above if both exist; only count if not yet counted
+                    replacedThis = true
+                }
+                // Single flag per replacement: pipe-only files must still be
+                // written, and target+alias in one file counts once
+                if replacedThis {
+                    modified = true
+                    linksFixed += 1
                 }
             }
             if modified {

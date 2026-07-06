@@ -631,10 +631,21 @@ struct SettingsView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color.primary.opacity(0.03))
         .cornerRadius(8)
-        .onAppear { checkForUpdate() }
+        .onAppear {
+            // Throttle the automatic check — every settings visit hitting the
+            // GitHub API burns rate limit and flashes errors when offline
+            let last = UserDefaults.standard.double(forKey: "lastUpdateCheckAt")
+            if Date().timeIntervalSince1970 - last > 3600 {
+                checkForUpdate(silent: true)
+            }
+        }
     }
 
     private func checkForUpdate() {
+        checkForUpdate(silent: false)
+    }
+
+    private func checkForUpdate(silent: Bool) {
         guard !isCheckingUpdate else { return }
         isCheckingUpdate = true
         updateError = nil
@@ -652,6 +663,7 @@ struct SettingsView: View {
                 if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
                    let tag = json["tag_name"] as? String {
                     let version = tag.hasPrefix("v") ? String(tag.dropFirst()) : tag
+                    UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: "lastUpdateCheckAt")
                     await MainActor.run {
                         isUpdateAnimating = false
                         withAnimation { updateIconRotation = 0 }
@@ -662,7 +674,7 @@ struct SettingsView: View {
                     await MainActor.run {
                         isUpdateAnimating = false
                         withAnimation { updateIconRotation = 0 }
-                        updateError = L10n.Settings.cantReadRelease
+                        if !silent { updateError = L10n.Settings.cantReadRelease }
                         isCheckingUpdate = false
                     }
                 }
@@ -670,7 +682,7 @@ struct SettingsView: View {
                 await MainActor.run {
                     isUpdateAnimating = false
                     withAnimation { updateIconRotation = 0 }
-                    updateError = L10n.Settings.checkFailed(error.localizedDescription)
+                    if !silent { updateError = L10n.Settings.checkFailed(error.localizedDescription) }
                     isCheckingUpdate = false
                 }
             }
@@ -685,19 +697,33 @@ struct SettingsView: View {
             return
         }
         let safeTag = "v\(version)"
-        let updateScript = """
-        #!/bin/bash
-        sleep 2
-        curl -sL https://raw.githubusercontent.com/DinN0000/DotBrain/main/install.sh -o /tmp/dotbrain_install.sh
-        bash /tmp/dotbrain_install.sh "\(safeTag)"
-        rm -f /tmp/dotbrain_install.sh /tmp/dotbrain_update.sh
-        """
-        let scriptPath = "/tmp/dotbrain_update.sh"
         do {
+            // Isolated per-user temp dir (0700): fixed world-writable /tmp
+            // paths let another local user pre-plant the script or symlink
+            // the log target
+            let workDir = (NSTemporaryDirectory() as NSString)
+                .appendingPathComponent("dotbrain-update-\(UUID().uuidString)")
+            try FileManager.default.createDirectory(
+                atPath: workDir,
+                withIntermediateDirectories: true,
+                attributes: [.posixPermissions: 0o700]
+            )
+            let installPath = (workDir as NSString).appendingPathComponent("install.sh")
+            let scriptPath = (workDir as NSString).appendingPathComponent("update.sh")
+            let logPath = (workDir as NSString).appendingPathComponent("update.log")
+
+            let updateScript = """
+            #!/bin/bash
+            set -euo pipefail
+            sleep 2
+            curl -fsSL --retry 2 "https://raw.githubusercontent.com/DinN0000/DotBrain/\(safeTag)/install.sh" -o "\(installPath)"
+            bash "\(installPath)" "\(safeTag)"
+            rm -rf "\(workDir)"
+            """
             try updateScript.write(toFile: scriptPath, atomically: true, encoding: .utf8)
             let process = Process()
             process.executableURL = URL(fileURLWithPath: "/bin/bash")
-            process.arguments = ["-c", "nohup bash \(scriptPath) > /tmp/dotbrain_update.log 2>&1 &"]
+            process.arguments = ["-c", "nohup bash \"\(scriptPath)\" > \"\(logPath)\" 2>&1 &"]
             try process.run()
             stopLaunchAgentForUpdate()
         } catch {

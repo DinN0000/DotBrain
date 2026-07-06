@@ -129,7 +129,16 @@ struct VaultSearcher {
                     guard let handle = FileHandle(forReadingAtPath: filePath) else { continue }
                     let data = handle.readData(ofLength: 65536)
                     handle.closeFile()
-                    guard let content = String(data: data, encoding: .utf8) else { continue }
+                    // The 64KB cut may split a multi-byte UTF-8 character —
+                    // trim up to 3 trailing bytes instead of dropping the note
+                    var decoded: String?
+                    for trim in 0...min(3, data.count) {
+                        if let s = String(data: data.dropLast(trim), encoding: .utf8) {
+                            decoded = s
+                            break
+                        }
+                    }
+                    guard let content = decoded else { continue }
 
                     let (frontmatter, body) = Frontmatter.parse(markdown: content)
                     if body.range(of: queryLower, options: .caseInsensitive) != nil {

@@ -31,6 +31,9 @@ final class InboxWatchdog {
 
     /// Start watching the inbox folder
     func start() {
+        // Re-arm safety: release any existing source/fd first
+        if source != nil { stop() }
+
         // Only watch if folder already exists — never create it
         guard FileManager.default.fileExists(atPath: folderPath) else {
             scheduleRetry()
@@ -52,10 +55,21 @@ final class InboxWatchdog {
             queue: DispatchQueue.global(qos: .utility)
         )
 
-        source.setEventHandler { [weak self] in
-            // Bridge from GCD to MainActor
+        source.setEventHandler { [weak self, weak source] in
+            guard let source else { return }
+            // The fd tracks the old inode after delete/rename — the watch is
+            // dead and must be re-armed on the new folder. Flags must be read
+            // on the handler queue, before the MainActor hop resets them.
+            let flags = source.data
             Task { @MainActor [weak self] in
-                self?.handleChange()
+                guard let self else { return }
+                if flags.contains(.delete) || flags.contains(.rename) {
+                    self.stop()
+                    self.retryCount = 0
+                    self.start()
+                } else {
+                    self.handleChange()
+                }
             }
         }
 

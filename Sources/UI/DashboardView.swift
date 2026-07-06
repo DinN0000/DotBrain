@@ -7,6 +7,7 @@ struct DashboardView: View {
 
     @State private var selectedActivity: ActivityEntry?
     @State private var healthScanTask: Task<Void, Never>?
+    @State private var statsTask: Task<Void, Never>?
 
     // Cached PARA counts to avoid recalculation on every render
     private var projectCount: Int { stats.byCategory["project"] ?? 0 }
@@ -193,6 +194,8 @@ struct DashboardView: View {
         .onDisappear {
             healthScanTask?.cancel()
             healthScanTask = nil
+            statsTask?.cancel()
+            statsTask = nil
         }
         .onChange(of: appState.currentScreen) { newScreen in
             if newScreen == .dashboard {
@@ -205,8 +208,14 @@ struct DashboardView: View {
     }
 
     private func refreshStats() {
-        let service = StatisticsService(pkmRoot: appState.pkmRootPath)
-        stats = service.collectStatistics()
+        // Full-vault enumeration must not run on the main thread
+        let root = appState.pkmRootPath
+        statsTask?.cancel()
+        statsTask = Task.detached(priority: .utility) {
+            let result = StatisticsService(pkmRoot: root).collectStatistics()
+            if Task.isCancelled { return }
+            await MainActor.run { stats = result }
+        }
         scanHealthSummary()
     }
 

@@ -32,6 +32,15 @@ struct NoteIndex: Codable, Sendable {
 
 // MARK: - Generator
 
+/// Serializes every note-index.json writer. The index has multiple async
+/// writers (pipelines, UI refresh, startup bootstrap) whose load-modify-write
+/// cycles would otherwise interleave and silently drop entries. The closures
+/// are synchronous, so actor reentrancy cannot split a cycle.
+private actor NoteIndexWriteQueue {
+    static let shared = NoteIndexWriteQueue()
+    func perform(_ work: @Sendable () -> Void) { work() }
+}
+
 /// Generates and maintains .meta/note-index.json for AI vault navigation.
 /// Replaces MOCGenerator with a single JSON index that AI tools can read efficiently.
 struct NoteIndexGenerator: Sendable {
@@ -54,115 +63,145 @@ struct NoteIndexGenerator: Sendable {
 
     /// Incremental update: re-scan only the specified folders, merge into existing index
     func updateForFolders(_ folderPaths: Set<String>) async {
-        var index = loadExisting() ?? emptyIndex()
+        await NoteIndexWriteQueue.shared.perform {
+            var index = loadExisting() ?? emptyIndex()
 
-        for folderPath in folderPaths {
-            let folderName = (folderPath as NSString).lastPathComponent
-            let para = PARACategory.fromPath(folderPath) ?? .archive
-            let relFolder = relativePath(folderPath)
-            let includeFolderEntry = folderPath != pathManager.paraPath(for: para)
-
-            // Remove old notes belonging to this folder
-            let keysToRemove = index.notes.keys.filter { index.notes[$0]?.folder == relFolder }
-            for key in keysToRemove {
-                index.notes.removeValue(forKey: key)
+            // Reverse indexes make stale-entry removal O(1) per note instead
+            // of a full key scan per note (quadratic on bootstrap-sized runs)
+            var keysByFolder: [String: Set<String>] = [:]
+            var keysByFileName: [String: Set<String>] = [:]
+            for (key, entry) in index.notes {
+                keysByFolder[entry.folder, default: []].insert(key)
+                keysByFileName[(key as NSString).lastPathComponent, default: []].insert(key)
             }
 
-            // Scan and add fresh entries
-            let (folderEntry, noteEntries) = scanFolder(
-                folderPath: folderPath,
-                folderName: folderName,
-                para: para,
-                includeFolderEntry: includeFolderEntry
+            func removeNote(_ key: String) {
+                guard let entry = index.notes.removeValue(forKey: key) else { return }
+                keysByFolder[entry.folder]?.remove(key)
+                keysByFileName[(key as NSString).lastPathComponent]?.remove(key)
+            }
+            func insertNote(_ key: String, _ entry: NoteIndexEntry) {
+                index.notes[key] = entry
+                keysByFolder[entry.folder, default: []].insert(key)
+                keysByFileName[(key as NSString).lastPathComponent, default: []].insert(key)
+            }
+
+            for folderPath in folderPaths {
+                let folderName = (folderPath as NSString).lastPathComponent
+                let para = PARACategory.fromPath(folderPath) ?? .archive
+                let relFolder = relativePath(folderPath)
+                let includeFolderEntry = folderPath != pathManager.paraPath(for: para)
+
+                // Remove old notes belonging to this folder
+                for key in Array(keysByFolder[relFolder] ?? []) {
+                    removeNote(key)
+                }
+
+                // Scan and add fresh entries
+                let (folderEntry, noteEntries) = scanFolder(
+                    folderPath: folderPath,
+                    folderName: folderName,
+                    para: para,
+                    includeFolderEntry: includeFolderEntry
+                )
+
+                if let folderEntry {
+                    index.folders[relFolder] = folderEntry
+                } else {
+                    index.folders.removeValue(forKey: relFolder)
+                }
+
+                for (notePath, entry) in noteEntries {
+                    // Remove stale entries for the same filename in other folders
+                    let fileName = (notePath as NSString).lastPathComponent
+                    for key in Array(keysByFileName[fileName] ?? []) where key != notePath {
+                        removeNote(key)
+                    }
+                    insertNote(notePath, entry)
+                }
+            }
+
+            index = NoteIndex(
+                version: NoteIndexGenerator.currentVersion,
+                updated: Self.timestamp(),
+                folders: index.folders,
+                notes: index.notes
             )
 
-            if let folderEntry {
-                index.folders[relFolder] = folderEntry
-            } else {
-                index.folders.removeValue(forKey: relFolder)
-            }
-
-            for (notePath, entry) in noteEntries {
-                // Remove stale entries for the same filename in other folders
-                let fileName = (notePath as NSString).lastPathComponent
-                let staleKeys = index.notes.keys.filter { key in
-                    key != notePath && (key as NSString).lastPathComponent == fileName
-                }
-                for key in staleKeys {
-                    index.notes.removeValue(forKey: key)
-                }
-                index.notes[notePath] = entry
-            }
+            save(index)
         }
-
-        index = NoteIndex(
-            version: NoteIndexGenerator.currentVersion,
-            updated: Self.timestamp(),
-            folders: index.folders,
-            notes: index.notes
-        )
-
-        save(index)
     }
 
     /// Full regeneration: scan all PARA categories from scratch
     func regenerateAll() async {
-        let fm = FileManager.default
-        let categories: [(PARACategory, String)] = [
-            (.project, pathManager.projectsPath),
-            (.area, pathManager.areaPath),
-            (.resource, pathManager.resourcePath),
-            (.archive, pathManager.archivePath),
-        ]
+        await NoteIndexWriteQueue.shared.perform {
+            let fm = FileManager.default
+            let categories: [(PARACategory, String)] = [
+                (.project, pathManager.projectsPath),
+                (.area, pathManager.areaPath),
+                (.resource, pathManager.resourcePath),
+                (.archive, pathManager.archivePath),
+            ]
 
-        var allFolders: [String: FolderIndexEntry] = [:]
-        var allNotes: [String: NoteIndexEntry] = [:]
+            var allFolders: [String: FolderIndexEntry] = [:]
+            var allNotes: [String: NoteIndexEntry] = [:]
 
-        for (para, basePath) in categories {
-            let (_, rootNoteEntries) = scanFolder(
-                folderPath: basePath,
-                folderName: (basePath as NSString).lastPathComponent,
-                para: para,
-                includeFolderEntry: false
-            )
-            for (notePath, noteEntry) in rootNoteEntries {
-                allNotes[notePath] = noteEntry
-            }
-
-            guard let entries = try? fm.contentsOfDirectory(atPath: basePath) else { continue }
-
-            for entry in entries.sorted() {
-                guard !entry.hasPrefix("."), !entry.hasPrefix("_") else { continue }
-                let folderPath = (basePath as NSString).appendingPathComponent(entry)
-                var isDir: ObjCBool = false
-                guard fm.fileExists(atPath: folderPath, isDirectory: &isDir), isDir.boolValue else { continue }
-                guard pathManager.isPathSafe(folderPath) else { continue }
-
-                let (folderEntry, noteEntries) = scanFolder(
-                    folderPath: folderPath,
-                    folderName: entry,
+            for (para, basePath) in categories {
+                let (_, rootNoteEntries) = scanFolder(
+                    folderPath: basePath,
+                    folderName: (basePath as NSString).lastPathComponent,
                     para: para,
-                    includeFolderEntry: true
+                    includeFolderEntry: false
                 )
-
-                let relFolder = relativePath(folderPath)
-                if let folderEntry {
-                    allFolders[relFolder] = folderEntry
-                }
-                for (notePath, noteEntry) in noteEntries {
+                for (notePath, noteEntry) in rootNoteEntries {
                     allNotes[notePath] = noteEntry
                 }
+
+                // Recurse into nested subfolders (vault allows up to depth 3);
+                // scanFolder itself stays non-recursive so each folder keeps
+                // its own entry
+                guard let enumerator = fm.enumerator(atPath: basePath) else { continue }
+                var subfolderPaths: [String] = []
+                while let element = enumerator.nextObject() as? String {
+                    let name = (element as NSString).lastPathComponent
+                    let folderPath = (basePath as NSString).appendingPathComponent(element)
+                    var isDir: ObjCBool = false
+                    guard fm.fileExists(atPath: folderPath, isDirectory: &isDir), isDir.boolValue else { continue }
+                    if name.hasPrefix(".") || name.hasPrefix("_") {
+                        enumerator.skipDescendants()
+                        continue
+                    }
+                    guard pathManager.isPathSafe(folderPath) else { continue }
+                    subfolderPaths.append(folderPath)
+                }
+
+                for folderPath in subfolderPaths.sorted() {
+                    let (folderEntry, noteEntries) = scanFolder(
+                        folderPath: folderPath,
+                        folderName: (folderPath as NSString).lastPathComponent,
+                        para: para,
+                        includeFolderEntry: true
+                    )
+
+                    let relFolder = relativePath(folderPath)
+                    if let folderEntry {
+                        allFolders[relFolder] = folderEntry
+                    }
+                    for (notePath, noteEntry) in noteEntries {
+                        allNotes[notePath] = noteEntry
+                    }
+                }
             }
+
+            let index = NoteIndex(
+                version: NoteIndexGenerator.currentVersion,
+                updated: Self.timestamp(),
+                folders: allFolders,
+                notes: allNotes
+            )
+
+            save(index)
         }
-
-        let index = NoteIndex(
-            version: NoteIndexGenerator.currentVersion,
-            updated: Self.timestamp(),
-            folders: allFolders,
-            notes: allNotes
-        )
-
-        save(index)
     }
 
     /// Remove index entries for folders that no longer exist on disk.
@@ -170,7 +209,13 @@ struct NoteIndexGenerator: Sendable {
     /// folders leave stale folder/note entries behind and pollute index-first
     /// context. Call this during vault checks to keep the index consistent.
     /// Mirrors `FolderRelationStore.pruneStale`.
-    func pruneStale(existingFolders: Set<String>) {
+    func pruneStale(existingFolders: Set<String>) async {
+        await NoteIndexWriteQueue.shared.perform {
+            pruneStaleSync(existingFolders: existingFolders)
+        }
+    }
+
+    private func pruneStaleSync(existingFolders: Set<String>) {
         guard var index = loadExisting() else { return }
 
         // Notes directly under a PARA category root (not in a subfolder) are

@@ -196,6 +196,7 @@ struct VaultInspectorView: View {
                 Spacer()
             } else {
                 let isBusy = appState.reorgPhase == .scanning || appState.reorgPhase == .executing
+                    || appState.isAnyTaskRunning
                 ScrollView {
                     LazyVStack(spacing: 0) {
                         ForEach(flatItems) { item in
@@ -801,6 +802,13 @@ struct VaultInspectorView: View {
     }
 
     private func startReorgScan() {
+        // Mutual exclusion with vault check / inbox pipelines — running both
+        // moves files while the other pipeline is writing them
+        guard !appState.isAnyTaskRunning else {
+            appState.reorgPhase = .idle
+            appState.taskBlockedAlert = "'\(appState.backgroundTaskName ?? "파일 처리")' 진행 중입니다. 완료 또는 취소 후 다시 시도해주세요."
+            return
+        }
         appState.reorgProgress = 0
         appState.reorgStatus = L10n.VaultInspector.preparingScan
         appState.backgroundTaskKind = .reorgScan
@@ -919,6 +927,10 @@ struct VaultInspectorView: View {
     private func executeReorgPlan() {
         let selected = appState.reorgAnalyses.filter { $0.isSelected && $0.needsMove }
         guard !selected.isEmpty else { return }
+        guard !appState.isAnyTaskRunning else {
+            appState.taskBlockedAlert = "'\(appState.backgroundTaskName ?? "파일 처리")' 진행 중입니다. 완료 또는 취소 후 다시 시도해주세요."
+            return
+        }
 
         appState.reorgPhase = .executing
         appState.reorgProgress = 0

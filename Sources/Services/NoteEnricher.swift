@@ -127,6 +127,10 @@ struct NoteEnricher: Sendable {
             var index = 0
 
             while index < uniqueFiles.count || !group.isEmpty {
+                if Task.isCancelled {
+                    group.cancelAll()
+                    break
+                }
                 // Launch up to 3 concurrent tasks
                 while active < 3 && index < uniqueFiles.count {
                     let filePath = uniqueFiles[index]
