@@ -312,6 +312,7 @@ struct InboxProcessor {
                 pkmRoot: pkmRoot,
                 userGuidance: userGuidance,
                 forcedCategory: forcedDestination?.categoryConstraint,
+                skipPreciseStage: forcedDestination?.folderName != nil,
                 onProgress: { [onProgress] progress, status in
                     // Map classifier's 0-1 progress to our 0.3-0.7 range
                     let mappedProgress = 0.3 + progress * 0.4

@@ -24,6 +24,35 @@ final class InboxGuidanceTests: XCTestCase {
         XCTAssertTrue(section.contains("반드시"))
     }
 
+    // MARK: - Classifier.needsPreciseStage
+
+    private func stage1(confidence: Double) -> ClassifyResult.Stage1Item {
+        ClassifyResult.Stage1Item(
+            fileName: "a.md", para: .resource, tags: [], summary: "",
+            confidence: confidence, project: nil, targetFolder: nil
+        )
+    }
+
+    // Stage 2 is both refinement (low confidence) and recovery (no Stage 1
+    // result at all). With a forced folder the refinement is wasted — its
+    // para/folder get overwritten — but recovery must always run.
+    func testNeedsPreciseStageSkipsRefinementButKeepsRecovery() {
+        XCTAssertTrue(
+            Classifier.needsPreciseStage(nil, skipRefinement: true, threshold: 0.6),
+            "missing Stage 1 result must still recover via Stage 2"
+        )
+        XCTAssertFalse(
+            Classifier.needsPreciseStage(stage1(confidence: 0.3), skipRefinement: true, threshold: 0.6),
+            "low-confidence refinement is skipped when the destination is forced"
+        )
+        XCTAssertTrue(
+            Classifier.needsPreciseStage(stage1(confidence: 0.3), skipRefinement: false, threshold: 0.6)
+        )
+        XCTAssertFalse(
+            Classifier.needsPreciseStage(stage1(confidence: 0.9), skipRefinement: false, threshold: 0.6)
+        )
+    }
+
     // MARK: - InboxProcessor.enforcing(destination:)
 
     private func result(

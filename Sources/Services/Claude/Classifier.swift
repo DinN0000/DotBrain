@@ -56,6 +56,7 @@ actor Classifier {
         pkmRoot: String = "",
         userGuidance: String? = nil,
         forcedCategory: PARACategory? = nil,
+        skipPreciseStage: Bool = false,
         onProgress: ((Double, String) -> Void)? = nil
     ) async throws -> [ClassifyResult] {
         guard !files.isEmpty else { return [] }
@@ -142,8 +143,11 @@ actor Classifier {
         // All stage result maps are keyed by filePath — fileName collides when
         // different folders contain same-named files (회의록.md, README.md)
         let uncertainFiles = files.filter { file in
-            guard let s1 = stage1Results[file.filePath] else { return true }
-            return s1.confidence < confidenceThreshold
+            Self.needsPreciseStage(
+                stage1Results[file.filePath],
+                skipRefinement: skipPreciseStage,
+                threshold: confidenceThreshold
+            )
         }
 
         var stage2Results: [String: ClassifyResult.Stage2Item] = [:]
@@ -447,6 +451,20 @@ actor Classifier {
     }
 
     // MARK: - Prompt Builders (Korean)
+
+    /// Whether a file escalates to the Stage 2 precise model. Stage 2 is both
+    /// refinement (low Stage 1 confidence) and recovery (no Stage 1 result at
+    /// all); skipRefinement drops only the refinement half — used when a
+    /// forced destination overwrites the refined para/folder anyway.
+    /// Pure — unit tested.
+    static func needsPreciseStage(
+        _ stage1: ClassifyResult.Stage1Item?,
+        skipRefinement: Bool,
+        threshold: Double
+    ) -> Bool {
+        guard let stage1 else { return true }
+        return !skipRefinement && stage1.confidence < threshold
+    }
 
     /// Prompt section carrying the user's free-text instruction and/or a hard
     /// category constraint into classification. Pure — unit tested.
