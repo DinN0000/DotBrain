@@ -6,7 +6,7 @@ import Foundation
 enum AICompanionService {
 
     /// Bump this when companion file content changes — triggers overwrite on existing vaults
-    static let version = 15
+    static let version = 16
 
     /// Generate all AI companion files in the PKM root (first-time only)
     static func generateAll(pkmRoot: String) throws {
@@ -212,9 +212,12 @@ enum AICompanionService {
 
     1. **이 파일(CLAUDE.md)** 을 먼저 읽어 구조와 규칙을 파악
     2. **`.meta/note-index.json`** 읽기: 전체 볼트 구조, 노트 메타데이터(태그, 요약, 프로젝트, 상태) 조회
-    3. **프론트매터 필드**로 필터링: `project`, `status: active`, `para` 등
-    4. **`## Related Notes` 링크** 따라가기: 관계 유형(prerequisite > project > reference > related) 우선순위로 탐색
-    5. **Grep 검색**으로 태그/키워드 기반 탐색 (아래 검색 패턴 참조)
+    3. **폴더 개체 페이지(`<폴더명>.md`)** 를 폴더 이해의 진입점으로 사용:
+       DotBrain 마커 섹션에 AI가 유지하는 종합(개요 · 최근 흐름 · 핵심 노트)이 있음.
+       마커 밖은 사용자 콘텐츠이므로 수정 금지
+    4. **프론트매터 필드**로 필터링: `project`, `status: active`, `para` 등
+    5. **`## Related Notes` 링크** 따라가기: 관계 유형(prerequisite > project > reference > related) 우선순위로 탐색
+    6. **Grep 검색**으로 태그/키워드 기반 탐색 (아래 검색 패턴 참조)
 
     ### 노트 인덱스 (`.meta/note-index.json`)
 
