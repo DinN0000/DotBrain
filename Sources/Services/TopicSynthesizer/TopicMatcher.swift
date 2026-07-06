@@ -136,3 +136,136 @@ struct TopicMatcher: Sendable {
         """
     }
 }
+
+// MARK: - AI integration
+
+extension TopicMatcher {
+    /// Vault-relative path with the same canonicalization as NoteIndexGenerator
+    /// (resolve symlinks, strip root, NFC-normalize). Returns nil for paths
+    /// outside the vault.
+    static func relativePath(_ absolutePath: String, pkmRoot: String) -> String? {
+        let canonicalRoot = URL(fileURLWithPath: pkmRoot).resolvingSymlinksInPath().path
+        let rootPrefix = canonicalRoot.hasSuffix("/") ? canonicalRoot : canonicalRoot + "/"
+        let canonicalPath = URL(fileURLWithPath: absolutePath).resolvingSymlinksInPath().path
+        guard canonicalPath.hasPrefix(rootPrefix) else { return nil }
+        return String(canonicalPath.dropFirst(rootPrefix.count))
+            .precomposedStringWithCanonicalMapping
+    }
+
+    /// Assign new notes (absolute paths) to topics. Pass an empty array for a
+    /// pool-only re-evaluation (Vault Check). Applies results to TopicStore
+    /// and returns the affected topic ids for resynthesis.
+    func assign(newNotePaths: [String]) async -> TopicMatchOutcome {
+        let store = TopicStore(pkmRoot: pkmRoot)
+        let pathManager = PKMPathManager(root: pkmRoot)
+        guard let noteIndex = pathManager.loadNoteIndex() else {
+            return TopicMatchOutcome(affectedTopicIds: [], createdTopicIds: [])
+        }
+
+        let relNew = newNotePaths.compactMap { Self.relativePath($0, pkmRoot: pkmRoot) }
+        let newEntries = relNew.compactMap { noteIndex.notes[$0] }
+        let index = store.load()
+        let poolEntries = index.unassigned.compactMap { noteIndex.notes[$0] }
+
+        // Nothing worth an AI call: no new notes and a pool below the
+        // new-topic threshold with no topics to match against
+        let worthEvaluating = !newEntries.isEmpty ||
+            (poolEntries.count >= Self.newTopicMemberThreshold)
+        guard worthEvaluating else {
+            store.addUnassigned(relNew)
+            return TopicMatchOutcome(affectedTopicIds: [], createdTopicIds: [])
+        }
+
+        let candidates = Self.candidateTopics(for: newEntries + poolEntries, topics: index.topics)
+        let newNoteInputs = newEntries.map { entry in
+            (path: entry.path,
+             summary: entry.summary,
+             excerpt: NoteExcerptReader.read(
+                (pkmRoot as NSString).appendingPathComponent(entry.path),
+                maxBytes: Self.bodyExcerptBytes) ?? "")
+        }
+        let poolInputs = poolEntries.map { (path: $0.path, summary: $0.summary) }
+        let prompt = Self.buildPrompt(newNotes: newNoteInputs, candidates: candidates,
+                                      unassigned: poolInputs)
+
+        let response: AIResponse
+        do {
+            response = try await AIService.shared.sendFastWithUsage(maxTokens: 1500, message: prompt)
+        } catch {
+            NSLog("[TopicMatcher] 배정 실패: %@", error.localizedDescription)
+            store.addUnassigned(relNew)
+            return TopicMatchOutcome(affectedTopicIds: [], createdTopicIds: [])
+        }
+        if let usage = response.usage {
+            let model = await AIService.shared.fastModel
+            StatisticsService.logTokenUsage(operation: "topic-assignment", model: model,
+                                            usage: usage, isEstimated: response.isEstimated)
+        }
+
+        guard let parsed = Self.parseResponse(response.text) else {
+            NSLog("[TopicMatcher] 응답 파싱 실패")
+            store.addUnassigned(relNew)
+            return TopicMatchOutcome(affectedTopicIds: [], createdTopicIds: [])
+        }
+
+        return apply(parsed, relNew: relNew, noteIndex: noteIndex, store: store)
+    }
+
+    /// Apply validated assignments and proposals to the store
+    private func apply(
+        _ parsed: TopicMatchResponse,
+        relNew: [String],
+        noteIndex: NoteIndex,
+        store: TopicStore
+    ) -> TopicMatchOutcome {
+        var index = store.load()
+        let liveIds = Set(index.topics.map(\.id))
+        let existingNotePaths = Set(noteIndex.notes.keys)
+        var affected = Set<String>()
+        var consumed = Set<String>()
+
+        // Assignments to existing topics — note and topic must both be real
+        for assignment in parsed.assignments {
+            guard existingNotePaths.contains(assignment.note) else { continue }
+            for topicId in assignment.topics where liveIds.contains(topicId) {
+                guard let pos = index.topics.firstIndex(where: { $0.id == topicId }) else { continue }
+                if !index.topics[pos].members.contains(assignment.note) {
+                    index.topics[pos].members.append(assignment.note)
+                    affected.insert(topicId)
+                }
+                consumed.insert(assignment.note)
+            }
+        }
+
+        // Validated new-topic proposals
+        let proposals = Self.validateProposals(
+            parsed.proposals,
+            existingNotePaths: existingNotePaths,
+            existingTopicIds: liveIds,
+            deletedTopicIds: Set(index.deletedTopics)
+        )
+        var created: [String] = []
+        let pathManager = PKMPathManager(root: pkmRoot)
+        for proposal in proposals {
+            let id = Self.slug(from: proposal.name)
+            let safeName = pathManager.sanitizeFolderName(proposal.name)
+            let pagePath = "_Wiki/\(safeName).md"
+            guard !index.topics.contains(where: { $0.pagePath == pagePath }) else { continue }
+            index.topics.append(Topic(
+                id: id, name: safeName, pagePath: pagePath,
+                members: proposal.members,
+                keywords: proposal.keywords.map { $0.lowercased() },
+                summary: "", membersHash: "",
+                created: Frontmatter.today(), lastSynthesized: nil
+            ))
+            created.append(id)
+            affected.insert(id)
+            consumed.formUnion(proposal.members)
+        }
+
+        store.save(index)
+        store.removeUnassigned(Array(consumed))
+        store.addUnassigned(relNew.filter { !consumed.contains($0) })
+        return TopicMatchOutcome(affectedTopicIds: affected.sorted(), createdTopicIds: created)
+    }
+}
