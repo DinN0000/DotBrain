@@ -148,6 +148,17 @@ struct PARAMover {
             }
 
             let srcPath = (sourceDir as NSString).appendingPathComponent(rawEntry)
+
+            // The source folder's entity page describes a folder that no longer
+            // exists after the merge — trash it (resynthesized on the next pass).
+            // A same-named file without markers is user content and moves as usual.
+            if entry == "\(safeSource).md",
+               let content = try? String(contentsOfFile: srcPath, encoding: .utf8),
+               FolderNotePage.isEntityPage(content),
+               (try? fm.trashItem(at: URL(fileURLWithPath: srcPath), resultingItemURL: nil)) != nil {
+                continue
+            }
+
             var dstPath = (targetDir as NSString).appendingPathComponent(entry)
 
             // Resolve name conflicts with timestamp
@@ -231,6 +242,17 @@ struct PARAMover {
 
         // Move (rename) the folder
         try fm.moveItem(atPath: oldDir, toPath: newDir)
+
+        // The entity page follows the folder's new name; a user-authored
+        // folder note (no markers) keeps its old name.
+        let oldPagePath = (newDir as NSString).appendingPathComponent("\(safeOld).md")
+        let newPagePath = (newDir as NSString).appendingPathComponent("\(safeNew).md")
+        if fm.fileExists(atPath: oldPagePath), !fm.fileExists(atPath: newPagePath),
+           let pageContent = try? String(contentsOfFile: oldPagePath, encoding: .utf8),
+           FolderNotePage.isEntityPage(pageContent) {
+            try? fm.moveItem(atPath: oldPagePath, toPath: newPagePath)
+        }
+
         try? FolderDescriptionStore.move(
             name: safeOld,
             from: category,
