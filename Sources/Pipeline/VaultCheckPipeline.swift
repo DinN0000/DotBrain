@@ -181,10 +181,22 @@ struct VaultCheckPipeline {
         let finalSnapshot = linkDetector.buildCurrentSnapshot(allNotes: allNotesForSnapshot)
         linkDetector.saveSnapshot(finalSnapshot)
 
-        // Update hashes for all changed files plus everything the linker and
-        // tag normalizer wrote — unhashed writes trigger pointless AI
-        // re-processing on the next check
-        await cache.updateHashes(Array(allChangedFiles.union(linkResult.modifiedFiles)))
+        // Phase 5.5: refresh entity pages for changed folders
+        if Task.isCancelled { return .empty }
+        onProgress(Progress(phase: "폴더 페이지 갱신 중...", fraction: 0.95))
+        let synthesized = await FolderSynthesizer(pkmRoot: pkmRoot).synthesizeFolders(dirtyFolders)
+        if !synthesized.isEmpty {
+            // Written folder notes carry a fresh overview — re-index those
+            // folders so the index summary picks it up immediately
+            await indexGenerator.updateForFolders(
+                Set(synthesized.map { ($0 as NSString).deletingLastPathComponent })
+            )
+        }
+
+        // Update hashes for all changed files plus everything the linker,
+        // tag normalizer, and folder synthesizer wrote — unhashed writes
+        // trigger pointless AI re-processing on the next check
+        await cache.updateHashes(Array(allChangedFiles.union(linkResult.modifiedFiles).union(synthesized)))
         await cache.save()
 
         StatisticsService.recordActivity(
