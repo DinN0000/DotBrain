@@ -1,9 +1,82 @@
 import Foundation
 
+/// Structured constraints resolved from a free-text inbox instruction.
+struct InboxInstructionResolution: Sendable {
+    let destination: InboxDestination?
+    let includedFileNames: Set<String>?
+    let inboxCount: Int
+}
+
 actor NaturalCommandService {
     static let shared = NaturalCommandService()
 
     private init() {}
+
+    /// Resolve a free-text inbox instruction into structured constraints.
+    /// An instruction the planner cannot map to a structured plan is not an
+    /// error — it still guides classification as raw prompt text. Explicit
+    /// failures (a named folder that doesn't exist, empty inbox, no matching
+    /// files) keep surfacing.
+    func resolveInboxInstruction(
+        _ instruction: String,
+        pkmRoot: String
+    ) async throws -> InboxInstructionResolution {
+        let inboxPaths = InboxScanner(pkmRoot: pkmRoot).scan()
+        let pathManager = PKMPathManager(root: pkmRoot)
+        let fileManager = FileManager.default
+        var folders: [NaturalCommandFolder] = []
+        for category in PARACategory.allCases {
+            let basePath = pathManager.paraPath(for: category)
+            guard let entries = try? fileManager.contentsOfDirectory(atPath: basePath) else { continue }
+            for entry in entries where !entry.hasPrefix(".") && !entry.hasPrefix("_") {
+                let path = (basePath as NSString).appendingPathComponent(entry)
+                var isDirectory: ObjCBool = false
+                guard fileManager.fileExists(atPath: path, isDirectory: &isDirectory),
+                      isDirectory.boolValue else { continue }
+                folders.append(NaturalCommandFolder(name: entry, category: category))
+            }
+        }
+        let context = NaturalCommandContext(
+            surface: .inbox,
+            inboxCount: inboxPaths.count,
+            folders: folders,
+            inboxFileNames: inboxPaths.map { ($0 as NSString).lastPathComponent }
+        )
+
+        let resolved: NaturalCommandPlan?
+        do {
+            resolved = try await plan(instruction, context: context)
+        } catch NaturalCommandError.unsupported {
+            resolved = nil
+        }
+        let (destination, included) = try Self.applying(resolved, inboxFileNames: context.inboxFileNames)
+        return InboxInstructionResolution(
+            destination: destination,
+            includedFileNames: included,
+            inboxCount: inboxPaths.count
+        )
+    }
+
+    /// Turn a validated plan into inbox constraints. nil plan = guidance-only
+    /// (no destination, no file filter). Pure — unit tested.
+    static func applying(
+        _ plan: NaturalCommandPlan?,
+        inboxFileNames: [String]
+    ) throws -> (destination: InboxDestination?, includedFileNames: Set<String>?) {
+        guard let plan else { return (nil, nil) }
+
+        var destination: InboxDestination?
+        if plan.action == .processInboxToFolder, let category = plan.targetCategory {
+            destination = InboxDestination(category: category, folderName: plan.folderName)
+        }
+        var selected = Set(inboxFileNames)
+        if let included = plan.includedFileNames { selected = Set(included) }
+        if let excluded = plan.excludedFileNames { selected.subtract(excluded) }
+        guard !selected.isEmpty else {
+            throw NaturalCommandError.unavailable(L10n.NaturalCommand.noMatchingFiles)
+        }
+        return (destination, selected)
+    }
 
     func plan(_ input: String, context: NaturalCommandContext) async throws -> NaturalCommandPlan {
         let trimmed = input.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -157,13 +230,13 @@ actor NaturalCommandService {
             // Category-only destination ("Project에 넣어줘"): folderName stays
             // nil and classification is constrained to the category downstream.
             var resolvedName: String?
-            if plan.folderName != nil {
+            if let name = plan.folderName {
                 guard let existing = existingFolder(
-                    named: plan.folderName,
+                    named: name,
                     category: category,
                     in: context
                 ) else {
-                    throw NaturalCommandError.folderNotFound(plan.folderName ?? "")
+                    throw NaturalCommandError.folderNotFound(name)
                 }
                 resolvedName = existing.name
             }

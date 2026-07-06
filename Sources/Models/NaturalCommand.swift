@@ -23,6 +23,10 @@ struct InboxDestination: Equatable, Sendable {
     /// nil = category-only destination: classification is constrained to the
     /// category and a folder is chosen per file.
     let folderName: String?
+
+    /// The classifier-level constraint — set only for category-only destinations;
+    /// a named folder is enforced after classification instead.
+    var categoryConstraint: PARACategory? { folderName == nil ? category : nil }
 }
 
 struct NaturalCommandPlan: Codable, Equatable, Identifiable {

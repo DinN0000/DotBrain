@@ -448,9 +448,6 @@ actor Classifier {
 
     // MARK: - Prompt Builders (Korean)
 
-    /// Build the static system prompt shared across Stage 1 and Stage 2.
-    /// Contains role instruction, vault context, classification rules.
-    /// Called once per classify batch for prompt caching.
     /// Prompt section carrying the user's free-text instruction and/or a hard
     /// category constraint into classification. Pure — unit tested.
     static func userDirectiveSection(guidance: String?, forcedCategory: PARACategory?) -> String {
@@ -471,6 +468,9 @@ actor Classifier {
         """
     }
 
+    /// Build the static system prompt shared across Stage 1 and Stage 2.
+    /// Contains role instruction, vault context, classification rules.
+    /// Called once per classify batch for prompt caching.
     private func buildSystemPrompt(
         projectContext: String,
         subfolderContext: String,
@@ -478,8 +478,8 @@ actor Classifier {
         areaContext: String,
         tagVocabulary: String,
         correctionContext: String,
-        userGuidance: String? = nil,
-        forcedCategory: PARACategory? = nil
+        userGuidance: String?,
+        forcedCategory: PARACategory?
     ) -> String {
         let directiveSection = Self.userDirectiveSection(
             guidance: userGuidance,

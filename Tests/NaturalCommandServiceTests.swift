@@ -174,6 +174,39 @@ final class NaturalCommandServiceTests: XCTestCase {
         XCTAssertEqual(validated.targetCategory, .project)
     }
 
+    // MARK: - applying(_:inboxFileNames:) — plan → inbox constraints
+
+    func testApplyingNilPlanMeansGuidanceOnly() throws {
+        let (destination, included) = try NaturalCommandService.applying(nil, inboxFileNames: ["a.md", "b.md"])
+        XCTAssertNil(destination)
+        XCTAssertNil(included)
+    }
+
+    func testApplyingCategoryOnlyPlanBuildsConstrainedDestination() throws {
+        let plan = NaturalCommandPlan(
+            action: .processInboxToFolder,
+            category: nil, sourceCategory: nil, targetCategory: .project,
+            folderName: nil, newName: nil
+        )
+        let (destination, included) = try NaturalCommandService.applying(plan, inboxFileNames: ["a.md"])
+        XCTAssertEqual(destination, InboxDestination(category: .project, folderName: nil))
+        XCTAssertEqual(included, ["a.md"])
+    }
+
+    func testApplyingExclusionSubtractsAndEmptySelectionThrows() throws {
+        var plan = NaturalCommandPlan(
+            action: .processInbox,
+            category: nil, sourceCategory: nil, targetCategory: nil,
+            folderName: nil, newName: nil
+        )
+        plan.excludedFileNames = ["a.md"]
+        let (_, included) = try NaturalCommandService.applying(plan, inboxFileNames: ["a.md", "b.md"])
+        XCTAssertEqual(included, ["b.md"])
+
+        plan.excludedFileNames = ["a.md", "b.md"]
+        XCTAssertThrowsError(try NaturalCommandService.applying(plan, inboxFileNames: ["a.md", "b.md"]))
+    }
+
     // "Inbox에 있는것들 Project에 넣어줘" — category-level destination without
     // a folder name is a valid plan: classification is constrained to the
     // category and the AI picks a folder per file.

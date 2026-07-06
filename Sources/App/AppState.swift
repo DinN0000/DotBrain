@@ -775,55 +775,14 @@ final class AppState: ObservableObject {
                    !instruction.isEmpty {
                     classifierGuidance = instruction
                     processingStatus = L10n.Processing.interpretingInstruction
-                    let inboxPaths = InboxScanner(pkmRoot: pkmRootPath).scan()
-                    processingTotalCount = inboxPaths.count
-                    let pathManager = PKMPathManager(root: pkmRootPath)
-                    let fileManager = FileManager.default
-                    var folders: [NaturalCommandFolder] = []
-                    for category in PARACategory.allCases {
-                        let basePath = pathManager.paraPath(for: category)
-                        guard let entries = try? fileManager.contentsOfDirectory(atPath: basePath) else { continue }
-                        for entry in entries where !entry.hasPrefix(".") && !entry.hasPrefix("_") {
-                            let path = (basePath as NSString).appendingPathComponent(entry)
-                            var isDirectory: ObjCBool = false
-                            guard fileManager.fileExists(atPath: path, isDirectory: &isDirectory),
-                                  isDirectory.boolValue else { continue }
-                            folders.append(NaturalCommandFolder(name: entry, category: category))
-                        }
-                    }
-                    let context = NaturalCommandContext(
-                        surface: .inbox,
-                        inboxCount: inboxPaths.count,
-                        folders: folders,
-                        inboxFileNames: inboxPaths.map { ($0 as NSString).lastPathComponent }
+                    let resolution = try await NaturalCommandService.shared.resolveInboxInstruction(
+                        instruction,
+                        pkmRoot: pkmRootPath
                     )
-                    // The instruction that doesn't fit a structured plan is not
-                    // an error anymore — the raw text still guides the
-                    // classifier below. Explicit failures (e.g. a named folder
-                    // that doesn't exist) keep surfacing.
-                    let plan: NaturalCommandPlan?
-                    do {
-                        plan = try await NaturalCommandService.shared.plan(instruction, context: context)
-                    } catch NaturalCommandError.unsupported {
-                        plan = nil
-                    }
                     guard !Task.isCancelled else { return }
-                    if let plan {
-                        if plan.action == .processInboxToFolder,
-                           let category = plan.targetCategory {
-                            resolvedDestination = InboxDestination(
-                                category: category,
-                                folderName: plan.folderName
-                            )
-                        }
-                        var selected = Set(context.inboxFileNames)
-                        if let included = plan.includedFileNames { selected = Set(included) }
-                        if let excluded = plan.excludedFileNames { selected.subtract(excluded) }
-                        guard !selected.isEmpty else {
-                            throw NaturalCommandError.unavailable(L10n.NaturalCommand.noMatchingFiles)
-                        }
-                        includedFileNames = selected
-                    }
+                    processingTotalCount = resolution.inboxCount
+                    resolvedDestination = resolution.destination
+                    includedFileNames = resolution.includedFileNames
                 }
 
                 let processor = InboxProcessor(

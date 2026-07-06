@@ -24,32 +24,39 @@ struct InboxProcessor {
         var failedPaths: [String] = []
     }
 
+    /// Below this confidence a classification routes to user confirmation.
+    static let confirmationThreshold = 0.5
+
     /// Apply a forced destination to classification results. Pure — unit tested.
-    ///
-    /// Named folder: every file goes there, no questions. Category-only
-    /// (folderName nil): the prompt already constrained classification, so
-    /// in-category results pass through; stragglers get the category forced
-    /// with lowered confidence so the confirmation flow catches them. The
-    /// first `mediaCount` entries are media with no classifiable text — they
-    /// keep their default asset routing under a category-only constraint.
     static func enforcing(
         destination: InboxDestination?,
-        on classifications: [ClassifyResult],
-        mediaCount: Int
+        on classifications: [ClassifyResult]
     ) -> [ClassifyResult] {
         guard let destination else { return classifications }
-        return classifications.enumerated().map { index, classification in
-            var forced = classification
-            if let folderName = destination.folderName {
+
+        // Named folder: every file goes there, no questions.
+        if let folderName = destination.folderName {
+            return classifications.map { classification in
+                var forced = classification
                 forced.para = destination.category
                 forced.targetFolder = folderName
                 forced.project = destination.category == .project ? folderName : nil
                 forced.confidence = 1.0
-            } else if index >= mediaCount, classification.para != destination.category {
-                forced.para = destination.category
-                if destination.category != .project { forced.project = nil }
-                forced.confidence = min(forced.confidence, 0.4)
+                return forced
             }
+        }
+
+        // Category-only: the prompt already constrained classification, so
+        // in-category results pass through; stragglers get the category forced
+        // with confidence below the confirmation gate so the user decides.
+        // Media entries have no classifiable text and keep default routing.
+        return classifications.map { classification in
+            guard !classification.isMediaAsset,
+                  classification.para != destination.category else { return classification }
+            var forced = classification
+            forced.para = destination.category
+            if destination.category != .project { forced.project = nil }
+            forced.confidence = min(forced.confidence, Self.confirmationThreshold - 0.1)
             return forced
         }
     }
@@ -304,7 +311,7 @@ struct InboxProcessor {
                 correctionContext: correctionContext,
                 pkmRoot: pkmRoot,
                 userGuidance: userGuidance,
-                forcedCategory: forcedDestination?.folderName == nil ? forcedDestination?.category : nil,
+                forcedCategory: forcedDestination?.categoryConstraint,
                 onProgress: { [onProgress] progress, status in
                     // Map classifier's 0-1 progress to our 0.3-0.7 range
                     let mappedProgress = 0.3 + progress * 0.4
@@ -322,7 +329,8 @@ struct InboxProcessor {
                 targetFolder: "",
                 project: nil,
                 confidence: 1.0,
-                relatedNotes: []
+                relatedNotes: [],
+                isMediaAsset: true
             )
         }
 
@@ -366,8 +374,7 @@ struct InboxProcessor {
         onPhaseChange?(.linking)
         let enrichedClassifications = Self.enforcing(
             destination: forcedDestination,
-            on: allClassifications,
-            mediaCount: mediaInputs.count
+            on: allClassifications
         )
         onProgress?(0.7, L10n.Processing.preparingMove)
 
@@ -386,7 +393,7 @@ struct InboxProcessor {
             onFileProgress?(i, allInputs.count, input.fileName)
 
             // Low confidence: ask user
-            if classification.confidence < 0.5 {
+            if classification.confidence < Self.confirmationThreshold {
                 needsConfirmation.append(PendingConfirmation(
                     fileName: input.fileName,
                     filePath: input.filePath,

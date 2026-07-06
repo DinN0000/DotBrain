@@ -17,6 +17,14 @@ struct ClassifyResult: Codable {
     var relatedNotes: [RelatedNote] = []
     /// AI's raw project name when fuzzyMatch failed — preserved for user confirmation
     var suggestedProject: String?
+    /// Media files bypass AI classification and keep default asset routing;
+    /// excluded from category-only destination enforcement. Flow-control only —
+    /// deliberately left out of CodingKeys so persisted JSON is unaffected.
+    var isMediaAsset: Bool = false
+
+    private enum CodingKeys: String, CodingKey {
+        case para, tags, summary, targetFolder, project, confidence, relatedNotes, suggestedProject
+    }
 
     /// Stage 1 batch classification item from Haiku
     struct Stage1Item: Codable {

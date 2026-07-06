@@ -26,11 +26,14 @@ final class InboxGuidanceTests: XCTestCase {
 
     // MARK: - InboxProcessor.enforcing(destination:)
 
-    private func result(para: PARACategory, folder: String = "X", confidence: Double = 0.9) -> ClassifyResult {
+    private func result(
+        para: PARACategory, folder: String = "X",
+        confidence: Double = 0.9, isMedia: Bool = false
+    ) -> ClassifyResult {
         ClassifyResult(
             para: para, tags: [], summary: "", targetFolder: folder,
             project: para == .project ? folder : nil,
-            confidence: confidence, relatedNotes: []
+            confidence: confidence, relatedNotes: [], isMediaAsset: isMedia
         )
     }
 
@@ -38,8 +41,7 @@ final class InboxGuidanceTests: XCTestCase {
         let destination = InboxDestination(category: .project, folderName: "DotBrain")
         let out = InboxProcessor.enforcing(
             destination: destination,
-            on: [result(para: .resource), result(para: .archive)],
-            mediaCount: 0
+            on: [result(para: .resource), result(para: .archive)]
         )
         XCTAssertTrue(out.allSatisfy { $0.para == .project && $0.targetFolder == "DotBrain" && $0.confidence == 1.0 })
     }
@@ -51,25 +53,26 @@ final class InboxGuidanceTests: XCTestCase {
         let destination = InboxDestination(category: .project, folderName: nil)
         let out = InboxProcessor.enforcing(
             destination: destination,
-            on: [result(para: .project, folder: "DotBrain"), result(para: .resource, folder: "Swift")],
-            mediaCount: 0
+            on: [result(para: .project, folder: "DotBrain"), result(para: .resource, folder: "Swift")]
         )
         XCTAssertEqual(out[0].para, .project)
         XCTAssertEqual(out[0].targetFolder, "DotBrain")
         XCTAssertEqual(out[0].confidence, 0.9, "in-category result stays untouched")
         XCTAssertEqual(out[1].para, .project)
-        XCTAssertLessThan(out[1].confidence, 0.5, "straggler must route to confirmation")
+        XCTAssertLessThan(
+            out[1].confidence, InboxProcessor.confirmationThreshold,
+            "straggler must route to confirmation"
+        )
     }
 
     // Media files have no classifiable text; under a category-only constraint
     // they keep their default asset routing instead of becoming confirmations.
     func testCategoryOnlyDestinationSkipsMediaEntries() {
         let destination = InboxDestination(category: .project, folderName: nil)
-        let media = result(para: .resource, folder: "", confidence: 1.0)
+        let media = result(para: .resource, folder: "", confidence: 1.0, isMedia: true)
         let out = InboxProcessor.enforcing(
             destination: destination,
-            on: [media, result(para: .resource, folder: "Swift")],
-            mediaCount: 1
+            on: [media, result(para: .resource, folder: "Swift")]
         )
         XCTAssertEqual(out[0].para, .resource, "media entry keeps default routing")
         XCTAssertEqual(out[0].confidence, 1.0)
@@ -78,7 +81,7 @@ final class InboxGuidanceTests: XCTestCase {
 
     func testNilDestinationLeavesResultsAlone() {
         let input = [result(para: .resource), result(para: .area)]
-        let out = InboxProcessor.enforcing(destination: nil, on: input, mediaCount: 0)
+        let out = InboxProcessor.enforcing(destination: nil, on: input)
         XCTAssertEqual(out.map(\.para), input.map(\.para))
         XCTAssertEqual(out.map(\.confidence), input.map(\.confidence))
     }
