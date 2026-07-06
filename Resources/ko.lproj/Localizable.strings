@@ -124,6 +124,7 @@
 "natural_command.execute" = "실행";
 "natural_command.process_inbox" = "인박스 파일을 분류하고 정리합니다.";
 "natural_command.process_inbox_to_folder" = "인박스 파일을 ‘%@’ 폴더(%@)로 정리합니다.";
+"natural_command.process_inbox_to_category" = "인박스 파일을 %@ 카테고리 안에서 정리합니다.";
 "natural_command.create_folder" = "‘%@’ 폴더를 %@에 만듭니다.";
 "natural_command.rename_folder" = "‘%@’ 폴더 이름을 ‘%@’(으)로 바꿉니다.";
 "natural_command.move_folder" = "‘%@’ 폴더를 %@에서 %@로 옮깁니다.";

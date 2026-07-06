@@ -28,7 +28,10 @@ actor NaturalCommandService {
 
         Rules:
         - Use only folder names present in context for rename, move, complete, and reactivate.
-        - On the inbox surface, processInboxToFolder means organize every current Inbox item into one existing folder.
+        - On the inbox surface, processInboxToFolder means organize current Inbox items into a destination.
+          The destination is either one existing folder (set targetCategory and folderName), or a whole
+          PARA category like "Project에 넣어줘" (set targetCategory and leave folderName null — a folder
+          per file is then chosen automatically within that category).
         - For requests like "only these", set includedFileNames. For "except these", set excludedFileNames.
         - Copy Inbox file names exactly from context. Leave both file lists null for all files.
         - On the inbox surface, only processInbox and processInboxToFolder are allowed.
@@ -151,12 +154,18 @@ actor NaturalCommandService {
             guard let category = plan.targetCategory else {
                 throw NaturalCommandError.missingArgument
             }
-            guard let existing = existingFolder(
-                named: plan.folderName,
-                category: category,
-                in: context
-            ) else {
-                throw NaturalCommandError.folderNotFound(plan.folderName ?? "")
+            // Category-only destination ("Project에 넣어줘"): folderName stays
+            // nil and classification is constrained to the category downstream.
+            var resolvedName: String?
+            if plan.folderName != nil {
+                guard let existing = existingFolder(
+                    named: plan.folderName,
+                    category: category,
+                    in: context
+                ) else {
+                    throw NaturalCommandError.folderNotFound(plan.folderName ?? "")
+                }
+                resolvedName = existing.name
             }
             let selection = try validatedFileSelection(plan, context: context)
             return NaturalCommandPlan(
@@ -164,7 +173,7 @@ actor NaturalCommandService {
                 category: nil,
                 sourceCategory: nil,
                 targetCategory: category,
-                folderName: existing.name,
+                folderName: resolvedName,
                 newName: nil,
                 includedFileNames: selection.included,
                 excludedFileNames: selection.excluded

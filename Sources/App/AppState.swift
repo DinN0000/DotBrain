@@ -770,8 +770,10 @@ final class AppState: ObservableObject {
             do {
                 var resolvedDestination: InboxDestination?
                 var includedFileNames: Set<String>?
+                var classifierGuidance: String?
                 if let instruction = instruction?.trimmingCharacters(in: .whitespacesAndNewlines),
                    !instruction.isEmpty {
+                    classifierGuidance = instruction
                     processingStatus = L10n.Processing.interpretingInstruction
                     let inboxPaths = InboxScanner(pkmRoot: pkmRootPath).scan()
                     processingTotalCount = inboxPaths.count
@@ -795,20 +797,33 @@ final class AppState: ObservableObject {
                         folders: folders,
                         inboxFileNames: inboxPaths.map { ($0 as NSString).lastPathComponent }
                     )
-                    let plan = try await NaturalCommandService.shared.plan(instruction, context: context)
+                    // The instruction that doesn't fit a structured plan is not
+                    // an error anymore — the raw text still guides the
+                    // classifier below. Explicit failures (e.g. a named folder
+                    // that doesn't exist) keep surfacing.
+                    let plan: NaturalCommandPlan?
+                    do {
+                        plan = try await NaturalCommandService.shared.plan(instruction, context: context)
+                    } catch NaturalCommandError.unsupported {
+                        plan = nil
+                    }
                     guard !Task.isCancelled else { return }
-                    if plan.action == .processInboxToFolder,
-                       let category = plan.targetCategory,
-                       let folderName = plan.folderName {
-                        resolvedDestination = InboxDestination(category: category, folderName: folderName)
+                    if let plan {
+                        if plan.action == .processInboxToFolder,
+                           let category = plan.targetCategory {
+                            resolvedDestination = InboxDestination(
+                                category: category,
+                                folderName: plan.folderName
+                            )
+                        }
+                        var selected = Set(context.inboxFileNames)
+                        if let included = plan.includedFileNames { selected = Set(included) }
+                        if let excluded = plan.excludedFileNames { selected.subtract(excluded) }
+                        guard !selected.isEmpty else {
+                            throw NaturalCommandError.unavailable(L10n.NaturalCommand.noMatchingFiles)
+                        }
+                        includedFileNames = selected
                     }
-                    var selected = Set(context.inboxFileNames)
-                    if let included = plan.includedFileNames { selected = Set(included) }
-                    if let excluded = plan.excludedFileNames { selected.subtract(excluded) }
-                    guard !selected.isEmpty else {
-                        throw NaturalCommandError.unavailable(L10n.NaturalCommand.noMatchingFiles)
-                    }
-                    includedFileNames = selected
                 }
 
                 let processor = InboxProcessor(
@@ -832,7 +847,8 @@ final class AppState: ObservableObject {
                         }
                     },
                     forcedDestination: resolvedDestination,
-                    includedFileNames: includedFileNames
+                    includedFileNames: includedFileNames,
+                    userGuidance: classifierGuidance
                 )
                 let results = try await processor.process()
                 guard !Task.isCancelled else { return }

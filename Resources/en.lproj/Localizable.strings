@@ -124,6 +124,7 @@
 "natural_command.execute" = "Run";
 "natural_command.process_inbox" = "Classify and organize the Inbox files.";
 "natural_command.process_inbox_to_folder" = "Organize the Inbox files into ‘%@’ in %@.";
+"natural_command.process_inbox_to_category" = "Organize the Inbox files within the %@ category.";
 "natural_command.create_folder" = "Create ‘%@’ in %@.";
 "natural_command.rename_folder" = "Rename ‘%@’ to ‘%@’.";
 "natural_command.move_folder" = "Move ‘%@’ from %@ to %@.";

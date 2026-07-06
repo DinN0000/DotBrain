@@ -20,7 +20,9 @@ struct NaturalCommandContext: Codable {
 
 struct InboxDestination: Equatable, Sendable {
     let category: PARACategory
-    let folderName: String
+    /// nil = category-only destination: classification is constrained to the
+    /// category and a folder is chosen per file.
+    let folderName: String?
 }
 
 struct NaturalCommandPlan: Codable, Equatable, Identifiable {
@@ -58,8 +60,11 @@ struct NaturalCommandPlan: Codable, Equatable, Identifiable {
         case .processInbox:
             return L10n.NaturalCommand.processInbox
         case .processInboxToFolder:
+            guard let folderName else {
+                return L10n.NaturalCommand.processInboxToCategory(targetCategory?.displayName ?? "")
+            }
             return L10n.NaturalCommand.processInboxToFolder(
-                folderName ?? "",
+                folderName,
                 targetCategory?.displayName ?? ""
             )
         case .createFolder:

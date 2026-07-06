@@ -9,6 +9,7 @@ struct InboxProcessor {
     let onPhaseChange: ((ProcessingPhase) -> Void)?
     var forcedDestination: InboxDestination? = nil
     var includedFileNames: Set<String>? = nil
+    var userGuidance: String? = nil
     private static let maxAutoPasses = 3
 
     struct Result {
@@ -21,6 +22,36 @@ struct InboxProcessor {
         /// rescan these (they stay in place and would be re-classified,
         /// double-counting failures and doubling AI cost)
         var failedPaths: [String] = []
+    }
+
+    /// Apply a forced destination to classification results. Pure — unit tested.
+    ///
+    /// Named folder: every file goes there, no questions. Category-only
+    /// (folderName nil): the prompt already constrained classification, so
+    /// in-category results pass through; stragglers get the category forced
+    /// with lowered confidence so the confirmation flow catches them. The
+    /// first `mediaCount` entries are media with no classifiable text — they
+    /// keep their default asset routing under a category-only constraint.
+    static func enforcing(
+        destination: InboxDestination?,
+        on classifications: [ClassifyResult],
+        mediaCount: Int
+    ) -> [ClassifyResult] {
+        guard let destination else { return classifications }
+        return classifications.enumerated().map { index, classification in
+            var forced = classification
+            if let folderName = destination.folderName {
+                forced.para = destination.category
+                forced.targetFolder = folderName
+                forced.project = destination.category == .project ? folderName : nil
+                forced.confidence = 1.0
+            } else if index >= mediaCount, classification.para != destination.category {
+                forced.para = destination.category
+                if destination.category != .project { forced.project = nil }
+                forced.confidence = min(forced.confidence, 0.4)
+            }
+            return forced
+        }
     }
 
     func process() async throws -> Result {
@@ -272,6 +303,8 @@ struct InboxProcessor {
                 tagVocabulary: tagVocabulary,
                 correctionContext: correctionContext,
                 pkmRoot: pkmRoot,
+                userGuidance: userGuidance,
+                forcedCategory: forcedDestination?.folderName == nil ? forcedDestination?.category : nil,
                 onProgress: { [onProgress] progress, status in
                     // Map classifier's 0-1 progress to our 0.3-0.7 range
                     let mappedProgress = 0.3 + progress * 0.4
@@ -331,15 +364,11 @@ struct InboxProcessor {
 
         // Classifications ready for move (semantic linking happens post-move)
         onPhaseChange?(.linking)
-        let enrichedClassifications = allClassifications.map { classification in
-            guard let destination = forcedDestination else { return classification }
-            var forced = classification
-            forced.para = destination.category
-            forced.targetFolder = destination.folderName
-            forced.project = destination.category == .project ? destination.folderName : nil
-            forced.confidence = 1.0
-            return forced
-        }
+        let enrichedClassifications = Self.enforcing(
+            destination: forcedDestination,
+            on: allClassifications,
+            mediaCount: mediaInputs.count
+        )
         onProgress?(0.7, L10n.Processing.preparingMove)
 
         // Move files

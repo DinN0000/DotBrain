@@ -174,6 +174,56 @@ final class NaturalCommandServiceTests: XCTestCase {
         XCTAssertEqual(validated.targetCategory, .project)
     }
 
+    // "Inbox에 있는것들 Project에 넣어줘" — category-level destination without
+    // a folder name is a valid plan: classification is constrained to the
+    // category and the AI picks a folder per file.
+    func testInboxCanTargetCategoryOnly() async throws {
+        let plan = NaturalCommandPlan(
+            action: .processInboxToFolder,
+            category: nil,
+            sourceCategory: nil,
+            targetCategory: .project,
+            folderName: nil,
+            newName: nil
+        )
+        let context = NaturalCommandContext(
+            surface: .inbox,
+            inboxCount: 3,
+            folders: folders
+        )
+
+        let validated = try await NaturalCommandService.shared.validate(plan, context: context)
+
+        XCTAssertNil(validated.folderName)
+        XCTAssertEqual(validated.targetCategory, .project)
+        XCTAssertEqual(validated.action, .processInboxToFolder)
+    }
+
+    // A named folder that does not exist must still fail loudly — silently
+    // scattering files elsewhere would betray the user's explicit target.
+    func testInboxNamedFolderStillFailsWhenMissing() async throws {
+        let plan = NaturalCommandPlan(
+            action: .processInboxToFolder,
+            category: nil,
+            sourceCategory: nil,
+            targetCategory: .project,
+            folderName: "없는폴더",
+            newName: nil
+        )
+        let context = NaturalCommandContext(
+            surface: .inbox,
+            inboxCount: 3,
+            folders: folders
+        )
+
+        do {
+            _ = try await NaturalCommandService.shared.validate(plan, context: context)
+            XCTFail("Expected folderNotFound")
+        } catch NaturalCommandError.folderNotFound {
+            // Expected.
+        }
+    }
+
     func testProjectDescriptionCanBeUpdated() async throws {
         let plan = NaturalCommandPlan(
             action: .updateFolderDescription,

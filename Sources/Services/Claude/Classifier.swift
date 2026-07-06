@@ -54,6 +54,8 @@ actor Classifier {
         tagVocabulary: String = "[]",
         correctionContext: String = "",
         pkmRoot: String = "",
+        userGuidance: String? = nil,
+        forcedCategory: PARACategory? = nil,
         onProgress: ((Double, String) -> Void)? = nil
     ) async throws -> [ClassifyResult] {
         guard !files.isEmpty else { return [] }
@@ -67,7 +69,9 @@ actor Classifier {
             weightedContext: weightedContext,
             areaContext: areaContext,
             tagVocabulary: tagVocabulary,
-            correctionContext: correctionContext
+            correctionContext: correctionContext,
+            userGuidance: userGuidance,
+            forcedCategory: forcedCategory
         )
 
         // Stage 1: Haiku batch classification (dynamic batch size based on file count)
@@ -447,14 +451,40 @@ actor Classifier {
     /// Build the static system prompt shared across Stage 1 and Stage 2.
     /// Contains role instruction, vault context, classification rules.
     /// Called once per classify batch for prompt caching.
+    /// Prompt section carrying the user's free-text instruction and/or a hard
+    /// category constraint into classification. Pure — unit tested.
+    static func userDirectiveSection(guidance: String?, forcedCategory: PARACategory?) -> String {
+        var lines: [String] = []
+        if let guidance, !guidance.isEmpty {
+            lines.append("사용자가 이번 정리에 대해 직접 지시했습니다. 다른 규칙과 충돌하면 이 지시를 우선하세요.")
+            lines.append("지시: \"\(guidance)\"")
+        }
+        if let forcedCategory {
+            lines.append("모든 파일의 para를 반드시 \(forcedCategory.rawValue)로 분류하세요. 폴더 선택도 해당 카테고리 안에서만 하세요.")
+        }
+        guard !lines.isEmpty else { return "" }
+        return """
+
+        ## 사용자 지시 (최우선)
+        \(lines.joined(separator: "\n"))
+
+        """
+    }
+
     private func buildSystemPrompt(
         projectContext: String,
         subfolderContext: String,
         weightedContext: String,
         areaContext: String,
         tagVocabulary: String,
-        correctionContext: String
+        correctionContext: String,
+        userGuidance: String? = nil,
+        forcedCategory: PARACategory? = nil
     ) -> String {
+        let directiveSection = Self.userDirectiveSection(
+            guidance: userGuidance,
+            forcedCategory: forcedCategory
+        )
 
         let weightedSection = weightedContext.isEmpty ? "" : """
 
@@ -487,7 +517,7 @@ actor Classifier {
 
         return """
         당신은 PARA 방법론 기반 문서 분류 전문가입니다.
-
+        \(directiveSection)
         ## 활성 프로젝트 목록
         \(projectContext)
         \(areaSection)

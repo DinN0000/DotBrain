@@ -344,6 +344,7 @@ enum L10n {
         static let execute = tr("natural_command.execute")
         static let processInbox = tr("natural_command.process_inbox")
         static func processInboxToFolder(_ name: String, _ category: String) -> String { tr("natural_command.process_inbox_to_folder", name, category) }
+        static func processInboxToCategory(_ category: String) -> String { tr("natural_command.process_inbox_to_category", category) }
         static func createFolder(_ name: String, _ category: String) -> String { tr("natural_command.create_folder", name, category) }
         static func renameFolder(_ old: String, _ new: String) -> String { tr("natural_command.rename_folder", old, new) }
         static func moveFolder(_ name: String, _ source: String, _ target: String) -> String { tr("natural_command.move_folder", name, source, target) }
