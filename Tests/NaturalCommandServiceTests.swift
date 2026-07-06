@@ -22,6 +22,54 @@ final class NaturalCommandServiceTests: XCTestCase {
         XCTAssertEqual(plan.targetCategory, .resource)
     }
 
+    func testDecodeDropsAmbiguousPipeTypeHintEcho() async throws {
+        // A multi-token echo is not a choice — salvaging the first token
+        // would fabricate a category the model never picked
+        let raw = #"{"action":"processInboxToFolder","category":null,"sourceCategory":null,"targetCategory":"project|area|resource|archive|null","folderName":"DotBrain","newName":null}"#
+
+        let plan = try await NaturalCommandService.shared.decodePlan(raw)
+
+        XCTAssertEqual(plan.action, .processInboxToFolder)
+        XCTAssertNil(plan.targetCategory)
+    }
+
+    func testDecodeSalvagesUnambiguousPipeEcho() async throws {
+        // Exactly one valid token inside the echo — safe to salvage
+        let raw = #"{"action":"processInboxToFolder","category":null,"sourceCategory":null,"targetCategory":"project|null","folderName":"DotBrain","newName":null}"#
+
+        let plan = try await NaturalCommandService.shared.decodePlan(raw)
+
+        XCTAssertEqual(plan.targetCategory, .project)
+    }
+
+    func testDecodeRecoversFromCapitalizedEnumValue() async throws {
+        let raw = #"{"action":"ProcessInboxToFolder","category":null,"sourceCategory":null,"targetCategory":"Project","folderName":"DotBrain","newName":null}"#
+
+        let plan = try await NaturalCommandService.shared.decodePlan(raw)
+
+        XCTAssertEqual(plan.action, .processInboxToFolder)
+        XCTAssertEqual(plan.targetCategory, .project)
+    }
+
+    func testDecodeFallsBackToUnsupportedForUnknownAction() async throws {
+        let raw = #"{"action":"deleteEverything","category":null,"sourceCategory":null,"targetCategory":"project","folderName":"DotBrain","newName":null}"#
+
+        let plan = try await NaturalCommandService.shared.decodePlan(raw)
+
+        XCTAssertEqual(plan.action, .unsupported)
+    }
+
+    func testDecodeFailsOnGenuinelyUnparseableResponse() async throws {
+        let raw = "죄송하지만 요청을 이해하지 못했습니다."
+
+        do {
+            _ = try await NaturalCommandService.shared.decodePlan(raw)
+            XCTFail("Expected invalidResponse for non-JSON prose")
+        } catch NaturalCommandError.invalidResponse {
+            // Expected.
+        }
+    }
+
     func testInboxRejectsFolderMutation() async throws {
         let plan = NaturalCommandPlan(
             action: .createFolder,

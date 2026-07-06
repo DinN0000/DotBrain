@@ -24,7 +24,7 @@ struct InboxDestination: Equatable, Sendable {
 }
 
 struct NaturalCommandPlan: Codable, Equatable, Identifiable {
-    enum Action: String, Codable {
+    enum Action: String, Codable, CaseIterable {
         case processInbox
         case processInboxToFolder
         case createFolder

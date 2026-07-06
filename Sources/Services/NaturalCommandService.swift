@@ -17,8 +17,14 @@ actor NaturalCommandService {
         let system = """
         You translate a user's Korean or English request into exactly one DotBrain command.
         Return one JSON object only. Never return Markdown or explanatory text.
-        Schema:
-        {"action":"processInbox|processInboxToFolder|createFolder|renameFolder|moveFolder|updateFolderDescription|completeProject|reactivateProject|unsupported","category":"project|area|resource|archive|null","sourceCategory":"project|area|resource|archive|null","targetCategory":"project|area|resource|archive|null","folderName":"string|null","newName":"string|null","description":"string|null","includedFileNames":["exact name"]|null,"excludedFileNames":["exact name"]|null}
+        Schema fields (do not copy these type hints as literal values — output only the actual chosen value):
+        - action: exactly one of these words: processInbox, processInboxToFolder, createFolder, renameFolder, moveFolder, updateFolderDescription, completeProject, reactivateProject, unsupported
+        - category, sourceCategory, targetCategory: exactly one of these words: project, area, resource, archive — or JSON null. Never write more than one word and never write a "|" character.
+        - folderName, newName, description: a plain string, or JSON null
+        - includedFileNames, excludedFileNames: a JSON array of exact strings, or JSON null
+
+        Example of a valid response (folderName must come from context, never from this example):
+        {"action":"processInbox","category":null,"sourceCategory":null,"targetCategory":null,"folderName":null,"newName":null,"description":null,"includedFileNames":null,"excludedFileNames":null}
 
         Rules:
         - Use only folder names present in context for rename, move, complete, and reactivate.
@@ -50,13 +56,60 @@ actor NaturalCommandService {
         if let first = trimmed.firstIndex(of: "{"), let last = trimmed.lastIndex(of: "}"), first <= last {
             json = String(trimmed[first...last])
         } else {
+            NSLog("[NaturalCommandService] JSON 중괄호를 찾지 못함 — 응답 처음 200자: %@", String(trimmed.prefix(200)))
             throw NaturalCommandError.invalidResponse
         }
-        guard let data = json.data(using: .utf8),
-              let plan = try? JSONDecoder().decode(NaturalCommandPlan.self, from: data) else {
+        guard let data = json.data(using: .utf8) else {
+            throw NaturalCommandError.invalidResponse
+        }
+        let normalizedData = Self.normalizingEnumFields(in: data) ?? data
+        guard let plan = try? JSONDecoder().decode(NaturalCommandPlan.self, from: normalizedData) else {
+            NSLog("[NaturalCommandService] JSON 디코딩 실패 — 추출된 JSON 처음 200자: %@", String(json.prefix(200)))
             throw NaturalCommandError.invalidResponse
         }
         return plan
+    }
+
+    private static let categoryFieldKeys: Set<String> = ["category", "sourceCategory", "targetCategory"]
+    private static let validCategoryValues = Set(PARACategory.allCases.map(\.rawValue))
+    private static let validActionValues = Set(NaturalCommandPlan.Action.allCases.map(\.rawValue))
+
+    private static func normalizedEnumToken(_ value: Any?, validValues: Set<String>) -> String? {
+        guard let raw = value as? String else { return nil }
+        func match(_ token: String) -> String? {
+            let trimmedToken = token.trimmingCharacters(in: .whitespacesAndNewlines)
+            if validValues.contains(trimmedToken) { return trimmedToken }
+            return validValues.first { $0.caseInsensitiveCompare(trimmedToken) == .orderedSame }
+        }
+        let candidate = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let exact = match(candidate) { return exact }
+        // Model echoed the prompt's "a|b|c" type hint literally. Salvage only
+        // when the echo contains exactly one valid token — picking the first
+        // of several would fabricate a choice the model never made.
+        var salvaged: Set<String> = []
+        for token in candidate.split(separator: "|") {
+            if let found = match(String(token)) { salvaged.insert(found) }
+        }
+        return salvaged.count == 1 ? salvaged.first : nil
+    }
+
+    /// Recover from models that echo the prompt's enum type hints literally
+    /// (e.g. "project|area|resource|archive" or "Project" instead of "project").
+    /// Salvages a valid token when unambiguous; otherwise falls back to a
+    /// value the rest of the pipeline already handles gracefully (nil for
+    /// category fields, "unsupported" for action) instead of failing the
+    /// whole decode.
+    private static func normalizingEnumFields(in data: Data) -> Data? {
+        guard var object = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else { return nil }
+
+        object["action"] = normalizedEnumToken(object["action"], validValues: validActionValues)
+            ?? NaturalCommandPlan.Action.unsupported.rawValue
+
+        for key in categoryFieldKeys where object[key] != nil {
+            object[key] = normalizedEnumToken(object[key], validValues: validCategoryValues) ?? NSNull()
+        }
+
+        return try? JSONSerialization.data(withJSONObject: object)
     }
 
     func validate(_ plan: NaturalCommandPlan, context: NaturalCommandContext) throws -> NaturalCommandPlan {
