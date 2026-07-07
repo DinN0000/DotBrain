@@ -73,9 +73,11 @@ struct InboxPostProcessingPipeline {
 
         // Topic synthesis — the topic-level compounding point: new notes
         // revise cross-folder topic understanding (_Wiki pages)
+        var topicsTouched = 0
         if !mdPaths.isEmpty && !Task.isCancelled {
             onProgress?(Progress(fraction: 0.88, phase: "주제 페이지 갱신 중..."))
             let outcome = await TopicMatcher(pkmRoot: pkmRoot).assign(newNotePaths: mdPaths)
+            topicsTouched = outcome.affectedTopicIds.count
             if !outcome.affectedTopicIds.isEmpty {
                 let relChanged = Set(mdPaths.compactMap {
                     TopicMatcher.relativePath($0, pkmRoot: pkmRoot)
@@ -84,6 +86,9 @@ struct InboxPostProcessingPipeline {
                     topicIds: outcome.affectedTopicIds,
                     changedNotePaths: relChanged
                 )
+                // Assignment happened after the last index write — refresh the
+                // topics overlay so new members are visible index-first
+                await NoteIndexGenerator(pkmRoot: pkmRoot).refreshTopics()
             }
         }
 
@@ -95,6 +100,17 @@ struct InboxPostProcessingPipeline {
             await cache.load()
             await cache.updateHashes(mdPaths + Array(linkResult.modifiedFiles) + synthesized)
             await cache.save()
+        }
+
+        if !Task.isCancelled {
+            let folderNames = folders.map { ($0 as NSString).lastPathComponent }.sorted()
+            let folderSummary = folderNames.count <= 2
+                ? folderNames.joined(separator: ", ")
+                : "\(folderNames.prefix(2).joined(separator: ", ")) 외 \(folderNames.count - 2)곳"
+            VaultLogService(pkmRoot: pkmRoot).append(
+                kind: "ingest",
+                summary: "\(successPaths.count)개 파일 → \(folderSummary), 링크 +\(linkResult.linksCreated), 주제 \(topicsTouched)개 갱신"
+            )
         }
 
         onProgress?(Progress(fraction: 1.0, phase: "링크 후처리 완료"))

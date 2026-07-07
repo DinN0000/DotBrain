@@ -169,7 +169,7 @@ struct LinkAIFilter: Sendable {
         candidates: [LinkCandidateGenerator.Candidate],
         maxResults: Int
     ) -> [FilteredLink] {
-        let cleaned = stripCodeBlock(text)
+        let cleaned = Self.stripCodeBlock(text)
 
         guard let startBracket = cleaned.firstIndex(of: "["),
               let endBracket = cleaned.lastIndex(of: "]") else { return [] }
@@ -196,7 +196,7 @@ struct LinkAIFilter: Sendable {
         notes: [(name: String, summary: String, tags: [String], candidates: [LinkCandidateGenerator.Candidate])],
         maxResultsPerNote: Int
     ) -> [[FilteredLink]] {
-        let cleaned = stripCodeBlock(text)
+        let cleaned = Self.stripCodeBlock(text)
 
         guard let startBracket = cleaned.firstIndex(of: "["),
               let endBracket = cleaned.lastIndex(of: "]") else {
@@ -236,7 +236,7 @@ struct LinkAIFilter: Sendable {
         _ text: String,
         notes: [(name: String, summary: String, tags: [String], siblings: [SiblingInfo])]
     ) -> [[FilteredLink]] {
-        let cleaned = stripCodeBlock(text)
+        let cleaned = Self.stripCodeBlock(text)
 
         guard let startBracket = cleaned.firstIndex(of: "["),
               let endBracket = cleaned.lastIndex(of: "]") else {
@@ -295,7 +295,8 @@ struct LinkAIFilter: Sendable {
         return raw
     }
 
-    private func stripCodeBlock(_ text: String) -> String {
+    /// Shared by the semantic-link parsers (this filter and RelatedNotesPruner)
+    static func stripCodeBlock(_ text: String) -> String {
         text
             .replacingOccurrences(of: #"^```(?:json)?\s*\n?"#, with: "", options: .regularExpression)
             .replacingOccurrences(of: #"\n?```\s*$"#, with: "", options: .regularExpression)

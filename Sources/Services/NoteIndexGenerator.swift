@@ -12,6 +12,10 @@ struct NoteIndexEntry: Codable, Sendable {
     let project: String?
     let status: String?
     let area: String?
+    /// _Wiki topic pages this note is a member of (topic names). Applied as
+    /// an overlay from topic-index.json on every save — never scanned from
+    /// the note itself.
+    var topics: [String]? = nil
 }
 
 /// Folder-level summary entry in the vault index
@@ -204,6 +208,20 @@ struct NoteIndexGenerator: Sendable {
         }
     }
 
+    /// Regenerate when the index is missing or its `updated` timestamp is
+    /// older than maxAge. The companion index-integrity skill tells AI tools
+    /// to expect a fresh index (24h); edits made outside DotBrain pipelines
+    /// never mark folders dirty, so launch enforces the bound.
+    func regenerateIfStale(maxAge: TimeInterval = 24 * 60 * 60) async {
+        if let index = loadExisting(),
+           let updated = ISO8601DateFormatter().date(from: index.updated),
+           Date().timeIntervalSince(updated) <= maxAge {
+            return
+        }
+        await regenerateAll()
+        NSLog("[NoteIndexGenerator] Regenerated missing/stale note-index.json")
+    }
+
     /// Remove index entries for folders that no longer exist on disk.
     /// Incremental `updateForFolders` only re-scans dirty folders, so deleted
     /// folders leave stale folder/note entries behind and pollute index-first
@@ -315,7 +333,7 @@ struct NoteIndexGenerator: Sendable {
                 summary: frontmatter.summary ?? "",
                 project: frontmatter.project,
                 status: frontmatter.status?.rawValue,
-                area: frontmatter.area
+                area: frontmatter.area  // topics filled by the save-time overlay
             )
 
             noteEntries.append((relNotePath, noteEntry))
@@ -387,8 +405,46 @@ struct NoteIndexGenerator: Sendable {
         }
     }
 
-    /// Save index to .meta/note-index.json with prettyPrinted + sortedKeys
+    /// Re-apply topic membership to the existing index without rescanning
+    /// folders. Call after topic assignment, pruning, or tombstoning so the
+    /// `topics` overlay reflects the current topic-index.
+    func refreshTopics() async {
+        await NoteIndexWriteQueue.shared.perform {
+            guard let index = loadExisting() else { return }
+            save(NoteIndex(
+                version: NoteIndexGenerator.currentVersion,
+                updated: Self.timestamp(),
+                folders: index.folders,
+                notes: index.notes
+            ))
+        }
+    }
+
+    /// Topic names keyed by vault-relative note path. TopicStore members use
+    /// the same canonicalization as index keys (TopicMatcher.relativePath).
+    private func topicsByNotePath() -> [String: [String]] {
+        let topicIndex = TopicStore(pkmRoot: pkmRoot).load()
+        var map: [String: [String]] = [:]
+        for topic in topicIndex.topics {
+            for member in topic.members {
+                map[member, default: []].append(topic.name)
+            }
+        }
+        return map.mapValues { $0.sorted() }
+    }
+
+    /// Save index to .meta/note-index.json with prettyPrinted + sortedKeys.
+    /// Topic membership is overlaid on every save so entries never carry a
+    /// stale `topics` value from an earlier folder scan.
     private func save(_ index: NoteIndex) {
+        var index = index
+        let topicMap = topicsByNotePath()
+        index.notes = index.notes.mapValues { entry in
+            var updated = entry
+            updated.topics = topicMap[entry.path]
+            return updated
+        }
+
         let fm = FileManager.default
         let metaDir = (pkmRoot as NSString).appendingPathComponent(".meta")
         let indexPath = metaIndexPath()

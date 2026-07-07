@@ -158,13 +158,7 @@ struct SemanticLinker: Sendable {
         let writer = RelatedNotesWriter()
         let notePathMap = Self.buildNotePathMap(allNotes)
 
-        var reverseLinks: [String: [(name: String, context: String, relation: String)]] = [:]
-        for entry in allLinks {
-            for link in entry.links {
-                let reverseContext = Self.reverseRelationContext[link.relation] ?? "관련 문서"
-                reverseLinks[link.name, default: []].append((name: entry.noteName, context: reverseContext, relation: link.relation))
-            }
-        }
+        let reverseLinks = Self.buildReverseLinks(from: allLinks)
 
         var notesLinked = 0
         var linksCreated = 0
@@ -365,14 +359,7 @@ struct SemanticLinker: Sendable {
             }
         }
 
-        // Collect reverse links into a dictionary so each target file is written only once
-        var reverseLinks: [String: [(name: String, context: String, relation: String)]] = [:]
-        for entry in allLinks {
-            for link in entry.links {
-                let reverseContext = Self.reverseRelationContext[link.relation] ?? "관련 문서"
-                reverseLinks[link.name, default: []].append((name: entry.noteName, context: reverseContext, relation: link.relation))
-            }
-        }
+        let reverseLinks = Self.buildReverseLinks(from: allLinks)
 
         // Write forward links
         var notesLinked = 0
@@ -443,7 +430,34 @@ struct SemanticLinker: Sendable {
         "related": "관련 주제를 다루는 문서",
     ]
 
+    /// Directional relations must not survive a reversal: a forward
+    /// prerequisite/reference says the *target* is read first / cited, so the
+    /// backlink from the target is just a related follow-up. project and
+    /// related are symmetric and keep their type.
+    private static let inverseRelation: [String: String] = [
+        "prerequisite": "related",
+        "project": "project",
+        "reference": "related",
+        "related": "related",
+    ]
+
     // MARK: - Private
+
+    /// Collect reverse entries keyed by target note so each target file is
+    /// written only once. Directional relations are inverted (inverseRelation).
+    private static func buildReverseLinks(
+        from allLinks: [(filePath: String, noteName: String, links: [LinkAIFilter.FilteredLink])]
+    ) -> [String: [(name: String, context: String, relation: String)]] {
+        var reverseLinks: [String: [(name: String, context: String, relation: String)]] = [:]
+        for entry in allLinks {
+            for link in entry.links {
+                let reverseContext = Self.reverseRelationContext[link.relation] ?? "관련 문서"
+                let reverseRelation = Self.inverseRelation[link.relation] ?? "related"
+                reverseLinks[link.name, default: []].append((name: entry.noteName, context: reverseContext, relation: reverseRelation))
+            }
+        }
+        return reverseLinks
+    }
 
     /// Same-named notes in different folders are legal in a PARA vault;
     /// first-wins keeps behavior consistent with name-based [[wiki-link]] resolution.

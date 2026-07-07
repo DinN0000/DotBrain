@@ -177,6 +177,23 @@ struct VaultCheckPipeline {
             onProgress(Progress(phase: status, fraction: 0.72 + progress * 0.23))
         }
 
+        // Phase 5.2: link diet — Related Notes accumulate across runs with no
+        // write-time ceiling; over-cap notes get re-selected down to the best
+        // N. Must run BEFORE the final snapshot so pruned links land in it and
+        // are never misread as user removals on the next check.
+        onProgress(Progress(phase: "링크 재선별 중...", fraction: 0.95))
+        let pruneCandidates = allNotesForSnapshot
+            .filter {
+                $0.existingRelated.count > RelatedNotesPruner.cumulativeCap ||
+                linkResult.modifiedFiles.contains($0.filePath)
+            }
+            .map { RelatedNotesPruner.PruneInput(name: $0.name, filePath: $0.filePath, summary: $0.summary) }
+        let pruneResult = await RelatedNotesPruner(pkmRoot: pkmRoot).pruneAll(candidates: pruneCandidates)
+        if pruneResult.prunedNotes > 0 {
+            NSLog("[VaultCheck] 링크 재선별: %d개 노트에서 %d개 링크 정리",
+                  pruneResult.prunedNotes, pruneResult.removedLinks)
+        }
+
         // Save post-link snapshot (reads file content fresh — captures newly written links)
         let finalSnapshot = linkDetector.buildCurrentSnapshot(allNotes: allNotesForSnapshot)
         linkDetector.saveSnapshot(finalSnapshot)
@@ -214,7 +231,7 @@ struct VaultCheckPipeline {
             TopicMatcher.relativePath($0, pkmRoot: pkmRoot)
         }
         let assignedPaths = Set(topicStore.load().topics.flatMap(\.members))
-        topicStore.addUnassigned(relChangedNotes.filter { !assignedPaths.contains($0) })
+        let evictedFromPool = topicStore.addUnassigned(relChangedNotes.filter { !assignedPaths.contains($0) })
 
         let topicOutcome = await TopicMatcher(pkmRoot: pkmRoot).assign(newNotePaths: [])
         // Pass every live topic — the members-hash gate inside synthesize
@@ -230,11 +247,19 @@ struct VaultCheckPipeline {
             NSLog("[VaultCheck] 고아 주제 %d개 (멤버 2개 미만): %@",
                   orphanTopics.count, orphanTopics.map(\.id).joined(separator: ", "))
         }
+        // Prune/tombstone/pool re-evaluation above may have changed topic
+        // membership — re-apply the topics overlay on the note index
+        await indexGenerator.refreshTopics()
 
         // Update hashes for all changed files plus everything the linker,
-        // tag normalizer, and folder synthesizer wrote — unhashed writes
-        // trigger pointless AI re-processing on the next check
-        await cache.updateHashes(Array(allChangedFiles.union(linkResult.modifiedFiles).union(synthesized)))
+        // tag normalizer, pruner, and folder synthesizer wrote — unhashed
+        // writes trigger pointless AI re-processing on the next check
+        await cache.updateHashes(Array(
+            allChangedFiles
+                .union(linkResult.modifiedFiles)
+                .union(pruneResult.modifiedFiles)
+                .union(synthesized)
+        ))
         await cache.save()
 
         StatisticsService.recordActivity(
@@ -242,6 +267,14 @@ struct VaultCheckPipeline {
             category: "system",
             action: "completed",
             detail: "\(report.totalIssues)건 발견, \(repairCount)건 복구, \(enrichCount)개 보완(직접 추가 \(manuallyProcessedCount)개), \(linkResult.linksCreated)개 링크, 주제 \(topicPagesWritten.count)개 갱신"
+        )
+
+        let evictionNote = evictedFromPool.isEmpty
+            ? ""
+            : ", 미배정 풀 초과로 \(evictedFromPool.count)개 노트 주제 후보 제외"
+        VaultLogService(pkmRoot: pkmRoot).append(
+            kind: "vault-check",
+            summary: "\(report.totalIssues)건 발견, \(repairCount)건 복구, 링크 +\(linkResult.linksCreated)/−\(pruneResult.removedLinks), 주제 \(topicPagesWritten.count)개 갱신\(evictionNote)"
         )
 
         return VaultCheckResult(

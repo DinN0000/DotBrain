@@ -2,9 +2,9 @@ import Foundation
 
 struct RelatedNotesWriter: Sendable {
 
-    private typealias Entry = (name: String, context: String, relation: String)
+    typealias Entry = (name: String, context: String, relation: String)
 
-    private struct ParsedSection {
+    struct ParsedSection {
         var entries: [Entry]
         var range: Range<String.Index>
         /// True when the section contains user-authored lines this writer
@@ -13,12 +13,20 @@ struct RelatedNotesWriter: Sendable {
         var hasUnrecognized: Bool
     }
 
-    private static let relationMap: [String: String] = [
-        "선행 지식": "prerequisite",
-        "관련 프로젝트": "project",
-        "참고 자료": "reference",
-        "함께 보기": "related",
+    /// Canonical relation ordering (also the display/priority order) and
+    /// Korean labels — the single owner other SemanticLinker components
+    /// (RelatedNotesPruner) read from.
+    static let relationOrder = ["prerequisite", "project", "reference", "related"]
+    static let relationLabels: [String: String] = [
+        "prerequisite": "선행 지식",
+        "project": "관련 프로젝트",
+        "reference": "참고 자료",
+        "related": "함께 보기",
     ]
+
+    /// Korean label → relation, derived so it can never drift from relationLabels
+    private static let relationMap: [String: String] =
+        Dictionary(uniqueKeysWithValues: relationLabels.map { ($0.value, $0.key) })
 
     /// Returns true when the file was actually written — callers use this to
     /// re-hash modified files in ContentHashCache.
@@ -62,34 +70,7 @@ struct RelatedNotesWriter: Sendable {
         let finalEntries = existingEntries + addedEntries
         guard !finalEntries.isEmpty else { return false }
 
-        let sectionText: String
-        let relationTypes = Set(finalEntries.map { $0.relation })
-
-        if relationTypes.count > 1 && !relationTypes.isSubset(of: ["related"]) {
-            // Group by relation type
-            let relationOrder = ["prerequisite", "project", "reference", "related"]
-            let relationLabels: [String: String] = [
-                "prerequisite": "선행 지식",
-                "project": "관련 프로젝트",
-                "reference": "참고 자료",
-                "related": "함께 보기",
-            ]
-            var grouped: [String] = []
-            for rel in relationOrder {
-                let entries = finalEntries.filter { $0.relation == rel }
-                guard !entries.isEmpty else { continue }
-                let label = relationLabels[rel] ?? rel
-                grouped.append("### \(label)")
-                for entry in entries {
-                    grouped.append(formatEntry(entry))
-                }
-            }
-            sectionText = "\n\n## Related Notes\n\n" + grouped.joined(separator: "\n") + "\n"
-        } else {
-            // Flat list (all same relation or all "related")
-            let sectionLines = finalEntries.map { formatEntry($0) }
-            sectionText = "\n\n## Related Notes\n\n" + sectionLines.joined(separator: "\n") + "\n"
-        }
+        let sectionText = renderSection(finalEntries)
 
         var newContent: String
         if let parsed {
@@ -101,6 +82,44 @@ struct RelatedNotesWriter: Sendable {
         guard newContent != content else { return false }
         try newContent.write(toFile: filePath, atomically: true, encoding: .utf8)
         return true
+    }
+
+    /// Rewrite the section to exactly `entries` — used by the link diet
+    /// (RelatedNotesPruner). Refuses when the section contains user-authored
+    /// bytes: those files are never pruned.
+    @discardableResult
+    func replaceEntries(filePath: String, entries: [Entry]) throws -> Bool {
+        guard !entries.isEmpty,
+              let content = try? String(contentsOfFile: filePath, encoding: .utf8),
+              let parsed = parseRelatedNotes(content),
+              !parsed.hasUnrecognized else { return false }
+
+        let newContent = content.replacingCharacters(in: parsed.range, with: renderSection(entries))
+        guard newContent != content else { return false }
+        try newContent.write(toFile: filePath, atomically: true, encoding: .utf8)
+        return true
+    }
+
+    private func renderSection(_ entries: [Entry]) -> String {
+        let relationTypes = Set(entries.map { $0.relation })
+
+        if relationTypes.count > 1 && !relationTypes.isSubset(of: ["related"]) {
+            // Group by relation type
+            var grouped: [String] = []
+            for rel in Self.relationOrder {
+                let group = entries.filter { $0.relation == rel }
+                guard !group.isEmpty else { continue }
+                let label = Self.relationLabels[rel] ?? rel
+                grouped.append("### \(label)")
+                for entry in group {
+                    grouped.append(formatEntry(entry))
+                }
+            }
+            return "\n\n## Related Notes\n\n" + grouped.joined(separator: "\n") + "\n"
+        }
+        // Flat list (all same relation or all "related")
+        let sectionLines = entries.map { formatEntry($0) }
+        return "\n\n## Related Notes\n\n" + sectionLines.joined(separator: "\n") + "\n"
     }
 
     // MARK: - Formatting
@@ -115,7 +134,7 @@ struct RelatedNotesWriter: Sendable {
 
     // MARK: - Parsing
 
-    private func parseRelatedNotes(_ content: String) -> ParsedSection? {
+    func parseRelatedNotes(_ content: String) -> ParsedSection? {
         guard let headerRange = content.range(of: "\n## Related Notes") ?? content.range(of: "## Related Notes") else {
             return nil
         }

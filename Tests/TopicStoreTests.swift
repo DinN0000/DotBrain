@@ -47,6 +47,16 @@ final class TopicStoreTests: XCTestCase {
         XCTAssertEqual(store.load().deletedTopics, ["dead-topic"])
     }
 
+    func testAddUnassignedReturnsEvictedPathsOnOverflow() {
+        let store = TopicStore(pkmRoot: root)
+        store.addUnassigned(["first.md"])
+        let flood = (0..<TopicStore.unassignedCap).map { "n\($0).md" }
+        let dropped = store.addUnassigned(flood)
+        XCTAssertEqual(dropped, ["first.md"], "evicted oldest entry must be reported")
+        XCTAssertTrue(store.addUnassigned(["one-more.md"]).count == 1,
+                      "each subsequent overflow reports its eviction")
+    }
+
     func testUnassignedPoolDedupesSkipsAssignedAndCaps() {
         let store = TopicStore(pkmRoot: root)
         store.upsert(makeTopic(id: "t", members: ["assigned.md"]))

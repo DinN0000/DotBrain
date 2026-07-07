@@ -1,18 +1,17 @@
 import Foundation
 
 /// Generates and updates AI companion files for the PKM vault.
-/// - CLAUDE.md (Claude Code), AGENTS.md (OpenClaw/Codex), .cursorrules (Cursor)
+/// - CLAUDE.md (Claude Code), AGENTS.md (Codex)
 /// - .claude/agents/ (agent workflows), .claude/skills/ (skill definitions)
 enum AICompanionService {
 
     /// Bump this when companion file content changes — triggers overwrite on existing vaults
-    static let version = 17
+    static let version = 18
 
     /// Generate all AI companion files in the PKM root (first-time only)
     static func generateAll(pkmRoot: String) throws {
         try generateClaudeMd(pkmRoot: pkmRoot)
         try generateAgentsMd(pkmRoot: pkmRoot)
-        try generateCursorRules(pkmRoot: pkmRoot)
         try generateClaudeAgents(pkmRoot: pkmRoot)
         try generateClaudeSkills(pkmRoot: pkmRoot)
         try writeVersion(pkmRoot: pkmRoot)
@@ -58,11 +57,14 @@ enum AICompanionService {
     private static func forceGenerateAll(pkmRoot: String) {
         let fm = FileManager.default
 
+        // v18: Cursor support dropped (Claude Code + Codex only) — retire the
+        // DotBrain-managed block in any existing .cursorrules
+        removeCursorRules(pkmRoot: pkmRoot)
+
         // Root-level files: marker-based safe update
         let files: [(String, String)] = [
             ("CLAUDE.md", claudeMdContent),
             ("AGENTS.md", agentsMdContent),
-            (".cursorrules", cursorRulesContent),
         ]
 
         for (fileName, content) in files {
@@ -160,6 +162,38 @@ enum AICompanionService {
         }
     }
 
+    /// Remove the DotBrain-managed block from an existing .cursorrules.
+    /// Deletes the file when nothing user-authored remains; a file without
+    /// markers is fully user-authored and is left untouched.
+    private static func removeCursorRules(pkmRoot: String) {
+        let fm = FileManager.default
+        let path = (pkmRoot as NSString).appendingPathComponent(".cursorrules")
+        guard fm.fileExists(atPath: path),
+              let existing = try? String(contentsOfFile: path, encoding: .utf8) else { return }
+        guard let startRange = existing.range(of: markerStart),
+              let endRange = existing.range(of: markerEnd, range: startRange.upperBound..<existing.endIndex) else {
+            return
+        }
+        var remainder = existing
+        remainder.replaceSubrange(startRange.lowerBound..<endRange.upperBound, with: "")
+        let userContent = remainder
+            .replacingOccurrences(of: "<!-- 아래에 자유롭게 추가하세요 -->", with: "")
+            .replacingOccurrences(of: "<!-- 아래는 기존 사용자 내용입니다 -->", with: "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        do {
+            if userContent.isEmpty {
+                try fm.removeItem(atPath: path)
+                NSLog("[AICompanionService] .cursorrules 삭제 (Cursor 지원 종료)")
+            } else {
+                try (remainder.trimmingCharacters(in: .whitespacesAndNewlines) + "\n")
+                    .write(toFile: path, atomically: true, encoding: .utf8)
+                NSLog("[AICompanionService] .cursorrules에서 DotBrain 블록 제거")
+            }
+        } catch {
+            NSLog("[AICompanionService] .cursorrules 정리 실패: %@", error.localizedDescription)
+        }
+    }
+
     /// Replace content between DotBrain markers, keep everything else
     private static func replaceMarkerSection(at path: String, with newSection: String) throws {
         let existing = try String(contentsOfFile: path, encoding: .utf8)
@@ -202,7 +236,7 @@ enum AICompanionService {
     # PKM Knowledge Base — DotBrain
 
     이 폴더는 **DotBrain**이 관리하는 PARA 방법론 기반 개인 지식 관리(PKM) 시스템입니다.
-    Obsidian과 호환되며, AI 도구(Claude Code, Cursor, OpenClaw)가 효과적으로 탐색할 수 있도록 설계되었습니다.
+    Obsidian과 호환되며, AI 도구(Claude Code, Codex)가 효과적으로 탐색할 수 있도록 설계되었습니다.
 
     ---
 
@@ -211,21 +245,28 @@ enum AICompanionService {
     이 볼트를 탐색할 때 다음 순서를 따르세요:
 
     1. **이 파일(CLAUDE.md)** 을 먼저 읽어 구조와 규칙을 파악
-    2. **`.meta/note-index.json`** 읽기: 전체 볼트 구조, 노트 메타데이터(태그, 요약, 프로젝트, 상태) 조회
-    3. **폴더 개체 페이지(`<폴더명>.md`)** 를 폴더 이해의 진입점으로 사용:
+    2. **`.meta/note-index.json`** 읽기: 전체 볼트 구조, 노트 메타데이터(태그, 요약, 프로젝트, 상태, 주제) 조회
+    3. **주제 단위 조사라면** `.meta/topic-index.json`에서 관련 주제를 찾아 `_Wiki/` 주제 페이지의 "현재 이해"부터 읽기 (아래 주제 위키 참조)
+    4. **폴더 개체 페이지(`<폴더명>.md`)** 를 폴더 이해의 진입점으로 사용:
        DotBrain 마커 섹션에 AI가 유지하는 종합(개요 · 최근 흐름 · 핵심 노트)이 있음.
        마커 밖은 사용자 콘텐츠이므로 수정 금지
-    4. **프론트매터 필드**로 필터링: `project`, `status: active`, `para` 등
-    5. **`## Related Notes` 링크** 따라가기: 관계 유형(prerequisite > project > reference > related) 우선순위로 탐색
-    6. **Grep 검색**으로 태그/키워드 기반 탐색 (아래 검색 패턴 참조)
+    5. **프론트매터 필드**로 필터링: `project`, `status: active`, `para` 등
+    6. **`## Related Notes` 링크** 따라가기: 관계 유형(prerequisite > project > reference > related) 우선순위로 탐색
+    7. **Grep 검색**으로 태그/키워드 기반 탐색 (아래 검색 패턴 참조)
 
     ### 노트 인덱스 (`.meta/note-index.json`)
 
     DotBrain이 자동 생성/갱신하는 볼트 메타데이터 인덱스입니다.
-    - 모든 노트의 경로, 태그, 요약, 프로젝트, 상태 정보 포함
-    - 폴더별 요약 태그 포함
-    - 파일 분류/이동 시 자동으로 갱신됨
+    - 노트별 필드: `path`, `folder`, `para`, `tags`, `summary`, `project`, `status`, `area`, `topics`(속한 _Wiki 주제명)
+    - 폴더별 요약·태그 포함
+    - 파일 분류/이동/주제 배정 시 자동 갱신되며, 앱 실행 시 24시간이 지난 인덱스는 전체 재생성됨
     - 볼트 전체를 파악하려면 개별 파일 대신 이 인덱스를 먼저 읽으세요
+
+    ### 기타 .meta/ 파일
+
+    - `.meta/topic-index.json` — 주제 카탈로그 (아래 주제 위키 참조)
+    - `.meta/log.md` — 볼트 변경 타임라인 (append-only). 세션 시작 시 최근 항목을 읽어 볼트의 최근 흐름을 파악하세요. 형식: `- [YYYY-MM-DD HH:mm] 종류 | 요약` (`grep "^- \\[" .meta/log.md | tail -10`)
+    - `.meta/folder-relations.json` — 폴더 쌍 관계(boost/suppress + 관계 힌트). DotBrain 시맨틱 링크가 관리하며, 폴더 간 연관성을 파악할 때 참고 가능
 
     ---
 
@@ -233,7 +274,9 @@ enum AICompanionService {
 
     - `_Wiki/` 주제 페이지 = DotBrain이 여러 노트를 종합한 최신 이해 (## 현재 이해 / ## 모순 / ## 노후 / ## 타임라인 / ## 멤버 노트)
     - 조사 시 개별 노트보다 주제 페이지의 "현재 이해"를 먼저 읽을 것
-    - `.meta/topic-index.json` — 주제 카탈로그 (id, 멤버, 요약)
+    - `.meta/topic-index.json` — 주제 카탈로그: `topics`(id, 이름, 페이지 경로, 멤버, 키워드, 요약), `deletedTopics`(사용자가 삭제한 주제 툼스톤 — 재생성 금지), `unassigned`(배정 대기 노트 풀)
+    - `_Wiki/` 페이지는 note-index.json에 포함되지 않음 — 주제 목록은 topic-index.json에서 조회
+    - 노트가 속한 주제는 note-index.json 노트 엔트리의 `topics` 필드로 역조회 가능
     - 마커(<!-- DotBrain:start/end -->) 안은 DotBrain 관리 영역 — 수정 금지, 마커 밖은 자유
 
     ---
@@ -330,6 +373,7 @@ enum AICompanionService {
     summary: "문서 내용 2-3문장 요약"
     source: original | meeting | literature | import
     project: "관련 프로젝트명"    # PARA와 무관하게, 관련 프로젝트가 있으면 기재
+    area: "관련 영역명"           # 관련된 2_Area/ 하위 폴더명 (선택)
     file:                         # 바이너리 동반 노트에만 사용
       name: "원본파일.pdf"
       format: pdf
@@ -361,6 +405,10 @@ enum AICompanionService {
     - `para`가 project가 아니어도, 관련 프로젝트가 있으면 기재
     - 예: `para: resource`인 참고 자료가 특정 프로젝트와 관련 → `project: MyProject`
     - 값은 `1_Project/` 아래 폴더명과 정확히 일치해야 함
+
+    **area** — 관련 영역
+    - 노트가 특정 영역과 관련되면 기재 (선택)
+    - 값은 `2_Area/` 아래 폴더명과 일치해야 함
 
     **file** — 바이너리 동반 노트용
     - PDF, DOCX, PPTX, XLSX, 이미지 등의 바이너리 파일에 대한 마크다운 동반 노트에서 사용
@@ -478,7 +526,9 @@ enum AICompanionService {
     - `.meta/note-index.json`을 파싱하여 **VaultContextMap**을 구축
     - 단순 태그 일치가 아닌 **맥락적 연관성** 기반 추천
     - 같은 폴더뿐 아니라 **다른 카테고리의 노트도** 적극 연결
-    - 문서당 최대 **5개** 관련 노트
+    - 링크 실행 1회당 문서별 최대 **15개** 추가, 볼트 점검이 누적 **12개**로 재선별(링크 다이어트 — 사용자가 직접 작성한 줄이 있는 문서는 건드리지 않음)
+    - 관계 유형: `prerequisite`(선행 지식) / `project`(관련 프로젝트) / `reference`(참고 자료) / `related`(함께 보기) — 유형이 2개 이상이면 `###` 소제목으로 그룹화
+    - 역방향 링크: 방향성 있는 유형(prerequisite/reference)의 역링크는 `related`로 기록됨
     - context는 `"~하려면"`, `"~할 때"`, `"~와 비교할 때"` 형식
 
     ```markdown
@@ -491,6 +541,19 @@ enum AICompanionService {
 
     ❌ 나쁜 예: `- [[Aave_Analysis]]`
     ✅ 좋은 예: `- [[Aave_Analysis]] — 프로토콜 설계의 기술적 근거를 확인하려면`
+
+    ---
+
+    ## 탐구 결과 환류
+
+    좋은 답변은 대화에서 증발시키지 말고 볼트에 되쌓으세요. 탐구도 수집처럼 복리로 쌓여야 합니다.
+
+    - 여러 노트를 종합해 **새 인사이트**가 나온 답변(비교, 분석, 종합)은 노트로 저장할 것을 제안
+    - 동의 시 synthesis-agent 형식(프론트매터 + 출처 노트 `[[링크]]` + 지식 갭)으로 적절한 PARA 폴더에 저장
+    - 저장된 노트는 DotBrain이 자동으로 링크·주제 페이지에 편입시킴 — 수동 색인 작업 불필요
+    - 단순 사실 확인이나 단일 노트 요약은 저장하지 않음 (볼트 오염 방지)
+    - 볼트를 유지보수(링크 수정, 노트 생성, 페이지 정리)했다면 `.meta/log.md`에 한 줄 기록:
+      `- [YYYY-MM-DD HH:mm] agent | 무엇을 했는지 요약`
 
     ---
 
@@ -550,6 +613,7 @@ enum AICompanionService {
     - **읽기**: 자유롭게 탐색 (위 탐색 우선순위 참조)
     - **쓰기**: 기존 노트 수정 시 프론트매터 기존 값 유지
     - **생성**: 마크다운 노트만, 적절한 PARA 폴더에, 프론트매터 필수
+    - **환류**: 가치 있는 종합·분석 결과는 노트로 저장 제안 (위 탐구 결과 환류 참조)
     - **검색**: 위 Grep 패턴 활용
     - **코드**: **절대 이 폴더 안에서 작성 금지**
     """
@@ -612,7 +676,9 @@ enum AICompanionService {
     - `.meta/note-index.json`을 파싱하여 VaultContextMap 구축
     - 단순 태그 일치가 아닌 **맥락적 연관성** 기반 추천
     - 같은 폴더뿐 아니라 **다른 카테고리의 노트도** 적극 연결
-    - 문서당 최대 **5개** 관련 노트
+    - 링크 실행 1회당 문서별 최대 **15개** 추가, 볼트 점검이 누적 **12개**로 재선별(사용자 작성 줄이 있는 문서 제외)
+    - 관계 유형: `prerequisite`(선행 지식) / `project`(관련 프로젝트) / `reference`(참고 자료) / `related`(함께 보기)
+    - 역방향 링크: 방향성 있는 유형(prerequisite/reference)의 역링크는 `related`로 기록됨
     - `[[위키링크]]` 형식 사용
     - context는 `"~하려면"`, `"~할 때"`, `"~와 비교할 때"` 형식으로 작성
     - 자기 자신은 포함하지 않음
@@ -621,8 +687,15 @@ enum AICompanionService {
 
     - `_Wiki/` 주제 페이지 = DotBrain이 여러 노트를 종합한 최신 이해 (## 현재 이해 / ## 모순 / ## 노후 / ## 타임라인 / ## 멤버 노트)
     - 조사 시 개별 노트보다 주제 페이지의 "현재 이해"를 먼저 읽을 것
-    - `.meta/topic-index.json` — 주제 카탈로그 (id, 멤버, 요약)
+    - `.meta/topic-index.json` — 주제 카탈로그: `topics`(id, 이름, 페이지 경로, 멤버, 키워드, 요약), `deletedTopics`(사용자가 삭제한 주제 툼스톤 — 재생성 금지), `unassigned`(배정 대기 노트 풀)
+    - `_Wiki/` 페이지는 note-index.json에 포함되지 않음 — 주제 목록은 topic-index.json에서 조회
+    - 노트가 속한 주제는 note-index.json 노트 엔트리의 `topics` 필드로 역조회 가능
     - 마커(<!-- DotBrain:start/end -->) 안은 DotBrain 관리 영역 — 수정 금지, 마커 밖은 자유
+
+    ## 탐구 결과 환류
+
+    - 여러 노트를 종합해 새 인사이트가 나온 답변은 노트로 저장할 것을 제안 — 탐구도 수집처럼 볼트에 복리로 쌓이게 (상세 형식은 CLAUDE.md 참조)
+    - 볼트 유지보수 작업 후에는 `.meta/log.md`에 한 줄 기록: `- [YYYY-MM-DD HH:mm] agent | 요약`
 
     ## 금지 사항
 
@@ -631,116 +704,6 @@ enum AICompanionService {
     - 기존 태그 삭제 금지
     - 유사하지만 다른 문서를 중복으로 보고 삭제/병합 금지 (본문이 정확히 같은 파일만 중복; 나머지는 원본 보존)
     - 개발 작업은 이 PKM 폴더 밖에서
-    """
-
-    // MARK: - .cursorrules
-
-    private static func generateCursorRules(pkmRoot: String) throws {
-        let fm = FileManager.default
-        let path = (pkmRoot as NSString).appendingPathComponent(".cursorrules")
-        guard !fm.fileExists(atPath: path) else { return }
-        let content = "\(markerStart)\n\(cursorRulesContent)\n\(markerEnd)\n\n<!-- 아래에 자유롭게 추가하세요 -->\n"
-        try content.write(toFile: path, atomically: true, encoding: .utf8)
-    }
-
-    private static let cursorRulesContent = """
-    # PKM Knowledge Base Rules — DotBrain
-
-    This is a PARA-organized PKM vault managed by DotBrain.
-
-    ## Structure
-    - `_Inbox/`: Auto-processed by DotBrain (**do not modify**)
-    - `1_Project/`: Active projects with goals and deadlines
-    - `2_Area/`: Ongoing responsibility areas you actively maintain and update (operating standards, policies, long-lived status) — not one-off references
-    - `3_Resource/`: Reference materials and interests
-    - `4_Archive/`: Completed or inactive items
-    - `_Assets/`: Global attachments (binary files)
-    - `.Templates/`: Note templates (Note.md, Project.md, Asset.md)
-    - `.claude/agents/`: AI agent workflow definitions
-    - `.claude/skills/`: AI skill definitions
-
-    ## DotBrain Automation
-    - **Inbox Processing**: 2-stage AI classification (Fast batch → Precise for uncertain), weighted context matching, AI semantic linking, auto note-index.json update
-    - **Folder Reorganization**: Flatten nested folders → deduplicate (SHA256) → AI reclassify → auto-relocate misclassified files
-    - **PARA Management**: Move folders between P/A/R/A categories, create projects, per-folder auto-reorganize (Dashboard → PARA 관리)
-    - **Vault Reorganization**: Cross-category AI scan → compare current vs recommended location → selective execution (Dashboard → 전체 재정리, max 200 files)
-    - **Vault Audit**: Detect broken WikiLinks, missing frontmatter/tags/PARA → auto-repair with Levenshtein matching
-
-    ## AI Agents (11 agents in `.claude/agents/`)
-    - inbox-agent: Inbox classification and processing
-    - project-agent: Project lifecycle management
-    - search-agent: Vault-wide knowledge search
-    - synthesis-agent: Topic synthesis and briefing generation
-    - review-agent: Periodic vault review (weekly/monthly)
-    - note-agent: Note writing, polishing, connecting, and QA
-    - link-health-agent: WikiLink health check and orphan detection
-    - tag-cleanup-agent: Tag standardization and deduplication
-    - stale-review-agent: Stale content review and quality check
-    - vault-audit-agent: Comprehensive vault health check (structure, frontmatter, links, index)
-
-    ## AI Skills (7 skills in `.claude/skills/`)
-    - inbox-processor: Binary file text extraction
-    - meeting-note: Meeting content → structured meeting note
-    - project-status: Project status report generation
-    - weekly-review: Weekly/monthly review report
-    - literature-note: External sources → structured literature note
-    - frontmatter-validator: Frontmatter schema validation and auto-fix
-    - index-integrity: note-index.json ↔ folder/file synchronization check
-
-    ## Navigation Priority
-    1. Read `.meta/note-index.json` for vault structure overview (tags, summary, project, status per note)
-    2. Read `CLAUDE.md` for detailed structure, frontmatter schema, and classification rules
-    3. Follow `[[wikilinks]]` in `## Related Notes` sections — relation priority: prerequisite > project > reference > related
-    4. Search by frontmatter fields using grep patterns
-
-    ## Frontmatter Schema (8 fields)
-    ```yaml
-    para: project | area | resource | archive
-    tags: [tag1, tag2]              # max 5
-    created: YYYY-MM-DD
-    status: active | draft | completed | on-hold
-    summary: "2-3 sentence summary"
-    source: original | meeting | literature | import
-    project: "related project name"  # matches folder name in 1_Project/
-    file:                            # binary companion notes only
-      name: "filename.pdf"
-      format: pdf
-      size_kb: 1234
-    ```
-
-    ## Search Patterns
-    ```
-    grep "^para: project" **/*.md        # all project docs
-    grep "tags:.*keyword" **/*.md        # search by tag
-    grep "^status: active" **/*.md       # active notes
-    grep "^project: ProjectName" **/*.md # notes related to a project
-    grep "keyword" **/*.md               # body search
-    ```
-
-    ## PARA Classification Rules
-    1. If frontmatter has `para:` already → keep it
-    2. Direct project work docs (action items, checklists, deadlines) → `project` (must set `project` field)
-    3. Ongoing maintenance, operations → `area`
-    4. Reference, guides, learning → `resource`
-    5. Completed or stale → `archive`
-    ⚠️ Project-related reference material → `resource` (NOT `project`), set `project` field
-
-    ## Related Notes
-    - DotBrain uses **AI semantic analysis** (not tag matching) to find related notes
-    - Based on VaultContextMap built from .meta/note-index.json
-    - Cross-category linking encouraged
-    - No artificial limit — all genuinely related notes are connected
-    - Context format: "~하려면", "~할 때", "~와 비교할 때"
-
-    ## Writing Rules
-    - Preserve existing frontmatter values when editing
-    - Use `[[wikilinks]]` for internal links
-    - Include contextual descriptions in Related Notes
-    - New notes must include full frontmatter
-
-    ## ⚠️ NO CODE FILES
-    DO NOT create code files (.swift, .ts, .py, .js, .go, .rs, .java, etc.) in this folder!
-    DotBrain filters out code files from inbox processing.
     """
 
     // MARK: - .claude/agents/
@@ -1182,7 +1145,7 @@ enum AICompanionService {
     ### 워크플로
     1. 대상 노트(또는 폴더) 읽기
     2. 다음 품질 기준 점검:
-       - ✅ 프론트매터 완전성 (8개 필드)
+       - ✅ 프론트매터 완전성 (스키마 필드 — CLAUDE.md 참조)
        - ✅ 태그 존재 여부
        - ✅ summary 필드 품질
        - ✅ Related Notes 존재 여부
@@ -1493,12 +1456,13 @@ enum AICompanionService {
 
     ## 개요
 
-    볼트 전체의 구조, 프론트매터, 링크, 인덱스 무결성을 한번에 검사합니다.
-    3개 검사를 **병렬 에이전트**로 실행한 뒤 종합 보고서를 생성하고, 자동 수정을 제안합니다.
+    볼트 전체의 구조, 프론트매터, 링크, 인덱스 무결성을 검사하고,
+    기계 점검이 못 잡는 **지식 갭**(미해결 모순, 빠진 주제, 조사할 질문)까지 살핍니다.
+    4개 검사를 **병렬 에이전트**로 실행한 뒤 종합 보고서를 생성하고, 자동 수정을 제안합니다.
 
     ## 워크플로
 
-    ### Phase 1: 병렬 검사 (에이전트 3개 동시 실행)
+    ### Phase 1: 병렬 검사 (에이전트 4개 동시 실행)
 
     **에이전트 A: PARA 구조 + 프론트매터**
     `.claude/skills/frontmatter-validator/SKILL.md` 참조
@@ -1518,6 +1482,14 @@ enum AICompanionService {
 
     **에이전트 C: 인덱스 무결성**
     `.claude/skills/index-integrity/SKILL.md` 참조
+
+    **에이전트 D: 지식 갭 (생성적 린트)**
+    기계 점검이 아닌 내용 점검 — 볼트가 더 똑똑해질 방향을 제안:
+    1. `_Wiki/` 주제 페이지의 `## 모순` 섹션에서 미해결 모순 수집
+    2. `.meta/topic-index.json`의 `unassigned` 풀 점검 — 반복되는 키워드가 있으면 새 주제 페이지 후보로 제안
+    3. 여러 노트에서 반복 언급되지만 주제 페이지가 없는 개념 탐지 (note-index.json 태그·요약 활용)
+    4. `## 노후` 항목 중 아직 본문이 갱신되지 않은 노트 표본 확인
+    5. 볼트에 없어서 답할 수 없는 것 — "다음에 조사할 질문" 3~5개 제안
 
     ### Phase 2: 종합 보고서 생성
 
@@ -1544,6 +1516,16 @@ enum AICompanionService {
     ## 낮은 우선순위 (수동 확인)
     | # | 파일 | 문제 | 제안 |
     |---|------|------|------|
+
+    ## 지식 갭 (생성적 린트)
+    ### 미해결 모순
+    - [[노트A]] vs [[노트B]]: 내용
+
+    ### 주제 페이지 후보
+    - 개념명 — 관련 노트 N개, 근거
+
+    ### 다음에 조사할 질문
+    1. 질문 (볼트에 빠진 부분)
     ```
 
     ### 채점 기준
@@ -1611,7 +1593,9 @@ enum AICompanionService {
     ## 주의사항
     - 삭제는 절대 하지 않음 — 이동 또는 수정만
     - 수정 전 반드시 사용자 확인 (자동 수정 항목 제외)
-    - 보고서는 화면에 출력, 파일로 저장하지 않음
+    - 기계 점검 보고서(점수·불일치)는 화면 출력만, 파일로 저장하지 않음
+    - 지식 갭 섹션은 가치가 있으면 노트로 저장 제안 (CLAUDE.md 탐구 결과 환류 참조)
+    - 점검 완료 후 `.meta/log.md`에 한 줄 기록
     """
 
     // MARK: - .claude/skills/
@@ -1994,6 +1978,7 @@ enum AICompanionService {
 
     ```yaml
     project: "프로젝트명"      # 1_Project/ 하위 폴더명과 일치해야 함
+    area: "영역명"             # 2_Area/ 하위 폴더명과 일치해야 함
     file:                       # 바이너리 동반 노트에만
       name: "원본파일.pdf"
       format: pdf
@@ -2133,11 +2118,14 @@ enum AICompanionService {
     | 파일 | 역할 |
     |------|------|
     | `.meta/note-index.json` | 전체 볼트 노트/폴더 메타데이터 인덱스 |
+    | `.meta/topic-index.json` | _Wiki 주제 카탈로그 (topics / deletedTopics / unassigned) |
+    | `.meta/folder-relations.json` | 폴더 쌍 관계 (boost/suppress) — 시맨틱 링크 내부용 |
 
-    DotBrain이 자동 생성/갱신합니다. 구조:
-    - `notes`: 노트명 → {path, folder, para, tags, summary, project, status}
-    - `folders`: 폴더명 → {path, para, summary, tags}
+    DotBrain이 자동 생성/갱신합니다. note-index.json 구조:
+    - `notes`: 노트 경로 → {path, folder, para, tags, summary, project, status, area, topics}
+    - `folders`: 폴더 경로 → {path, para, summary, tags}
     - `version`, `updated` (ISO8601 타임스탬프)
+    - `topics`는 topic-index.json 기준으로 저장 시마다 재계산되는 오버레이 필드
 
     ## 검증 절차
 
@@ -2173,7 +2161,8 @@ enum AICompanionService {
     ### Step 5: 타임스탬프 확인
 
     `updated` 필드가 24시간 이내인지 확인.
-    오래된 경우 → DotBrain "볼트 점검" 실행 안내
+    DotBrain이 앱 실행 시 24시간 지난 인덱스를 자동 재생성하므로,
+    오래된 경우 → DotBrain 앱 실행 또는 "볼트 점검" 실행 안내
 
     ## 자동 수정 규칙
 

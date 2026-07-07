@@ -82,19 +82,27 @@ struct TopicStore: Sendable {
     }
 
     /// Add notes to the unassigned pool — skips already-assigned notes,
-    /// dedupes, and enforces the FIFO cap (oldest dropped first)
-    func addUnassigned(_ paths: [String]) {
-        guard !paths.isEmpty else { return }
+    /// dedupes, and enforces the FIFO cap (oldest dropped first).
+    /// Returns the evicted paths so callers can report the compounding leak
+    /// (evicted notes never get considered for topic pages again).
+    @discardableResult
+    func addUnassigned(_ paths: [String]) -> [String] {
+        guard !paths.isEmpty else { return [] }
         var index = load()
         let assigned = Set(index.topics.flatMap(\.members))
         for path in paths where !assigned.contains(path) && !index.unassigned.contains(path) {
             index.unassigned.append(path)
         }
+        var dropped: [String] = []
         if index.unassigned.count > Self.unassignedCap {
-            index.unassigned.removeFirst(index.unassigned.count - Self.unassignedCap)
+            let overflow = index.unassigned.count - Self.unassignedCap
+            dropped = Array(index.unassigned.prefix(overflow))
+            index.unassigned.removeFirst(overflow)
+            NSLog("[TopicStore] 미배정 풀 초과 — %d개 노트가 주제 후보에서 제외됨", overflow)
         }
         index.updated = Self.timestamp()
         save(index)
+        return dropped
     }
 
     func removeUnassigned(_ paths: [String]) {

@@ -149,7 +149,7 @@ struct PKMPathManager {
             try ignoreContent.write(toFile: obsidianIgnorePath, atomically: true, encoding: .utf8)
         }
 
-        // Generate AI companion files (CLAUDE.md, AGENTS.md, .cursorrules, agents, skills)
+        // Generate AI companion files (CLAUDE.md, AGENTS.md, agents, skills)
         try AICompanionService.generateAll(pkmRoot: root)
 
         // Create .Templates/ folder with default templates

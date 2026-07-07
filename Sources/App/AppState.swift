@@ -405,15 +405,12 @@ final class AppState: ObservableObject {
 
             setupWatchdog()
 
-            // Pre-generate note-index.json if missing so first inbox processing
-            // doesn't fall back to expensive disk scans
+            // Regenerate note-index.json when missing or older than 24h so
+            // index-first navigation (AI companions, inbox processing) never
+            // reads cold data — external edits bypass the dirty-folder updates
             let root = pkmRootPath
-            if !FileManager.default.fileExists(atPath: PKMPathManager(root: root).noteIndexPath) {
-                Task.detached(priority: .utility) {
-                    let generator = NoteIndexGenerator(pkmRoot: root)
-                    await generator.regenerateAll()
-                    NSLog("[AppState] note-index.json 사전 생성 완료")
-                }
+            Task.detached(priority: .utility) {
+                await NoteIndexGenerator(pkmRoot: root).regenerateIfStale()
             }
         }
     }
