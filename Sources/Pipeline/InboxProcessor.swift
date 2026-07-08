@@ -389,11 +389,21 @@ struct InboxProcessor {
         var failed = 0
         var failedPaths: [String] = []
 
-        for (i, (classification, input)) in zip(enrichedClassifications, allInputs).enumerated() {
+        for (i, (rawClassification, input)) in zip(enrichedClassifications, allInputs).enumerated() {
             if Task.isCancelled { throw CancellationError() }
             let progress = 0.7 + Double(i) / Double(max(enrichedClassifications.count, 1)) * 0.25
             onProgress?(progress, L10n.Processing.movingFile(input.fileName))
             onFileProgress?(i, allInputs.count, input.fileName)
+
+            // R2 new-intake policy, resolved ONCE here: an Area/Resource file
+            // with no (or sanitized-empty) target folder is destined for
+            // <category>/Unsorted. Materializing into the classification means
+            // the conflict check, any PendingConfirmation round-trip, and the
+            // move below all agree on the same destination. Folders are exempt —
+            // they supply their own name as the subfolder.
+            let classification = isDirectory(input.filePath)
+                ? rawClassification
+                : pathManager.materializedCatchAll(for: rawClassification)
 
             // Low confidence: ask user
             if classification.confidence < Self.confirmationThreshold {
@@ -425,7 +435,7 @@ struct InboxProcessor {
 
             // Name conflict: same name exists at target with different content
             if !isDirectory(input.filePath),
-               mover.wouldConflictWithExistingFile(fileName: input.fileName, classification: classification, allowCatchAll: true) {
+               mover.wouldConflictWithExistingFile(fileName: input.fileName, classification: classification) {
                 needsConfirmation.append(PendingConfirmation(
                     fileName: input.fileName,
                     filePath: input.filePath,
@@ -441,9 +451,7 @@ struct InboxProcessor {
                 if isDirectory(input.filePath) {
                     result = try mover.moveFolder(at: input.filePath, with: classification)
                 } else {
-                    // New intake: route Area/Resource notes with no target folder
-                    // into <category>/Unsorted rather than the bare category root.
-                    result = try await mover.moveFile(at: input.filePath, with: classification, allowCatchAll: true)
+                    result = try await mover.moveFile(at: input.filePath, with: classification)
                 }
                 processed.append(result)
                 let action: String

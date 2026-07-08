@@ -2,9 +2,12 @@ import XCTest
 @testable import DotBrain
 
 /// R2 new-intake routing: Area/Resource notes with no AI-assigned subfolder land
-/// in a `Unsorted` catch-all instead of the bare category root, but ONLY when the
-/// caller opts in via `allowCatchAll` (new-intake sites). Reorganizers keep their
-/// existing keep-in-place behavior (allowCatchAll defaults to false).
+/// in a `Unsorted` catch-all instead of the bare category root. The policy is
+/// materialized ONCE into the classification at the intake boundary
+/// (`materializedCatchAll`), so the conflict check, pending-confirmation
+/// round-trip, and the move all agree by construction. `targetDirectory` itself
+/// stays policy-free — reorganizers keep their keep-in-place behavior simply by
+/// never materializing.
 final class PKMPathManagerCatchAllTests: XCTestCase {
     var root: String!
     var pathManager: PKMPathManager!
@@ -37,89 +40,91 @@ final class PKMPathManagerCatchAllTests: XCTestCase {
         )
     }
 
-    // MARK: - allowCatchAll = true (new intake)
+    // MARK: - Materialization (new intake)
 
-    func testEmptyResourceRoutesToUnsortedWhenAllowed() {
-        let dir = pathManager.targetDirectory(
-            for: result(para: .resource, targetFolder: ""),
-            allowCatchAll: true
+    func testEmptyResourceMaterializesToUnsorted() {
+        let adjusted = pathManager.materializedCatchAll(
+            for: result(para: .resource, targetFolder: "")
         )
-        XCTAssertEqual(dir, pathManager.resourcePath + "/Unsorted")
+        XCTAssertEqual(adjusted.targetFolder, "Unsorted")
+        XCTAssertEqual(pathManager.targetDirectory(for: adjusted),
+                       pathManager.resourcePath + "/Unsorted")
     }
 
-    func testEmptyAreaRoutesToUnsortedWhenAllowed() {
-        let dir = pathManager.targetDirectory(
-            for: result(para: .area, targetFolder: ""),
-            allowCatchAll: true
+    func testEmptyAreaMaterializesToUnsorted() {
+        let adjusted = pathManager.materializedCatchAll(
+            for: result(para: .area, targetFolder: "")
         )
-        XCTAssertEqual(dir, pathManager.areaPath + "/Unsorted")
+        XCTAssertEqual(pathManager.targetDirectory(for: adjusted),
+                       pathManager.areaPath + "/Unsorted")
     }
 
     /// A target folder that sanitizes to empty (e.g. the bare category name) is
-    /// treated like an empty folder — it also routes to Unsorted.
-    func testSanitizedToEmptyResourceRoutesToUnsortedWhenAllowed() {
-        let dir = pathManager.targetDirectory(
-            for: result(para: .area, targetFolder: "2_Area"),
-            allowCatchAll: true
+    /// treated like an empty folder — it also materializes to Unsorted. This is
+    /// the case a destination-time flag could not cover consistently.
+    func testSanitizedToEmptyAreaMaterializesToUnsorted() {
+        let adjusted = pathManager.materializedCatchAll(
+            for: result(para: .area, targetFolder: "2_Area")
         )
-        XCTAssertEqual(dir, pathManager.areaPath + "/Unsorted")
+        XCTAssertEqual(pathManager.targetDirectory(for: adjusted),
+                       pathManager.areaPath + "/Unsorted")
     }
 
     /// Catch-all folder has NO leading underscore (underscore folders are skipped
     /// across index/link/synthesis/search), so it stays visible to the pipeline.
     func testCatchAllFolderHasNoUnderscore() {
-        let dir = pathManager.targetDirectory(
-            for: result(para: .resource, targetFolder: ""),
-            allowCatchAll: true
-        )
-        let last = (dir as NSString).lastPathComponent
-        XCTAssertFalse(last.hasPrefix("_"), "catch-all folder must not be underscore-prefixed")
+        XCTAssertFalse(PKMPathManager.catchAllFolderName.hasPrefix("_"),
+                       "catch-all folder must not be underscore-prefixed")
     }
 
-    // MARK: - Project excluded
+    // MARK: - Exclusions
 
-    func testEmptyProjectNotRerouted() {
-        let dir = pathManager.targetDirectory(
-            for: result(para: .project, targetFolder: "", project: nil),
-            allowCatchAll: true
+    func testEmptyProjectNotMaterialized() {
+        let adjusted = pathManager.materializedCatchAll(
+            for: result(para: .project, targetFolder: "", project: nil)
         )
-        XCTAssertEqual(dir, pathManager.projectsPath)
+        XCTAssertEqual(adjusted.targetFolder, "",
+                       "Project keeps the suggestedProject-confirm flow")
+        XCTAssertEqual(pathManager.targetDirectory(for: adjusted), pathManager.projectsPath)
     }
 
-    // MARK: - Media unchanged
-
-    func testMediaAssetNotRerouted() {
-        let dir = pathManager.targetDirectory(
-            for: result(para: .resource, targetFolder: "", isMediaAsset: true),
-            allowCatchAll: true
+    func testMediaAssetNotMaterialized() {
+        let adjusted = pathManager.materializedCatchAll(
+            for: result(para: .resource, targetFolder: "", isMediaAsset: true)
         )
-        XCTAssertEqual(dir, pathManager.resourcePath)
+        XCTAssertEqual(adjusted.targetFolder, "", "media keeps default asset routing")
     }
 
-    // MARK: - Non-empty target unaffected
-
-    func testNonEmptyTargetUnaffectedByCatchAll() {
-        let dir = pathManager.targetDirectory(
-            for: result(para: .resource, targetFolder: "DevOps"),
-            allowCatchAll: true
+    func testNonEmptyTargetNotMaterialized() {
+        let adjusted = pathManager.materializedCatchAll(
+            for: result(para: .resource, targetFolder: "DevOps")
         )
-        XCTAssertEqual(dir, pathManager.resourcePath + "/DevOps")
+        XCTAssertEqual(adjusted.targetFolder, "DevOps")
+        XCTAssertEqual(pathManager.targetDirectory(for: adjusted),
+                       pathManager.resourcePath + "/DevOps")
     }
 
-    // MARK: - allowCatchAll = false (reorganizers / default)
+    // MARK: - targetDirectory stays policy-free (reorganizers)
 
-    func testEmptyResourceKeepsCategoryRootWhenNotAllowed() {
-        let dir = pathManager.targetDirectory(
+    func testTargetDirectoryWithoutMaterializationKeepsCategoryRoot() {
+        XCTAssertEqual(
+            pathManager.targetDirectory(for: result(para: .resource, targetFolder: "")),
+            pathManager.resourcePath,
+            "reorganizers never materialize, so empty stays at the category root"
+        )
+        XCTAssertEqual(
+            pathManager.targetDirectory(for: result(para: .area, targetFolder: "")),
+            pathManager.areaPath
+        )
+    }
+
+    // MARK: - Idempotence (safe if a path materializes twice)
+
+    func testMaterializationIsIdempotent() {
+        let once = pathManager.materializedCatchAll(
             for: result(para: .resource, targetFolder: "")
         )
-        XCTAssertEqual(dir, pathManager.resourcePath)
-    }
-
-    func testEmptyAreaKeepsCategoryRootWhenNotAllowed() {
-        let dir = pathManager.targetDirectory(
-            for: result(para: .area, targetFolder: ""),
-            allowCatchAll: false
-        )
-        XCTAssertEqual(dir, pathManager.areaPath)
+        let twice = pathManager.materializedCatchAll(for: once)
+        XCTAssertEqual(twice.targetFolder, "Unsorted")
     }
 }

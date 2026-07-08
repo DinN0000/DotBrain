@@ -90,14 +90,16 @@ struct ManualPlacementRepairer: Sendable {
             let classification = pair.1
 
             guard let location = locationContext(for: input.filePath) else { continue }
-            let adjusted = adjustClassification(classification, location: location)
+            // Manual-placement repair is new intake — materialize the catch-all
+            // destination once so the move below and any later consumer agree.
+            let adjusted = pathManager.materializedCatchAll(
+                for: adjustClassification(classification, location: location)
+            )
 
             do {
                 let result: ProcessedFileResult
                 if shouldMove(location: location, classification: adjusted) {
-                    // New intake: route Area/Resource notes with no target folder
-                    // into <category>/Unsorted rather than the bare category root.
-                    result = try await mover.moveFile(at: input.filePath, with: adjusted, allowCatchAll: true)
+                    result = try await mover.moveFile(at: input.filePath, with: adjusted)
                 } else {
                     result = updateFrontmatterInPlace(
                         at: input.filePath,

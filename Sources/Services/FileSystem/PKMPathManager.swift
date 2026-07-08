@@ -53,16 +53,32 @@ struct PKMPathManager {
     /// the note into a black hole.
     static let catchAllFolderName = "Unsorted"
 
-    /// Get the target directory for a classification result.
-    ///
-    /// `allowCatchAll` opts a caller into R2 new-intake routing: an Area/Resource
-    /// note whose target folder is empty (or sanitizes to empty) is placed in a
-    /// `Unsorted` catch-all instead of the bare category root. Only new-intake
-    /// sites (inbox processing, manual-placement repair) pass `true`; the
-    /// reorganizers keep their existing keep-in-place behavior with the default.
-    /// Project is excluded (its suggestedProject-confirm flow is preserved) and
-    /// media assets are unaffected (they route to `_Assets`).
-    func targetDirectory(for result: ClassifyResult, allowCatchAll: Bool = false) -> String {
+    /// R2 new-intake destination policy, resolved ONCE at the intake boundary:
+    /// an Area/Resource note whose target folder is empty (or sanitizes to
+    /// empty) belongs in the `Unsorted` catch-all, never at the bare category
+    /// root. Materializing the decision into `targetFolder` means every later
+    /// consumer — conflict check, pending-confirmation round-trip, the actual
+    /// move — agrees by construction, instead of each call site re-deciding via
+    /// a flag it can forget to pass. Reorganizers never call this, keeping
+    /// their keep-in-place behavior for already-filed notes. Project is
+    /// excluded (suggestedProject-confirm flow) and media assets are unaffected
+    /// (they route to `_Assets`).
+    func materializedCatchAll(for result: ClassifyResult) -> ClassifyResult {
+        guard !result.isMediaAsset,
+              result.para == .area || result.para == .resource,
+              sanitizeTargetFolder(result.targetFolder, para: result.para).isEmpty else {
+            return result
+        }
+        var adjusted = result
+        adjusted.targetFolder = Self.catchAllFolderName
+        return adjusted
+    }
+
+    /// Get the target directory for a classification result. Policy-free: an
+    /// empty target folder resolves to the category root (new-intake callers
+    /// materialize the `Unsorted` catch-all beforehand via
+    /// `materializedCatchAll`).
+    func targetDirectory(for result: ClassifyResult) -> String {
         if result.para == .project, let project = result.project {
             let safeProject = sanitizeFolderName(project)
             let targetPath = (projectsPath as NSString).appendingPathComponent(safeProject)
@@ -71,14 +87,8 @@ struct PKMPathManager {
         }
 
         let base = paraPath(for: result.para)
-        var sanitized = sanitizeTargetFolder(result.targetFolder, para: result.para)
-        if sanitized.isEmpty {
-            let eligibleForCatchAll = allowCatchAll
-                && !result.isMediaAsset
-                && (result.para == .area || result.para == .resource)
-            guard eligibleForCatchAll else { return base }
-            sanitized = Self.catchAllFolderName
-        }
+        let sanitized = sanitizeTargetFolder(result.targetFolder, para: result.para)
+        if sanitized.isEmpty { return base }
         let safeFolder = sanitizeFolderName(sanitized)
         let targetPath = (base as NSString).appendingPathComponent(safeFolder)
         guard isPathInsideRoot(targetPath, base: base) else { return base }
