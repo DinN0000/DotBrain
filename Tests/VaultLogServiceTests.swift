@@ -39,6 +39,18 @@ final class VaultLogServiceTests: XCTestCase {
                       "empty pre-existing file must still get the header")
     }
 
+    func testAppendSynthesisEntryWritesOneScopedLine() throws {
+        // 3b: each folder/hub page write appends one "<scope>: <요지>" line so
+        // the chronicle records how synthesis evolved.
+        let log = VaultLogService(pkmRoot: root)
+        log.append(kind: "synthesis", summary: "MyProject: 프로젝트가 Phase 2로 진입함.")
+
+        let content = try String(contentsOfFile: log.logPath(), encoding: .utf8)
+        let entries = content.components(separatedBy: "\n").filter { $0.hasPrefix("- [") }
+        XCTAssertEqual(entries.count, 1)
+        XCTAssertTrue(entries[0].contains("synthesis | MyProject: 프로젝트가 Phase 2로 진입함."))
+    }
+
     func testAppendSanitizesNewlinesToKeepOneLinePerEntry() throws {
         let log = VaultLogService(pkmRoot: root)
         log.append(kind: "agent", summary: "여러 줄\n요약\n시도")

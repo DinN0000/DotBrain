@@ -216,6 +216,13 @@ struct VaultCheckPipeline {
             await indexGenerator.updateForFolders(
                 Set(synthesized.map { ($0.path as NSString).deletingLastPathComponent })
             )
+            // Chronicle each synthesis 요지 so the .meta/log.md timeline records
+            // how folder knowledge evolved this run
+            let synthesisLog = VaultLogService(pkmRoot: pkmRoot)
+            for output in synthesized where !output.gist.isEmpty {
+                let scope = ((output.path as NSString).deletingLastPathComponent as NSString).lastPathComponent
+                synthesisLog.append(kind: "synthesis", summary: "\(scope): \(output.gist)")
+            }
         }
 
         // Update hashes for all changed files plus everything the linker,

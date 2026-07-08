@@ -70,6 +70,12 @@ struct InboxPostProcessingPipeline {
                 await NoteIndexGenerator(pkmRoot: pkmRoot).updateForFolders(
                     Set(synthesized.map { ($0.path as NSString).deletingLastPathComponent })
                 )
+                // Chronicle each synthesis 요지 to the .meta/log.md timeline
+                let synthesisLog = VaultLogService(pkmRoot: pkmRoot)
+                for output in synthesized where !output.gist.isEmpty {
+                    let scope = ((output.path as NSString).deletingLastPathComponent as NSString).lastPathComponent
+                    synthesisLog.append(kind: "synthesis", summary: "\(scope): \(output.gist)")
+                }
             }
         }
 
