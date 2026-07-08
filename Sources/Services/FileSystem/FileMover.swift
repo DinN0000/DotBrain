@@ -20,15 +20,19 @@ struct FileMover {
         var storage: [String: [String: String]] = [:]
     }
 
-    /// Check if a file with the same name already exists at the target (different content)
-    func wouldConflictWithExistingFile(fileName: String, classification: ClassifyResult) -> Bool {
-        let targetDir = pathManager.targetDirectory(for: classification)
+    /// Check if a file with the same name already exists at the target (different content).
+    /// `allowCatchAll` must match the value passed to the corresponding `moveFile`
+    /// call so the conflict check inspects the actual destination directory.
+    func wouldConflictWithExistingFile(fileName: String, classification: ClassifyResult, allowCatchAll: Bool = false) -> Bool {
+        let targetDir = pathManager.targetDirectory(for: classification, allowCatchAll: allowCatchAll)
         let targetPath = (targetDir as NSString).appendingPathComponent(fileName)
         return FileManager.default.fileExists(atPath: targetPath)
     }
 
-    /// Move a file according to its classification result
-    func moveFile(at filePath: String, with classification: ClassifyResult) async throws -> ProcessedFileResult {
+    /// Move a file according to its classification result.
+    /// `allowCatchAll` enables R2 new-intake routing to the `Unsorted` catch-all
+    /// for Area/Resource notes with no target folder (set true only at new-intake sites).
+    func moveFile(at filePath: String, with classification: ClassifyResult, allowCatchAll: Bool = false) async throws -> ProcessedFileResult {
         let fm = FileManager.default
         let fileName = PKMPathManager.normalizeToNFC((filePath as NSString).lastPathComponent)
 
@@ -39,7 +43,7 @@ struct FileMover {
         }
 
         // Determine target directory
-        let targetDir = pathManager.targetDirectory(for: classification)
+        let targetDir = pathManager.targetDirectory(for: classification, allowCatchAll: allowCatchAll)
 
         // Create target directory if needed
         try fm.createDirectory(atPath: targetDir, withIntermediateDirectories: true)

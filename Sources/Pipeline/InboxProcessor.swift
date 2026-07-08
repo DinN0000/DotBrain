@@ -425,7 +425,7 @@ struct InboxProcessor {
 
             // Name conflict: same name exists at target with different content
             if !isDirectory(input.filePath),
-               mover.wouldConflictWithExistingFile(fileName: input.fileName, classification: classification) {
+               mover.wouldConflictWithExistingFile(fileName: input.fileName, classification: classification, allowCatchAll: true) {
                 needsConfirmation.append(PendingConfirmation(
                     fileName: input.fileName,
                     filePath: input.filePath,
@@ -441,7 +441,9 @@ struct InboxProcessor {
                 if isDirectory(input.filePath) {
                     result = try mover.moveFolder(at: input.filePath, with: classification)
                 } else {
-                    result = try await mover.moveFile(at: input.filePath, with: classification)
+                    // New intake: route Area/Resource notes with no target folder
+                    // into <category>/Unsorted rather than the bare category root.
+                    result = try await mover.moveFile(at: input.filePath, with: classification, allowCatchAll: true)
                 }
                 processed.append(result)
                 let action: String

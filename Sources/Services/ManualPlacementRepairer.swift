@@ -95,7 +95,9 @@ struct ManualPlacementRepairer: Sendable {
             do {
                 let result: ProcessedFileResult
                 if shouldMove(location: location, classification: adjusted) {
-                    result = try await mover.moveFile(at: input.filePath, with: adjusted)
+                    // New intake: route Area/Resource notes with no target folder
+                    // into <category>/Unsorted rather than the bare category root.
+                    result = try await mover.moveFile(at: input.filePath, with: adjusted, allowCatchAll: true)
                 } else {
                     result = updateFrontmatterInPlace(
                         at: input.filePath,

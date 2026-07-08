@@ -47,8 +47,22 @@ struct PKMPathManager {
         }.joined(separator: "/").precomposedStringWithCanonicalMapping
     }
 
-    /// Get the target directory for a classification result
-    func targetDirectory(for result: ClassifyResult) -> String {
+    /// Catch-all subfolder for new-intake notes with no AI-assigned target folder.
+    /// Deliberately NO leading underscore: `_`-prefixed folders are skipped across
+    /// the pipeline (index/enrich/link/synthesis/search/reorg), which would turn
+    /// the note into a black hole.
+    static let catchAllFolderName = "Unsorted"
+
+    /// Get the target directory for a classification result.
+    ///
+    /// `allowCatchAll` opts a caller into R2 new-intake routing: an Area/Resource
+    /// note whose target folder is empty (or sanitizes to empty) is placed in a
+    /// `Unsorted` catch-all instead of the bare category root. Only new-intake
+    /// sites (inbox processing, manual-placement repair) pass `true`; the
+    /// reorganizers keep their existing keep-in-place behavior with the default.
+    /// Project is excluded (its suggestedProject-confirm flow is preserved) and
+    /// media assets are unaffected (they route to `_Assets`).
+    func targetDirectory(for result: ClassifyResult, allowCatchAll: Bool = false) -> String {
         if result.para == .project, let project = result.project {
             let safeProject = sanitizeFolderName(project)
             let targetPath = (projectsPath as NSString).appendingPathComponent(safeProject)
@@ -57,9 +71,13 @@ struct PKMPathManager {
         }
 
         let base = paraPath(for: result.para)
-        let sanitized = sanitizeTargetFolder(result.targetFolder, para: result.para)
+        var sanitized = sanitizeTargetFolder(result.targetFolder, para: result.para)
         if sanitized.isEmpty {
-            return base
+            let eligibleForCatchAll = allowCatchAll
+                && !result.isMediaAsset
+                && (result.para == .area || result.para == .resource)
+            guard eligibleForCatchAll else { return base }
+            sanitized = Self.catchAllFolderName
         }
         let safeFolder = sanitizeFolderName(sanitized)
         let targetPath = (base as NSString).appendingPathComponent(safeFolder)
