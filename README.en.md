@@ -49,7 +49,7 @@ structuring that knowledge into a form AI can understand and leverage.
 DotBrain delegates this 'organizing bottleneck' to AI.
 - **Zero-Friction Sort:** Collect files in the inbox and run a sort — AI reads the content and automatically classifies and moves them per the PARA framework.
 - **Semantic Structure:** Automatically generates Obsidian-compatible frontmatter and wiki-links to connect context between documents.
-- **Compounding Wiki:** As each new note arrives, AI synthesizes and updates folder and topic pages, so knowledge compounds as records accumulate.
+- **Compounding Synthesis:** As each new note arrives, AI synthesizes and updates folder pages and category hubs, so knowledge compounds as records accumulate.
 - **Self-Healing:** Flattens nested folder structures, repairs broken links and missing frontmatter, and detects duplicate files via SHA256 hashing for merging.
 - **Reliability:** Supports Claude CLI · Codex CLI · Claude API, falling back to another provider if one fails.
 
@@ -97,7 +97,7 @@ Two-stage AI classification
     ├── Stage 1: fast batch classification
     └── Stage 2: precise recheck — only for low-confidence files
     ↓
-File move + frontmatter injection + related note linking + index/folder-page/topic-wiki update
+File move + frontmatter injection + related note linking + index/folder-page/category-hub update
     ↓
 Classification complete
 ```
@@ -131,7 +131,7 @@ AI reclassification
 
 - **PARA Management** — move folders between categories, create projects, auto-organize per folder
 - **Full Reorganization** — AI scans the entire vault and suggests misclassification moves (executed after user approval)
-- **Vault Check** — fixes broken links and missing frontmatter, refreshes semantic links for changed notes, re-selects over-cap links (keeps 12 per document), and maintains topic wiki pages in one pass
+- **Vault Check** — fixes broken links and missing frontmatter, refreshes semantic links for changed notes, re-selects over-cap links (keeps 12 per document), and refreshes folder and category synthesis in one pass
 
 ### Frontmatter Standardization
 
@@ -174,19 +174,23 @@ PKM Root/
 │   ├── documents/                   ← PDF, DOCX, etc.
 │   ├── images/                      ← Images
 │   └── videos/                      ← Videos
-├── _Wiki/                           ← Topic wiki (AI-synthesized topic pages)
-├── .meta/                           ← Machine layer (note/topic indexes, vault log)
+├── .meta/                           ← Machine layer (note index, vault log)
 ├── 1_Project/
+│   ├── 1_Project.md                 ← Category hub (terrain · cross-links · contradictions)
 │   └── MyProject/
-│       ├── MyProject.md             ← Folder entity page (auto-generated)
+│       ├── MyProject.md             ← Subfolder page (overview · recent flow · key notes · contradictions · staleness)
 │       └── plan.md
 ├── 2_Area/
-│   └── DevOps/
-│       └── monitoring-guide.md
+│   ├── 2_Area.md                    ← Category hub
+│   ├── DevOps/
+│   │   └── monitoring-guide.md
+│   └── Unsorted/                    ← Catch-all for ambiguous new Area/Resource notes
 ├── 3_Resource/
-│   └── Python/
-│       └── asyncio-patterns.md
-└── 4_Archive/
+│   ├── 3_Resource.md                ← Category hub
+│   ├── Python/
+│   │   └── asyncio-patterns.md
+│   └── Unsorted/
+└── 4_Archive/                       ← No synthesis (no hub, no subfolder page)
     └── 2024-Q1/
         └── quarterly-report.md
 ```
@@ -253,19 +257,22 @@ summary: "DeFi system architecture project"
 ---
 ```
 
-For humans, it's metadata that's immediately visible in Obsidian and directly editable.
-For AI, it's structured data where classification, search, and summary information can be extracted in a single parse.
+For humans, it's metadata visible in Obsidian; for AI, it's structured data where classification, search, and summary information can be extracted in a single parse.
 
-**AI handles generation and management, while humans retain editing authority.**
-Users are freed from the labor of manually filling in metadata, and AI gets consistently formatted data.
+**`tags` and `summary` are generated and maintained by AI.** When you edit a note's body, vault check regenerates its summary and tags from the latest content, so metadata never goes stale.
+The one thing that stays yours is the **prose body** you wrote — DotBrain never touches it. You're freed from the labor of manually filling in metadata, and AI gets consistently formatted data.
 
-### Wiki-links + auto-synthesis — A table of contents for humans, an exploration graph for AI
+### Three layers of synthesis — folders on top of notes, categories on top of folders
 
-Each folder maintains a **folder entity page** (`<folder>.md`) —
-an entry-point note where AI keeps a synthesized overview, recent flow, and key notes for that folder.
+The raw notes stay untouched; AI stacks two synthesis layers on top of them. As records accumulate, the upper layers re-organize themselves, so knowledge compounds.
 
-Topics scattered across folders are synthesized into **`_Wiki/` topic pages**:
-current understanding · contradictions · superseded claims · timeline · member notes — revised every time a new note arrives, so knowledge compounds as records accumulate.
+- **Note** — the raw source. AI only writes the frontmatter and `## Related Notes`; the prose body you wrote is never touched.
+- **Subfolder page** (`<folder>.md`) — an entry point synthesizing that folder's overview · recent flow · key notes · contradictions · staleness.
+- **Category hub** (`1_Project.md`, etc.) — synthesizes the terrain · cross-links · contradictions *between* subfolders. Created for Project · Area · Resource once a category has 2+ subfolders; Archive is not synthesized.
+
+The temporal axis of knowledge lives as a flow, not a separate file. Each page's `## Recent Flow` carries prior entries forward and accumulates (append, not snapshot), and every synthesis appends one `synthesis` line to `.meta/log.md`, forming a chronicle you can skim with a single `grep`.
+
+**All synthesis is user-triggered and hash-gated.** It runs only when you sort the inbox or run a vault check, and only for folders and categories whose content actually changed — no background scheduler, no full rewrite every pass.
 
 Documents are cross-linked through `## Related Notes` sections carrying **a relation type and one-line context**.
 Past 12 links per document, AI re-selects only the most valuable ones (link diet).
@@ -281,7 +288,7 @@ Past 12 links per document, AI re-selects only the most valuable ones (link diet
 ```
 
 For humans, these links are a clickable table of contents; for AI, they are edges of an exploration graph.
-The `.meta/` layer keeps note/topic indexes (JSON) and a vault change timeline (`log.md`),
+The `.meta/` layer keeps a note index (JSON) and a vault change timeline (`log.md`),
 so AI can decide what to read first without scanning the whole vault.
 
 **The same structure works as navigation for humans and as an exploration graph for AI.**
@@ -362,11 +369,11 @@ echo "Uninstall complete"
 ## 💬 So, what is DotBrain?
 
 > DotBrain is an AI-powered PKM app that runs in the macOS menu bar.
-> Drop files into the inbox and AI analyzes the content, automatically classifying them into the PARA structure, writing frontmatter, linking related notes, and synthesizing folder and topic pages — all handled for you.
+> Drop files into the inbox and AI analyzes the content, automatically classifying them into the PARA structure, writing frontmatter, linking related notes, and synthesizing folder and category pages — all handled for you.
 >
 > **It eliminates the time spent organizing notes.** Deciding where to put things, adding tags, finding and linking related documents — AI does all of that, so users only need to write and read. Instead of a note app where things pile up and never get revisited, everything organizes itself so you actually come back and use it.
 >
-> And the real key is that **when AI reads a vault organized this way, its performance dramatically improves.** Thanks to structured frontmatter, automatic indexes, typed note links, and topic wiki pages, AI grasps context accurately and finds the documents it needs quickly. The better your knowledge is organized, the smarter AI works — that's the feedback loop.
+> And the real key is that **when AI reads a vault organized this way, its performance dramatically improves.** Thanks to structured frontmatter, automatic indexes, typed note links, and folder and category synthesis pages, AI grasps context accurately and finds the documents it needs quickly. The better your knowledge is organized, the smarter AI works — that's the feedback loop.
 >
 > It's Obsidian-compatible, and automatically embeds agents for Claude Code and Codex, so a single command like "audit my vault" runs a full health check.
 
