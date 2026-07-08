@@ -3,6 +3,9 @@ import Foundation
 struct LinkAIFilter: Sendable {
     private let aiService = AIService.shared
 
+    /// Per-note ceiling for one filter run — companion docs interpolate this
+    static let defaultMaxResultsPerNote = 15
+
     struct FilteredLink {
         let name: String
         let context: String
@@ -11,7 +14,7 @@ struct LinkAIFilter: Sendable {
 
     func filterBatch(
         notes: [(name: String, summary: String, tags: [String], candidates: [LinkCandidateGenerator.Candidate])],
-        maxResultsPerNote: Int = 15,
+        maxResultsPerNote: Int = LinkAIFilter.defaultMaxResultsPerNote,
         folderHintContext: String = ""
     ) async throws -> [[FilteredLink]] {
         guard !notes.isEmpty else { return [] }
@@ -69,7 +72,7 @@ struct LinkAIFilter: Sendable {
         noteSummary: String,
         noteTags: [String],
         candidates: [LinkCandidateGenerator.Candidate],
-        maxResults: Int = 15
+        maxResults: Int = LinkAIFilter.defaultMaxResultsPerNote
     ) async throws -> [FilteredLink] {
         guard !candidates.isEmpty else { return [] }
 

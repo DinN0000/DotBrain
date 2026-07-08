@@ -26,6 +26,19 @@ final class VaultLogServiceTests: XCTestCase {
         XCTAssertTrue(entries[1].contains("vault-check | 0건 발견"))
     }
 
+    func testAppendWritesHeaderIntoPreexistingEmptyFile() throws {
+        let log = VaultLogService(pkmRoot: root)
+        try FileManager.default.createDirectory(
+            atPath: root + "/.meta", withIntermediateDirectories: true)
+        FileManager.default.createFile(atPath: log.logPath(), contents: nil)
+
+        log.append(kind: "ingest", summary: "첫 항목")
+
+        let content = try String(contentsOfFile: log.logPath(), encoding: .utf8)
+        XCTAssertTrue(content.hasPrefix("# Vault Log"),
+                      "empty pre-existing file must still get the header")
+    }
+
     func testAppendSanitizesNewlinesToKeepOneLinePerEntry() throws {
         let log = VaultLogService(pkmRoot: root)
         log.append(kind: "agent", summary: "여러 줄\n요약\n시도")

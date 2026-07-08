@@ -410,6 +410,7 @@ final class AppState: ObservableObject {
             // reads cold data — external edits bypass the dirty-folder updates
             let root = pkmRootPath
             Task.detached(priority: .utility) {
+                await ReverseLinkRelationMigrator(pkmRoot: root).migrateIfNeeded()
                 await NoteIndexGenerator(pkmRoot: root).regenerateIfStale()
             }
         }

@@ -79,6 +79,45 @@ final class RelatedNotesPrunerTests: XCTestCase {
         XCTAssertTrue(updated.contains("본문"), "body untouched")
     }
 
+    // MARK: - Relation round-trip fidelity
+
+    func testSingleDirectionalTypeSectionKeepsHeaderOnRoundTrip() throws {
+        let path = root + "/refs.md"
+        try "본문".write(toFile: path, atomically: true, encoding: .utf8)
+
+        let writer = RelatedNotesWriter()
+        let links = [
+            LinkAIFilter.FilteredLink(name: "A", context: "비교할 때", relation: "reference"),
+            LinkAIFilter.FilteredLink(name: "B", context: "참고하려면", relation: "reference"),
+        ]
+        try writer.writeRelatedNotes(filePath: path, newLinks: links, noteNames: ["A", "B"])
+
+        let content = try String(contentsOfFile: path, encoding: .utf8)
+        XCTAssertTrue(content.contains("### 참고 자료"),
+                      "single-type directional sections must keep the group header")
+
+        let parsed = writer.parseRelatedNotes(content)
+        XCTAssertEqual(parsed?.entries.map { $0.relation }, ["reference", "reference"],
+                       "relation must survive the write-parse round-trip")
+    }
+
+    func testWriteRelatedNotesDedupsWithinBatch() throws {
+        let path = root + "/dup.md"
+        try "본문".write(toFile: path, atomically: true, encoding: .utf8)
+
+        let writer = RelatedNotesWriter()
+        let links = [
+            LinkAIFilter.FilteredLink(name: "Foo", context: "하나", relation: "related"),
+            LinkAIFilter.FilteredLink(name: "Foo", context: "둘", relation: "related"),
+        ]
+        try writer.writeRelatedNotes(filePath: path, newLinks: links, noteNames: ["Foo"])
+
+        let content = try String(contentsOfFile: path, encoding: .utf8)
+        let fooLines = content.components(separatedBy: "\n").filter { $0.contains("[[Foo]]") }
+        XCTAssertEqual(fooLines.count, 1, "same name in one batch must be written once (first wins)")
+        XCTAssertTrue(fooLines[0].contains("하나"))
+    }
+
     func testReplaceEntriesRefusesUserAuthoredSections() throws {
         let path = root + "/user.md"
         let content = """

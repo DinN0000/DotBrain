@@ -423,7 +423,7 @@ struct SemanticLinker: Sendable {
 
     // MARK: - Constants
 
-    private static let reverseRelationContext: [String: String] = [
+    static let reverseRelationContext: [String: String] = [
         "prerequisite": "이 문서를 선행 지식으로 활용",
         "project": "이 자료를 활용하는 프로젝트",
         "reference": "이 문서를 참고 자료로 인용",

@@ -94,7 +94,7 @@ Two-stage AI classification
     ├── Stage 1: Fast (Haiku/Flash) — batch classification
     └── Stage 2: Precise (Sonnet/Pro) — only for low-confidence files
     ↓
-File move + frontmatter injection + related note linking + MOC update
+File move + frontmatter injection + related note linking + index/folder-page/topic-wiki update
     ↓
 Classification complete
 ```
@@ -104,6 +104,7 @@ Classification complete
 | Provider | Stage 1 (Fast) | Stage 2 (Precise) | Cost |
 |----------|----------------|-------------------|------|
 | **Claude CLI (recommended)** | Haiku | Sonnet | Uses subscription tokens |
+| Codex CLI | Default model | Default model | Uses subscription tokens |
 | Claude API | Haiku 4.5 | Sonnet 4.5 | ~$0.002/file |
 | Gemini API | Flash 2.5 | Pro 2.5 | Possible within free tier |
 
@@ -127,7 +128,7 @@ AI reclassification
 
 - **PARA Management** — move folders between categories, create projects, auto-organize per folder
 - **Full Reorganization** — AI scans the entire vault and suggests misclassification moves (executed after user approval)
-- **Vault Audit** — automatically fixes broken links and missing frontmatter
+- **Vault Check** — fixes broken links and missing frontmatter, refreshes semantic links for changed notes, re-selects over-cap links (keeps 12 per document), and maintains topic wiki pages in one pass
 
 ### Frontmatter Standardization
 
@@ -170,9 +171,11 @@ PKM Root/
 │   ├── documents/                   ← PDF, DOCX, etc.
 │   ├── images/                      ← Images
 │   └── videos/                      ← Videos
+├── _Wiki/                           ← Topic wiki (AI-synthesized topic pages)
+├── .meta/                           ← Machine layer (note/topic indexes, vault log)
 ├── 1_Project/
 │   └── MyProject/
-│       ├── MyProject.md             ← Index note (auto-generated)
+│       ├── MyProject.md             ← Folder entity page (auto-generated)
 │       └── plan.md
 ├── 2_Area/
 │   └── DevOps/
@@ -212,7 +215,7 @@ PKM Root/
 
 - **Swift 5.9** + SwiftUI + Combine
 - **macOS menu bar app** — `NSStatusItem` + `NSPopover`
-- **AI** — Claude CLI (subscription, recommended) / Claude API / Gemini API — triple provider, automatic fallback
+- **AI** — Claude CLI (subscription, recommended) / Codex CLI / Claude API / Gemini API — quad provider, automatic fallback
 - **Dependencies** — ZIPFoundation (DOCX/PPTX/XLSX processing)
 - **Security** — Claude CLI requires no API key (subscription auth). When using API keys, stored in AES-GCM encrypted files with device binding (hardware UUID + HKDF)
 - **Reliability** — Exponential backoff retry, provider fallback, path traversal protection
@@ -253,32 +256,38 @@ For AI, it's structured data where classification, search, and summary informati
 **AI handles generation and management, while humans retain editing authority.**
 Users are freed from the labor of manually filling in metadata, and AI gets consistently formatted data.
 
-### Wiki-links + MOC — A table of contents for humans, an index for AI
+### Wiki-links + auto-synthesis — A table of contents for humans, an exploration graph for AI
 
-Each folder gets an automatically generated MOC (Map of Content).
-An MOC is an index note that lists all documents in a folder with `[[wiki-links]]` alongside **a summary of each document**.
+Each folder maintains a **folder entity page** (`<folder>.md`) —
+an entry-point note where AI keeps a synthesized overview, recent flow, and key notes for that folder.
+
+Topics scattered across folders are synthesized into **`_Wiki/` topic pages**:
+current understanding · contradictions · superseded claims · timeline · member notes — revised every time a new note arrives, so knowledge compounds as records accumulate.
+
+Documents are cross-linked through `## Related Notes` sections carrying **a relation type and one-line context**.
+Past 12 links per document, AI re-selects only the most valuable ones (link diet).
 
 ```markdown
-# MyProject
+## Related Notes
 
-> System architecture project. Covers from architecture design to validation.
+### Prerequisites
+- [[DeFi Basics]] — to understand the protocol structure
 
-## Documents
-- [[Architecture Design]] — Full system architecture design document
-- [[Meeting Notes 0211]] — 2nd requirements meeting. API integration approach finalized
-- [[Audit Report]] — Static analysis results and vulnerability remediation details
+### See Also
+- [[Market Report]] — when comparing against overall market trends
 ```
 
-For humans, these links are a clickable table of contents, and the summaries are guides that convey content without opening each file.
-For AI, these links are graph edges, and the summaries are context for determining exploration priority.
-Which document to read first, which document is relevant to the current question — all of this can be determined from the MOC alone.
+For humans, these links are a clickable table of contents; for AI, they are edges of an exploration graph.
+The `.meta/` layer keeps note/topic indexes (JSON) and a vault change timeline (`log.md`),
+so AI can decide what to read first without scanning the whole vault.
 
 **The same structure works as navigation for humans and as an exploration graph for AI.**
 
 ### AI Companion Files — Making your vault AI-ready
 
-DotBrain automatically generates AI companion files like `CLAUDE.md`, `AGENTS.md`, and `.cursorrules` in your vault.
-With these files in place, AI tools like Claude Code or Cursor can immediately understand the folder structure, classification rules, and tag system when they open the vault.
+DotBrain automatically generates the AI companion files `CLAUDE.md` (Claude Code) and `AGENTS.md` (Codex) in your vault.
+With these files in place, AI coding tools immediately understand the folder structure, classification rules, tag system, and navigation priority when they open the vault.
+They also encourage the AI to file valuable synthesis answers back as notes, so explorations compound in the vault too.
 
 Without reading the entire vault, a single companion file communicates **"this knowledge base is organized like this, and follows these rules."**
 
@@ -350,13 +359,13 @@ echo "Uninstall complete"
 ## 💬 So, what is DotBrain?
 
 > DotBrain is an AI-powered PKM app that runs in the macOS menu bar.
-> Drop files into the inbox and AI analyzes the content, automatically classifying them into the PARA structure, writing frontmatter, linking related notes, and generating MOCs — all handled for you.
+> Drop files into the inbox and AI analyzes the content, automatically classifying them into the PARA structure, writing frontmatter, linking related notes, and synthesizing folder and topic pages — all handled for you.
 >
 > **It eliminates the time spent organizing notes.** Deciding where to put things, adding tags, finding and linking related documents — AI does all of that, so users only need to write and read. Instead of a note app where things pile up and never get revisited, everything organizes itself so you actually come back and use it.
 >
-> And the real key is that **when AI reads a vault organized this way, its performance dramatically improves.** Thanks to structured frontmatter, MOCs, and related note links, AI grasps context accurately and finds the documents it needs quickly. The better your knowledge is organized, the smarter AI works — that's the feedback loop.
+> And the real key is that **when AI reads a vault organized this way, its performance dramatically improves.** Thanks to structured frontmatter, automatic indexes, typed note links, and topic wiki pages, AI grasps context accurately and finds the documents it needs quickly. The better your knowledge is organized, the smarter AI works — that's the feedback loop.
 >
-> It's Obsidian-compatible, and automatically embeds agents for Claude Code and Cursor, so a single command like "audit my vault" runs a full health check.
+> It's Obsidian-compatible, and automatically embeds agents for Claude Code and Codex, so a single command like "audit my vault" runs a full health check.
 
 ---
 

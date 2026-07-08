@@ -24,14 +24,21 @@ struct VaultLogService: Sendable {
         let line = "- [\(Self.timestamp())] \(kind) | \(sanitized)\n"
 
         let path = logPath()
-        if let handle = FileHandle(forWritingAtPath: path) {
-            defer { handle.closeFile() }
-            handle.seekToEndOfFile()
-            if let data = line.data(using: .utf8) {
-                handle.write(data)
+        do {
+            // Throwing FileHandle API: disk-full/unmounted surface as Swift
+            // errors instead of uncatchable NSExceptions from the legacy write
+            if let handle = FileHandle(forWritingAtPath: path) {
+                defer { try? handle.close() }
+                let end = try handle.seekToEnd()
+                let text = (end == 0 ? Self.header : "") + line
+                if let data = text.data(using: .utf8) {
+                    try handle.write(contentsOf: data)
+                }
+            } else {
+                try (Self.header + line).write(toFile: path, atomically: true, encoding: .utf8)
             }
-        } else {
-            try? (Self.header + line).write(toFile: path, atomically: true, encoding: .utf8)
+        } catch {
+            NSLog("[VaultLogService] 로그 기록 실패: %@", error.localizedDescription)
         }
     }
 

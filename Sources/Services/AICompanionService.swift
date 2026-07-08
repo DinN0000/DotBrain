@@ -51,6 +51,17 @@ enum AICompanionService {
     private static let markerStart = "<!-- DotBrain:start -->"
     private static let markerEnd = "<!-- DotBrain:end -->"
 
+    /// Topic-wiki guidance shared verbatim by CLAUDE.md and AGENTS.md —
+    /// one fragment so the two templates cannot drift
+    private static let topicWikiSection = """
+    - `_Wiki/` 주제 페이지 = DotBrain이 여러 노트를 종합한 최신 이해 (## 현재 이해 / ## 모순 / ## 노후 / ## 타임라인 / ## 멤버 노트)
+    - 조사 시 개별 노트보다 주제 페이지의 "현재 이해"를 먼저 읽을 것
+    - `.meta/topic-index.json` — 주제 카탈로그: `topics`(id, 이름, 페이지 경로, 멤버, 키워드, 요약), `deletedTopics`(사용자가 삭제한 주제 툼스톤 — 재생성 금지), `unassigned`(배정 대기 노트 풀)
+    - `_Wiki/` 페이지는 note-index.json에 포함되지 않음 — 주제 목록은 topic-index.json에서 조회
+    - 노트가 속한 주제는 note-index.json 노트 엔트리의 `topics` 필드로 역조회 가능
+    - 마커(<!-- DotBrain:start/end -->) 안은 DotBrain 관리 영역 — 수정 금지, 마커 밖은 자유
+    """
+
     /// Update all AI guide files, preserving user content outside markers.
     /// Each step is individually wrapped in do/catch so partial failures
     /// do not prevent the remaining steps from executing.
@@ -162,6 +173,15 @@ enum AICompanionService {
         }
     }
 
+    /// Locate the DotBrain-managed block (markers inclusive)
+    private static func markerRange(in content: String) -> Range<String.Index>? {
+        guard let startRange = content.range(of: markerStart),
+              let endRange = content.range(of: markerEnd, range: startRange.upperBound..<content.endIndex) else {
+            return nil
+        }
+        return startRange.lowerBound..<endRange.upperBound
+    }
+
     /// Remove the DotBrain-managed block from an existing .cursorrules.
     /// Deletes the file when nothing user-authored remains; a file without
     /// markers is fully user-authored and is left untouched.
@@ -169,13 +189,10 @@ enum AICompanionService {
         let fm = FileManager.default
         let path = (pkmRoot as NSString).appendingPathComponent(".cursorrules")
         guard fm.fileExists(atPath: path),
-              let existing = try? String(contentsOfFile: path, encoding: .utf8) else { return }
-        guard let startRange = existing.range(of: markerStart),
-              let endRange = existing.range(of: markerEnd, range: startRange.upperBound..<existing.endIndex) else {
-            return
-        }
+              let existing = try? String(contentsOfFile: path, encoding: .utf8),
+              let blockRange = markerRange(in: existing) else { return }
         var remainder = existing
-        remainder.replaceSubrange(startRange.lowerBound..<endRange.upperBound, with: "")
+        remainder.replaceSubrange(blockRange, with: "")
         let userContent = remainder
             .replacingOccurrences(of: "<!-- 아래에 자유롭게 추가하세요 -->", with: "")
             .replacingOccurrences(of: "<!-- 아래는 기존 사용자 내용입니다 -->", with: "")
@@ -198,15 +215,10 @@ enum AICompanionService {
     private static func replaceMarkerSection(at path: String, with newSection: String) throws {
         let existing = try String(contentsOfFile: path, encoding: .utf8)
 
-        let searchAfterStart = { (start: Range<String.Index>) -> Range<String.Index>? in
-            existing.range(of: markerEnd, range: start.upperBound..<existing.endIndex)
-        }
-        if let startRange = existing.range(of: markerStart),
-           let endRange = searchAfterStart(startRange),
-           startRange.lowerBound < endRange.lowerBound {
+        if let blockRange = markerRange(in: existing) {
             // Markers found — replace only between them (inclusive)
             var updated = existing
-            updated.replaceSubrange(startRange.lowerBound..<endRange.upperBound, with: newSection)
+            updated.replaceSubrange(blockRange, with: newSection)
             // No global blank-line collapsing here: it would rewrite user
             // content outside the markers. Sections are trimmed at wrap time.
             try updated.write(toFile: path, atomically: true, encoding: .utf8)
@@ -272,12 +284,7 @@ enum AICompanionService {
 
     ## 주제 위키 (_Wiki/)
 
-    - `_Wiki/` 주제 페이지 = DotBrain이 여러 노트를 종합한 최신 이해 (## 현재 이해 / ## 모순 / ## 노후 / ## 타임라인 / ## 멤버 노트)
-    - 조사 시 개별 노트보다 주제 페이지의 "현재 이해"를 먼저 읽을 것
-    - `.meta/topic-index.json` — 주제 카탈로그: `topics`(id, 이름, 페이지 경로, 멤버, 키워드, 요약), `deletedTopics`(사용자가 삭제한 주제 툼스톤 — 재생성 금지), `unassigned`(배정 대기 노트 풀)
-    - `_Wiki/` 페이지는 note-index.json에 포함되지 않음 — 주제 목록은 topic-index.json에서 조회
-    - 노트가 속한 주제는 note-index.json 노트 엔트리의 `topics` 필드로 역조회 가능
-    - 마커(<!-- DotBrain:start/end -->) 안은 DotBrain 관리 영역 — 수정 금지, 마커 밖은 자유
+    \(topicWikiSection)
 
     ---
 
@@ -526,8 +533,8 @@ enum AICompanionService {
     - `.meta/note-index.json`을 파싱하여 **VaultContextMap**을 구축
     - 단순 태그 일치가 아닌 **맥락적 연관성** 기반 추천
     - 같은 폴더뿐 아니라 **다른 카테고리의 노트도** 적극 연결
-    - 링크 실행 1회당 문서별 최대 **15개** 추가, 볼트 점검이 누적 **12개**로 재선별(링크 다이어트 — 사용자가 직접 작성한 줄이 있는 문서는 건드리지 않음)
-    - 관계 유형: `prerequisite`(선행 지식) / `project`(관련 프로젝트) / `reference`(참고 자료) / `related`(함께 보기) — 유형이 2개 이상이면 `###` 소제목으로 그룹화
+    - 링크 실행 1회당 문서별 최대 **\(LinkAIFilter.defaultMaxResultsPerNote)개** 추가, 볼트 점검이 누적 **\(RelatedNotesPruner.cumulativeCap)개**로 재선별(링크 다이어트 — 사용자가 직접 작성한 줄이 있는 문서는 건드리지 않음)
+    - 관계 유형: `prerequisite`(선행 지식) / `project`(관련 프로젝트) / `reference`(참고 자료) / `related`(함께 보기) — `related` 외 유형이 있으면 `###` 소제목으로 그룹화
     - 역방향 링크: 방향성 있는 유형(prerequisite/reference)의 역링크는 `related`로 기록됨
     - context는 `"~하려면"`, `"~할 때"`, `"~와 비교할 때"` 형식
 
@@ -676,7 +683,7 @@ enum AICompanionService {
     - `.meta/note-index.json`을 파싱하여 VaultContextMap 구축
     - 단순 태그 일치가 아닌 **맥락적 연관성** 기반 추천
     - 같은 폴더뿐 아니라 **다른 카테고리의 노트도** 적극 연결
-    - 링크 실행 1회당 문서별 최대 **15개** 추가, 볼트 점검이 누적 **12개**로 재선별(사용자 작성 줄이 있는 문서 제외)
+    - 링크 실행 1회당 문서별 최대 **\(LinkAIFilter.defaultMaxResultsPerNote)개** 추가, 볼트 점검이 누적 **\(RelatedNotesPruner.cumulativeCap)개**로 재선별(사용자 작성 줄이 있는 문서 제외)
     - 관계 유형: `prerequisite`(선행 지식) / `project`(관련 프로젝트) / `reference`(참고 자료) / `related`(함께 보기)
     - 역방향 링크: 방향성 있는 유형(prerequisite/reference)의 역링크는 `related`로 기록됨
     - `[[위키링크]]` 형식 사용
@@ -685,12 +692,7 @@ enum AICompanionService {
 
     ## 주제 위키 (_Wiki/)
 
-    - `_Wiki/` 주제 페이지 = DotBrain이 여러 노트를 종합한 최신 이해 (## 현재 이해 / ## 모순 / ## 노후 / ## 타임라인 / ## 멤버 노트)
-    - 조사 시 개별 노트보다 주제 페이지의 "현재 이해"를 먼저 읽을 것
-    - `.meta/topic-index.json` — 주제 카탈로그: `topics`(id, 이름, 페이지 경로, 멤버, 키워드, 요약), `deletedTopics`(사용자가 삭제한 주제 툼스톤 — 재생성 금지), `unassigned`(배정 대기 노트 풀)
-    - `_Wiki/` 페이지는 note-index.json에 포함되지 않음 — 주제 목록은 topic-index.json에서 조회
-    - 노트가 속한 주제는 note-index.json 노트 엔트리의 `topics` 필드로 역조회 가능
-    - 마커(<!-- DotBrain:start/end -->) 안은 DotBrain 관리 영역 — 수정 금지, 마커 밖은 자유
+    \(topicWikiSection)
 
     ## 탐구 결과 환류
 

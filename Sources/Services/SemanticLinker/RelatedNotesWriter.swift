@@ -47,8 +47,13 @@ struct RelatedNotesWriter: Sendable {
         let existingNames = Set(existingEntries.map { $0.name })
         let selfName = ((filePath as NSString).lastPathComponent as NSString).deletingPathExtension
 
+        // batchSeen: the incoming batch itself can repeat a name (same-named
+        // notes in different folders feeding reverse links) — first wins
+        var batchSeen = Set<String>()
         let addedEntries: [Entry] = verifiedLinks.compactMap { link in
-            guard !existingNames.contains(link.name), link.name != selfName else { return nil }
+            guard !existingNames.contains(link.name),
+                  link.name != selfName,
+                  batchSeen.insert(link.name).inserted else { return nil }
             return (name: link.name, context: link.context, relation: link.relation)
         }
 
@@ -103,7 +108,11 @@ struct RelatedNotesWriter: Sendable {
     private func renderSection(_ entries: [Entry]) -> String {
         let relationTypes = Set(entries.map { $0.relation })
 
-        if relationTypes.count > 1 && !relationTypes.isSubset(of: ["related"]) {
+        // Any non-"related" type forces grouped rendering — even a single-type
+        // section. A flat list has no ### header, so parseRelatedNotes would
+        // read every entry back as "related" and the type would be lost on the
+        // next merge/prune round-trip.
+        if !relationTypes.isSubset(of: ["related"]) {
             // Group by relation type
             var grouped: [String] = []
             for rel in Self.relationOrder {

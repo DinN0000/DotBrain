@@ -16,3 +16,6 @@ docs/
 Package.resolved
 *.dmg
 npm/node_modules/
+
+# bkit agent tooling state (local only)
+.bkit/

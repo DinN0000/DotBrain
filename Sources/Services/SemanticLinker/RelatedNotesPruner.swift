@@ -11,6 +11,7 @@ struct RelatedNotesPruner: Sendable {
 
     static let cumulativeCap = 12
     private let batchSize = 5
+    private let maxConcurrentAI = 3
     private let aiService = AIService.shared
 
     struct PruneInput: Sendable {
@@ -19,10 +20,16 @@ struct RelatedNotesPruner: Sendable {
         let summary: String
     }
 
-    struct Result {
+    struct Result: Sendable {
         var prunedNotes = 0
         var removedLinks = 0
         var modifiedFiles: Set<String> = []
+
+        mutating func merge(_ other: Result) {
+            prunedNotes += other.prunedNotes
+            removedLinks += other.removedLinks
+            modifiedFiles.formUnion(other.modifiedFiles)
+        }
     }
 
     /// Inspect candidate notes and prune over-cap sections. Candidates that
@@ -33,15 +40,23 @@ struct RelatedNotesPruner: Sendable {
 
         let writer = RelatedNotesWriter()
 
-        // Re-read and parse each candidate; keep only truly over-cap,
-        // machine-owned sections
+        // Re-read and parse each candidate. Duplicate-name lines (same-named
+        // notes in different folders, historical accumulation) are deduped
+        // first-wins: dup-only notes get rewritten without an AI call, and
+        // only genuinely over-cap sections go to AI re-selection.
         var targets: [(input: PruneInput, entries: [RelatedNotesWriter.Entry])] = []
         for candidate in candidates {
             guard let content = try? String(contentsOfFile: candidate.filePath, encoding: .utf8),
                   let parsed = writer.parseRelatedNotes(content),
-                  !parsed.hasUnrecognized,
-                  parsed.entries.count > Self.cumulativeCap else { continue }
-            targets.append((input: candidate, entries: parsed.entries))
+                  !parsed.hasUnrecognized else { continue }
+            var seen = Set<String>()
+            let deduped = parsed.entries.filter { seen.insert($0.name).inserted }
+            if deduped.count > Self.cumulativeCap {
+                targets.append((input: candidate, entries: deduped))
+            } else if deduped.count < parsed.entries.count {
+                result.merge(rewrite(candidate, entries: deduped,
+                                     originalCount: parsed.entries.count, writer: writer))
+            }
         }
         guard !targets.isEmpty else { return result }
 
@@ -52,27 +67,67 @@ struct RelatedNotesPruner: Sendable {
             Array(targets[$0..<min($0 + batchSize, targets.count)])
         }
 
-        for batch in batches {
-            let keptSets = await selectKept(batch: batch)
-            for (item, kept) in zip(batch, keptSets) {
-                // Preserve original file order among kept entries
-                let keptEntries = item.entries.enumerated()
-                    .filter { kept.contains($0.offset) }
-                    .map { $0.element }
-                guard keptEntries.count < item.entries.count, !keptEntries.isEmpty else { continue }
-                do {
-                    if try writer.replaceEntries(filePath: item.input.filePath, entries: keptEntries) {
-                        result.prunedNotes += 1
-                        result.removedLinks += item.entries.count - keptEntries.count
-                        result.modifiedFiles.insert(item.input.filePath)
+        // Batch-AI pattern: TaskGroup capped at maxConcurrentAI. Batches
+        // partition targets, so concurrent tasks write distinct files.
+        await withTaskGroup(of: Result.self) { group in
+            var activeTasks = 0
+            for batch in batches {
+                if activeTasks >= maxConcurrentAI {
+                    if let partial = await group.next() {
+                        result.merge(partial)
+                        activeTasks -= 1
                     }
-                } catch {
-                    NSLog("[RelatedNotesPruner] 재선별 기록 실패: %@ — %@",
-                          item.input.name, error.localizedDescription)
                 }
+                group.addTask {
+                    await pruneBatch(batch, writer: writer)
+                }
+                activeTasks += 1
+            }
+            for await partial in group {
+                result.merge(partial)
             }
         }
 
+        return result
+    }
+
+    private func pruneBatch(
+        _ batch: [(input: PruneInput, entries: [RelatedNotesWriter.Entry])],
+        writer: RelatedNotesWriter
+    ) async -> Result {
+        var result = Result()
+        let keptSets = await selectKept(batch: batch)
+        for (item, kept) in zip(batch, keptSets) {
+            // Preserve original file order among kept entries
+            let keptEntries = item.entries.enumerated()
+                .filter { kept.contains($0.offset) }
+                .map { $0.element }
+            result.merge(rewrite(item.input, entries: keptEntries,
+                                 originalCount: item.entries.count, writer: writer))
+        }
+        return result
+    }
+
+    /// Rewrite one note's section to exactly `entries`; no-ops (identical
+    /// content, empty entries, user-authored sections) are handled by
+    /// replaceEntries returning false.
+    private func rewrite(
+        _ input: PruneInput,
+        entries: [RelatedNotesWriter.Entry],
+        originalCount: Int,
+        writer: RelatedNotesWriter
+    ) -> Result {
+        var result = Result()
+        do {
+            if try writer.replaceEntries(filePath: input.filePath, entries: entries) {
+                result.prunedNotes += 1
+                result.removedLinks += originalCount - entries.count
+                result.modifiedFiles.insert(input.filePath)
+            }
+        } catch {
+            NSLog("[RelatedNotesPruner] 재선별 기록 실패: %@ — %@",
+                  input.name, error.localizedDescription)
+        }
         return result
     }
 

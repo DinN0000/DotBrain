@@ -182,9 +182,12 @@ struct VaultCheckPipeline {
         // N. Must run BEFORE the final snapshot so pruned links land in it and
         // are never misread as user removals on the next check.
         onProgress(Progress(phase: "링크 재선별 중...", fraction: 0.95))
+        // existingRelated dedups names, so a section can exceed the cap in
+        // LINES at exactly cap unique names (duplicate lines) — >= closes
+        // that gap at the cost of one cheap read for at-cap clean notes
         let pruneCandidates = allNotesForSnapshot
             .filter {
-                $0.existingRelated.count > RelatedNotesPruner.cumulativeCap ||
+                $0.existingRelated.count >= RelatedNotesPruner.cumulativeCap ||
                 linkResult.modifiedFiles.contains($0.filePath)
             }
             .map { RelatedNotesPruner.PruneInput(name: $0.name, filePath: $0.filePath, summary: $0.summary) }
