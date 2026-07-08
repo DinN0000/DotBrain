@@ -1,12 +1,11 @@
 import Foundation
 
-/// Provider-agnostic AI service that routes to Claude, Gemini, or Claude CLI
+/// Provider-agnostic AI service that routes to Claude API, Claude CLI, or Codex CLI
 /// with adaptive rate limiting, retry logic, and provider fallback
 actor AIService {
     static let shared = AIService()
 
     private let claudeClient = ClaudeAPIClient()
-    private let geminiClient = GeminiAPIClient()
     private let claudeCLIClient = ClaudeCLIClient()
     private let codexCLIClient = CodexCLIClient()
     private let rateLimiter = RateLimiter.shared
@@ -31,13 +30,11 @@ actor AIService {
         let candidates: [AIProvider]
         switch primary {
         case .claude:
-            candidates = [.gemini, .claudeCLI, .codexCLI]
-        case .gemini:
-            candidates = [.claude, .claudeCLI, .codexCLI]
+            candidates = [.claudeCLI, .codexCLI]
         case .claudeCLI:
-            candidates = [.codexCLI, .claude, .gemini]
+            candidates = [.codexCLI, .claude]
         case .codexCLI:
-            candidates = [.claudeCLI, .claude, .gemini]
+            candidates = [.claudeCLI, .claude]
         }
         return candidates.first { $0.hasAPIKey() }
     }
@@ -50,7 +47,6 @@ actor AIService {
     private func fastModel(for provider: AIProvider) -> String {
         switch provider {
         case .claude: return ClaudeAPIClient.haikuModel
-        case .gemini: return GeminiAPIClient.flashModel
         case .claudeCLI: return ClaudeCLIClient.fastModel
         case .codexCLI: return CodexCLIClient.fastModel
         }
@@ -59,7 +55,6 @@ actor AIService {
     private func preciseModel(for provider: AIProvider) -> String {
         switch provider {
         case .claude: return ClaudeAPIClient.sonnetModel
-        case .gemini: return GeminiAPIClient.proModel
         case .claudeCLI: return ClaudeCLIClient.preciseModel
         case .codexCLI: return CodexCLIClient.preciseModel
         }
@@ -174,13 +169,6 @@ actor AIService {
                 userMessage: userMessage,
                 systemMessage: systemMessage
             )
-        case .gemini:
-            return try await geminiClient.sendMessage(
-                model: model,
-                maxTokens: maxTokens,
-                userMessage: userMessage,
-                systemMessage: systemMessage
-            )
         case .claudeCLI:
             return try await claudeCLIClient.sendMessage(
                 model: model,
@@ -216,12 +204,12 @@ actor AIService {
         return (error as NSError).domain == NSURLErrorDomain
     }
 
-    /// Send using the fast model (Haiku / Flash)
+    /// Send using the fast model
     func sendFast(maxTokens: Int = 4096, message: String, systemMessage: String? = nil) async throws -> String {
         try await sendMessage(model: fastModel, maxTokens: maxTokens, userMessage: message, systemMessage: systemMessage).0
     }
 
-    /// Send using the precise model (Sonnet / Pro)
+    /// Send using the precise model
     func sendPrecise(maxTokens: Int = 2048, message: String, systemMessage: String? = nil) async throws -> String {
         try await sendMessage(model: preciseModel, maxTokens: maxTokens, userMessage: message, systemMessage: systemMessage).0
     }
@@ -253,8 +241,7 @@ actor AIService {
     func shutdownAll() async {
         async let a: () = claudeCLIClient.shutdown()
         async let b: () = claudeClient.shutdown()
-        async let c: () = geminiClient.shutdown()
-        _ = await (a, b, c)
+        _ = await (a, b)
     }
 }
 

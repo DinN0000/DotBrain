@@ -181,13 +181,11 @@ final class AppState: ObservableObject {
     var hasAPIKey: Bool {
         switch selectedProvider {
         case .claude: return hasClaudeKey
-        case .gemini: return hasGeminiKey
         case .claudeCLI: return hasClaudeCLI
         case .codexCLI: return hasCodexCLI
         }
     }
     @Published var hasClaudeKey: Bool = false
-    @Published var hasGeminiKey: Bool = false
     @Published var hasClaudeCLI: Bool = false
     @Published var hasCodexCLI: Bool = false
     @Published var codexCLIInstalled: Bool = false
@@ -237,7 +235,6 @@ final class AppState: ObservableObject {
 
     func updateAPIKeyStatus() {
         hasClaudeKey = KeychainService.getAPIKey() != nil
-        hasGeminiKey = KeychainService.getGeminiAPIKey() != nil
         refreshCLIAvailability()
     }
 
@@ -336,7 +333,6 @@ final class AppState: ObservableObject {
         }
 
         self.hasClaudeKey = KeychainService.getAPIKey() != nil
-        self.hasGeminiKey = KeychainService.getGeminiAPIKey() != nil
         // CLI availability is resolved asynchronously below — detection may
         // spawn a login shell (seconds) and must not block app startup.
         self.hasClaudeCLI = false

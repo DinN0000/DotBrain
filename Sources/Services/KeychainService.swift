@@ -8,7 +8,6 @@ import Security  // legacy keychain migration only
 enum KeychainService {
     private static let service = "com.hwaa.dotbrain"
     private static let claudeKeyAccount = "anthropic-api-key"
-    private static let geminiKeyAccount = "gemini-api-key"
 
     private static let saltV1 = "dotbrain-key-salt-v1"
     private static let saltV2 = "dotbrain-kdf-salt-v2"
@@ -36,24 +35,6 @@ enum KeychainService {
     static func deleteAPIKey() -> Bool {
         migrateFromKeychainIfNeeded()
         return deleteValue(forKey: claudeKeyAccount)
-    }
-
-    // MARK: - Gemini API Key
-
-    static func saveGeminiAPIKey(_ key: String) -> Bool {
-        migrateFromKeychainIfNeeded()
-        return saveValue(key, forKey: geminiKeyAccount)
-    }
-
-    static func getGeminiAPIKey() -> String? {
-        migrateFromKeychainIfNeeded()
-        return getValue(forKey: geminiKeyAccount)
-    }
-
-    @discardableResult
-    static func deleteGeminiAPIKey() -> Bool {
-        migrateFromKeychainIfNeeded()
-        return deleteValue(forKey: geminiKeyAccount)
     }
 
     // MARK: - Encrypted File Storage
@@ -226,19 +207,16 @@ enum KeychainService {
 
         // Try to read from legacy keychain
         let claudeKey = legacyKeychainGet(account: claudeKeyAccount)
-        let geminiKey = legacyKeychainGet(account: geminiKeyAccount)
 
-        guard claudeKey != nil || geminiKey != nil else { return }
+        guard claudeKey != nil else { return }
 
         var store: [String: String] = [:]
         if let k = claudeKey { store[claudeKeyAccount] = k }
-        if let k = geminiKey { store[geminiKeyAccount] = k }
 
         if saveStore(store) {
             NSLog("[SecureStore] 키체인 → 암호화 파일 마이그레이션 완료")
             // Clean up legacy keychain entries
             legacyKeychainDelete(account: claudeKeyAccount)
-            legacyKeychainDelete(account: geminiKeyAccount)
         }
     }
 

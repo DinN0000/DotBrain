@@ -24,7 +24,7 @@ protocol RetryClassifiable: LocalizedError {
 struct TokenUsage: Codable, Sendable {
     let inputTokens: Int
     let outputTokens: Int
-    let cachedTokens: Int  // Claude cache_read, Gemini = 0
+    let cachedTokens: Int  // Claude cache_read; 0 for CLI providers
     var totalTokens: Int { inputTokens + outputTokens }
 
     static let zero = TokenUsage(inputTokens: 0, outputTokens: 0, cachedTokens: 0)

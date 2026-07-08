@@ -2,7 +2,7 @@ import Foundation
 
 /// Adaptive rate limiter with concurrent slot support per AI provider.
 /// Each provider gets N slots that can fire independently, maintaining minInterval per slot.
-/// Claude gets 3 slots (120 RPM headroom), Gemini gets 1 slot (conservative for free tier).
+/// Claude API gets 3 slots (120 RPM headroom); CLI providers get 2 slots each.
 actor RateLimiter {
     static let shared = RateLimiter()
 
@@ -18,7 +18,6 @@ actor RateLimiter {
 
     /// Conservative defaults per provider (safe for free tiers)
     private let defaults: [AIProvider: Duration] = [
-        .gemini: .milliseconds(4200),   // ~14 RPM (free tier: 15 RPM)
         .claude: .milliseconds(500),    // ~120 RPM
         .claudeCLI: .milliseconds(100), // Minimal — CLI manages its own pacing
         .codexCLI: .milliseconds(100),  // Minimal — CLI manages its own pacing
@@ -26,7 +25,6 @@ actor RateLimiter {
 
     /// Minimum allowed interval (50% of default) — acceleration floor
     private let minFloor: [AIProvider: Duration] = [
-        .gemini: .milliseconds(2100),
         .claude: .milliseconds(250),
         .claudeCLI: .milliseconds(50),
         .codexCLI: .milliseconds(50),
@@ -35,7 +33,6 @@ actor RateLimiter {
     /// Number of concurrent slots per provider
     private let defaultSlots: [AIProvider: Int] = [
         .claude: 3,   // 120 RPM allows comfortable concurrent requests
-        .gemini: 1,   // Free tier 15 RPM — keep sequential to avoid 429
         .claudeCLI: 2, // CLI has process overhead, limit concurrency
         .codexCLI: 2,  // CLI has process overhead, limit concurrency
     ]

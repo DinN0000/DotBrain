@@ -45,11 +45,11 @@ AI가 이해하고 활용할 수 있는 형태로 그 지식을 구조화하는 
 
 **The Solution: DotBrain**
 DotBrain은 이 '정리의 병목'을 AI에게 위임합니다.
-- **Zero-Friction Sort:** 인박스에 파일을 던지면 AI가 내용을 읽고, PARA 체계에 맞춰 자동으로 이동시킵니다.
+- **Zero-Friction Sort:** 인박스에 파일을 모아두고 정리를 실행하면, AI가 내용을 읽고 PARA 체계에 맞춰 자동으로 분류·이동시킵니다.
 - **Semantic Structure:** Obsidian 호환 프론트매터와 위키링크를 자동 생성하여 문서 간의 맥락을 연결합니다.
 - **Compounding Wiki:** 새 노트가 들어올 때마다 폴더·주제 페이지를 AI가 종합·갱신하여, 기록이 쌓일수록 지식이 복리로 정리됩니다.
 - **Self-Healing:** 중첩된 폴더 구조를 플랫화하고, 깨진 링크와 누락된 프론트매터를 복구하며, SHA256 해시로 중복 파일을 감지해 병합합니다.
-- **Reliability:** Claude CLI · Codex CLI · Claude API · Gemini API를 지원하며, 한쪽이 실패하면 다른 제공자로 폴백합니다.
+- **Reliability:** Claude CLI · Codex CLI · Claude API를 지원하며, 한쪽이 실패하면 다른 제공자로 폴백합니다.
 
 ---
 
@@ -63,7 +63,7 @@ npx dotbrain
 
 > 📖 자세한 사용법은 **[서비스 매뉴얼 (MANUAL.md)](MANUAL.md)**을 참고하세요.
 
-> **필요한 것:** macOS 13 (Ventura) 이상 / Node.js 18+ (npx 사용 시) / Claude 구독 (Pro/Max) + Claude CLI 기본. Codex CLI, [Claude API 키](https://console.anthropic.com/settings/keys), [Gemini API 키](https://aistudio.google.com/apikey)도 지원.
+> **필요한 것:** macOS 13 (Ventura) 이상 / Node.js 18+ (npx 사용 시) / Claude 구독 (Pro/Max) + Claude CLI 기본. Codex CLI, [Claude API 키](https://console.anthropic.com/settings/keys)도 지원.
 
 <details>
 <summary><b>소스에서 직접 빌드</b></summary>
@@ -82,16 +82,18 @@ swift build -c release
 
 ### 인박스 처리
 
-인박스에 파일을 넣으면 자동으로 처리됩니다 :
+인박스에 파일을 모아두고 정리를 실행하면 다음 순서로 처리됩니다 :
 
 ```
 _Inbox/에 파일 추가 (드래그앤드롭)
     ↓
+"정리" 실행 (사용자 트리거 — 던지는 순간 자동 실행 아님)
+    ↓
 내용 추출 (텍스트/PDF/이미지/PPTX/XLSX/DOCX)
     ↓
 2단계 AI 분류
-    ├── Stage 1: Fast (Haiku/Flash) — 배치 분류
-    └── Stage 2: Precise (Sonnet/Pro) — 신뢰도 낮은 파일만
+    ├── Stage 1: 빠른 배치 분류
+    └── Stage 2: 정밀 재확인 — 신뢰도 낮은 파일만
     ↓
 파일 이동 + 프론트매터 주입 + 관련 노트 연결 + 인덱스·폴더 페이지·주제 위키 갱신
     ↓
@@ -102,12 +104,12 @@ _Inbox/에 파일 추가 (드래그앤드롭)
 
 | 제공자 | Stage 1 (Fast) | Stage 2 (Precise) | 비용 |
 |--------|----------------|-------------------|------|
-| **Claude CLI (추천)** | Haiku | Sonnet | 구독 토큰 사용 |
-| Codex CLI | 기본 모델 | 기본 모델 | 구독 토큰 사용 |
+| **Claude CLI (추천)** | 사용자 기본 모델 | 사용자 기본 모델 | 구독 토큰 사용 |
+| Codex CLI | 사용자 기본 모델 | 사용자 기본 모델 | 구독 토큰 사용 |
 | Claude API | Haiku 4.5 | Sonnet 4.5 | ~$0.002/파일 |
-| Gemini API | Flash 2.5 | Pro 2.5 | 무료 티어 내 가능 |
 
 대부분의 파일은 Stage 1에서 끝납니다. Claude CLI는 구독 토큰을 사용하므로 별도 API 비용이 없습니다.
+CLI 제공자(Claude/Codex)는 별도 모델을 지정하지 않고 사용자의 CLI 기본 모델을 그대로 사용하며, 두 스테이지는 모델이 아니라 프롬프트 전략(배치 vs 개별 정밀)만 다릅니다. 특정 모델(Haiku/Sonnet)은 API 키를 쓰는 Claude API 경로에만 적용됩니다.
 
 ### 폴더 정리
 
@@ -214,7 +216,7 @@ PKM Root/
 
 - **Swift 5.9** + SwiftUI + Combine
 - **macOS 메뉴바 앱** — `NSStatusItem` + `NSPopover`
-- **AI** — Claude CLI (구독, 추천) / Codex CLI / Claude API / Gemini API — 4중 제공자, 자동 폴백
+- **AI** — Claude CLI (구독, 추천) / Codex CLI / Claude API — 3중 제공자, 자동 폴백
 - **의존성** — ZIPFoundation (DOCX/PPTX/XLSX 처리)
 - **보안** — Claude CLI는 API 키 불필요 (구독 인증). API 키 사용 시 AES-GCM 암호화 파일로 기기 종속 저장 (하드웨어 UUID + HKDF)
 - **안정성** — 지수 백오프 재시도, 제공자 폴백, 경로 탐색 보호
@@ -358,7 +360,7 @@ echo "제거 완료"
 ## 💬 그래서 DotBrain은?
 
 > DotBrain은 macOS 메뉴바에서 동작하는 AI PKM 앱입니다.
-> 파일을 인박스에 넣으면 AI가 내용을 분석해서 PARA 구조로 자동 분류하고, 프론트매터 작성, 관련 노트 연결, 폴더·주제 페이지 종합까지 다 해줍니다.
+> 파일을 인박스에 모아두고 정리하면 AI가 내용을 분석해서 PARA 구조로 자동 분류하고, 프론트매터 작성, 관련 노트 연결, 폴더·주제 페이지 종합까지 다 해줍니다.
 >
 > **노트 정리하는 시간을 없애줍니다.** 어디에 넣을지 고민하고, 태그 달고, 관련 문서 찾아서 연결하는 작업을 AI가 대신 하니까, 사용자는 쓰고 읽는 것만 하면 됩니다. 쌓기만 하고 안 보는 노트앱이 아니라, 알아서 정리되니까 실제로 다시 찾아 쓰게 됩니다.
 >

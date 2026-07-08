@@ -18,8 +18,6 @@ actor APIUsageLogger {
     private static let pricing: [String: ModelPricing] = [
         "claude-haiku-4-5-20251001": ModelPricing(inputPerMillion: 0.80, outputPerMillion: 4.00),
         "claude-sonnet-4-5-20250929": ModelPricing(inputPerMillion: 3.00, outputPerMillion: 15.00),
-        "gemini-2.5-flash": ModelPricing(inputPerMillion: 0.15, outputPerMillion: 0.60),
-        "gemini-2.5-pro": ModelPricing(inputPerMillion: 1.25, outputPerMillion: 5.00),
     ]
 
     init(pkmRoot: String) {

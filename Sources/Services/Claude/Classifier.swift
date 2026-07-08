@@ -13,7 +13,7 @@ struct ClassificationContext {
 }
 
 /// 2-stage document classifier (Fast batch → Precise for uncertain)
-/// Supports Claude (Haiku/Sonnet) and Gemini (Flash/Pro)
+/// Supports Claude API (Haiku/Sonnet), Claude CLI, and Codex CLI
 actor Classifier {
     private let aiService = AIService.shared
     private let maxBatchSize = 25
@@ -675,7 +675,7 @@ actor Classifier {
                 stage2Concurrency: 2,
                 stage2ContentLimit: 4000
             )
-        case .claude, .gemini:
+        case .claude:
             return ProviderTuning(
                 stage1PreviewLength: 2000,
                 stage1CharBudget: 50000,

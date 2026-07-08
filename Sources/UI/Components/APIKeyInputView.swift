@@ -4,9 +4,7 @@ import SwiftUI
 struct APIKeyInputView: View {
     @EnvironmentObject var appState: AppState
     @State private var claudeKeyInput: String = ""
-    @State private var geminiKeyInput: String = ""
     @State private var showingClaudeKey: Bool = false
-    @State private var showingGeminiKey: Bool = false
     @State private var saveMessage: (provider: AIProvider, text: String)?
 
     /// Whether to show the delete button when a key exists
@@ -24,20 +22,10 @@ struct APIKeyInputView: View {
                 showingKey: $showingClaudeKey,
                 hasKey: appState.hasClaudeKey
             )
-
-            providerSection(
-                provider: .gemini,
-                keyInput: $geminiKeyInput,
-                showingKey: $showingGeminiKey,
-                hasKey: appState.hasGeminiKey
-            )
         }
         .onAppear {
             if appState.hasClaudeKey {
                 claudeKeyInput = "••••••••"
-            }
-            if appState.hasGeminiKey {
-                geminiKeyInput = "••••••••"
             }
         }
     }
@@ -156,7 +144,6 @@ struct APIKeyInputView: View {
     private func providerAccentColor(_ provider: AIProvider) -> Color {
         switch provider {
         case .claude: return Color(red: 0.85, green: 0.45, blue: 0.25)
-        case .gemini: return Color(red: 0.25, green: 0.52, blue: 0.96)
         case .claudeCLI: return Color(red: 0.85, green: 0.45, blue: 0.25)
         case .codexCLI: return Color(red: 0.0, green: 0.65, blue: 0.42)
         }
@@ -230,7 +217,7 @@ struct APIKeyInputView: View {
                 Button(action: {
                     showingKey.wrappedValue.toggle()
                     if showingKey.wrappedValue, keyInput.wrappedValue == "••••••••", hasKey {
-                        if let key = provider == .claude ? KeychainService.getAPIKey() : KeychainService.getGeminiAPIKey() {
+                        if let key = KeychainService.getAPIKey() {
                             keyInput.wrappedValue = key
                         }
                     } else if !showingKey.wrappedValue, hasKey, keyInput.wrappedValue.hasPrefix(provider.keyPrefix) {

@@ -94,8 +94,6 @@ enum L10n {
     enum Provider {
         static let costIncluded = tr("provider.cost_included")
         static let costPerFile = tr("provider.cost_per_file")
-        static let freeTier = tr("provider.free_tier")
-        static let free = tr("provider.free")
         static let subscription = tr("provider.subscription")
         static func activeLabel(_ name: String) -> String { tr("provider.active_label", name) }
         static let active = tr("provider.active")
@@ -427,7 +425,6 @@ enum L10n {
         static let aiConnectionTitle = tr("onboarding.ai_connection_title")
         static let aiConnectionDesc = tr("onboarding.ai_connection_desc")
         static let badgeSubscription = tr("onboarding.badge_subscription")
-        static let badgeFreeStart = tr("onboarding.badge_free_start")
         static let badgeApiPayment = tr("onboarding.badge_api_payment")
         static let cliInstalled = tr("onboarding.cli_installed")
         static let cliPipeMode = tr("onboarding.cli_pipe_mode")

@@ -47,11 +47,11 @@ structuring that knowledge into a form AI can understand and leverage.
 
 **The Solution: DotBrain**
 DotBrain delegates this 'organizing bottleneck' to AI.
-- **Zero-Friction Sort:** Drop files into the inbox and AI reads the content, automatically moving them according to the PARA framework.
+- **Zero-Friction Sort:** Collect files in the inbox and run a sort — AI reads the content and automatically classifies and moves them per the PARA framework.
 - **Semantic Structure:** Automatically generates Obsidian-compatible frontmatter and wiki-links to connect context between documents.
 - **Compounding Wiki:** As each new note arrives, AI synthesizes and updates folder and topic pages, so knowledge compounds as records accumulate.
 - **Self-Healing:** Flattens nested folder structures, repairs broken links and missing frontmatter, and detects duplicate files via SHA256 hashing for merging.
-- **Reliability:** Supports Claude CLI · Codex CLI · Claude API · Gemini API, falling back to another provider if one fails.
+- **Reliability:** Supports Claude CLI · Codex CLI · Claude API, falling back to another provider if one fails.
 
 ---
 
@@ -65,7 +65,7 @@ When `·‿·` appears in your menu bar, installation is complete. Click the ico
 
 > 📖 For detailed usage instructions, see the **[Service Manual (MANUAL.md)](MANUAL.md)**.
 
-> **Requirements:** macOS 13 (Ventura) or later / Node.js 18+ (when using npx) / Claude subscription (Pro/Max) + Claude CLI as default. Codex CLI, [Claude API key](https://console.anthropic.com/settings/keys), and [Gemini API key](https://aistudio.google.com/apikey) also supported.
+> **Requirements:** macOS 13 (Ventura) or later / Node.js 18+ (when using npx) / Claude subscription (Pro/Max) + Claude CLI as default. Codex CLI and [Claude API key](https://console.anthropic.com/settings/keys) also supported.
 
 <details>
 <summary><b>Build from source</b></summary>
@@ -84,16 +84,18 @@ swift build -c release
 
 ### Inbox Processing
 
-Drop files into the inbox and they are processed automatically:
+Collect files in the inbox and run a sort — they're processed in these steps:
 
 ```
 Add file to _Inbox/ (drag & drop)
     ↓
+Run sort (user-triggered — not automatic on drop)
+    ↓
 Content extraction (text/PDF/image/PPTX/XLSX/DOCX)
     ↓
 Two-stage AI classification
-    ├── Stage 1: Fast (Haiku/Flash) — batch classification
-    └── Stage 2: Precise (Sonnet/Pro) — only for low-confidence files
+    ├── Stage 1: fast batch classification
+    └── Stage 2: precise recheck — only for low-confidence files
     ↓
 File move + frontmatter injection + related note linking + index/folder-page/topic-wiki update
     ↓
@@ -104,12 +106,12 @@ Classification complete
 
 | Provider | Stage 1 (Fast) | Stage 2 (Precise) | Cost |
 |----------|----------------|-------------------|------|
-| **Claude CLI (recommended)** | Haiku | Sonnet | Uses subscription tokens |
-| Codex CLI | Default model | Default model | Uses subscription tokens |
+| **Claude CLI (recommended)** | User's default model | User's default model | Uses subscription tokens |
+| Codex CLI | User's default model | User's default model | Uses subscription tokens |
 | Claude API | Haiku 4.5 | Sonnet 4.5 | ~$0.002/file |
-| Gemini API | Flash 2.5 | Pro 2.5 | Possible within free tier |
 
 Most files finish at Stage 1. Claude CLI uses subscription tokens, so there is no additional API cost.
+The CLI providers (Claude/Codex) pass no explicit model — they use your CLI's default model, and the two stages differ only in prompt strategy (batch vs per-file precise), not model. Specific models (Haiku/Sonnet) apply only to the API-key path (Claude API).
 
 ### Folder Reorganization
 
@@ -216,7 +218,7 @@ PKM Root/
 
 - **Swift 5.9** + SwiftUI + Combine
 - **macOS menu bar app** — `NSStatusItem` + `NSPopover`
-- **AI** — Claude CLI (subscription, recommended) / Codex CLI / Claude API / Gemini API — quad provider, automatic fallback
+- **AI** — Claude CLI (subscription, recommended) / Codex CLI / Claude API — triple provider, automatic fallback
 - **Dependencies** — ZIPFoundation (DOCX/PPTX/XLSX processing)
 - **Security** — Claude CLI requires no API key (subscription auth). When using API keys, stored in AES-GCM encrypted files with device binding (hardware UUID + HKDF)
 - **Reliability** — Exponential backoff retry, provider fallback, path traversal protection

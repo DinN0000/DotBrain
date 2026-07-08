@@ -42,14 +42,14 @@ struct SettingsView: View {
         var providers: [AIProvider] {
             switch self {
             case .subscription: return [.claudeCLI, .codexCLI]
-            case .api: return [.claude, .gemini]
+            case .api: return [.claude]
             }
         }
 
         static func group(for provider: AIProvider) -> AIProviderGroup {
             switch provider {
             case .claudeCLI, .codexCLI: return .subscription
-            case .claude, .gemini: return .api
+            case .claude: return .api
             }
         }
     }
@@ -57,7 +57,6 @@ struct SettingsView: View {
     private var activeHasKey: Bool {
         switch activeProvider {
         case .claude: return appState.hasClaudeKey
-        case .gemini: return appState.hasGeminiKey
         case .claudeCLI: return appState.hasClaudeCLI
         case .codexCLI: return appState.hasCodexCLI
         }
@@ -66,7 +65,6 @@ struct SettingsView: View {
     private var viewingHasKey: Bool {
         switch viewingProvider {
         case .claude: return appState.hasClaudeKey
-        case .gemini: return appState.hasGeminiKey
         case .claudeCLI: return appState.hasClaudeCLI
         case .codexCLI: return appState.hasCodexCLI
         }
@@ -312,16 +310,6 @@ struct SettingsView: View {
                 Text(provider.rawValue)
                     .font(.caption2)
                     .fontWeight(isViewing ? .semibold : .regular)
-
-                if provider == .gemini {
-                    Text(L10n.Provider.free)
-                        .font(.system(size: 7, weight: .medium))
-                        .foregroundColor(.secondary)
-                        .padding(.horizontal, 3)
-                        .padding(.vertical, 1)
-                        .background(Color.secondary.opacity(0.1))
-                        .cornerRadius(2)
-                }
             }
             .padding(.horizontal, 8)
             .padding(.vertical, 3)
@@ -929,7 +917,7 @@ struct SettingsView: View {
             keyInput = ""
             return
         }
-        let hasKey = provider == .claude ? appState.hasClaudeKey : appState.hasGeminiKey
+        let hasKey = appState.hasClaudeKey
         keyInput = hasKey ? "••••••••" : ""
     }
 
@@ -937,7 +925,7 @@ struct SettingsView: View {
         guard viewingProvider.needsAPIKey else { return }
         showingKey.toggle()
         if showingKey, keyInput == "••••••••", viewingHasKey {
-            if let key = viewingProvider == .claude ? KeychainService.getAPIKey() : KeychainService.getGeminiAPIKey() {
+            if let key = KeychainService.getAPIKey() {
                 keyInput = key
             }
         } else if !showingKey, viewingHasKey, keyInput.hasPrefix(viewingProvider.keyPrefix) {

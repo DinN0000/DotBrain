@@ -509,7 +509,7 @@ struct InboxProcessor {
         let desc = error.localizedDescription
 
         // API key / quota errors
-        if error is ClaudeAPIError || error is GeminiAPIError {
+        if error is ClaudeAPIError {
             if desc.contains("API 키") || desc.contains("noAPIKey") {
                 return "API 키를 확인해주세요. 설정에서 올바른 키를 입력하세요."
             }

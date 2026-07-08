@@ -729,12 +729,6 @@ struct OnboardingView: View {
                         )
 
                         providerCard(
-                            provider: .gemini,
-                            badge: L10n.Onboarding.badgeFreeStart,
-                            badgeColor: .green
-                        )
-
-                        providerCard(
                             provider: .claude,
                             badge: L10n.Onboarding.badgeApiPayment,
                             badgeColor: .orange
@@ -759,12 +753,7 @@ struct OnboardingView: View {
                                     .fontWeight(.semibold)
 
                                 Button(action: {
-                                    let url: URL
-                                    if provider == .gemini {
-                                        url = URL(string: "https://aistudio.google.com/apikey")!
-                                    } else {
-                                        url = URL(string: "https://console.anthropic.com/settings/keys")!
-                                    }
+                                    let url = URL(string: "https://console.anthropic.com/settings/keys")!
                                     NSWorkspace.shared.open(url)
                                 }) {
                                     HStack(spacing: 2) {
@@ -792,7 +781,7 @@ struct OnboardingView: View {
                                 Button(action: {
                                     showingKey.toggle()
                                     if showingKey, keyInput == "••••••••", provider.hasAPIKey() {
-                                        if let key = provider == .claude ? KeychainService.getAPIKey() : KeychainService.getGeminiAPIKey() {
+                                        if let key = KeychainService.getAPIKey() {
                                             keyInput = key
                                         }
                                     } else if !showingKey, provider.hasAPIKey(), keyInput.hasPrefix(provider.keyPrefix) {
