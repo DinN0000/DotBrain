@@ -141,6 +141,16 @@ struct VaultCheckPipeline {
         await indexGenerator.updateForFolders(dirtyFolders)
         if Task.isCancelled { return .empty }
 
+        // Phase 4.2: clean orphaned entity pages left by Finder folder
+        // renames/merges (a page whose baseName no longer matches its parent
+        // folder). Scans ONLY the 4 PARA folders — the vault-root
+        // CLAUDE.md/AGENTS.md carry the same DotBrain marker but are never
+        // enumerated, so the companion files can never be corrupted.
+        let orphansCleaned = Self.cleanOrphanEntityPages(pm: pm)
+        if orphansCleaned > 0 {
+            NSLog("[VaultCheck] %d orphaned entity pages cleaned", orphansCleaned)
+        }
+
         // Phase 4.5: Link State Diff — detect user link removals BEFORE writing new links
         onProgress(Progress(phase: "링크 변경 감지 중...", fraction: 0.70))
         let linker = SemanticLinker(pkmRoot: pkmRoot)
@@ -356,6 +366,52 @@ struct VaultCheckPipeline {
             }
         }
         return results
+    }
+
+    /// Remove orphaned entity pages left behind by a Finder folder rename/merge.
+    ///
+    /// A folder/hub page lives at `<folder>/<folderName>.md`, so its baseName
+    /// always equals its parent folder name. When a user renames or merges the
+    /// folder in Finder the page keeps its old baseName, producing
+    /// `<newFolder>/<oldName>.md` (baseName != parentName) — a stale synthesis
+    /// that no longer describes its folder. Such a page is stripped of its
+    /// DotBrain synthesis block (preserving any user prose), or trashed when
+    /// nothing user-authored remains.
+    ///
+    /// Scope guardrail: iterates `collectAllMdFiles`, which enumerates ONLY the
+    /// four PARA folders and skips `.`/`_` directories. The vault-root
+    /// `CLAUDE.md`/`AGENTS.md` also carry the DotBrain marker and have
+    /// baseName != parentName, but they live at the root (never enumerated) so
+    /// they are never scanned or modified. Normal notes never carry the marker
+    /// (`RelatedNotesWriter` writes plain `## Related Notes`), so they are
+    /// filtered out by the `isEntityPage` check. Returns the number of pages
+    /// cleaned.
+    static func cleanOrphanEntityPages(pm: PKMPathManager) -> Int {
+        let fm = FileManager.default
+        var cleaned = 0
+        for path in collectAllMdFiles(pm: pm) {
+            let baseName = ((path as NSString).lastPathComponent as NSString)
+                .deletingPathExtension
+            let parentName = ((path as NSString).deletingLastPathComponent as NSString)
+                .lastPathComponent
+            guard baseName != parentName else { continue }
+            guard let content = try? String(contentsOfFile: path, encoding: .utf8),
+                  FolderNotePage.isEntityPage(content),
+                  let stripped = CategoryHubPage.strippingSynthesis(from: content) else { continue }
+
+            // Trash the page when only frontmatter/whitespace remains (a pure
+            // DotBrain page); otherwise write back the stripped content so the
+            // user's prose below the block survives.
+            let userBody = Frontmatter.parse(markdown: stripped).body
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            if userBody.isEmpty {
+                try? fm.trashItem(at: URL(fileURLWithPath: path), resultingItemURL: nil)
+            } else {
+                try? stripped.write(toFile: path, atomically: true, encoding: .utf8)
+            }
+            cleaned += 1
+        }
+        return cleaned
     }
 
 }
