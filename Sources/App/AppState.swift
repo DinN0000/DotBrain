@@ -407,6 +407,7 @@ final class AppState: ObservableObject {
             let root = pkmRootPath
             Task.detached(priority: .utility) {
                 await ReverseLinkRelationMigrator(pkmRoot: root).migrateIfNeeded()
+                await TopicWikiRetirementMigrator(pkmRoot: root).migrateIfNeeded()
                 await NoteIndexGenerator(pkmRoot: root).regenerateIfStale()
             }
         }

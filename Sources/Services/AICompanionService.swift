@@ -61,9 +61,10 @@ enum AICompanionService {
         // DotBrain-managed block in any existing .cursorrules
         removeCursorRules(pkmRoot: pkmRoot)
 
-        // v19: topic-wiki retired in favor of the in-PARA synthesis hierarchy —
-        // strip the DotBrain block from any leftover _Wiki/*.md pages
-        removeTopicWikiPages(pkmRoot: pkmRoot)
+        // v19 note: leftover _Wiki/*.md cleanup lives in
+        // TopicWikiRetirementMigrator (launch-invoked, marker-gated) — a
+        // destructive one-shot must retry on partial failure, which the
+        // always-written companion version stamp would suppress.
 
         // Root-level files: marker-based safe update
         let files: [(String, String)] = [
@@ -201,51 +202,6 @@ enum AICompanionService {
             }
         } catch {
             NSLog("[AICompanionService] .cursorrules 정리 실패: %@", error.localizedDescription)
-        }
-    }
-
-    /// Remove the DotBrain-managed block from every `_Wiki/*.md` left over from
-    /// the retired topic-wiki (v18 and earlier). A page becomes fully
-    /// user-authored once its DotBrain block is gone: delete it when nothing
-    /// else remains, otherwise keep the user's content. Pages without markers
-    /// are untouched. Mirrors `removeCursorRules`, iterated over the folder.
-    private static func removeTopicWikiPages(pkmRoot: String) {
-        let fm = FileManager.default
-        let wikiDir = (pkmRoot as NSString).appendingPathComponent("_Wiki")
-        guard fm.fileExists(atPath: wikiDir),
-              let entries = try? fm.contentsOfDirectory(atPath: wikiDir) else { return }
-        for entry in entries where entry.hasSuffix(".md") {
-            let path = (wikiDir as NSString).appendingPathComponent(entry)
-            guard let existing = try? String(contentsOfFile: path, encoding: .utf8),
-                  let blockRange = markerRange(in: existing) else { continue }
-            var remainder = existing
-            remainder.replaceSubrange(blockRange, with: "")
-            let userContent = remainder
-                .replacingOccurrences(of: "<!-- 아래에 자유롭게 추가하세요 -->", with: "")
-                .replacingOccurrences(of: "<!-- 아래는 기존 사용자 내용입니다 -->", with: "")
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-            do {
-                if userContent.isEmpty {
-                    try fm.removeItem(atPath: path)
-                    NSLog("[AICompanionService] _Wiki/%@ 삭제 (주제 위키 종료)", entry)
-                } else {
-                    try (remainder.trimmingCharacters(in: .whitespacesAndNewlines) + "\n")
-                        .write(toFile: path, atomically: true, encoding: .utf8)
-                    NSLog("[AICompanionService] _Wiki/%@에서 DotBrain 블록 제거", entry)
-                }
-            } catch {
-                NSLog("[AICompanionService] _Wiki/%@ 정리 실패: %@", entry, error.localizedDescription)
-            }
-        }
-        // Remove the _Wiki folder once no visible entries remain after cleanup
-        if let remaining = try? fm.contentsOfDirectory(atPath: wikiDir),
-           remaining.allSatisfy({ $0.hasPrefix(".") }) {
-            do {
-                try fm.removeItem(atPath: wikiDir)
-                NSLog("[AICompanionService] 빈 _Wiki 폴더 삭제")
-            } catch {
-                NSLog("[AICompanionService] _Wiki 폴더 삭제 실패: %@", error.localizedDescription)
-            }
         }
     }
 
