@@ -49,8 +49,9 @@ structuring that knowledge into a form AI can understand and leverage.
 DotBrain delegates this 'organizing bottleneck' to AI.
 - **Zero-Friction Sort:** Drop files into the inbox and AI reads the content, automatically moving them according to the PARA framework.
 - **Semantic Structure:** Automatically generates Obsidian-compatible frontmatter and wiki-links to connect context between documents.
+- **Compounding Wiki:** As each new note arrives, AI synthesizes and updates folder and topic pages, so knowledge compounds as records accumulate.
 - **Self-Healing:** Flattens nested folder structures, repairs broken links and missing frontmatter, and detects duplicate files via SHA256 hashing for merging.
-- **Reliability:** Supports both Claude and Gemini simultaneously, with an automatic fallback safety net — if one fails, the other takes over.
+- **Reliability:** Supports Claude CLI · Codex CLI · Claude API · Gemini API, falling back to another provider if one fails.
 
 ---
 
@@ -64,7 +65,7 @@ When `·‿·` appears in your menu bar, installation is complete. Click the ico
 
 > 📖 For detailed usage instructions, see the **[Service Manual (MANUAL.md)](MANUAL.md)**.
 
-> **Requirements:** macOS 13 (Ventura) or later / Node.js 18+ (when using npx) / Claude subscription (Pro/Max) + Claude CLI as default. [Claude API key](https://console.anthropic.com/settings/keys) or [Gemini API key](https://aistudio.google.com/apikey) also supported.
+> **Requirements:** macOS 13 (Ventura) or later / Node.js 18+ (when using npx) / Claude subscription (Pro/Max) + Claude CLI as default. Codex CLI, [Claude API key](https://console.anthropic.com/settings/keys), and [Gemini API key](https://aistudio.google.com/apikey) also supported.
 
 <details>
 <summary><b>Build from source</b></summary>
@@ -209,7 +210,7 @@ PKM Root/
 | Same content, different name | SHA256 body hash (excluding frontmatter) | Merge tags → delete |
 | Same content binary | SHA256 hash (≤500MB) or size+modified date (>500MB) | Merge tags → delete |
 | Same name, different content | Filename comparison | Prompt user for confirmation |
-| Name conflict with index note | `foldername.md` comparison | Prompt user for confirmation |
+| Name conflict with folder entity page | `foldername.md` comparison | Prompt user for confirmation |
 
 ### Tech Stack
 

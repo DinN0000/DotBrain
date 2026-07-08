@@ -47,8 +47,9 @@ AI가 이해하고 활용할 수 있는 형태로 그 지식을 구조화하는 
 DotBrain은 이 '정리의 병목'을 AI에게 위임합니다.
 - **Zero-Friction Sort:** 인박스에 파일을 던지면 AI가 내용을 읽고, PARA 체계에 맞춰 자동으로 이동시킵니다.
 - **Semantic Structure:** Obsidian 호환 프론트매터와 위키링크를 자동 생성하여 문서 간의 맥락을 연결합니다.
+- **Compounding Wiki:** 새 노트가 들어올 때마다 폴더·주제 페이지를 AI가 종합·갱신하여, 기록이 쌓일수록 지식이 복리로 정리됩니다.
 - **Self-Healing:** 중첩된 폴더 구조를 플랫화하고, 깨진 링크와 누락된 프론트매터를 복구하며, SHA256 해시로 중복 파일을 감지해 병합합니다.
-- **Reliability:** Claude와 Gemini를 동시에 지원하며, 한쪽이 실패하면 자동으로 다른 쪽이 처리하는(Fallback) 이중 안전장치를 갖췄습니다.
+- **Reliability:** Claude CLI · Codex CLI · Claude API · Gemini API를 지원하며, 한쪽이 실패하면 다른 제공자로 폴백합니다.
 
 ---
 
@@ -62,7 +63,7 @@ npx dotbrain
 
 > 📖 자세한 사용법은 **[서비스 매뉴얼 (MANUAL.md)](MANUAL.md)**을 참고하세요.
 
-> **필요한 것:** macOS 13 (Ventura) 이상 / Node.js 18+ (npx 사용 시) / Claude 구독 (Pro/Max) + Claude CLI 기본. [Claude API 키](https://console.anthropic.com/settings/keys) 또는 [Gemini API 키](https://aistudio.google.com/apikey)도 지원.
+> **필요한 것:** macOS 13 (Ventura) 이상 / Node.js 18+ (npx 사용 시) / Claude 구독 (Pro/Max) + Claude CLI 기본. Codex CLI, [Claude API 키](https://console.anthropic.com/settings/keys), [Gemini API 키](https://aistudio.google.com/apikey)도 지원.
 
 <details>
 <summary><b>소스에서 직접 빌드</b></summary>
@@ -207,7 +208,7 @@ PKM Root/
 | 같은 내용, 다른 이름 | SHA256 본문 해시 (frontmatter 제외) | 태그 병합 → 삭제 |
 | 같은 내용 바이너리 | SHA256 해시 (≤500MB) 또는 크기+수정일 (>500MB) | 태그 병합 → 삭제 |
 | 같은 이름, 다른 내용 | 파일명 비교 | 사용자에게 확인 |
-| 인덱스 노트와 이름 충돌 | `폴더명.md` 비교 | 사용자에게 확인 |
+| 폴더 개체 페이지와 이름 충돌 | `폴더명.md` 비교 | 사용자에게 확인 |
 
 ### 기술 스택
 
