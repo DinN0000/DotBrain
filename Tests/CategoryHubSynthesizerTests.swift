@@ -12,7 +12,7 @@ final class CategoryHubSynthesizerTests: XCTestCase {
         para: project
         tags: []
         ---
-        \(CategoryHubPage.markerStart)
+        \(FolderNotePage.markerStart)
         <!-- dotbrain-synthesis-hash: h -->
         ## 개요
         \(overview)
@@ -28,7 +28,7 @@ final class CategoryHubSynthesizerTests: XCTestCase {
 
         ## 노후
         - 없음
-        \(CategoryHubPage.markerEnd)
+        \(FolderNotePage.markerEnd)
         """
     }
 
@@ -143,24 +143,24 @@ final class CategoryHubSynthesizerTests: XCTestCase {
         para: project
         tags: []
         ---
-        \(CategoryHubPage.markerStart)
+        \(FolderNotePage.markerStart)
         <!-- dotbrain-synthesis-hash: h -->
         ## 지형
         지형.
-        \(CategoryHubPage.markerEnd)
+        \(FolderNotePage.markerEnd)
 
         사용자 메모는 남아야 한다.
         """
-        let stripped = CategoryHubPage.strippingSynthesis(from: page)
+        let stripped = FolderNotePage.strippingSynthesis(from: page)
         XCTAssertNotNil(stripped)
         XCTAssertFalse(stripped!.contains("## 지형"))
-        XCTAssertFalse(stripped!.contains(CategoryHubPage.markerStart))
+        XCTAssertFalse(stripped!.contains(FolderNotePage.markerStart))
         XCTAssertTrue(stripped!.contains("사용자 메모는 남아야 한다."))
         XCTAssertTrue(stripped!.contains("para: project"))
     }
 
     func testStrippingSynthesisReturnsNilWhenNoBlock() {
-        XCTAssertNil(CategoryHubPage.strippingSynthesis(from: "마커 없는 파일"))
+        XCTAssertNil(FolderNotePage.strippingSynthesis(from: "마커 없는 파일"))
     }
 
     // MARK: - capToBytes

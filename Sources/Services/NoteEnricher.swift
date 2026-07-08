@@ -34,9 +34,7 @@ struct NoteEnricher: Sendable {
     /// synthesis recompounds after a body edit).
     func enrichNote(at filePath: String, refreshExisting: Bool = false) async throws -> EnrichResult {
         // Folder entity pages are synthesized by FolderSynthesizer, not enriched
-        let baseName = ((filePath as NSString).lastPathComponent as NSString).deletingPathExtension
-        let parentName = ((filePath as NSString).deletingLastPathComponent as NSString).lastPathComponent
-        if baseName.precomposedStringWithCanonicalMapping == parentName.precomposedStringWithCanonicalMapping {
+        if FolderNotePage.isFolderPagePath(filePath) {
             return EnrichResult(filePath: filePath, fieldsUpdated: 0)
         }
 

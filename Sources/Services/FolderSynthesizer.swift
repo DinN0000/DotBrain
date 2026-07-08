@@ -16,35 +16,35 @@ struct FolderSynthesizer: Sendable {
 
     private var pathManager: PKMPathManager { PKMPathManager(root: pkmRoot) }
 
-    /// A written folder page plus the one-line 요지 harvested from it. Callers
-    /// re-hash `path` in ContentHashCache; `gist` feeds `.meta/log.md`.
-    struct Output: Sendable {
-        let path: String
-        let gist: String
-    }
-
     /// Synthesize the given folders (absolute paths). `changedNotePaths` are
     /// absolute paths whose bodies changed this run; the intersection with a
-    /// folder's members is fed into the prompt in full. Returns paths of
-    /// folder notes actually written.
+    /// folder's members is fed into the prompt in full. Each written page's
+    /// 요지 is chronicled to `.meta/log.md` here — the log line is an invariant
+    /// of synthesis happening, not of who called it. Returns paths of folder
+    /// notes actually written (callers re-hash them in ContentHashCache).
     func synthesizeFolders(
         _ folderPaths: Set<String>,
         changedNotePaths: Set<String>
-    ) async -> [Output] {
+    ) async -> [String] {
         guard let index = pathManager.loadNoteIndex() else { return [] }
         let descriptions = FolderDescriptionStore.load(pkmRoot: pkmRoot)
         let fm = FileManager.default
         let today = Frontmatter.today()
-        // Normalize the absolute changed paths to vault-relative once so they
-        // can be intersected with member entry.path (also vault-relative).
-        let changedRel = Set(changedNotePaths.map { relativePath($0) })
-        var written: [Output] = []
+        let log = VaultLogService(pkmRoot: pkmRoot)
+        // Resolve the root's symlinks once for the whole batch, then normalize
+        // the absolute changed paths to vault-relative so they can be
+        // intersected with member entry.path (also vault-relative).
+        let rootPrefix = pathManager.canonicalRootPrefix()
+        let changedRel = Set(changedNotePaths.map {
+            pathManager.relativePath($0, rootPrefix: rootPrefix)
+        })
+        var written: [String] = []
 
         for folderPath in folderPaths.sorted() {
             if Task.isCancelled { break }
             guard let para = PARACategory.fromPath(folderPath), para != .archive else { continue }
 
-            let relPath = relativePath(folderPath)
+            let relPath = pathManager.relativePath(folderPath, rootPrefix: rootPrefix)
             // Category roots have no entity page
             guard relPath != para.folderName else { continue }
 
@@ -97,7 +97,10 @@ struct FolderSynthesizer: Sendable {
                     inputsHash: hash, folderName: folderName, para: para
                 )
                 try updated.write(toFile: notePath, atomically: true, encoding: .utf8)
-                written.append(Output(path: notePath, gist: gist))
+                written.append(notePath)
+                if !gist.isEmpty {
+                    log.append(kind: "synthesis", summary: "\(folderName): \(gist)")
+                }
             } catch {
                 // Keep the previous synthesis on any failure — never blank the page
                 NSLog("[FolderSynthesizer] 종합 실패: %@ — %@", folderName, error.localizedDescription)
@@ -258,25 +261,12 @@ struct FolderSynthesizer: Sendable {
                 usage: usage, isEstimated: response.isEstimated
             )
         }
-        return stripCodeBlock(response.text)
+        return Self.stripCodeBlock(response.text)
     }
 
-    // MARK: - Private
-
-    /// Convert an absolute path to a vault-relative path (same canonicalization
-    /// as NoteIndexGenerator: resolve symlinks, strip root, NFC-normalize)
-    private func relativePath(_ absolutePath: String) -> String {
-        let canonicalRoot = URL(fileURLWithPath: pkmRoot).resolvingSymlinksInPath().path
-        let rootPrefix = canonicalRoot.hasSuffix("/") ? canonicalRoot : canonicalRoot + "/"
-        let canonicalPath = URL(fileURLWithPath: absolutePath).resolvingSymlinksInPath().path
-        guard canonicalPath.hasPrefix(rootPrefix) else {
-            return absolutePath.precomposedStringWithCanonicalMapping
-        }
-        return String(canonicalPath.dropFirst(rootPrefix.count))
-            .precomposedStringWithCanonicalMapping
-    }
-
-    private func stripCodeBlock(_ text: String) -> String {
+    /// Strip a markdown code fence the model may wrap its response in.
+    /// Shared by CategoryHubSynthesizer (same response shape).
+    static func stripCodeBlock(_ text: String) -> String {
         text
             .replacingOccurrences(of: #"^```(?:markdown|md)?\s*\n?"#, with: "", options: .regularExpression)
             .replacingOccurrences(of: #"\n?```\s*$"#, with: "", options: .regularExpression)

@@ -51,6 +51,14 @@ final class VaultCheckOrphanCleanupTests: XCTestCase {
         return dir
     }
 
+    /// Compose enumeration + cleanup exactly the way the pipeline does — the
+    /// guardrail (PARA-only scan) lives in `collectAllMdFiles`.
+    private func clean() -> Int {
+        VaultCheckPipeline.cleanOrphanEntityPages(
+            files: VaultCheckPipeline.collectAllMdFiles(pm: pm)
+        )
+    }
+
     // MARK: - Guardrail
 
     /// A vault-root CLAUDE.md with a DotBrain marker must never be scanned or
@@ -66,7 +74,7 @@ final class VaultCheckOrphanCleanupTests: XCTestCase {
         """
         try original.write(toFile: claudePath, atomically: true, encoding: .utf8)
 
-        _ = VaultCheckPipeline.cleanOrphanEntityPages(pm: pm)
+        _ = clean()
 
         let after = try String(contentsOfFile: claudePath, encoding: .utf8)
         XCTAssertEqual(after, original, "root CLAUDE.md must never be scanned or modified")
@@ -82,7 +90,7 @@ final class VaultCheckOrphanCleanupTests: XCTestCase {
         try entityPage(overview: "synthesis text", extraBody: "## 내 메모\n사용자 작성 본문\n")
             .write(toFile: orphan, atomically: true, encoding: .utf8)
 
-        let count = VaultCheckPipeline.cleanOrphanEntityPages(pm: pm)
+        let count = clean()
 
         XCTAssertEqual(count, 1)
         let after = try String(contentsOfFile: orphan, encoding: .utf8)
@@ -98,7 +106,7 @@ final class VaultCheckOrphanCleanupTests: XCTestCase {
         try entityPage(overview: "only synthesis")
             .write(toFile: orphan, atomically: true, encoding: .utf8)
 
-        let count = VaultCheckPipeline.cleanOrphanEntityPages(pm: pm)
+        let count = clean()
 
         XCTAssertEqual(count, 1)
         XCTAssertFalse(FileManager.default.fileExists(atPath: orphan),
@@ -114,7 +122,7 @@ final class VaultCheckOrphanCleanupTests: XCTestCase {
         let content = entityPage(overview: "valid synthesis")
         try content.write(toFile: page, atomically: true, encoding: .utf8)
 
-        let count = VaultCheckPipeline.cleanOrphanEntityPages(pm: pm)
+        let count = clean()
 
         XCTAssertEqual(count, 0)
         let after = try String(contentsOfFile: page, encoding: .utf8)
@@ -128,7 +136,7 @@ final class VaultCheckOrphanCleanupTests: XCTestCase {
         let content = entityPage(overview: "hub synthesis")
         try content.write(toFile: page, atomically: true, encoding: .utf8)
 
-        let count = VaultCheckPipeline.cleanOrphanEntityPages(pm: pm)
+        let count = clean()
 
         XCTAssertEqual(count, 0)
         XCTAssertTrue(FileManager.default.fileExists(atPath: page))
@@ -142,7 +150,7 @@ final class VaultCheckOrphanCleanupTests: XCTestCase {
         let content = "---\npara: resource\n---\n\nplain note body\n"
         try content.write(toFile: note, atomically: true, encoding: .utf8)
 
-        let count = VaultCheckPipeline.cleanOrphanEntityPages(pm: pm)
+        let count = clean()
 
         XCTAssertEqual(count, 0)
         XCTAssertTrue(FileManager.default.fileExists(atPath: note))

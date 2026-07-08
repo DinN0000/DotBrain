@@ -334,7 +334,10 @@ struct AIStatisticsView: View {
         case "classify-stage1": return L10n.AIStats.opClassifyStage1
         case "classify-stage2": return L10n.AIStats.opClassifyStage2
         case "enrich": return L10n.AIStats.opEnrich
-        case "moc": return L10n.AIStats.opMoc
+        // "moc" is the legacy name folder synthesis logged under — keep the
+        // alias so historical usage rows still render localized
+        case "folder-synthesis", "moc": return L10n.AIStats.opFolderSynthesis
+        case "category-hub-synthesis": return L10n.AIStats.opCategoryHub
         case "semantic-link", "semantic-link-context": return L10n.AIStats.opSemanticLink
         case "folder-relation-analyze": return L10n.AIStats.opFolderRelation
         case "summary": return L10n.AIStats.opSummary

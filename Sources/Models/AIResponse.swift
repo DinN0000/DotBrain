@@ -34,7 +34,7 @@ struct TokenUsage: Codable, Sendable {
 struct APIUsageEntry: Codable, Identifiable {
     let id: UUID
     let timestamp: Date
-    let operation: String   // "classify", "enrich", "moc", "semantic-link", "summary"
+    let operation: String   // "classify", "enrich", "folder-synthesis", "category-hub-synthesis", "semantic-link", "summary"
     let model: String
     let inputTokens: Int
     let outputTokens: Int

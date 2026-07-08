@@ -57,8 +57,9 @@ struct InboxPostProcessingPipeline {
         let linkResult = await SemanticLinker(pkmRoot: pkmRoot).linkNotes(filePaths: successPaths)
 
         // Refresh entity pages for affected folders — ingest is the
-        // compounding point where new notes update existing folder knowledge
-        var synthesized: [FolderSynthesizer.Output] = []
+        // compounding point where new notes update existing folder knowledge.
+        // The synthesizer chronicles each 요지 to .meta/log.md itself.
+        var synthesized: [String] = []
         if !folders.isEmpty && !Task.isCancelled {
             onProgress?(Progress(fraction: 0.85, phase: "폴더 페이지 갱신 중..."))
             synthesized = await FolderSynthesizer(pkmRoot: pkmRoot).synthesizeFolders(
@@ -68,33 +69,20 @@ struct InboxPostProcessingPipeline {
                 // Written folder notes carry a fresh overview — re-index those
                 // folders so the index summary picks it up immediately
                 await NoteIndexGenerator(pkmRoot: pkmRoot).updateForFolders(
-                    Set(synthesized.map { ($0.path as NSString).deletingLastPathComponent })
+                    Set(synthesized.map { ($0 as NSString).deletingLastPathComponent })
                 )
-                // Chronicle each synthesis 요지 to the .meta/log.md timeline
-                let synthesisLog = VaultLogService(pkmRoot: pkmRoot)
-                for output in synthesized where !output.gist.isEmpty {
-                    let scope = ((output.path as NSString).deletingLastPathComponent as NSString).lastPathComponent
-                    synthesisLog.append(kind: "synthesis", summary: "\(scope): \(output.gist)")
-                }
             }
         }
 
         // Refresh category hub pages for the categories the new notes touched —
         // hash-gated on each subfolder's STABLE slice, so most ingests skip the
         // AI call entirely.
-        var synthesizedHubs: [CategoryHubSynthesizer.Output] = []
+        var synthesizedHubs: [String] = []
         let affectedCategories = CategoryHubSynthesizer.categoryRoots(for: folders, pkmRoot: pkmRoot)
         if !affectedCategories.isEmpty && !Task.isCancelled {
             onProgress?(Progress(fraction: 0.88, phase: "카테고리 허브 갱신 중..."))
             synthesizedHubs = await CategoryHubSynthesizer(pkmRoot: pkmRoot)
                 .synthesizeCategories(affectedCategories)
-            if !synthesizedHubs.isEmpty {
-                let hubLog = VaultLogService(pkmRoot: pkmRoot)
-                for hub in synthesizedHubs where !hub.gist.isEmpty {
-                    let scope = ((hub.path as NSString).deletingLastPathComponent as NSString).lastPathComponent
-                    hubLog.append(kind: "synthesis", summary: "\(scope): \(hub.gist)")
-                }
-            }
         }
 
         // Skip the hash save on cancellation — persisting stale hashes here
@@ -104,8 +92,7 @@ struct InboxPostProcessingPipeline {
             let cache = ContentHashCache(pkmRoot: pkmRoot)
             await cache.load()
             await cache.updateHashes(
-                mdPaths + Array(linkResult.modifiedFiles)
-                    + synthesized.map(\.path) + synthesizedHubs.map(\.path)
+                mdPaths + Array(linkResult.modifiedFiles) + synthesized + synthesizedHubs
             )
             await cache.save()
         }

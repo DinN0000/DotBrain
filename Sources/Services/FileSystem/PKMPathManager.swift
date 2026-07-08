@@ -123,6 +123,28 @@ struct PKMPathManager {
         return documentsAssetsPath
     }
 
+    /// Canonicalized root prefix ("<resolved-root>/") for vault-relative path
+    /// derivation — compute once per batch, then pass into `relativePath` so a
+    /// thousand-file loop resolves the root's symlinks exactly once.
+    func canonicalRootPrefix() -> String {
+        let canonicalRoot = URL(fileURLWithPath: root).resolvingSymlinksInPath().path
+        return canonicalRoot.hasSuffix("/") ? canonicalRoot : canonicalRoot + "/"
+    }
+
+    /// Convert an absolute path to a vault-relative path — resolve symlinks,
+    /// strip the root, NFC-normalize (the same canonicalization NoteIndexGenerator
+    /// and ContentHashCache use for index/cache keys). This is the single home
+    /// for the conversion; batch callers pass a precomputed `rootPrefix`.
+    func relativePath(_ absolutePath: String, rootPrefix: String? = nil) -> String {
+        let prefix = rootPrefix ?? canonicalRootPrefix()
+        let canonicalPath = URL(fileURLWithPath: absolutePath).resolvingSymlinksInPath().path
+        guard canonicalPath.hasPrefix(prefix) else {
+            return absolutePath.precomposedStringWithCanonicalMapping
+        }
+        return String(canonicalPath.dropFirst(prefix.count))
+            .precomposedStringWithCanonicalMapping
+    }
+
     /// Validate that a path is safely within the PKM root (prevents symlink traversal)
     /// Call this before any file read/write to untrusted paths
     func isPathSafe(_ path: String) -> Bool {

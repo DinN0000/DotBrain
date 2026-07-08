@@ -17,13 +17,6 @@ struct CategoryHubSynthesizer: Sendable {
 
     private var pathManager: PKMPathManager { PKMPathManager(root: pkmRoot) }
 
-    /// A written hub page plus the one-line 요지 harvested from it. Callers
-    /// re-hash `path` in ContentHashCache; `gist` feeds `.meta/log.md`.
-    struct Output: Sendable {
-        let path: String
-        let gist: String
-    }
-
     /// One subfolder's STABLE, bounded contribution to the hub: its 개요 + 핵심
     /// 노트 only (never the churny 최근 흐름), so a subfolder's timeline update
     /// does not flip the hub hash. `modified` orders the top-N cap; `name`/`slice`
@@ -37,12 +30,15 @@ struct CategoryHubSynthesizer: Sendable {
     /// Synthesize hub pages for the given category root folders (absolute paths,
     /// e.g. `.../1_Project`). Archive and non-roots are ignored. A category with
     /// fewer than 2 subfolders has any existing hub marker section stripped.
-    /// Returns hub pages actually written.
-    func synthesizeCategories(_ categoryPaths: Set<String>) async -> [Output] {
+    /// Each written hub's 요지 is chronicled to `.meta/log.md` here. Returns hub
+    /// pages actually written (callers re-hash them in ContentHashCache).
+    func synthesizeCategories(_ categoryPaths: Set<String>) async -> [String] {
         guard let index = pathManager.loadNoteIndex() else { return [] }
         let fm = FileManager.default
         let today = Frontmatter.today()
-        var written: [Output] = []
+        let log = VaultLogService(pkmRoot: pkmRoot)
+        let rootPrefix = pathManager.canonicalRootPrefix()
+        var written: [String] = []
 
         for categoryPath in categoryPaths.sorted() {
             if Task.isCancelled { break }
@@ -60,7 +56,7 @@ struct CategoryHubSynthesizer: Sendable {
             // cross-subfolder tension to synthesize. Below that, strip the now
             // meaningless hub section.
             guard subfolders.count >= 2 else {
-                if let existing, let stripped = CategoryHubPage.strippingSynthesis(from: existing) {
+                if let existing, let stripped = FolderNotePage.strippingSynthesis(from: existing) {
                     if stripped.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                         try? fm.removeItem(atPath: hubPath)
                     } else {
@@ -71,7 +67,9 @@ struct CategoryHubSynthesizer: Sendable {
             }
 
             // Build a STABLE slice per subfolder (page 개요+핵심노트, or index summary)
-            let slices = subfolders.compactMap { buildSlice(subfolderPath: $0, index: index) }
+            let slices = subfolders.compactMap {
+                buildSlice(subfolderPath: $0, index: index, rootPrefix: rootPrefix)
+            }
             guard slices.count >= 2 else { continue }
 
             // Cap at the top-N most-recently-changed subfolders, then re-sort by
@@ -83,7 +81,7 @@ struct CategoryHubSynthesizer: Sendable {
             let sliceArray = Array(capped)
 
             let hash = Self.inputsHash(slices: sliceArray)
-            if let existing, CategoryHubPage.inputsHash(from: existing) == hash { continue }
+            if let existing, FolderNotePage.inputsHash(from: existing) == hash { continue }
 
             do {
                 let raw = try await requestSynthesis(
@@ -97,12 +95,15 @@ struct CategoryHubSynthesizer: Sendable {
                 }
                 // Reuse the folder gist parser — hub gist semantics are identical
                 let (synthesis, gist) = FolderSynthesizer.extractGist(from: raw)
-                let updated = CategoryHubPage.replacingSynthesis(
+                let updated = FolderNotePage.replacingSynthesis(
                     in: existing, synthesis: synthesis,
                     inputsHash: hash, folderName: categoryName, para: para
                 )
                 try updated.write(toFile: hubPath, atomically: true, encoding: .utf8)
-                written.append(Output(path: hubPath, gist: gist))
+                written.append(hubPath)
+                if !gist.isEmpty {
+                    log.append(kind: "synthesis", summary: "\(categoryName): \(gist)")
+                }
             } catch {
                 NSLog("[CategoryHubSynthesizer] 종합 실패: %@ — %@", categoryName, error.localizedDescription)
             }
@@ -220,7 +221,9 @@ struct CategoryHubSynthesizer: Sendable {
 
     /// Build one subfolder's stable slice: its page's 개요+핵심노트, or the
     /// NoteIndex folder summary when the subfolder has no page yet.
-    private func buildSlice(subfolderPath: String, index: NoteIndex) -> SubfolderSlice? {
+    private func buildSlice(
+        subfolderPath: String, index: NoteIndex, rootPrefix: String
+    ) -> SubfolderSlice? {
         let fm = FileManager.default
         let name = (subfolderPath as NSString).lastPathComponent
             .precomposedStringWithCanonicalMapping
@@ -231,7 +234,7 @@ struct CategoryHubSynthesizer: Sendable {
             sliceText = CategoryHubPage.stableSlice(from: content)
         }
         if sliceText == nil {
-            let rel = relativePath(subfolderPath)
+            let rel = pathManager.relativePath(subfolderPath, rootPrefix: rootPrefix)
             if let summary = index.folders[rel]?.summary, !summary.isEmpty {
                 sliceText = "## 개요\n\(summary)"
             }
@@ -265,28 +268,6 @@ struct CategoryHubSynthesizer: Sendable {
                 usage: usage, isEstimated: response.isEstimated
             )
         }
-        return stripCodeBlock(response.text)
-    }
-
-    // MARK: - Private
-
-    /// Convert an absolute path to a vault-relative path (same canonicalization
-    /// as NoteIndexGenerator: resolve symlinks, strip root, NFC-normalize)
-    private func relativePath(_ absolutePath: String) -> String {
-        let canonicalRoot = URL(fileURLWithPath: pkmRoot).resolvingSymlinksInPath().path
-        let rootPrefix = canonicalRoot.hasSuffix("/") ? canonicalRoot : canonicalRoot + "/"
-        let canonicalPath = URL(fileURLWithPath: absolutePath).resolvingSymlinksInPath().path
-        guard canonicalPath.hasPrefix(rootPrefix) else {
-            return absolutePath.precomposedStringWithCanonicalMapping
-        }
-        return String(canonicalPath.dropFirst(rootPrefix.count))
-            .precomposedStringWithCanonicalMapping
-    }
-
-    private func stripCodeBlock(_ text: String) -> String {
-        text
-            .replacingOccurrences(of: #"^```(?:markdown|md)?\s*\n?"#, with: "", options: .regularExpression)
-            .replacingOccurrences(of: #"\n?```\s*$"#, with: "", options: .regularExpression)
-            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return FolderSynthesizer.stripCodeBlock(response.text)
     }
 }

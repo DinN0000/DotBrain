@@ -50,8 +50,6 @@
 /* AI Provider */
 "provider.cost_included" = "Included in subscription";
 "provider.cost_per_file" = "~$0.002 per file (Haiku 4.5)";
-"provider.free_tier" = "Free tier: 15/min, 1500/day";
-"provider.free" = "Free";
 "provider.subscription" = "Sub";
 "provider.active_label" = "Using %@";
 "provider.active" = "Active";
@@ -251,7 +249,8 @@
 "aistats.op.classify_stage1" = "Classification (Stage 1)";
 "aistats.op.classify_stage2" = "Classification (Stage 2)";
 "aistats.op.enrich" = "Metadata Enrichment";
-"aistats.op.moc" = "Folder Summary";
+"aistats.op.folder_synthesis" = "Folder Synthesis";
+"aistats.op.category_hub" = "Category Hub Synthesis";
 "aistats.op.semantic_link" = "Semantic Link";
 "aistats.op.folder_relation" = "Folder Relation";
 "aistats.op.summary" = "AI Summary";
@@ -350,7 +349,6 @@
 "onboarding.ai_connection_title" = "AI Connection";
 "onboarding.ai_connection_desc" = "AI reads and classifies your files.\nChoose a provider.";
 "onboarding.badge_subscription" = "Subscription (Recommended)";
-"onboarding.badge_free_start" = "Free to start";
 "onboarding.badge_api_payment" = "API payment required";
 "onboarding.cli_installed" = "Claude CLI installed";
 "onboarding.cli_pipe_mode" = "AI calls via claude -p pipe mode";

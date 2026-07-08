@@ -50,8 +50,6 @@
 /* AI Provider */
 "provider.cost_included" = "구독 포함";
 "provider.cost_per_file" = "파일당 약 $0.002 (Haiku 4.5)";
-"provider.free_tier" = "무료 티어: 분당 15회, 일 1500회";
-"provider.free" = "무료";
 "provider.subscription" = "구독";
 "provider.active_label" = "%@ 사용 중";
 "provider.active" = "사용 중";
@@ -251,7 +249,8 @@
 "aistats.op.classify_stage1" = "분류 (1단계)";
 "aistats.op.classify_stage2" = "분류 (2단계)";
 "aistats.op.enrich" = "메타 보완";
-"aistats.op.moc" = "폴더 요약";
+"aistats.op.folder_synthesis" = "폴더 종합";
+"aistats.op.category_hub" = "카테고리 허브 종합";
 "aistats.op.semantic_link" = "시맨틱 링크";
 "aistats.op.folder_relation" = "폴더 관계 분석";
 "aistats.op.summary" = "AI 요약";
@@ -350,7 +349,6 @@
 "onboarding.ai_connection_title" = "AI 연결";
 "onboarding.ai_connection_desc" = "AI가 파일을 읽고 분류합니다.\n제공자를 선택하세요.";
 "onboarding.badge_subscription" = "구독 사용 (추천)";
-"onboarding.badge_free_start" = "무료로 시작 가능";
 "onboarding.badge_api_payment" = "API 결제 필요";
 "onboarding.cli_installed" = "Claude CLI 설치됨";
 "onboarding.cli_pipe_mode" = "claude -p 파이프 모드로 AI 호출";

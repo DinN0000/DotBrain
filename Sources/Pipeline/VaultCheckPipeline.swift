@@ -101,10 +101,14 @@ struct VaultCheckPipeline {
                     active += 1
                     group.addTask {
                         do {
-                            // Body changed since the last check — refresh the
-                            // AI-owned tags/summary so folder synthesis
-                            // recompounds and metadata stays current.
-                            return try await enricher.enrichNote(at: path, refreshExisting: true)
+                            // Refresh AI-owned tags/summary only for MODIFIED
+                            // bodies (so folder synthesis recompounds). `.new`
+                            // files are only new *to the path-keyed cache* — a
+                            // Finder folder rename makes every note inside
+                            // `.new` with identical content, and refreshing
+                            // those would be one pointless AI call per note.
+                            let refresh = fileStatuses[path] == .modified
+                            return try await enricher.enrichNote(at: path, refreshExisting: refresh)
                         } catch {
                             NSLog("[NoteEnricher] enrichNote 실패 %@: %@",
                                   (path as NSString).lastPathComponent, error.localizedDescription)
@@ -146,7 +150,7 @@ struct VaultCheckPipeline {
         // folder). Scans ONLY the 4 PARA folders — the vault-root
         // CLAUDE.md/AGENTS.md carry the same DotBrain marker but are never
         // enumerated, so the companion files can never be corrupted.
-        let orphansCleaned = Self.cleanOrphanEntityPages(pm: pm)
+        let orphansCleaned = Self.cleanOrphanEntityPages(files: allMdFiles)
         if orphansCleaned > 0 {
             NSLog("[VaultCheck] %d orphaned entity pages cleaned", orphansCleaned)
         }
@@ -214,7 +218,8 @@ struct VaultCheckPipeline {
         let finalSnapshot = linkDetector.buildCurrentSnapshot(allNotes: allNotesForSnapshot)
         linkDetector.saveSnapshot(finalSnapshot)
 
-        // Phase 5.5: refresh entity pages for changed folders
+        // Phase 5.5: refresh entity pages for changed folders. The synthesizer
+        // chronicles each 요지 to .meta/log.md itself.
         if Task.isCancelled { return .empty }
         onProgress(Progress(phase: "폴더 페이지 갱신 중...", fraction: 0.95))
         let synthesized = await FolderSynthesizer(pkmRoot: pkmRoot).synthesizeFolders(
@@ -224,15 +229,8 @@ struct VaultCheckPipeline {
             // Written folder notes carry a fresh overview — re-index those
             // folders so the index summary picks it up immediately
             await indexGenerator.updateForFolders(
-                Set(synthesized.map { ($0.path as NSString).deletingLastPathComponent })
+                Set(synthesized.map { ($0 as NSString).deletingLastPathComponent })
             )
-            // Chronicle each synthesis 요지 so the .meta/log.md timeline records
-            // how folder knowledge evolved this run
-            let synthesisLog = VaultLogService(pkmRoot: pkmRoot)
-            for output in synthesized where !output.gist.isEmpty {
-                let scope = ((output.path as NSString).deletingLastPathComponent as NSString).lastPathComponent
-                synthesisLog.append(kind: "synthesis", summary: "\(scope): \(output.gist)")
-            }
         }
 
         // Phase 5.6: refresh category hub pages across the affected categories.
@@ -242,17 +240,11 @@ struct VaultCheckPipeline {
         let affectedCategories = CategoryHubSynthesizer.categoryRoots(
             for: dirtyFolders, pkmRoot: pkmRoot
         )
-        var synthesizedHubs: [CategoryHubSynthesizer.Output] = []
+        var synthesizedHubs: [String] = []
         if !affectedCategories.isEmpty && !Task.isCancelled {
             onProgress(Progress(phase: "카테고리 허브 갱신 중...", fraction: 0.97))
             synthesizedHubs = await CategoryHubSynthesizer(pkmRoot: pkmRoot)
                 .synthesizeCategories(affectedCategories)
-            // Chronicle each hub 요지 to the same .meta/log.md timeline
-            let hubLog = VaultLogService(pkmRoot: pkmRoot)
-            for hub in synthesizedHubs where !hub.gist.isEmpty {
-                let scope = ((hub.path as NSString).deletingLastPathComponent as NSString).lastPathComponent
-                hubLog.append(kind: "synthesis", summary: "\(scope): \(hub.gist)")
-            }
         }
 
         // Update hashes for all changed files plus everything the linker,
@@ -262,8 +254,8 @@ struct VaultCheckPipeline {
             allChangedFiles
                 .union(linkResult.modifiedFiles)
                 .union(pruneResult.modifiedFiles)
-                .union(Set(synthesized.map(\.path)))
-                .union(Set(synthesizedHubs.map(\.path)))
+                .union(Set(synthesized))
+                .union(Set(synthesizedHubs))
         ))
         await cache.save()
 
@@ -341,8 +333,10 @@ struct VaultCheckPipeline {
         return folders
     }
 
-    /// Collect all .md files across PARA folders
-    private static func collectAllMdFiles(pm: PKMPathManager) -> [String] {
+    /// Collect all .md files across PARA folders. Internal (not private) so the
+    /// orphan-cleanup guardrail test can compose it with `cleanOrphanEntityPages`
+    /// exactly the way the pipeline does.
+    static func collectAllMdFiles(pm: PKMPathManager) -> [String] {
         let fm = FileManager.default
         var results: [String] = []
         for basePath in [pm.projectsPath, pm.areaPath, pm.resourcePath, pm.archivePath] {
@@ -368,36 +362,40 @@ struct VaultCheckPipeline {
         return results
     }
 
+    /// How many bytes of a note to probe for the DotBrain marker. The writer
+    /// places the synthesis block directly after the frontmatter, so a 4KB
+    /// partial read (repo convention for frontmatter-adjacent probes) is enough
+    /// to decide entity-page-ness without reading whole note bodies.
+    private static let orphanProbeBytes = 4096
+
     /// Remove orphaned entity pages left behind by a Finder folder rename/merge.
     ///
     /// A folder/hub page lives at `<folder>/<folderName>.md`, so its baseName
-    /// always equals its parent folder name. When a user renames or merges the
-    /// folder in Finder the page keeps its old baseName, producing
-    /// `<newFolder>/<oldName>.md` (baseName != parentName) — a stale synthesis
-    /// that no longer describes its folder. Such a page is stripped of its
-    /// DotBrain synthesis block (preserving any user prose), or trashed when
-    /// nothing user-authored remains.
+    /// always equals its parent folder name (`FolderNotePage.isFolderPagePath`,
+    /// NFC-normalized). When a user renames or merges the folder in Finder the
+    /// page keeps its old baseName — a stale synthesis that no longer describes
+    /// its folder. Such a page is stripped of its DotBrain synthesis block
+    /// (preserving any user prose), or trashed when nothing user-authored remains.
     ///
-    /// Scope guardrail: iterates `collectAllMdFiles`, which enumerates ONLY the
-    /// four PARA folders and skips `.`/`_` directories. The vault-root
+    /// Scope guardrail: `files` comes from `collectAllMdFiles`, which enumerates
+    /// ONLY the four PARA folders and skips `.`/`_` directories. The vault-root
     /// `CLAUDE.md`/`AGENTS.md` also carry the DotBrain marker and have
     /// baseName != parentName, but they live at the root (never enumerated) so
     /// they are never scanned or modified. Normal notes never carry the marker
-    /// (`RelatedNotesWriter` writes plain `## Related Notes`), so they are
-    /// filtered out by the `isEntityPage` check. Returns the number of pages
+    /// (`RelatedNotesWriter` writes plain `## Related Notes`), so a cheap 4KB
+    /// probe filters them out without full reads. Returns the number of pages
     /// cleaned.
-    static func cleanOrphanEntityPages(pm: PKMPathManager) -> Int {
+    static func cleanOrphanEntityPages(files: [String]) -> Int {
         let fm = FileManager.default
         var cleaned = 0
-        for path in collectAllMdFiles(pm: pm) {
-            let baseName = ((path as NSString).lastPathComponent as NSString)
-                .deletingPathExtension
-            let parentName = ((path as NSString).deletingLastPathComponent as NSString)
-                .lastPathComponent
-            guard baseName != parentName else { continue }
+        for path in files {
+            guard !FolderNotePage.isFolderPagePath(path) else { continue }
+            // Cheap marker probe first — the full read is paid only by actual
+            // orphans, not by every ordinary note in the vault
+            guard let head = NoteExcerptReader.read(path, maxBytes: Self.orphanProbeBytes),
+                  FolderNotePage.isEntityPage(head) else { continue }
             guard let content = try? String(contentsOfFile: path, encoding: .utf8),
-                  FolderNotePage.isEntityPage(content),
-                  let stripped = CategoryHubPage.strippingSynthesis(from: content) else { continue }
+                  let stripped = FolderNotePage.strippingSynthesis(from: content) else { continue }
 
             // Trash the page when only frontmatter/whitespace remains (a pure
             // DotBrain page); otherwise write back the stripped content so the

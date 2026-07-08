@@ -13,6 +13,36 @@ struct FolderNotePage {
         content.contains(markerStart)
     }
 
+    /// True when the path is where a folder/hub page legitimately lives:
+    /// `<folder>/<folderName>.md`. NFC-normalizes both sides — Korean folder
+    /// names arrive in mixed NFC/NFD forms, and an unnormalized compare would
+    /// misclassify a valid page as an orphan (or vice versa). Single home for
+    /// the predicate so every caller normalizes the same way.
+    static func isFolderPagePath(_ path: String) -> Bool {
+        let baseName = ((path as NSString).lastPathComponent as NSString)
+            .deletingPathExtension.precomposedStringWithCanonicalMapping
+        let parentName = ((path as NSString).deletingLastPathComponent as NSString)
+            .lastPathComponent.precomposedStringWithCanonicalMapping
+        return baseName == parentName
+    }
+
+    /// Remove the entire DotBrain synthesis block, preserving every byte of user
+    /// content outside the markers. Returns nil when the file carries no block.
+    static func strippingSynthesis(from content: String) -> String? {
+        var result = content
+        guard let start = result.range(of: markerStart),
+              let end = result.range(of: markerEnd, range: start.upperBound..<result.endIndex) else {
+            return nil
+        }
+        var removeEnd = end.upperBound
+        // Absorb the trailing newline(s) the block leaves behind so no gap remains
+        while removeEnd < result.endIndex, result[removeEnd] == "\n" {
+            removeEnd = result.index(after: removeEnd)
+        }
+        result.removeSubrange(start.lowerBound..<removeEnd)
+        return result
+    }
+
     /// Stored inputs hash — used to skip AI calls when members are unchanged
     static func inputsHash(from content: String) -> String? {
         guard let range = content.range(of: hashCommentPrefix),
