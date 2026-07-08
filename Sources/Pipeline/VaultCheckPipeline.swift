@@ -101,7 +101,10 @@ struct VaultCheckPipeline {
                     active += 1
                     group.addTask {
                         do {
-                            return try await enricher.enrichNote(at: path)
+                            // Body changed since the last check — refresh the
+                            // AI-owned tags/summary so folder synthesis
+                            // recompounds and metadata stays current.
+                            return try await enricher.enrichNote(at: path, refreshExisting: true)
                         } catch {
                             NSLog("[NoteEnricher] enrichNote 실패 %@: %@",
                                   (path as NSString).lastPathComponent, error.localizedDescription)

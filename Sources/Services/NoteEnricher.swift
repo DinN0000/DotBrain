@@ -6,8 +6,33 @@ struct NoteEnricher: Sendable {
     private let aiService = AIService.shared
     private let maxContentLength = 5000
 
-    /// Enrich a single note's frontmatter by filling empty fields with AI analysis
-    func enrichNote(at filePath: String) async throws -> EnrichResult {
+    /// Which AI-owned frontmatter fields the enricher will (re)generate.
+    /// `para`/`source` are fill-empty only. `tags`/`summary` are AI-owned
+    /// metadata that go stale as the body evolves, so `refreshExisting` (set for
+    /// body-changed notes in vault check) regenerates them even when present —
+    /// never user-curated, never data loss.
+    struct EnrichNeeds: Equatable {
+        var para: Bool
+        var tags: Bool
+        var summary: Bool
+        var source: Bool
+        var any: Bool { para || tags || summary || source }
+    }
+
+    static func fieldsNeeding(_ fm: Frontmatter, refreshExisting: Bool) -> EnrichNeeds {
+        EnrichNeeds(
+            para: fm.para == nil,
+            tags: fm.tags.isEmpty || refreshExisting,
+            summary: (fm.summary ?? "").isEmpty || refreshExisting,
+            source: fm.source == nil
+        )
+    }
+
+    /// Enrich a single note's frontmatter with AI analysis. Empty fields are
+    /// always filled; when `refreshExisting` is set, the AI-owned tags/summary
+    /// are regenerated even if present (keeps metadata current so folder
+    /// synthesis recompounds after a body edit).
+    func enrichNote(at filePath: String, refreshExisting: Bool = false) async throws -> EnrichResult {
         // Folder entity pages are synthesized by FolderSynthesizer, not enriched
         let baseName = ((filePath as NSString).lastPathComponent as NSString).deletingPathExtension
         let parentName = ((filePath as NSString).deletingLastPathComponent as NSString).lastPathComponent
@@ -28,14 +53,11 @@ struct NoteEnricher: Sendable {
 
         let (existing, body) = Frontmatter.parse(markdown: fullContent)
 
-        // Determine which fields need filling
-        let needsPara = existing.para == nil
-        let needsTags = existing.tags.isEmpty
-        let needsSummary = (existing.summary ?? "").isEmpty
-        let needsSource = existing.source == nil
+        // Determine which fields need (re)generation
+        let needs = Self.fieldsNeeding(existing, refreshExisting: refreshExisting)
 
-        // If all fields are present, nothing to do
-        guard needsPara || needsTags || needsSummary || needsSource else {
+        // If nothing needs writing, skip the AI call
+        guard needs.any else {
             return EnrichResult(filePath: filePath, fieldsUpdated: 0)
         }
 
@@ -77,19 +99,19 @@ struct NoteEnricher: Sendable {
         var updated = existing
         var fieldsUpdated = 0
 
-        if needsPara, let paraStr = json["para"] as? String, let para = PARACategory(rawValue: paraStr) {
+        if needs.para, let paraStr = json["para"] as? String, let para = PARACategory(rawValue: paraStr) {
             updated.para = para
             fieldsUpdated += 1
         }
-        if needsTags, let tags = json["tags"] as? [String], !tags.isEmpty {
+        if needs.tags, let tags = json["tags"] as? [String], !tags.isEmpty {
             updated.tags = Array(tags.prefix(5))
             fieldsUpdated += 1
         }
-        if needsSummary, let summary = json["summary"] as? String, !summary.isEmpty {
+        if needs.summary, let summary = json["summary"] as? String, !summary.isEmpty {
             updated.summary = summary
             fieldsUpdated += 1
         }
-        if needsSource, let sourceStr = json["source"] as? String, let source = NoteSource(rawValue: sourceStr) {
+        if needs.source, let sourceStr = json["source"] as? String, let source = NoteSource(rawValue: sourceStr) {
             updated.source = source
             fieldsUpdated += 1
         }
