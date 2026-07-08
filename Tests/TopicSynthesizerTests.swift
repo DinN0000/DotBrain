@@ -40,9 +40,37 @@ final class TopicSynthesizerTests: XCTestCase {
         XCTAssertTrue(prompt.contains("2026-07-06"))
     }
 
-    func testIsValidSynthesisRequiresCurrentUnderstanding() {
-        XCTAssertTrue(TopicSynthesizer.isValidSynthesis("## 현재 이해\n내용"))
+    private static let wellFormedSynthesis = """
+    ## 현재 이해
+    종합 이해.
+
+    ## 모순
+    - 감지된 모순 없음
+
+    ## 노후
+    - 없음
+
+    ## 타임라인
+    - 2026-07-08: 첫 합성
+
+    ## 멤버 노트
+    - [[a]] — 핵심
+    """
+
+    func testIsValidSynthesisRequiresEveryPromisedSection() {
+        XCTAssertTrue(TopicSynthesizer.isValidSynthesis(Self.wellFormedSynthesis),
+                      "모든 필수 섹션이 있으면 통과")
         XCTAssertFalse(TopicSynthesizer.isValidSynthesis("아무 형식 없는 응답"))
         XCTAssertFalse(TopicSynthesizer.isValidSynthesis(""))
+        // 현재 이해만 있고 나머지가 빠지면 거부 — 모순/타임라인 유실 방지
+        XCTAssertFalse(TopicSynthesizer.isValidSynthesis("## 현재 이해\n내용만 있음"),
+                       "모순/노후/타임라인/멤버 노트가 빠지면 거부")
+    }
+
+    func testIsValidSynthesisRejectsWhenTimelineDropped() {
+        let missingTimeline = Self.wellFormedSynthesis
+            .replacingOccurrences(of: "## 타임라인", with: "## 딴섹션")
+        XCTAssertFalse(TopicSynthesizer.isValidSynthesis(missingTimeline),
+                       "타임라인 헤더가 빠지면 거부되어 이전 페이지가 유지됨")
     }
 }

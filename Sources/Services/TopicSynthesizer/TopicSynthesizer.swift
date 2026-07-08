@@ -115,8 +115,18 @@ struct TopicSynthesizer: Sendable {
         return digest.map { String(format: "%02x", $0) }.joined()
     }
 
+    /// Every section the prompt promises. Each carries a distinct compounding
+    /// artifact — 모순 (contradictions), 노후 (superseded claims), 타임라인
+    /// (evolution). The prompt tells the AI to emit all of them (with a "없음"
+    /// placeholder when empty), so a response missing any header dropped
+    /// structure and is rejected — we keep the previous page rather than let
+    /// contradictions/timeline silently vanish on the next round-trip.
+    static let requiredSections = [
+        "## 현재 이해", "## 모순", "## 노후", "## 타임라인", "## 멤버 노트",
+    ]
+
     static func isValidSynthesis(_ text: String) -> Bool {
-        text.contains("## 현재 이해")
+        requiredSections.allSatisfy { text.contains($0) }
     }
 
     static func buildPrompt(
