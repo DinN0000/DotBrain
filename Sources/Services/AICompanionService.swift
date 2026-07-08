@@ -6,7 +6,7 @@ import Foundation
 enum AICompanionService {
 
     /// Bump this when companion file content changes — triggers overwrite on existing vaults
-    static let version = 18
+    static let version = 19
 
     /// Generate all AI companion files in the PKM root (first-time only)
     static func generateAll(pkmRoot: String) throws {
@@ -60,6 +60,10 @@ enum AICompanionService {
         // v18: Cursor support dropped (Claude Code + Codex only) — retire the
         // DotBrain-managed block in any existing .cursorrules
         removeCursorRules(pkmRoot: pkmRoot)
+
+        // v19: topic-wiki retired in favor of the in-PARA synthesis hierarchy —
+        // strip the DotBrain block from any leftover _Wiki/*.md pages
+        removeTopicWikiPages(pkmRoot: pkmRoot)
 
         // Root-level files: marker-based safe update
         let files: [(String, String)] = [
@@ -200,6 +204,51 @@ enum AICompanionService {
         }
     }
 
+    /// Remove the DotBrain-managed block from every `_Wiki/*.md` left over from
+    /// the retired topic-wiki (v18 and earlier). A page becomes fully
+    /// user-authored once its DotBrain block is gone: delete it when nothing
+    /// else remains, otherwise keep the user's content. Pages without markers
+    /// are untouched. Mirrors `removeCursorRules`, iterated over the folder.
+    private static func removeTopicWikiPages(pkmRoot: String) {
+        let fm = FileManager.default
+        let wikiDir = (pkmRoot as NSString).appendingPathComponent("_Wiki")
+        guard fm.fileExists(atPath: wikiDir),
+              let entries = try? fm.contentsOfDirectory(atPath: wikiDir) else { return }
+        for entry in entries where entry.hasSuffix(".md") {
+            let path = (wikiDir as NSString).appendingPathComponent(entry)
+            guard let existing = try? String(contentsOfFile: path, encoding: .utf8),
+                  let blockRange = markerRange(in: existing) else { continue }
+            var remainder = existing
+            remainder.replaceSubrange(blockRange, with: "")
+            let userContent = remainder
+                .replacingOccurrences(of: "<!-- 아래에 자유롭게 추가하세요 -->", with: "")
+                .replacingOccurrences(of: "<!-- 아래는 기존 사용자 내용입니다 -->", with: "")
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            do {
+                if userContent.isEmpty {
+                    try fm.removeItem(atPath: path)
+                    NSLog("[AICompanionService] _Wiki/%@ 삭제 (주제 위키 종료)", entry)
+                } else {
+                    try (remainder.trimmingCharacters(in: .whitespacesAndNewlines) + "\n")
+                        .write(toFile: path, atomically: true, encoding: .utf8)
+                    NSLog("[AICompanionService] _Wiki/%@에서 DotBrain 블록 제거", entry)
+                }
+            } catch {
+                NSLog("[AICompanionService] _Wiki/%@ 정리 실패: %@", entry, error.localizedDescription)
+            }
+        }
+        // Remove the _Wiki folder once no visible entries remain after cleanup
+        if let remaining = try? fm.contentsOfDirectory(atPath: wikiDir),
+           remaining.allSatisfy({ $0.hasPrefix(".") }) {
+            do {
+                try fm.removeItem(atPath: wikiDir)
+                NSLog("[AICompanionService] 빈 _Wiki 폴더 삭제")
+            } catch {
+                NSLog("[AICompanionService] _Wiki 폴더 삭제 실패: %@", error.localizedDescription)
+            }
+        }
+    }
+
     /// Replace content between DotBrain markers, keep everything else
     private static func replaceMarkerSection(at path: String, with newSection: String) throws {
         let existing = try String(contentsOfFile: path, encoding: .utf8)
@@ -247,9 +296,10 @@ enum AICompanionService {
 
     1. **이 파일(CLAUDE.md)** 을 먼저 읽어 구조와 규칙을 파악
     2. **`.meta/note-index.json`** 읽기: 전체 볼트 구조, 노트 메타데이터(태그, 요약, 프로젝트, 상태) 조회
-    3. **폴더 개체 페이지(`<폴더명>.md`)** 를 폴더 이해의 진입점으로 사용:
-       DotBrain 마커 섹션에 AI가 유지하는 종합(개요 · 최근 흐름 · 핵심 노트)이 있음.
-       마커 밖은 사용자 콘텐츠이므로 수정 금지
+    3. **종합 페이지를 위→아래로 탐색** (허브 → 하위 폴더 → 노트):
+       카테고리 허브(`<N_Category>/<N_Category>.md`)에서 전체 지형을 잡고 →
+       하위 폴더 페이지(`<폴더명>/<폴더명>.md`)로 좁힌 뒤 → 링크된 개별 노트로 내려감.
+       세 계층 모두 DotBrain 마커 섹션이 AI 관리 영역이며, 마커 밖은 사용자 콘텐츠이므로 수정 금지 (아래 "종합 계층" 참조)
     4. **프론트매터 필드**로 필터링: `project`, `status: active`, `para` 등
     5. **`## Related Notes` 링크** 따라가기: 관계 유형(prerequisite > project > reference > related) 우선순위로 탐색
     6. **Grep 검색**으로 태그/키워드 기반 탐색 (아래 검색 패턴 참조)
@@ -284,14 +334,43 @@ enum AICompanionService {
 
     ### 폴더별 하위 구조
 
-    각 PARA 폴더 아래에는 주제별 하위 폴더가 있습니다:
+    각 PARA 폴더 아래에는 주제별 하위 폴더가 있고, 폴더/카테고리마다 AI 종합 페이지가 함께 놓입니다.
+    새 노트는 항상 하위 폴더 안에 들어가며, 카테고리 최상위(예: `3_Resource/` 바로 아래)에는 두지 않습니다
+    (분류가 애매한 Area/Resource 신규 노트는 `Unsorted/` 하위 폴더로 들어감):
     ```
     1_Project/
-    ├── MyProject/
-    │   ├── _Assets/        ← 프로젝트 첨부파일
-    │   ├── meeting_0115.md
-    │   └── design_spec.md
+    ├── 1_Project.md            ← 카테고리 허브 (지형/교차연결/모순)
+    └── MyProject/
+        ├── MyProject.md        ← 하위 폴더 페이지 (개요/최근흐름/핵심노트/모순/노후)
+        ├── _Assets/            ← 프로젝트 첨부파일
+        ├── meeting_0115.md
+        └── design_spec.md
     ```
+
+    ---
+
+    ## 종합 계층 (Synthesis Hierarchy)
+
+    DotBrain은 raw 노트 위에 두 겹의 AI 종합 페이지를 유지합니다.
+    개별 노트를 훑기 전에 이 페이지들을 먼저 읽으면 폴더·카테고리의 현재 이해를 빠르게 잡을 수 있습니다.
+
+    1. **노트 (raw)** — DotBrain이 기계로 쓰는 부분은 프론트매터(`tags`/`summary` 등)와 `## Related Notes` 링크뿐.
+       **사용자 산문 본문만 불변이며, `tags`/`summary`는 AI가 생성·갱신함** — 본문이 바뀌면 볼트 점검 때 요약·태그도 최신으로 재생성됩니다.
+    2. **하위 폴더 페이지 (`<폴더명>/<폴더명>.md`)** — 그 폴더 안 노트들을 종합한 페이지. DotBrain 마커 섹션에 5개 섹션:
+       - `## 개요` — 이 폴더가 다루는 것
+       - `## 최근 흐름` — 누적 타임라인 (최근 항목이 맨 위, 최대 20개까지 이어짐)
+       - `## 핵심 노트` — 대표 노트 `[[링크]]`
+       - `## 모순` — 서로 상충하는 노트 쌍 (`- [[A]] vs [[B]]: 내용`)
+       - `## 노후` — 대체·구식 노트 (`- [[옛]]: [[새]]에 의해 대체됨`)
+    3. **카테고리 허브 (`<N_Category>/<N_Category>.md`)** — 하위 폴더들 사이를 가로지르는 종합. 섹션: `## 지형`(어떤 폴더가 무엇을 담당) · `## 교차연결`(폴더 간 연결) · `## 모순`.
+       `1_Project`/`2_Area`/`3_Resource` 중 **하위 폴더가 2개 이상**인 카테고리에만 존재하며, `4_Archive`에는 종합 페이지가 없습니다.
+
+    **탐색 순서**: 허브 → 하위 폴더 → 노트 (위 "AI 탐색 우선순위" 참조). 세 계층 모두 마커(`<!-- DotBrain:start/end -->`) 안은 DotBrain 관리 영역이라 직접 편집 금지, 마커 밖은 자유입니다.
+
+    **갱신 시점**: 인박스 처리 후, 그리고 "볼트 점검해줘" 실행 시 변경분(해시 기반)만 자동 재종합됩니다. 별도 스케줄러 없이 사용자 트리거로만 갱신됩니다.
+
+    **지식 흐름 (temporal)**: 각 페이지의 `## 최근 흐름`이 이전 항목을 이어받아 누적되고, 종합할 때마다 `.meta/log.md`에 `- [YYYY-MM-DD HH:mm] synthesis | <범위>: <요지>` 한 줄이 append됩니다.
+    볼트의 시간 축 흐름을 잡으려면 `grep "synthesis" .meta/log.md`로 종합 이력을 훑으세요.
 
     ---
 
@@ -538,7 +617,7 @@ enum AICompanionService {
 
     - 여러 노트를 종합해 **새 인사이트**가 나온 답변(비교, 분석, 종합)은 노트로 저장할 것을 제안
     - 동의 시 synthesis-agent 형식(프론트매터 + 출처 노트 `[[링크]]` + 지식 갭)으로 적절한 PARA 폴더에 저장
-    - 저장된 노트는 다음 볼트 점검 때 링크·주제 페이지에 편입됨 (수동 색인 불필요). 바로 반영하려면 "볼트 점검해줘"를 실행
+    - 저장된 노트는 다음 볼트 점검 때 링크·폴더/카테고리 종합 페이지에 편입됨 (수동 색인 불필요). 바로 반영하려면 "볼트 점검해줘"를 실행
     - 단순 사실 확인이나 단일 노트 요약은 저장하지 않음 (볼트 오염 방지)
     - 볼트를 유지보수(링크 수정, 노트 생성, 페이지 정리)했다면 `.meta/log.md`에 한 줄 기록:
       `- [YYYY-MM-DD HH:mm] agent | 무엇을 했는지 요약`
@@ -670,6 +749,16 @@ enum AICompanionService {
     - `[[위키링크]]` 형식 사용
     - context는 `"~하려면"`, `"~할 때"`, `"~와 비교할 때"` 형식으로 작성
     - 자기 자신은 포함하지 않음
+
+    ## 종합 계층 (하위 폴더 페이지 · 카테고리 허브)
+
+    DotBrain이 raw 노트 위에 유지하는 두 겹의 AI 종합 페이지 (구조·섹션 상세는 CLAUDE.md 참조):
+    - **하위 폴더 페이지** `<폴더명>/<폴더명>.md` (개요/최근흐름/핵심노트/모순/노후)
+    - **카테고리 허브** `<N_Category>/<N_Category>.md` (지형/교차연결/모순) — 하위 폴더 2개 이상인 Project/Area/Resource에만
+    - 조사 시 개별 노트보다 이 페이지들의 종합을 먼저 읽을 것 (탐색 순서: 허브 → 하위 폴더 → 노트)
+    - 마커(`<!-- DotBrain:start/end -->`) 안은 DotBrain 관리 영역 — 직접 편집 금지, 마커 밖은 자유
+    - **사용자 산문 본문만 불변**; `tags`/`summary`/`## Related Notes`는 AI가 생성·갱신함 (본문이 바뀌면 볼트 점검 때 요약·태그도 재생성)
+    - 인박스 처리·"볼트 점검" 시 변경분만 자동 재종합되고, 종합마다 `.meta/log.md`에 `synthesis` 한 줄이 기록됨
 
     ## 탐구 결과 환류
 
@@ -1464,7 +1553,7 @@ enum AICompanionService {
 
     **에이전트 D: 지식 갭 (생성적 린트)**
     기계 점검이 아닌 내용 점검 — 볼트가 더 똑똑해질 방향을 제안:
-    1. 여러 노트에서 반복 언급되지만 폴더 개체 페이지에 정리되지 않은 개념 탐지 (note-index.json 태그·요약 활용)
+    1. 여러 노트에서 반복 언급되지만 폴더/카테고리 종합 페이지에 정리되지 않은 개념 탐지 (note-index.json 태그·요약 활용)
     2. 서로 모순되거나 중복되어 보이는 노트 쌍 탐지 — 통합 또는 구분 제안
     3. 오래되어 갱신이 필요한 노트 표본 확인
     4. 볼트에 없어서 답할 수 없는 것 — "다음에 조사할 질문" 3~5개 제안
@@ -1499,8 +1588,8 @@ enum AICompanionService {
     ### 미해결 모순
     - [[노트A]] vs [[노트B]]: 내용
 
-    ### 주제 페이지 후보
-    - 개념명 — 관련 노트 N개, 근거
+    ### 종합에 빠진 개념
+    - 개념명 — 관련 노트 N개, 근거 (폴더/카테고리 종합 페이지에 아직 반영 안 됨)
 
     ### 다음에 조사할 질문
     1. 질문 (볼트에 빠진 부분)
