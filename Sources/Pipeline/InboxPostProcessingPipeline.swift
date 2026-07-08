@@ -58,15 +58,17 @@ struct InboxPostProcessingPipeline {
 
         // Refresh entity pages for affected folders — ingest is the
         // compounding point where new notes update existing folder knowledge
-        var synthesized: [String] = []
+        var synthesized: [FolderSynthesizer.Output] = []
         if !folders.isEmpty && !Task.isCancelled {
             onProgress?(Progress(fraction: 0.85, phase: "폴더 페이지 갱신 중..."))
-            synthesized = await FolderSynthesizer(pkmRoot: pkmRoot).synthesizeFolders(folders)
+            synthesized = await FolderSynthesizer(pkmRoot: pkmRoot).synthesizeFolders(
+                folders, changedNotePaths: Set(mdPaths)
+            )
             if !synthesized.isEmpty {
                 // Written folder notes carry a fresh overview — re-index those
                 // folders so the index summary picks it up immediately
                 await NoteIndexGenerator(pkmRoot: pkmRoot).updateForFolders(
-                    Set(synthesized.map { ($0 as NSString).deletingLastPathComponent })
+                    Set(synthesized.map { ($0.path as NSString).deletingLastPathComponent })
                 )
             }
         }
@@ -77,7 +79,7 @@ struct InboxPostProcessingPipeline {
             onProgress?(Progress(fraction: 0.9, phase: "해시 캐시 저장 중..."))
             let cache = ContentHashCache(pkmRoot: pkmRoot)
             await cache.load()
-            await cache.updateHashes(mdPaths + Array(linkResult.modifiedFiles) + synthesized)
+            await cache.updateHashes(mdPaths + Array(linkResult.modifiedFiles) + synthesized.map(\.path))
             await cache.save()
         }
 

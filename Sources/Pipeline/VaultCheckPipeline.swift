@@ -204,12 +204,14 @@ struct VaultCheckPipeline {
         // Phase 5.5: refresh entity pages for changed folders
         if Task.isCancelled { return .empty }
         onProgress(Progress(phase: "폴더 페이지 갱신 중...", fraction: 0.95))
-        let synthesized = await FolderSynthesizer(pkmRoot: pkmRoot).synthesizeFolders(dirtyFolders)
+        let synthesized = await FolderSynthesizer(pkmRoot: pkmRoot).synthesizeFolders(
+            dirtyFolders, changedNotePaths: allChangedFiles
+        )
         if !synthesized.isEmpty {
             // Written folder notes carry a fresh overview — re-index those
             // folders so the index summary picks it up immediately
             await indexGenerator.updateForFolders(
-                Set(synthesized.map { ($0 as NSString).deletingLastPathComponent })
+                Set(synthesized.map { ($0.path as NSString).deletingLastPathComponent })
             )
         }
 
@@ -220,7 +222,7 @@ struct VaultCheckPipeline {
             allChangedFiles
                 .union(linkResult.modifiedFiles)
                 .union(pruneResult.modifiedFiles)
-                .union(synthesized)
+                .union(Set(synthesized.map(\.path)))
         ))
         await cache.save()
 

@@ -48,6 +48,23 @@ struct FolderNotePage {
         return paragraph.isEmpty ? nil : paragraph.joined(separator: " ")
     }
 
+    /// Full synthesis body between the markers with comment lines stripped —
+    /// fed back into the next prompt so "최근 흐름" items carry forward across
+    /// runs instead of being overwritten.
+    static func synthesisSection(from content: String) -> String? {
+        guard let start = content.range(of: markerStart),
+              let end = content.range(of: markerEnd, range: start.upperBound..<content.endIndex) else {
+            return nil
+        }
+        let body = content[start.upperBound..<end.lowerBound]
+        let cleaned = body
+            .split(separator: "\n", omittingEmptySubsequences: false)
+            .filter { !$0.trimmingCharacters(in: .whitespaces).hasPrefix("<!--") }
+            .joined(separator: "\n")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return cleaned.isEmpty ? nil : cleaned
+    }
+
     /// Replace (or create) the synthesis section. nil content = new file.
     static func replacingSynthesis(
         in content: String?,

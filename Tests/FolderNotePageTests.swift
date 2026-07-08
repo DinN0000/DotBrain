@@ -72,4 +72,31 @@ final class FolderNotePageTests: XCTestCase {
         XCTAssertEqual(FolderNotePage.inputsHash(from: content), "xyz")
         XCTAssertNil(FolderNotePage.inputsHash(from: "no markers"))
     }
+
+    func testSynthesisSectionReturnsBodyWithoutCommentLines() {
+        let content = """
+        ---
+        para: project
+        tags: []
+        ---
+        \(FolderNotePage.markerStart)
+        <!-- dotbrain-synthesis-hash: h -->
+        ## 개요
+        현재 이해.
+
+        ## 최근 흐름
+        - 2026-07-08: 시작
+        \(FolderNotePage.markerEnd)
+
+        사용자 메모.
+        """
+        let section = FolderNotePage.synthesisSection(from: content)
+        XCTAssertNotNil(section)
+        // Full synthesis body is fed back for carry-forward
+        XCTAssertTrue(section!.contains("## 최근 흐름"))
+        XCTAssertTrue(section!.contains("- 2026-07-08: 시작"))
+        // Comment lines and user content outside markers are excluded
+        XCTAssertFalse(section!.contains("dotbrain-synthesis-hash"))
+        XCTAssertFalse(section!.contains("사용자 메모."))
+    }
 }
