@@ -51,17 +51,6 @@ enum AICompanionService {
     private static let markerStart = "<!-- DotBrain:start -->"
     private static let markerEnd = "<!-- DotBrain:end -->"
 
-    /// Topic-wiki guidance shared verbatim by CLAUDE.md and AGENTS.md —
-    /// one fragment so the two templates cannot drift
-    private static let topicWikiSection = """
-    - `_Wiki/` 주제 페이지 = DotBrain이 여러 노트를 종합한 최신 이해 (## 현재 이해 / ## 모순 / ## 노후 / ## 타임라인 / ## 멤버 노트)
-    - 조사 시 개별 노트보다 주제 페이지의 "현재 이해"를 먼저 읽을 것
-    - `.meta/topic-index.json` — 주제 카탈로그: `topics`(id, 이름, 페이지 경로, 멤버, 키워드, 요약), `deletedTopics`(사용자가 삭제한 주제 툼스톤 — 재생성 금지), `unassigned`(배정 대기 노트 풀)
-    - `_Wiki/` 페이지는 note-index.json에 포함되지 않음 — 주제 목록은 topic-index.json에서 조회
-    - 노트가 속한 주제는 note-index.json 노트 엔트리의 `topics` 필드로 역조회 가능
-    - 마커(<!-- DotBrain:start/end -->) 안은 DotBrain 관리 영역 — 수정 금지, 마커 밖은 자유
-    """
-
     /// Update all AI guide files, preserving user content outside markers.
     /// Each step is individually wrapped in do/catch so partial failures
     /// do not prevent the remaining steps from executing.
@@ -257,34 +246,26 @@ enum AICompanionService {
     이 볼트를 탐색할 때 다음 순서를 따르세요:
 
     1. **이 파일(CLAUDE.md)** 을 먼저 읽어 구조와 규칙을 파악
-    2. **`.meta/note-index.json`** 읽기: 전체 볼트 구조, 노트 메타데이터(태그, 요약, 프로젝트, 상태, 주제) 조회
-    3. **주제 단위 조사라면** `.meta/topic-index.json`에서 관련 주제를 찾아 `_Wiki/` 주제 페이지의 "현재 이해"부터 읽기 (아래 주제 위키 참조)
-    4. **폴더 개체 페이지(`<폴더명>.md`)** 를 폴더 이해의 진입점으로 사용:
+    2. **`.meta/note-index.json`** 읽기: 전체 볼트 구조, 노트 메타데이터(태그, 요약, 프로젝트, 상태) 조회
+    3. **폴더 개체 페이지(`<폴더명>.md`)** 를 폴더 이해의 진입점으로 사용:
        DotBrain 마커 섹션에 AI가 유지하는 종합(개요 · 최근 흐름 · 핵심 노트)이 있음.
        마커 밖은 사용자 콘텐츠이므로 수정 금지
-    5. **프론트매터 필드**로 필터링: `project`, `status: active`, `para` 등
-    6. **`## Related Notes` 링크** 따라가기: 관계 유형(prerequisite > project > reference > related) 우선순위로 탐색
-    7. **Grep 검색**으로 태그/키워드 기반 탐색 (아래 검색 패턴 참조)
+    4. **프론트매터 필드**로 필터링: `project`, `status: active`, `para` 등
+    5. **`## Related Notes` 링크** 따라가기: 관계 유형(prerequisite > project > reference > related) 우선순위로 탐색
+    6. **Grep 검색**으로 태그/키워드 기반 탐색 (아래 검색 패턴 참조)
 
     ### 노트 인덱스 (`.meta/note-index.json`)
 
     DotBrain이 자동 생성/갱신하는 볼트 메타데이터 인덱스입니다.
-    - 노트별 필드: `path`, `folder`, `para`, `tags`, `summary`, `project`, `status`, `area`, `topics`(속한 _Wiki 주제명)
+    - 노트별 필드: `path`, `folder`, `para`, `tags`, `summary`, `project`, `status`, `area`
     - 폴더별 요약·태그 포함
-    - 파일 분류/이동/주제 배정 시 자동 갱신되며, 앱 실행 시 24시간이 지난 인덱스는 전체 재생성됨
+    - 파일 분류/이동 시 자동 갱신되며, 앱 실행 시 24시간이 지난 인덱스는 전체 재생성됨
     - 볼트 전체를 파악하려면 개별 파일 대신 이 인덱스를 먼저 읽으세요
 
     ### 기타 .meta/ 파일
 
-    - `.meta/topic-index.json` — 주제 카탈로그 (아래 주제 위키 참조)
     - `.meta/log.md` — 볼트 변경 타임라인 (append-only). 세션 시작 시 최근 항목을 읽어 볼트의 최근 흐름을 파악하세요. 형식: `- [YYYY-MM-DD HH:mm] 종류 | 요약` (`grep "^- \\[" .meta/log.md | tail -10`)
     - `.meta/folder-relations.json` — 폴더 쌍 관계(boost/suppress + 관계 힌트). DotBrain 시맨틱 링크가 관리하며, 폴더 간 연관성을 파악할 때 참고 가능
-
-    ---
-
-    ## 주제 위키 (_Wiki/)
-
-    \(topicWikiSection)
 
     ---
 
@@ -689,10 +670,6 @@ enum AICompanionService {
     - `[[위키링크]]` 형식 사용
     - context는 `"~하려면"`, `"~할 때"`, `"~와 비교할 때"` 형식으로 작성
     - 자기 자신은 포함하지 않음
-
-    ## 주제 위키 (_Wiki/)
-
-    \(topicWikiSection)
 
     ## 탐구 결과 환류
 
@@ -1223,7 +1200,7 @@ enum AICompanionService {
     ## 고아 노트
     | 파일 | 위치 | 제안 |
     |------|------|------|
-    | lonely.md | 3_Resource/Topic | 연결 또는 아카이브 |
+    | lonely.md | 3_Resource/Swift | 연결 또는 아카이브 |
 
     ## 고립된 노트 (링크 0개)
     (목록)
@@ -1487,11 +1464,10 @@ enum AICompanionService {
 
     **에이전트 D: 지식 갭 (생성적 린트)**
     기계 점검이 아닌 내용 점검 — 볼트가 더 똑똑해질 방향을 제안:
-    1. `_Wiki/` 주제 페이지의 `## 모순` 섹션에서 미해결 모순 수집
-    2. `.meta/topic-index.json`의 `unassigned` 풀 점검 — 반복되는 키워드가 있으면 새 주제 페이지 후보로 제안
-    3. 여러 노트에서 반복 언급되지만 주제 페이지가 없는 개념 탐지 (note-index.json 태그·요약 활용)
-    4. `## 노후` 항목 중 아직 본문이 갱신되지 않은 노트 표본 확인
-    5. 볼트에 없어서 답할 수 없는 것 — "다음에 조사할 질문" 3~5개 제안
+    1. 여러 노트에서 반복 언급되지만 폴더 개체 페이지에 정리되지 않은 개념 탐지 (note-index.json 태그·요약 활용)
+    2. 서로 모순되거나 중복되어 보이는 노트 쌍 탐지 — 통합 또는 구분 제안
+    3. 오래되어 갱신이 필요한 노트 표본 확인
+    4. 볼트에 없어서 답할 수 없는 것 — "다음에 조사할 질문" 3~5개 제안
 
     ### Phase 2: 종합 보고서 생성
 
@@ -1851,7 +1827,7 @@ enum AICompanionService {
     ## 새로 추가된 노트
     | 노트 | 위치 | 태그 |
     |------|------|------|
-    | [[new_note]] | 3_Resource/Topic | 키워드 |
+    | [[new_note]] | 3_Resource/Swift | 키워드 |
 
     ## 인박스 현황
     - 처리 완료: N개
@@ -2120,14 +2096,12 @@ enum AICompanionService {
     | 파일 | 역할 |
     |------|------|
     | `.meta/note-index.json` | 전체 볼트 노트/폴더 메타데이터 인덱스 |
-    | `.meta/topic-index.json` | _Wiki 주제 카탈로그 (topics / deletedTopics / unassigned) |
     | `.meta/folder-relations.json` | 폴더 쌍 관계 (boost/suppress) — 시맨틱 링크 내부용 |
 
     DotBrain이 자동 생성/갱신합니다. note-index.json 구조:
-    - `notes`: 노트 경로 → {path, folder, para, tags, summary, project, status, area, topics}
+    - `notes`: 노트 경로 → {path, folder, para, tags, summary, project, status, area}
     - `folders`: 폴더 경로 → {path, para, summary, tags}
     - `version`, `updated` (ISO8601 타임스탬프)
-    - `topics`는 topic-index.json 기준으로 저장 시마다 재계산되는 오버레이 필드
 
     ## 검증 절차
 

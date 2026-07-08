@@ -72,56 +72,6 @@ final class NoteIndexGeneratorTests: XCTestCase {
         )
     }
 
-    // MARK: - Topics overlay
-
-    func testTopicsOverlayAppliedFromTopicIndexOnSave() async throws {
-        let root = try makeVault()
-        defer { try? FileManager.default.removeItem(at: root) }
-        let folder = root.appendingPathComponent("1_Project/X")
-        try writeMemberNotes(in: folder)
-
-        let store = TopicStore(pkmRoot: root.path)
-        store.upsert(Topic(
-            id: "swift-concurrency", name: "Swift Concurrency",
-            pagePath: "_Wiki/Swift Concurrency.md",
-            members: ["1_Project/X/a.md"], keywords: [], summary: "",
-            membersHash: "", created: "2026-07-07T00:00:00Z", lastSynthesized: nil
-        ))
-
-        await NoteIndexGenerator(pkmRoot: root.path).updateForFolders([folder.path])
-
-        let indexURL = root.appendingPathComponent(".meta/note-index.json")
-        let index = try JSONDecoder().decode(NoteIndex.self, from: Data(contentsOf: indexURL))
-        XCTAssertEqual(index.notes["1_Project/X/a.md"]?.topics, ["Swift Concurrency"],
-                       "member note must carry its topic name")
-        XCTAssertNil(index.notes["1_Project/X/b.md"]?.topics,
-                     "non-member note must have no topics field")
-    }
-
-    func testRefreshTopicsPicksUpAssignmentsAfterIndexWrite() async throws {
-        let root = try makeVault()
-        defer { try? FileManager.default.removeItem(at: root) }
-        let folder = root.appendingPathComponent("1_Project/X")
-        try writeMemberNotes(in: folder)
-
-        let generator = NoteIndexGenerator(pkmRoot: root.path)
-        await generator.updateForFolders([folder.path])
-
-        // Topic assigned after the index was written — refreshTopics must
-        // overlay it without a folder rescan
-        TopicStore(pkmRoot: root.path).upsert(Topic(
-            id: "late-topic", name: "Late Topic",
-            pagePath: "_Wiki/Late Topic.md",
-            members: ["1_Project/X/b.md"], keywords: [], summary: "",
-            membersHash: "", created: "2026-07-07T00:00:00Z", lastSynthesized: nil
-        ))
-        await generator.refreshTopics()
-
-        let indexURL = root.appendingPathComponent(".meta/note-index.json")
-        let index = try JSONDecoder().decode(NoteIndex.self, from: Data(contentsOf: indexURL))
-        XCTAssertEqual(index.notes["1_Project/X/b.md"]?.topics, ["Late Topic"])
-    }
-
     func testPruneStaleRemovesEntriesForDeletedFolders() async throws {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("DotBrain-NoteIndexPruneTests-\(UUID().uuidString)")

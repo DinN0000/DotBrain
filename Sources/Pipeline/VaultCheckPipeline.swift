@@ -213,47 +213,6 @@ struct VaultCheckPipeline {
             )
         }
 
-        // Phase 5.7: Topic maintenance — prune dead members, tombstone
-        // user-deleted pages, grow the unassigned pool from changed notes,
-        // re-evaluate the pool, and resynthesize changed topics
-        if Task.isCancelled { return .empty }
-        onProgress(Progress(phase: "주제 페이지 점검 중...", fraction: 0.96))
-        let topicStore = TopicStore(pkmRoot: pkmRoot)
-        var topicPagesWritten: [String] = []
-        if let noteIndex = pm.loadNoteIndex() {
-            topicStore.pruneStale(existingNotePaths: Set(noteIndex.notes.keys))
-        }
-        for topic in topicStore.load().topics where topic.lastSynthesized != nil {
-            let abs = (pkmRoot as NSString).appendingPathComponent(topic.pagePath)
-            if !FileManager.default.fileExists(atPath: abs) {
-                topicStore.tombstone(id: topic.id)
-                NSLog("[VaultCheck] 사용자가 삭제한 주제 페이지 툼스톤 처리: %@", topic.id)
-            }
-        }
-        let relChangedNotes = allChangedFiles.compactMap {
-            TopicMatcher.relativePath($0, pkmRoot: pkmRoot)
-        }
-        let assignedPaths = Set(topicStore.load().topics.flatMap(\.members))
-        let evictedFromPool = topicStore.addUnassigned(relChangedNotes.filter { !assignedPaths.contains($0) })
-
-        let topicOutcome = await TopicMatcher(pkmRoot: pkmRoot).assign(newNotePaths: [])
-        // Pass every live topic — the members-hash gate inside synthesize
-        // skips the unchanged ones without an AI call
-        let allTopicIds = Set(topicStore.load().topics.map(\.id))
-            .union(topicOutcome.affectedTopicIds)
-        topicPagesWritten = await TopicSynthesizer(pkmRoot: pkmRoot).synthesize(
-            topicIds: Array(allTopicIds),
-            changedNotePaths: Set(relChangedNotes)
-        )
-        let orphanTopics = topicStore.load().topics.filter { $0.members.count < 2 }
-        if !orphanTopics.isEmpty {
-            NSLog("[VaultCheck] 고아 주제 %d개 (멤버 2개 미만): %@",
-                  orphanTopics.count, orphanTopics.map(\.id).joined(separator: ", "))
-        }
-        // Prune/tombstone/pool re-evaluation above may have changed topic
-        // membership — re-apply the topics overlay on the note index
-        await indexGenerator.refreshTopics()
-
         // Update hashes for all changed files plus everything the linker,
         // tag normalizer, pruner, and folder synthesizer wrote — unhashed
         // writes trigger pointless AI re-processing on the next check
@@ -269,15 +228,12 @@ struct VaultCheckPipeline {
             fileName: "볼트 점검",
             category: "system",
             action: "completed",
-            detail: "\(report.totalIssues)건 발견, \(repairCount)건 복구, \(enrichCount)개 보완(직접 추가 \(manuallyProcessedCount)개), \(linkResult.linksCreated)개 링크, 주제 \(topicPagesWritten.count)개 갱신"
+            detail: "\(report.totalIssues)건 발견, \(repairCount)건 복구, \(enrichCount)개 보완(직접 추가 \(manuallyProcessedCount)개), \(linkResult.linksCreated)개 링크"
         )
 
-        let evictionNote = evictedFromPool.isEmpty
-            ? ""
-            : ", 미배정 풀 초과로 \(evictedFromPool.count)개 노트 주제 후보 제외"
         VaultLogService(pkmRoot: pkmRoot).append(
             kind: "vault-check",
-            summary: "\(report.totalIssues)건 발견, \(repairCount)건 복구, 링크 +\(linkResult.linksCreated)/−\(pruneResult.removedLinks), 주제 \(topicPagesWritten.count)개 갱신\(evictionNote)"
+            summary: "\(report.totalIssues)건 발견, \(repairCount)건 복구, 링크 +\(linkResult.linksCreated)/−\(pruneResult.removedLinks)"
         )
 
         return VaultCheckResult(
