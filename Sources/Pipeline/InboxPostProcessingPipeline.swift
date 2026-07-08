@@ -79,13 +79,34 @@ struct InboxPostProcessingPipeline {
             }
         }
 
+        // Refresh category hub pages for the categories the new notes touched —
+        // hash-gated on each subfolder's STABLE slice, so most ingests skip the
+        // AI call entirely.
+        var synthesizedHubs: [CategoryHubSynthesizer.Output] = []
+        let affectedCategories = CategoryHubSynthesizer.categoryRoots(for: folders, pkmRoot: pkmRoot)
+        if !affectedCategories.isEmpty && !Task.isCancelled {
+            onProgress?(Progress(fraction: 0.88, phase: "카테고리 허브 갱신 중..."))
+            synthesizedHubs = await CategoryHubSynthesizer(pkmRoot: pkmRoot)
+                .synthesizeCategories(affectedCategories)
+            if !synthesizedHubs.isEmpty {
+                let hubLog = VaultLogService(pkmRoot: pkmRoot)
+                for hub in synthesizedHubs where !hub.gist.isEmpty {
+                    let scope = ((hub.path as NSString).deletingLastPathComponent as NSString).lastPathComponent
+                    hubLog.append(kind: "synthesis", summary: "\(scope): \(hub.gist)")
+                }
+            }
+        }
+
         // Skip the hash save on cancellation — persisting stale hashes here
         // would overwrite what a newer pipeline has already recorded
-        if (!mdPaths.isEmpty || !synthesized.isEmpty) && !Task.isCancelled {
+        if (!mdPaths.isEmpty || !synthesized.isEmpty || !synthesizedHubs.isEmpty) && !Task.isCancelled {
             onProgress?(Progress(fraction: 0.9, phase: "해시 캐시 저장 중..."))
             let cache = ContentHashCache(pkmRoot: pkmRoot)
             await cache.load()
-            await cache.updateHashes(mdPaths + Array(linkResult.modifiedFiles) + synthesized.map(\.path))
+            await cache.updateHashes(
+                mdPaths + Array(linkResult.modifiedFiles)
+                    + synthesized.map(\.path) + synthesizedHubs.map(\.path)
+            )
             await cache.save()
         }
 

@@ -225,14 +225,35 @@ struct VaultCheckPipeline {
             }
         }
 
+        // Phase 5.6: refresh category hub pages across the affected categories.
+        // Hash-gated on each subfolder's STABLE slice (개요+핵심노트), so a hub
+        // re-synthesizes only when a subfolder's durable content changed — a
+        // subfolder's 최근 흐름/timestamp churn never flips the hub hash.
+        let affectedCategories = CategoryHubSynthesizer.categoryRoots(
+            for: dirtyFolders, pkmRoot: pkmRoot
+        )
+        var synthesizedHubs: [CategoryHubSynthesizer.Output] = []
+        if !affectedCategories.isEmpty && !Task.isCancelled {
+            onProgress(Progress(phase: "카테고리 허브 갱신 중...", fraction: 0.97))
+            synthesizedHubs = await CategoryHubSynthesizer(pkmRoot: pkmRoot)
+                .synthesizeCategories(affectedCategories)
+            // Chronicle each hub 요지 to the same .meta/log.md timeline
+            let hubLog = VaultLogService(pkmRoot: pkmRoot)
+            for hub in synthesizedHubs where !hub.gist.isEmpty {
+                let scope = ((hub.path as NSString).deletingLastPathComponent as NSString).lastPathComponent
+                hubLog.append(kind: "synthesis", summary: "\(scope): \(hub.gist)")
+            }
+        }
+
         // Update hashes for all changed files plus everything the linker,
-        // tag normalizer, pruner, and folder synthesizer wrote — unhashed
+        // tag normalizer, pruner, and folder/hub synthesizers wrote — unhashed
         // writes trigger pointless AI re-processing on the next check
         await cache.updateHashes(Array(
             allChangedFiles
                 .union(linkResult.modifiedFiles)
                 .union(pruneResult.modifiedFiles)
                 .union(Set(synthesized.map(\.path)))
+                .union(Set(synthesizedHubs.map(\.path)))
         ))
         await cache.save()
 
